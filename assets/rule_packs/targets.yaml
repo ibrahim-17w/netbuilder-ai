@@ -1,0 +1,60 @@
+# GNS3 + Packet Tracer + AWS + validation packs
+- id: gns3-01
+  targets: [gns3]
+  rule: Use c3725/c7200 templates; start with 2GB RAM per router max.
+- id: gns3-02
+  targets: [gns3]
+  rule: Idle PC values are set after boot so the host CPU stays sane; a router at 100% host CPU for no reason is misconfigured, not busy.
+- id: pt-01
+  targets: [packet-tracer]
+  rule: Packet Tracer supports a subset of IOS; prefer static/OSPF/VLAN basics for autopilot.
+- id: pt-02
+  targets: [packet-tracer]
+  rule: "A router-to-router WAN is Serial0/0/0 with exactly one DCE end (clock rate 64000); the executor fits the HWIC-2T serial module and reports the port it actually gets."
+- id: pt-03
+  targets: [packet-tracer]
+  rule: "PC/server/laptop/printer are configured through Desktop > IP Configuration; phones, access points, cloud/modem and IoT devices have only their own GUI - never type IOS at them."
+- id: pt-04
+  targets: [packet-tracer]
+  rule: "Firewall-PT (ASA) syntax is not IOS: place and cable the firewall, and report its configuration as manual."
+- id: pt-05
+  targets: [packet-tracer]
+  rule: "Wireless clients (tablet, smartphone, smart TV) associate with the access point; they are never cabled."
+- id: pt-06
+  targets: [packet-tracer]
+  rule: PT cabling is physical: router-switch and switch-PC take copper straight-through, like-device links (router-router, PC-PC) take copper cross-over, serial ports take serial DCE/DTE, and fiber ports take fiber - the wrong cable kind shows link lights down.
+- id: pt-07
+  targets: [packet-tracer]
+  rule: Switch ports used by routers/APs/servers are access ports in their VLAN; only switch-to-switch links are trunks. A port is never both.
+- id: pt-08
+  targets: [packet-tracer]
+  rule: Port security is set on user access ports only (sticky or static MAC, violation restrict), never on uplinks, trunk or router-facing ports.
+- id: pt-09
+  targets: [packet-tracer]
+  rule: DHCP snooping trusts only the port toward the DHCP server/router and is enabled per-VLAN; every other port stays untrusted.
+- id: pt-10
+  targets: [packet-tracer]
+  rule: An ASA needs its interfaces named and security-levels set (inside 100, outside 0) before any ACL or NAT on it applies; same-security traffic is explicitly permitted when used.
+- id: pt-11
+  targets: [packet-tracer]
+  rule: IPSec site-to-site on PT routers: matching ISAKMP policies (aes, sha, pre-share) and transform sets on both peers, crypto maps with each other peer address, and ACLs defining exactly the interesting traffic both ways.
+- id: pt-12
+  targets: [packet-tracer]
+  rule: A wireless AP bridges its clients onto the VLAN of the SSID; the AP port toward the switch is a trunk (or access in that VLAN) and the router/WLC serves DHCP to that VLAN or the clients get none.
+- id: pt-13
+  targets: [packet-tracer]
+  rule: The executor believes only the live device: an interface is used when `show ip interface brief` lists it up, a service is set only when its panel read-back shows the value, and every fallback is journaled - the plan is corrected, never silently guessed.
+- id: aws-01
+  targets: [aws-vpc]
+  rule: VPC CIDR /16, public /24 per AZ + IGW, private + NAT.
+- id: aws-02
+  targets: [aws-vpc]
+  rule: Route tables are split: private subnets point at the NAT gateway, public at the IGW; 0.0.0.0/0 routes never cross between the two tables.
+- id: val-01
+  targets: [all]
+  severity: block
+  rule: Block deploy on validator errors; warnings need explicit approve.
+- id: val-02
+  targets: [all]
+  severity: warn
+  rule: The plan must be internally consistent before execution: every link endpoints at interfaces the named models actually have, and every addressed interface appears on a link or is a loopback.

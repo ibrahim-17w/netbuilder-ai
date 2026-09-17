@@ -1,0 +1,9 @@
+{
+  "cmd::server": {
+    "fx": 0.4883,
+    "fy": 0.1089
+  },
+  "tile_spots_reset_v2": true,
+  "field_rows_reset_v3": true,
+  "tile_spots_scoped_v4": true
+}

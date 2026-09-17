@@ -1,0 +1,40 @@
+# Cisco base rules - IOS hardening, routing, switching, services
+- id: cisco-01
+  targets: [gns3, cisco-ssh, packet-tracer]
+  rule: Set hostname, no ip domain-lookup, service password-encryption.
+- id: cisco-02
+  targets: [gns3, cisco-ssh, packet-tracer]
+  rule: OSPF consistent wildcard masks, same area, auth together.
+- id: cisco-03
+  targets: [gns3, cisco-ssh, packet-tracer]
+  rule: Avoid VLAN 1 for users; dedicated VLANs + trunk prune.
+- id: cisco-04
+  targets: [gns3, cisco-ssh, packet-tracer]
+  rule: Passwords are never plain: enable secret (not enable password), service password-encryption, and line console/vty get login local.
+- id: cisco-05
+  targets: [gns3, cisco-ssh, packet-tracer]
+  rule: VTY access is locked to the manager subnet with an ACL, uses SSH version 2 (transport input ssh), and a banner warns against unauthorized use.
+- id: cisco-06
+  targets: [gns3, cisco-ssh, packet-tracer]
+  rule: Access ports get switchport mode access, their VLAN, and spanning-tree portfast; trunks get mode trunk plus an allowed-VLAN list, never DTP auto.
+- id: cisco-07
+  targets: [gns3, cisco-ssh, packet-tracer]
+  rule: OSPF networks use precise wildcard masks (area borders on the router, not the interface), and passive-interface on every user facing port.
+- id: cisco-08
+  targets: [gns3, cisco-ssh, packet-tracer]
+  rule: A static default route (or default-information originate) points at the ISP/cloud edge; internal routers never point defaults at each other in a loop.
+- id: cisco-09
+  targets: [gns3, cisco-ssh, packet-tracer]
+  rule: ACLs are written top-down most-specific-first, applied close to the destination for extended, close to the source for standard, with an explicit deny any only where the brief says to block.
+- id: cisco-10
+  targets: [gns3, cisco-ssh, packet-tracer]
+  rule: "NAT: inside/outside roles on the right interfaces, an ACL matching only private ranges, and overload for many-to-one. NAT is never applied to both sides of one link."
+- id: cisco-11
+  targets: [gns3, cisco-ssh, packet-tracer]
+  rule: "DHCP: one pool per subnet with default-router = that subnet gateway and dns-server pointing at the DNS server; ip helper-address on the router interface when the server is remote."
+- id: cisco-12
+  targets: [gns3, cisco-ssh, packet-tracer]
+  rule: Inter-VLAN routing uses router-on-a-stick subinterfaces (g0/0.10, encapsulation dot1Q 10) or an L3 switch SVI per VLAN - never both for the same VLAN.
+- id: cisco-13
+  targets: [gns3, cisco-ssh, packet-tracer]
+  rule: Every router and switch gets a unique hostname matching the plan name (R1, SW1...); interface descriptions name the far end.

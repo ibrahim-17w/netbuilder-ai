@@ -1,0 +1,13 @@
+# Security-control rules - plan-level obligations for any target
+- id: sec-01
+  targets: [all]
+  rule: Security controls are verified, not assumed: each requested control maps to a test (ACL blocks the branch, AAA rejects bad credentials, snooping drops rogue offers) and the plan lists those tests.
+- id: sec-02
+  targets: [all]
+  rule: Credentials are never invented: missing usernames, passwords or pre-shared keys become questions in the plan, and redacted values are never echoed into notes or exports.
+- id: sec-03
+  targets: [all]
+  rule: AAA is configured with the server address, shared key and method lists together - a router pointing at a nonexistent AAA server locks every VTY session out.
+- id: sec-04
+  targets: [all]
+  rule: An ACL that mentions a manager subnet or office hours is a time-range ACL: the time-range is created, referenced, and its period matches the brief (weekdays 08:00-17:00 by default).

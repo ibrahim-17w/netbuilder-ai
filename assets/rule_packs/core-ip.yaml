@@ -1,0 +1,37 @@
+# Core IP rules - bundled with app, mirrored in RulePacksService.packs
+- id: core-01
+  targets: [all]
+  rule: Management gateway must be inside its subnet.
+- id: core-02
+  targets: [all]
+  rule: No overlapping subnets across interfaces unless VRF.
+- id: core-03
+  targets: [all]
+  rule: Every L3 interface needs description + no shutdown.
+- id: core-04
+  targets: [all]
+  rule: "One server role per device unless the brief says otherwise: DHCP, DHCPv6, DNS, HTTP(S), FTP, EMAIL, AAA, NTP, TFTP, SYSLOG, IoT."
+- id: core-05
+  targets: [all]
+  rule: A WAN/transit subnet is /30 or smaller on a private range and is never reused for a LAN.
+- id: core-06
+  targets: [all]
+  rule: User LANs get addressing from one block (e.g. 192.168.x.0/24 per VLAN/site); infrastructure (/30 transit) and user ranges never mix.
+- id: core-07
+  targets: [all]
+  rule: The router LAN interface is the first usable host (.1) and the DHCP pool never contains it, the server .10x range or the broadcast address - exclude them explicitly.
+- id: core-08
+  targets: [all]
+  rule: Every end device needs a working default gateway: PCs/servers point at the router LAN interface, routers at the next-hop transit IP.
+- id: core-09
+  targets: [all]
+  rule: A subnet must be sized for its stated hosts: 50 users never fits a /29; size the pool and state the assumption when the brief is silent.
+- id: core-10
+  targets: [all]
+  rule: Loopback0 is the router ID source: give every router a unique loopback (10.255.0.x/32) and use it for router-id, iBGP peering and management.
+- id: core-11
+  targets: [all]
+  rule: VLAN numbering follows purpose, not randomness: 1 is never used, 10/20/30... for users, 99 for native, 100+ for management/voice; each VLAN gets a name.
+- id: core-12
+  targets: [all]
+  rule: Every subnet and VLAN the plan creates must be used by at least one interface or explained in the notes; nothing is configured that the brief did not ask for.

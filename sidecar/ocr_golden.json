@@ -1,0 +1,260 @@
+{
+ "images": {
+  "PC1_panel.png": {
+   "cli": {
+    "ms": 431.4,
+    "text": "PU Vvireless VEN Iramc Generator VIB browser Cisco IF Communicator\n=@\nEmail PPPoE Dialer Text Editor Firewall IPv6 Firewall\n>\n\n= \u00c2\u00a9 = a\n\nTy \u00c2\u00a9 a\n\nNetflow Collector loX IDE TFTP Sernice Telnet / SSH Client Bluetooth\nan, E an, E @ ill an =\n"
+   },
+   "prompt11": {
+    "ms": 190.0,
+    "text": "aa, |\n\naa, |\n\ny hil\n\naa, |\n"
+   },
+   "prompt6": {
+    "ms": 205.3,
+    "text": "BS SS\n"
+   }
+  },
+  "_labels.png": {
+   "cli": {
+    "ms": 281.6,
+    "text": "IPvo Adaress i\nLink Local Address FE80::201:63FF:FEB5:7447\nDefault Gateway\nDNS Server\n802.1X\nUse 802.1X Security\nUsername\nPassword\n"
+   },
+   "prompt11": {
+    "ms": 161.1,
+    "text": ""
+   },
+   "prompt6": {
+    "ms": 300.9,
+    "text": ""
+   }
+  },
+  "_srv.png": {
+   "cli": {
+    "ms": 242.2,
+    "text": "PRP 5 index.html (edit) (delete)\n; [impor\n"
+   },
+   "prompt11": {
+    "ms": 166.3,
+    "text": "Rew ia) [rapa\n"
+   },
+   "prompt6": {
+    "ms": 163.5,
+    "text": "| New Fil [impor\n"
+   }
+  },
+  "_text.png": {
+   "cli": {
+    "ms": 461.8,
+    "text": "VEN AAAACCOUNtING Iramc Generator VIB browser Cisco IF Communicator\n=@\nEmail PPPoE Dialer Text Editor Firewall IPv6 Firewall\n_ ee ee\n> a | a |\nmw! fs | =|\nNetflow Collector loX IDE Telnet / SSH Client loT Monitor loT IDE\nwih or E\n\u00e2\u20ac\u02dc \u00e2\u20ac\u201d\u00e2\u20ac\u201dy pl =]\n"
+   },
+   "prompt11": {
+    "ms": 175.5,
+    "text": "=] Bi\n"
+   },
+   "prompt6": {
+    "ms": 174.4,
+    "text": "Bl\n"
+   }
+  },
+  "after.png": {
+   "cli": {
+    "ms": 448.1,
+    "text": "| '\nAe =e\nJ i \\ Switch1 \\\n( = ]\n\nPC-PT PC-PT PC-PT\n\nPCO Pel PC2\n\nServer-PT Server-PT Server-PT Server-PT\n\nServer0 Server3 Server Server2\n32:421\u00c2\u00a9)] >] =.\n| = = fa | = | | | [@ |Sz=mo Fire Last Status | Source | Destination |Type Color Time(sec) | Periodic | Num | Edit | Delete\n"
+   },
+   "prompt11": {
+    "ms": 286.9,
+    "text": "EE\n\n32:421\u00c2\u00a9|>]\n\n[QRealtime][.\n\n= \u00e2\u20ac\u201d IC] A B ly ] [Fire |Last Status |Source |Destination |Type [Color | Time(sec) |Periodic [Num |Edit | Delete\n"
+   },
+   "prompt6": {
+    "ms": 257.0,
+    "text": "[Op] ) Realtime [e.\n= |Fire |Last Status | Source | Destination [Type | Color |Time(sec) [Periodic |Num | Edit |Delete\n= sists) 1 aloe\n7\nBree) LV ULE E\n"
+   }
+  },
+  "before.png": {
+   "cli": {
+    "ms": 536.6,
+    "text": "-00:36[@] >>] 9} Realtime||\u00c2\u00ae.\nFr 4 \u00e2\u20ac\u201dy aI es] G | [eo] aS Fire Last Status | Source | Destination |Type Color Time(sec) | Periodic | Num | Edit | Delete\naa 7 | PTS200\u00c2\u00a7\u00c2\u00a7 4331 4321 \u00c2\u00a71r8340 2901 S191OXBS19HGWH 829 1240 9 .1R1101 9 PrRouter Berd\n"
+   },
+   "prompt11": {
+    "ms": 357.2,
+    "text": "EE\n\n00 36[@][>>]\n\n[QRealtime][.\n\n\u00e2\u20ac\u201d\u00e2\u20ac\u201d\n\n\u00e2\u20ac\u02dcwe\n\nEe\n\nIR8340\n\nBee\n\n81910;\n\n40\n\nIRit\n\nBG |e \u00e2\u20ac\u02dcFire \u00e2\u20ac\u02dcLast Status | Source | Destination |Type | Color | Time(sec) | Periodic Num | Edit |Delete\n"
+   },
+   "prompt6": {
+    "ms": 251.6,
+    "text": "00:36] (QRealtime][=.\nes es] aI aI ] | Fire \u00e2\u20ac\u02dcLast Status | Source | Destination |Type | Color | Time(sec) | Periodic Num | Edit |Delete\n"
+   }
+  },
+  "cli_BR_Router.png": {
+   "cli": {
+    "ms": 814.2,
+    "text": "% Invalid input detected at '*' marker.\nBR_Router# enable\nBR_Router# show ip interface brief\nInterface IP-Address OK? Method Status Protocol\nGigabitEthernet0/0 unassigned YES unset administratively down down\nGigabitEthernet0/1 10.1.1.2 YES manual up up\nGigabitEthernet0/2 unassigned YES unset administratively down down\nViani unassigned YES unset administratively down down\nBR_Router# enable\nBR_Router# configure terminal\nEnter configuration commands, one per line. End with CNIL/Z.\nBR_Router(config)# interface 90/0\nBR_Router(config-if)# no shutdown\nBR_Router (config-if) #\nSLINK-5-CHANGED: Interface GigabitEthernet0/0, changed state to up\nSLINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/0, changed state to up\nend\nBR_Router#\n$SYS-5-CONFIG I: Configured from console by console\nend\nTranslating \"end\"\n% Unknown command or computer name, or unable to find computer address\nBR_Router# write memory\nBuilding configuration...\n[OK]\nBR Router? <2\n17:58 \u00c2\u00a9)p>] Top DRealtimel|\u00c2\u00ae.\n> 4 ( Va we WA WA Ss < : : adic | Num | Edit | Delete\n"
+   },
+   "prompt11": {
+    "ms": 266.0,
+    "text": "Go] a]\n\n17: 58[@] >>]\n\n[QRealtime][.\n\nodic /Num |Edit |Delete\n\nae |F| L/L eee | | Lem yiseenaioo\n"
+   },
+   "prompt6": {
+    "ms": 297.4,
+    "text": "\u00e2\u20ac\u201d\u00e2\u20ac\u201d\u00e2\u20ac\u201d\u00e2\u20ac\u201d\u00e2\u20ac\u201d\u00e2\u20ac\u201d ee\n17:58 ]>>] i Top EEE [QReaitime] )Realtime][\u00c2\u00ae.\neiZim@el4| VEL. | > | Sear een = ee |e\n"
+   }
+  },
+  "cli_BR_Switch.png": {
+   "cli": {
+    "ms": 1025.7,
+    "text": "as Sess eu Meme eye ee ol \u00e2\u20ac\u0153bY\nFastEthernet0/3 unassigned YES manual down down\nFastEthernet0/4 unassigned YES manual down down\nFastEthernet0/5 unassigned YES manual down down\nFastEthernet0/6 unassigned YES manual down down\nFastEthernet0/7 unassigned YES manual down down\nFastEthernet0/8 unassigned YES manual down down\nFastEthernet0/9 unassigned YES manual down down\nFastEthernet0/10 unassigned YES manual up up\nFastEthernet0/i1 unassigned YES manual down down\nFastEthernet0/12 unassigned YES manual down down\nFastEthernet0/13 unassigned YES manual down down\nFastEthernet0/14 unassigned YES manual down down\nFastEthernet0/1i5 unassigned YES manual down down\nFastEthernet0/16 unassigned YES manual down down\nFastEthernet0/17 unassigned YES manual down down\nFastEthernet0/18 unassigned YES manual down down\nFastEthernet0/19 unassigned YES manual down down\nFastEthernet0/20 unassigned YES manual down down\nFastEthernet0/21 unassigned YES manual down down\nFastEthernet0/22 unassigned YES manual down down\nFastEthernet0/23 unassigned YES manual down down\nFastEthernet0/24 unassigned YES manual down down\nGigabitEthernet0/1 unassigned YES manual down down\nGigabitEthernet0/2 unassigned YES manual down down\nViani unassigned YES manual administratively down down\nBR_Switch? enable\nBR_Switch? write memory\nBuilding configuration...\n[OX]\nBR Switch? Se\n\n22431 P>] vop Realtime].\n"
+   },
+   "prompt11": {
+    "ms": 257.0,
+    "text": "Go] a]\n\n22: 43[O >]\n\n[QRealtime][.\n\nae |F| L/L eee | | Lem yiseenaioo\n\nodic /Num |Edit |Delete\n"
+   },
+   "prompt6": {
+    "ms": 270.9,
+    "text": "ee | re\nror \u00e2\u20ac\u201d \u00e2\u20ac\u201d (ORs:\ngizim@el4| YL | > eerrr, | |b scenario = / a adic [Num | Edit | Delete\n"
+   }
+  },
+  "cli_HQ_Router.png": {
+   "cli": {
+    "ms": 860.9,
+    "text": "HQ_Router#\nSSYS-5-CONFIG I: Configured from console by console\nconfigure terminal\nEnter configuration commands, one per line. End with CNIL/Z.\nHQ Router(config)# line vty 0 4\nHQ_Router(config-line)# access-class VIY_MANAGER_ONLY in\nHQ Router (config-line)# exit\nHQ Router (config)# exit\nHQ Router?\nSSYS-5-CONFIG I: Configured from console by console\nconfigure terminal\nEnter configuration commands, one per line. End with CNIL/Z.\nHQ_Router(config)# ip access-list extended SITE_VPN_TRAFFIC\nHQ Router (config-ext-nacl)# permit ip 192.168.1.0 0.0.0.255 192.168.2.0 0.0.0.255\nHQ Router (config-ext-nacl)# exit\nHQ Router (config)# exit\nHQ Router?\n$SYS-5-CONFIG I: Configured from console by console\nip route 192.168.2.0 255.255.255.0 10.1.1.2\n% Invalid input detected at '*' marker.\nHQ Router# enable\nHQ Router# show ip interface brief\nInterface IP-Address OK? Method Status Protocol\nGigabitEthernet0/0 unassigned YES unset administratively down down\nGigabitEthernet0/1 20..2.1.1 YES manual up down\nGigabitEthernet0/2 unassigned YES unset administratively down down\nViani unassigned YES unset administratively down down\nHQ Router? 2\n1254\u00c2\u00bb wep (QReaitimel[,\n"
+   },
+   "prompt11": {
+    "ms": 250.7,
+    "text": "Go] a]\n\n12: sal] p>]\n\n[QRealtime][.\n\nae |F| L/L eee | | Lem yiseenaioo\n\nodic /Num |Edit |Delete\n"
+   },
+   "prompt6": {
+    "ms": 277.1,
+    "text": "\u00e2\u20ac\u201drrrrrCCCCSCsT | Bee\nos \u00e2\u20ac\u201d \u00e2\u20ac\u201d (ORs:\ngizim@el4| YL | > eerrr, | |b scenario = / a adic [Num | Edit | Delete\n"
+   }
+  },
+  "cli_HQ_Switch.png": {
+   "cli": {
+    "ms": 1021.0,
+    "text": "as Sess eu Meme eye ee ol \u00e2\u20ac\u0153bY\nFastEthernet0/3 unassigned YES manual up up\nFastEthernet0/4 unassigned YES manual up up\nFastEtherneto/5 unassigned YES manual up up\nFastEthernet0/6 unassigned YES manual up up\nFastEthernet0/7 unassigned YES manual up up\nFastEthernet0/8 unassigned YES manual down down\nFastEthernet0/9 unassigned YES manual down down\nFastEthernet0/10 unassigned YES manual down down\nFastEthernet0/i1 unassigned YES manual down down\nFastEthernet0/12 unassigned YES manual down down\nFastEthernet0/13 unassigned YES manual down down\nFastEthernet0/14 unassigned YES manual down down\nFastEthernet0/1i5 unassigned YES manual down down\nFastEthernet0/16 unassigned YES manual down down\nFastEthernet0/17 unassigned YES manual down down\nFastEthernet0/18 unassigned YES manual down down\nFastEthernet0/19 unassigned YES manual down down\nFastEthernet0/20 unassigned YES manual down down\nFastEthernet0/21 unassigned YES manual down down\nFastEthernet0/22 unassigned YES manual down down\nFastEthernet0/23 unassigned YES manual down down\nFastEthernet0/24 unassigned YES manual down down\nGigabitEthernet0/1 unassigned YES manual down down\nGigabitEthernet0/2 unassigned YES manual down down\nViani unassigned YES manual administratively down down\nHQ Switch? enable\nHQ_Switch# write memory\nBuilding configuration...\n[OX]\nHQ Switch? Se\n\n1857] vop Realtime].\n"
+   },
+   "prompt11": {
+    "ms": 254.9,
+    "text": "Go] a]\n\n19: 571] >]\n\n[QRealtime][.\n\nodic /Num |Edit |Delete\n\nae |F| L/L eee | | Lem yiseenaioo\n"
+   },
+   "prompt6": {
+    "ms": 300.5,
+    "text": "\u00e2\u20ac\u201d\u00e2\u20ac\u201d\u00e2\u20ac\u201d\u00e2\u20ac\u201d\u00e2\u20ac\u201d\u00e2\u20ac\u201d\u00e2\u20ac\u201d ee\n19:57[O]P>] i Top EEE [QReaitime] )Realtime][\u00c2\u00ae.\neiZim@el4| VEL. | > | Sear een = ee |e\n"
+   }
+  },
+  "cli_PC1.png": {
+   "cli": {
+    "ms": 380.4,
+    "text": "/ /\n2960-24TT 2960-24TT\nSwitch0 Switch1\n_|\nPC-PT PC-PT\nPCO Pel\nsoc D>] (Realtime,\n| = iF] = fa Al WA = | | | [eo] Sconano0 [Fire Last Status | Source | Destination [Type Color | Time(sec) | Periodic [Num [Edit Delete\n"
+   },
+   "prompt11": {
+    "ms": 301.0,
+    "text": "EE\n\n11:06[@ [>>]\n\n[QRealtime][.\n\n= \u00e2\u20ac\u201d IC] A B ly ] [Fire |Last Status |Source |Destination |Type [Color | Time(sec) |Periodic [Num |Edit | Delete\n"
+   },
+   "prompt6": {
+    "ms": 256.1,
+    "text": "[Ol] ) Realtime [e.\n= |Fire |Last Status | Source | Destination [Type | Color |Time(sec) [Periodic |Num | Edit |Delete\n= sists) 1 aloe\n7\nBrees) VV ULEEEE\n"
+   }
+  },
+  "cli_R1.png": {
+   "cli": {
+    "ms": 407.8,
+    "text": "a a. \u00e2\u20ac\u0153SS :\n| ~\u00e2\u20ac\u0153\n= = = =\nPC-PT ij PC-PT PC-PT\nPCO PG PC2 PES\n|\nServer-PT\nServer0\n02:23, >>] im.\n| = = fa | = | | | [@ |Sz=mo [Fire Last Status | Source | Destination |Type Color Time(sec) | Periodic | Num [Edit Delete\n"
+   },
+   "prompt11": {
+    "ms": 287.0,
+    "text": "EE\n\n02:23[@]>>]\n\n[QRealtime][.\n\n= \u00e2\u20ac\u201d IC] A B ly ] [Fire |Last Status |Source |Destination |Type [Color | Time(sec) |Periodic [Num |Edit | Delete\n"
+   },
+   "prompt6": {
+    "ms": 253.3,
+    "text": "[Ol>] ) Realtime [e.\n= |Fire |Last Status | Source | Destination [Type | Color |Time(sec) [Periodic |Num | Edit |Delete\n= sists) 1 aloe\n7\nBree) VUE E\n"
+   }
+  },
+  "cli_R2.png": {
+   "cli": {
+    "ms": 455.3,
+    "text": "oe ai SS\na 7. \u00e2\u20ac\u0153SS >\n| ~\u00e2\u20ac\u0153\nms = = =\nPC-PT ij PC-PT PC-PT\nPC36 Pq@37 PC38 PC39\n|\nServer-PT\nServer13\n16:08[ >>] im.\nr iF] \u00e2\u20ac\u201dy fa A | = | | | [eo] aS [Fire Last Status | Source | Destination |Type Color Time(sec) | Periodic | Num [Edit Delete\n= y \u00e2\u20ac\u0153 |s S\n"
+   },
+   "prompt11": {
+    "ms": 289.7,
+    "text": "EE\n\n16:08[\u00c2\u00a9 [>>]\n\n[QRealtime][.\n\n= \u00e2\u20ac\u201d IC] A B ly ] [Fire |Last Status |Source |Destination |Type [Color | Time(sec) |Periodic [Num |Edit | Delete\n"
+   },
+   "prompt6": {
+    "ms": 257.9,
+    "text": "[Ol] ) Realtime [e.\n= |Fire |Last Status | Source | Destination [Type | Color |Time(sec) [Periodic |Num | Edit |Delete\n= sists) 1 aloe\n7\nBrees) VUE Ee\n"
+   }
+  },
+  "cli_SW1.png": {
+   "cli": {
+    "ms": 432.4,
+    "text": "ane SS\na a. \u00e2\u20ac\u0153SS :\n| ~\u00e2\u20ac\u0153\n= = = =\nPC-PT ij PC-PT PC-PT\nPCO PG PC2 PES\n|\nServer-PT\nServer0\n02:51) >] im.\n| = = fa | = | | | [@ |Sz=mo [Fire Last Status | Source | Destination |Type Color Time(sec) | Periodic | Num [Edit Delete\n"
+   },
+   "prompt11": {
+    "ms": 292.4,
+    "text": "EE\n\n02:51[\u00c2\u00a9 >]\n\n[QRealtime][.\n\n= \u00e2\u20ac\u201d IC] A B ly ] [Fire |Last Status |Source |Destination |Type [Color | Time(sec) |Periodic [Num |Edit | Delete\n"
+   },
+   "prompt6": {
+    "ms": 256.9,
+    "text": "[Ol] ) Realtime [e.\n= |Fire |Last Status | Source | Destination [Type | Color |Time(sec) [Periodic |Num | Edit |Delete\n= sists) 1 aloe\n7\nBree) VV ULEEEE\n"
+   }
+  },
+  "cli_SW2.png": {
+   "cli": {
+    "ms": 440.2,
+    "text": "a \u00e2\u20ac\u0153T \u00e2\u20ac\u0153SS >\nir n _)\nPC-PT ij PC-PT PC-PT\nPC36 Pq@37 PC38 PC39\n: |\nServer-PT\nServer13\n\u00c2\u00ab121 (QReaitimell=,\n| me | \u00e2\u20ac\u201dy AVAL LAL lseledsel Ley oes = Fire Last Status | Source | Destination |Type Color Time(sec) | Periodic | Num | Edit | Delete\n"
+   },
+   "prompt11": {
+    "ms": 315.4,
+    "text": "EE\n\n17:21(\u00c2\u00a9| >]\n\n[QRealtime][.\n\n= \u00e2\u20ac\u201d IC] A B ly ] [Fire |Last Status |Source |Destination |Type [Color | Time(sec) |Periodic [Num |Edit | Delete\n"
+   },
+   "prompt6": {
+    "ms": 260.7,
+    "text": "[Ol] ) Realtime [e.\n= |Fire |Last Status | Source | Destination [Type | Color |Time(sec) [Periodic |Num | Edit |Delete\n= sists) 1 aloe\n7\nBree) VU EEEE\n"
+   }
+  },
+  "diag_region.png": {
+   "cli": {
+    "ms": 204.8,
+    "text": "B\nA\n"
+   },
+   "prompt11": {
+    "ms": 155.9,
+    "text": ""
+   },
+   "prompt6": {
+    "ms": 286.8,
+    "text": ""
+   }
+  },
+  "link0_after.png": {
+   "cli": {
+    "ms": 237.7,
+    "text": "2960-24TT 2960-24TT\nSwitch0 Switch1\nJ J J\nPC-PT PC-PT PC-PT\nPCO PC1 PC2\n"
+   },
+   "prompt11": {
+    "ms": 155.1,
+    "text": ""
+   },
+   "prompt6": {
+    "ms": 295.6,
+    "text": ""
+   }
+  }
+ },
+ "meanMs": 337.5,
+ "note": "Text the pipeline extracted from the real captures in shots/ with the DEFAULT settings.  Regenerate only when the pipeline's intended output legitimately changes.",
+ "recorded": "2026-09-16 22:11:22",
+ "refreshed": {
+  "before.png": "2026-09-17 12:34:50"
+ },
+ "schema": 1,
+ "settings": {
+  "band": [
+   0.4,
+   0.94
+  ],
+  "cliPsm": 6,
+  "psmFallback": 11,
+  "resample": "LANCZOS",
+  "upscale": 3
+ },
+ "sidecarVersion": "2026-09-15-f"
+}
