@@ -57,9 +57,15 @@ sidecar/*.png
 sidecar/shots/
 sidecar/pkt_backups/
 sidecar/pkt_output/
+# Offline generator: template library extracted from the user's own .pkt
+# files (machine-local by design - nothing Cisco-authored is committed) and
+# the generated demo artifacts.
+sidecar/pkt_templates/
+sidecar/*.pkt
 
 # Platform-generated dependencies and intermediates
 android/.gradle/
+android/build/
 android/.cxx/
 android/local.properties
 ios/Pods/
@@ -68,3 +74,13 @@ ios/Flutter/ephemeral/
 linux/flutter/ephemeral/
 macos/Flutter/ephemeral/
 windows/flutter/ephemeral/
+
+# Local reports, integration plans, and mutable sidecar state
+/analyze_out.txt
+sidecar/.pytest_out.txt
+sidecar/pytest_out.txt
+sidecar/_tmp_*.json
+sidecar/_offline_plan_*.json
+sidecar/pkt_learning.json
+sidecar/run_ledger.json
+sidecar/strategy_memory.json.v1.bak

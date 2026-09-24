@@ -1,9 +1,31 @@
 {
   "cmd::server": {
-    "fx": 0.4883,
-    "fy": 0.1089
+    "fx": 0.488,
+    "fy": 0.109
+  },
+  "cmd::pc-pt": {
+    "fx": 0.667,
+    "fy": 0.126
   },
   "tile_spots_reset_v2": true,
   "field_rows_reset_v3": true,
-  "tile_spots_scoped_v4": true
+  "tile_spots_scoped_v4": true,
+  "ip_config::pc": {
+    "fx": 0.1211,
+    "fy": 0.1235
+  },
+  "field_rows": {
+    "ip": 0.169,
+    "mask": 0.2038,
+    "gw": 0.2403,
+    "dns": 0.2734
+  },
+  "ip_config::server": {
+    "fx": 0.1211,
+    "fy": 0.1235
+  },
+  "cmd::pc": {
+    "fx": 0.6712,
+    "fy": 0.1089
+  }
 }

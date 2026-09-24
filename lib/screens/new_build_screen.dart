@@ -5,12 +5,18 @@ import 'package:provider/provider.dart';
 import '../models/build_attempt.dart';
 import '../models/build_record.dart';
 import '../models/network_intent.dart';
+import '../services/autopilot_service.dart';
 import '../services/build_artifact_service.dart';
 import '../services/gemini_service.dart';
 import '../services/memory_service.dart';
+import '../services/planner_memory_service.dart';
+import '../services/secret_vault.dart';
+import '../services/casual_english.dart';
+import '../services/planner_suggestions_service.dart';
 import '../services/rule_packs_service.dart';
 import '../services/settings_service.dart';
 import '../services/validator_service.dart';
+import '../theme/app_palette.dart';
 
 /// New Build Wizard: instruction -> intent preview -> generate -> approve+save.
 class NewBuildScreen extends StatefulWidget {
@@ -34,6 +40,15 @@ class _NewBuildScreenState extends State<NewBuildScreen> {
   String _target = 'gns3';
   bool _busy = false;
   String _log = '';
+
+  /// Plan with the deterministic local parser only: no API key, no quota, no
+  /// network.  On by default because that is the path that always works; the
+  /// AI planner is a quality upgrade, never a requirement.
+  bool _offlineOnly = true;
+
+  /// One-line reason the AI planner was skipped or failed, shown next to the
+  /// plan.  Never a stack trace: the plan is still valid and reviewable.
+  String _aiNote = '';
   NetworkIntent? _intent;
   String _plannerSource = 'Not planned yet';
 
@@ -51,8 +66,22 @@ class _NewBuildScreenState extends State<NewBuildScreen> {
   }
 
   Future<void> _parse() async {
+    final mem = context.read<MemoryService>();
+    var parsed = NetworkIntent.parseSimple(
+      _name.text.trim(),
+      CasualEnglish.normalize(_instr.text),
+    );
+    if (mem.ready) {
+      try {
+        parsed = PlannerMemoryService.apply(
+          parsed,
+          rules: (await mem.allRules()).map((r) => r.ruleText).toList(),
+          preferences: await mem.allPrefs(),
+        );
+      } catch (_) {}
+    }
     setState(() {
-      _intent = NetworkIntent.parseSimple(_name.text.trim(), _instr.text);
+      _intent = parsed;
       _plannerSource = 'Local offline planner';
       _log =
           'Parsed offline intent: ${_intent!.nodes.length} nodes, '
@@ -68,14 +97,27 @@ class _NewBuildScreenState extends State<NewBuildScreen> {
     try {
       final settings = context.read<SettingsService>();
       final mem = context.read<MemoryService>();
-      final offlineCandidate = NetworkIntent.parseSimple(
+      var offlineCandidate = NetworkIntent.parseSimple(
         _name.text.trim(),
-        _instr.text,
+        CasualEnglish.normalize(_instr.text),
       );
+      // EVOLUTION: a rule or preference the user taught the app (for
+      // example "always use OSPF") changes the keyless plan too, so a
+      // repeated brief improves instead of repeating the same result.
+      if (mem.ready) {
+        try {
+          offlineCandidate = PlannerMemoryService.apply(
+            offlineCandidate,
+            rules: (await mem.allRules()).map((r) => r.ruleText).toList(),
+            preferences: await mem.allPrefs(),
+          );
+        } catch (_) {}
+      }
       var intent = offlineCandidate;
       var plannerSource = 'Local offline planner';
+      var aiNote = '';
 
-      if (!settings.privateMode) {
+      if (!settings.privateMode && !_offlineOnly) {
         final key = await settings.getApiKey();
         if (key != null && key.isNotEmpty) {
           List<String> past = [];
@@ -91,44 +133,81 @@ class _NewBuildScreenState extends State<NewBuildScreen> {
             rules = (await mem.allRules()).map((r) => r.ruleText).toList();
             prefs = await mem.allPrefs();
           }
+          // CROSS-RUN FAILURE SIGNAL: what real runs kept failing to do, and
+          // what Packet Tracer has already proven it cannot do. Both are
+          // best-effort reads of the sidecar - a stopped sidecar yields
+          // empty lists rather than blocking the plan.
+          final svc = AutopilotService();
+          final blockers = await svc.blockerLines(project: _name.text.trim());
+          final unsupported = await svc.provenUnsupported();
           final ctx = RulePacksService.contextBlock(
             target: _target,
             pastBuildSummaries: past,
             learnedRules: rules,
             preferences: prefs,
             recentAttemptSummaries: attempts,
+            knownBlockers: blockers,
+            unsupportedCapabilities: unsupported,
           );
           try {
-            intent = await GeminiService().generateIntent(
-              apiKey: key,
-              model: settings.model,
-              instruction: _instr.text,
-              contextBlock: ctx,
-              target: _target,
-              offlineCandidate: offlineCandidate.toPlannerJson(),
+            // PLANNER CACHE: an identical brief (same instruction + target)
+            // reuses its last successful plan instead of re-hitting the API.
+            final cached = await GeminiService.cachedPlan(
+              _instr.text,
+              _target,
             );
-            plannerSource = 'Gemini structured planner';
+            if (cached != null) {
+              intent = cached;
+              plannerSource = 'Gemini plan (cached)';
+              aiNote = 'Reused the saved plan for this exact brief.';
+            } else {
+              intent = await GeminiService().generateIntent(
+                apiKey: key,
+                model: settings.model,
+                instruction: _instr.text,
+                contextBlock: ctx,
+                target: _target,
+                offlineCandidate: offlineCandidate.toPlannerJson(),
+              );
+              plannerSource = 'Gemini structured planner';
+            }
           } catch (e) {
-            plannerSource = 'Local offline planner (Gemini unavailable)';
-            setState(
-              () => _log =
-                  'Gemini could not produce a structured plan. Using the local planner safely.\n$e',
-            );
+            // Expected whenever the key is unset, out of quota or the model
+            // is busy.  The offline plan is already complete, so this is a
+            // note, not an error.
+            plannerSource = 'Local offline planner (AI unavailable)';
+            aiNote =
+                'AI planner unavailable (${_briefReason(e)}); '
+                'planned offline instead.';
           }
         } else {
-          plannerSource = 'Local offline planner (no Gemini key)';
+          plannerSource = 'Local offline planner (no AI key)';
         }
       } else {
-        plannerSource = 'Local offline planner (Private Mode)';
+        plannerSource = _offlineOnly
+            ? 'Local offline planner (offline mode)'
+            : 'Local offline planner (Private Mode)';
       }
 
+      // The local planner has no model to steer, so the cross-run failure
+      // signal is surfaced to the user directly instead of being dropped.
+      final offlineBlockers = await AutopilotService().blockerLines(
+        project: _name.text.trim(),
+      );
+
       intent = intent.copyWith(planningSource: plannerSource);
+      _aiNote = aiNote;
       final issues = ValidatorService.validate(intent, target: _target);
+      final suggestions = PlannerSuggestionsService.forIntent(
+        intent,
+        target: _target,
+      );
       if (ValidatorService.hasErrors(issues)) {
         setState(() {
           _intent = intent;
+          _plannerSource = plannerSource;
           _log =
-              'Blocked by validator:\n${issues.map((e) => '- [${e.severity}] ${e.message}').join('\n')}';
+              'Blocked by validator (planner: $plannerSource):\n${issues.map((e) => '- [${e.severity}] ${e.message}').join('\n')}';
           _busy = false;
         });
         return;
@@ -146,16 +225,25 @@ class _NewBuildScreenState extends State<NewBuildScreen> {
         _log =
             'Plan ready. Source: $plannerSource. '
             '${intent.nodes.length} devices, ${intent.links.length} links, '
-            '$warnings warning(s). Review the plan before execution.';
+            '$warnings warning(s). Review the plan before execution.'
+            '${suggestions.isEmpty ? '' : '\n\n${PlannerSuggestionsService.summaryLine(intent, target: _target)}'}'
+            '${aiNote.isEmpty ? '' : '\n$aiNote'}'
+            '${offlineBlockers.isEmpty ? '' : '\n\nKnown blockers from previous runs - expect these to be reported as skipped rather than retried:\n${offlineBlockers.take(6).join('\n')}'}';
       });
 
-      // Persist + learn
+      // Persist + learn.  Secrets (AAA key, VPN PSK) go to the OS keychain,
+      // and the stored intent is saved WITHOUT them - the keychain is the
+      // only place they exist at rest (see SecretVault).
       if (mem.ready) {
+        await SecretVault.store(
+          intent.projectName,
+          SecretVault.extract(intent.toJson()),
+        );
         final now = DateTime.now();
         final rec = BuildRecord(
           projectName: intent.projectName,
           instruction: _instr.text,
-          intentJson: jsonEncode(intent.toJson()),
+          intentJson: jsonEncode(intent.toJson(includeSecrets: false)),
           target: _target,
           success: false,
           status: 'planned',
@@ -199,7 +287,7 @@ class _NewBuildScreenState extends State<NewBuildScreen> {
           BuildRecord(
             projectName: intent.projectName,
             instruction: _instr.text,
-            intentJson: jsonEncode(intent.toJson()),
+            intentJson: jsonEncode(intent.toJson(includeSecrets: false)),
             target: _target,
             status: 'planned',
             success: false,
@@ -217,6 +305,13 @@ class _NewBuildScreenState extends State<NewBuildScreen> {
     }
   }
 
+  /// A short, human reason from a planner exception - never a stack trace.
+  String _briefReason(Object e) {
+    final text = e.toString().replaceFirst('Exception: ', '').trim();
+    final line = text.split('\n').first.trim();
+    return line.length <= 120 ? line : '${line.substring(0, 120)}...';
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -230,7 +325,7 @@ class _NewBuildScreenState extends State<NewBuildScreen> {
           ),
           const SizedBox(height: 8),
           Card(
-            color: Colors.blue.shade50,
+            color: AppPalette.accentFill(Theme.of(context).colorScheme),
             child: const Padding(
               padding: EdgeInsets.all(12),
               child: Column(
@@ -269,6 +364,16 @@ class _NewBuildScreenState extends State<NewBuildScreen> {
             onChanged: (v) => setState(() => _target = v ?? 'gns3'),
             decoration: const InputDecoration(labelText: 'Target'),
           ),
+          SwitchListTile(
+            value: _offlineOnly,
+            onChanged: (v) => setState(() => _offlineOnly = v),
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Plan offline only'),
+            subtitle: const Text(
+              'Deterministic local planner: no API key, no quota, no network. '
+              'Turn off to let Gemini re-interpret the request when a key is set.',
+            ),
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -302,6 +407,11 @@ class _NewBuildScreenState extends State<NewBuildScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Plan source: $_plannerSource'),
+                    if (_aiNote.isNotEmpty)
+                      Text(
+                        _aiNote,
+                        style: const TextStyle(color: Colors.orange),
+                      ),
                     Text(
                       'Devices: ${_intent!.nodes.map((n) => '${n.name} (${n.type})').join(', ')}',
                     ),
@@ -331,6 +441,21 @@ class _NewBuildScreenState extends State<NewBuildScreen> {
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                       for (final a in _intent!.assumptions) Text('• $a'),
+                    ],
+                    if (PlannerSuggestionsService.forIntent(
+                      _intent!,
+                      target: _target,
+                    ).isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Suggested fixes:',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      for (final s in PlannerSuggestionsService.forIntent(
+                        _intent!,
+                        target: _target,
+                      ))
+                        Text('- $s'),
                     ],
                     if (_intent!.questions.isNotEmpty) ...[
                       const SizedBox(height: 6),

@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 
 import '../models/network_intent.dart';
 import '../services/autopilot_service.dart';
+import '../theme/app_palette.dart';
 
 /// Safe Packet Tracer file workflow.
 ///
@@ -427,7 +428,7 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
       'sha256': report['sha256'],
     });
     return Card(
-      color: Colors.blue.shade50,
+      color: AppPalette.accentFill(Theme.of(context).colorScheme),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -468,7 +469,7 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
         .toList();
     final error = (analysis['error'] ?? '').toString();
     return Card(
-      color: error.isEmpty ? Colors.green.shade50 : Colors.red.shade50,
+      color: error.isEmpty ? AppPalette.successFill(Theme.of(context).colorScheme) : AppPalette.dangerFill(Theme.of(context).colorScheme),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(

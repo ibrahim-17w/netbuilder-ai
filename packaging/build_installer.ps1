@@ -39,7 +39,17 @@ New-Item -ItemType Directory -Path $StageRoot, $PyDistRoot, $PyWorkRoot,
 if (-not $SkipFlutterBuild) {
     Push-Location $AppRoot
     try {
-        & flutter build windows --release --no-pub
+        # A native tool writing a warning to stderr must not fail the build:
+        # under ErrorActionPreference=Stop PowerShell turns that into a
+        # terminating error. The exit code is the real signal, and it is
+        # checked below.
+        $previousPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            & flutter build windows --release --no-pub
+        } finally {
+            $ErrorActionPreference = $previousPreference
+        }
         if ($LASTEXITCODE -ne 0) { throw 'Flutter Windows release build failed.' }
     } finally {
         Pop-Location
@@ -53,12 +63,20 @@ if (-not (Test-Path -LiteralPath (Join-Path $ReleaseRoot 'net_builder.exe'))) {
 Write-Host 'Building the bundled sidecar executable...'
 Push-Location $AppRoot
 try {
-    & $PyInstaller -m pip install --disable-pip-version-check --quiet pyinstaller
-    if ($LASTEXITCODE -ne 0) { throw 'Could not install PyInstaller.' }
-    & $PyInstaller -m PyInstaller --noconfirm --clean --onedir --noconsole `
-        --name pt_autopilot --distpath $PyDistRoot --workpath $PyWorkRoot `
-        --specpath $WorkRoot (Join-Path $AppRoot 'sidecar\pt_autopilot.py')
-    if ($LASTEXITCODE -ne 0) { throw 'PyInstaller sidecar build failed.' }
+    # Same reason as the Flutter call: PyInstaller prints deprecation notes on
+    # stderr, and those are not build failures.
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $PyInstaller -m pip install --disable-pip-version-check --quiet pyinstaller
+        if ($LASTEXITCODE -ne 0) { throw 'Could not install PyInstaller.' }
+        & $PyInstaller -m PyInstaller --noconfirm --clean --onedir --noconsole `
+            --name pt_autopilot --distpath $PyDistRoot --workpath $PyWorkRoot `
+            --specpath $WorkRoot (Join-Path $AppRoot 'sidecar\pt_autopilot.py')
+        if ($LASTEXITCODE -ne 0) { throw 'PyInstaller sidecar build failed.' }
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
 } finally {
     Pop-Location
 }
@@ -66,6 +84,22 @@ try {
 $BuiltSidecar = Join-Path $PyDistRoot 'pt_autopilot'
 if (-not (Test-Path -LiteralPath (Join-Path $BuiltSidecar 'pt_autopilot.exe'))) {
     throw "Bundled sidecar executable not found: $BuiltSidecar"
+}
+
+# The .pkt generator is useless without its template library, and the frozen
+# sidecar looks for it inside its own _internal folder. Shipping it here is
+# what makes 'build a .pkt' work on a machine that has never seen one; the
+# sample saves are what let the app rebuild the library if it is ever missing.
+$BuiltInternal = Join-Path $BuiltSidecar '_internal'
+New-Item -ItemType Directory -Path $BuiltInternal -Force | Out-Null
+foreach ($Name in @('pkt_templates', 'pkt_seed')) {
+    $Source = Join-Path $AppRoot "sidecar\$Name"
+    if (Test-Path -LiteralPath $Source) {
+        Copy-Item -Path $Source -Destination $BuiltInternal -Recurse -Force
+        Write-Host "Bundled sidecar\$Name"
+    } else {
+        Write-Warning "sidecar\$Name is missing; the installed app may not be able to build a .pkt."
+    }
 }
 
 # Keep the unpacked Windows release self-contained too.  Previously only the

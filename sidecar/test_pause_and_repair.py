@@ -326,3 +326,81 @@ if __name__ == "__main__":
             fn()
             print(f"ok {name}")
     print("all pause/repair tests passed")
+
+
+def test_status_payload_does_not_re_enter_the_global_lock():
+    """The /status deadlock, which used to wedge the ENTIRE sidecar.
+
+    `LOCK` is a plain `threading.Lock` - not reentrant.  The /status handler
+    held it and then called `pause_snapshot()`, which does `with LOCK:` again.
+    Because the sidecar serves with a single-threaded `HTTPServer`, that one
+    re-acquire blocked the only request-serving thread forever: /status never
+    answered, and neither did /health or /corrections afterwards, for the life
+    of the process.  It was found by probing a live sidecar, not by any test,
+    which is why this test exists.
+
+    The work is done on a daemon thread with a join timeout so that a relapse
+    FAILS this test instead of hanging the whole suite.
+    """
+    import threading
+
+    result = {}
+
+    def build():
+        with pt.LOCK:
+            result["body"] = pt._status_payload_locked()
+
+    worker = threading.Thread(target=build, daemon=True)
+    worker.start()
+    worker.join(5)
+    assert not worker.is_alive(), (
+        "building the /status payload blocks while LOCK is held - something in "
+        "it acquires the non-reentrant LOCK again, which wedges the whole "
+        "single-threaded server")
+    body = result["body"]
+    assert body["pause"] == {"paused": False, "pauseRequested": False,
+                             "pauseSource": None} or isinstance(
+        body["pause"], dict)
+    assert "running" in body and "log" in body
+
+
+def test_status_endpoint_answers_and_keeps_answering():
+    """End to end: /status must answer, and must not strand the next request.
+
+    A single-threaded server makes "the next request" the real test - a
+    deadlocked handler is invisible until you ask it for something else.
+    """
+    import http.client
+    import json as _json
+    import threading
+    from http.server import HTTPServer
+
+    server = HTTPServer(("127.0.0.1", 0), pt.H)
+    port = server.server_address[1]
+    serving = threading.Thread(target=server.serve_forever, daemon=True)
+    serving.start()
+    replies = {}
+
+    def probe():
+        try:
+            for path in ("/status", "/health"):
+                conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+                conn.request("GET", path)
+                replies[path] = _json.loads(conn.getresponse().read().decode())
+                conn.close()
+        except Exception as exc:  # noqa: BLE001 - reported via the assertion
+            replies["error"] = exc
+
+    worker = threading.Thread(target=probe, daemon=True)
+    worker.start()
+    worker.join(20)
+    try:
+        assert not worker.is_alive(), (
+            "/status did not answer within 20s - the handler is deadlocked")
+        assert "error" not in replies, replies.get("error")
+        assert "pause" in replies["/status"]
+        assert replies["/health"]["ok"] is True, (
+            "the request after /status must still be served")
+    finally:
+        server.shutdown()
+        server.server_close()

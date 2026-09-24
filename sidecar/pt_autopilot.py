@@ -33,6 +33,7 @@ FAILSAFE: move mouse to a screen corner to abort pyautogui.
 """
 from __future__ import annotations
 
+import base64
 import json
 import hashlib
 import os
@@ -60,9 +61,139 @@ try:
 except ImportError:  # pragma: no cover - package import fallback
     from .learning_controller import SessionLearningController, StrategyStore
 
+try:
+    from learning_memory import (CapabilityMap, CorrectionStore,
+                                 LlmRejectionStore, RunLedger, correction_plan,
+                                 normalize_signature, parse_promotion,
+                                 promotion_ref, taxonomy_snapshot)
+except ImportError:  # pragma: no cover - package import fallback
+    from .learning_memory import (CapabilityMap, CorrectionStore,
+                                  LlmRejectionStore, RunLedger,
+                                  correction_plan, normalize_signature,
+                                  parse_promotion, promotion_ref,
+                                  taxonomy_snapshot)
+try:
+    import pkt_builder
+    import pkt_template_build
+except ImportError:  # pragma: no cover - package import fallback
+    from . import pkt_builder, pkt_template_build
+
+try:
+    import pkt_learning
+except ImportError:  # pragma: no cover - package import fallback
+    from . import pkt_learning
+
+try:
+    import pkt_audit
+except ImportError:  # pragma: no cover - package import fallback
+    from . import pkt_audit
+
+try:
+    import pt_dryrun
+except ImportError:  # pragma: no cover - package import fallback
+    from . import pt_dryrun
+
+try:
+    import pkt_fix
+except ImportError:  # pragma: no cover - package import fallback
+    from . import pkt_fix
+
+try:
+    import net_tools
+except ImportError:  # pragma: no cover - package import fallback
+    from . import net_tools
+
 HOST = "127.0.0.1"
 PORT = 5005
 SHOTS = os.path.join(os.path.dirname(__file__), "shots")
+
+# EVIDENCE FOR THE CHAT: the app can attach a screenshot the run already took
+# so the user can ask "what is it looking at?" and get an answer grounded in
+# the actual pixels rather than in a description of them.  Read-only: this
+# never writes to shots/ and never touches the live screen.
+SHOT_MAX_BYTES = 8 * 1024 * 1024
+SHOT_LIST_LIMIT = 60
+
+
+def _shot_name(name: str) -> str:
+    """Sanitize a requested screenshot name the same way `shot()` wrote it.
+
+    `shot()` keeps the extension but sanitizes both halves, so a request has
+    to be normalized identically before the containment check - otherwise a
+    legitimate file would 404 while a crafted name could still be probed.
+    """
+    stem, dot, ext = str(name or "").rpartition(".")
+    if dot and ext:
+        safe = _safe_stem(stem) + "." + _safe_stem(ext)
+    else:
+        safe = _safe_stem(str(name)) + ".png"
+    return safe if safe.lower().endswith(".png") else ""
+
+
+def shot_listing(limit: int = SHOT_LIST_LIMIT) -> list:
+    """Recent evidence screenshots, newest first.  Never raises."""
+    rows = []
+    try:
+        # `_`-prefixed names are scratch files (`_ocr_tmp.png` from the OCR
+        # pass), not evidence - they must not show up in the picker.
+        names = [n for n in os.listdir(SHOTS)
+                 if n.lower().endswith(".png")
+                 and not n.startswith("_")
+                 and os.path.isfile(os.path.join(SHOTS, n))]
+    except Exception:
+        return []
+    for name in names:
+        path = os.path.join(SHOTS, name)
+        try:
+            stat = os.stat(path)
+        except Exception:
+            continue
+        rows.append({
+            "name": name,
+            "bytes": stat.st_size,
+            "epoch": stat.st_mtime,
+            "modified": time.strftime("%Y-%m-%d %H:%M:%S",
+                                      time.localtime(stat.st_mtime)),
+        })
+    rows.sort(key=lambda row: row["epoch"], reverse=True)
+    return rows[:max(1, min(200, int(limit or SHOT_LIST_LIMIT)))]
+
+
+def read_shot(name: str, limit_bytes: int = SHOT_MAX_BYTES) -> dict:
+    """One evidence screenshot as base64, or {} when it is not readable."""
+    safe = _shot_name(name)
+    if not safe:
+        return {}
+    # Resolve against the *configured* evidence folder (a packaged build or
+    # a test may relocate it) and enforce containment against that folder, so
+    # a read can never walk out of the place screenshots actually live.
+    try:
+        base = os.path.realpath(SHOTS)
+        path = os.path.realpath(os.path.join(SHOTS, safe))
+    except Exception:
+        return {}
+    if not (path == base or path.startswith(base + os.sep)):
+        return {}
+    if os.path.basename(path) != safe:
+        return {}
+    try:
+        if not os.path.isfile(path):
+            return {}
+        size = os.path.getsize(path)
+        if size <= 0 or size > limit_bytes:
+            return {}
+        with open(path, "rb") as stream:
+            data = stream.read()
+    except Exception:
+        return {}
+    return {
+        "name": safe,
+        "bytes": len(data),
+        "mimeType": "image/png",
+        "modified": time.strftime("%Y-%m-%d %H:%M:%S",
+                                  time.localtime(os.path.getmtime(path))),
+        "data": base64.b64encode(data).decode("ascii"),
+    }
 
 
 def _hidden_subprocess_options() -> dict:
@@ -87,11 +218,453 @@ def _run_hidden(command, **kwargs):
 # Bump on every behaviour change. Served on /health so a stale process
 # (old code, old port-holder, double instance) is detectable remotely
 # instead of producing "nothing changed" mystery runs.
-VERSION = "2026-09-17-gaps2"
+VERSION = "2026-09-20-offline-planner-wording"
 STRATEGY_MEM_FILE = os.path.join(os.path.dirname(__file__),
                                  "strategy_memory.json")
 STRATEGY_STORE = StrategyStore(STRATEGY_MEM_FILE)
 LEARNING = SessionLearningController(STRATEGY_STORE)
+
+# CROSS-RUN MEMORY: the parts that must outlive `_run_reset`.
+# StrategyStore only ever held pixel-level tactics (this button is here), so
+# nothing existed to stop a *whole step* from failing the identical way on
+# every run.  These three do.  See learning_memory.py.
+LLM_MEMORY = LlmRejectionStore(
+    os.path.join(os.path.dirname(__file__), "llm_memory.json"))
+RUN_LEDGER = RunLedger(
+    os.path.join(os.path.dirname(__file__), "run_ledger.json"))
+CAPABILITIES = CapabilityMap(
+    os.path.join(os.path.dirname(__file__), "pt_capability.json"))
+
+# USER CORRECTIONS: what the user said when the engine got something wrong.
+# Kept apart from the three above because it is the only store whose rows are a
+# hypothesis rather than a measurement.  Nothing here changes behaviour on its
+# own - a correction has to be re-attempted and verified first (see
+# learning_memory.py for the rule, and _undo_promotion below for the way out).
+CORRECTIONS = CorrectionStore(
+    os.path.join(os.path.dirname(__file__), "corrections.json"))
+
+# TEACH OVERRIDES ------------------------------------------------------
+# How a correction gets to be applied WITHOUT being believed.  The user's
+# answer is armed here for exactly one run, the step is re-attempted, and the
+# screen decides whether it was right; only then does anything get written to
+# a store (see _undo_promotion for the way back out).
+#
+# This dict is empty on every ordinary run, so every lookup that consults it
+# behaves byte-for-byte as it did before, and nothing here is ever serialised.
+_TEACH_OVERRIDES: dict = {}
+
+
+def _teach_override(store: str, key: str, dev: str = "") -> dict:
+    """The override for one store lookup, or {} - which is the normal case."""
+    if not _TEACH_OVERRIDES:
+        return {}
+    store = str(store or "")
+    key = str(key or "")
+    candidates = [f"{store}|{key}"]
+    if dev:
+        # Device-specific first: a correction made on one device must not
+        # silently apply to another device in the same teach run.
+        candidates.insert(0, f"{store}|{key}|{dev}")
+    for candidate in candidates:
+        row = _TEACH_OVERRIDES.get(candidate)
+        if isinstance(row, dict):
+            return dict(row)
+    return {}
+
+
+def _teach_label(store: str, key: str, dev: str = "") -> str:
+    """A taught LABEL, stripped and bounded.  '' when there is none."""
+    return str(_teach_override(store, key, dev).get("label")
+               or "").strip()[:80]
+
+
+def _teach_point(store: str, key: str, dev: str = ""):
+    """A taught (fx, fy) inside the window, or None.
+
+    Rejects anything outside 0..1 for the same reason the store does: a
+    fraction of 1.4 is a point in another coordinate system, and clicking it
+    would land off the window.
+    """
+    row = _teach_override(store, key, dev)
+    try:
+        fx, fy = float(row["fx"]), float(row["fy"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if 0.0 < fx < 1.0 and 0.0 < fy < 1.0:
+        return (fx, fy)
+    return None
+
+
+def _teach_kind(store: str, key: str, dev: str = "", default: str = "single"):
+    """The field shape a taught point is for ('single' or 'octets')."""
+    kind = str(_teach_override(store, key, dev).get("kind") or "").strip()
+    return kind if kind in ("single", "octets") else default
+
+
+def _load_teach_overrides(teach) -> list:
+    """Arm the overrides from a plan's `teach` block; return what was armed.
+
+    Every entry must name the store and key its correction applies to: a
+    correction that cannot say WHERE it applies cannot be verified, and an
+    override with no key would silently apply everywhere.
+    """
+    _TEACH_OVERRIDES.clear()
+    armed = []
+    for item in (teach if isinstance(teach, list) else []):
+        if not isinstance(item, dict):
+            continue
+        store = str(item.get("store") or "").strip()[:24]
+        key = str(item.get("key") or "").strip()[:80]
+        if not store or not key:
+            continue
+        override = {}
+        label = str(item.get("label") or "").strip()
+        if label:
+            override["label"] = label[:80]
+        cli = str(item.get("cli") or "").strip()
+        if cli:
+            override["cli"] = cli[:400]
+        kind = str(item.get("kind") or "").strip().lower()
+        if kind in ("single", "octets"):
+            override["kind"] = kind
+        # fx and fy are one thing, not two: an override carrying a single
+        # axis would be armed, matched, and then silently ignored by
+        # _teach_point, which wants both.  Take them as a pair or not at all.
+        point = {}
+        for axis in ("fx", "fy"):
+            try:
+                value = float(item.get(axis))
+            except (TypeError, ValueError):
+                continue
+            if 0.0 <= value <= 1.0:
+                point[axis] = round(value, 4)
+        if len(point) == 2:
+            override.update(point)
+        try:
+            above = float(item.get("clickAbove"))
+        except (TypeError, ValueError):
+            above = None
+        if above is not None and 0.0 <= above <= 1.0:
+            override["clickAbove"] = round(above, 4)
+        if not override:
+            continue
+        dev = str(item.get("device") or "").strip()
+        _TEACH_OVERRIDES[f"{store}|{key}|{dev}" if dev
+                        else f"{store}|{key}"] = override
+        armed.append({"store": store, "key": key, "device": dev,
+                      "correctionId": str(item.get("correctionId") or "")[:20]})
+    return armed
+
+
+# PHASE 2: PROVENANCE, PRECEDENCE AND SETTLEMENT -------------------------
+# Phase 1 made a correction APPLICABLE without being believed.  Phase 2 closes
+# the loop: when the teach run's step verifies on screen, the override is
+# promoted into the same memory the engine reads - tagged as user-taught,
+# ranked above anything the engine learned on its own, and guarded against
+# silent eviction or overwrite.  When the step does not verify, the
+# correction is REJECTED with the observed reason and shown back to the user;
+# and once promoted, a correction that stops working is REPORTED as stale,
+# never quietly quarantined the way the engine's own guesses are.
+
+
+def _taught_meta(cid: str = "", device: str = "") -> dict:
+    """The provenance tag stamped onto every promoted entry."""
+    meta = {"taught": True}
+    if cid:
+        meta["correctionId"] = str(cid)[:20]
+    if device:
+        meta["taughtOn"] = str(device)[:60]
+    return meta
+
+
+def _taught_meta_of(entry) -> dict:
+    """Read a promoted entry's provenance tag, or {} for engine-learned."""
+    if not isinstance(entry, dict):
+        return {}
+    if not entry.get("taught"):
+        return {}
+    return {"correctionId": str(entry.get("correctionId") or ""),
+            "taughtOn": str(entry.get("taughtOn") or "")}
+
+
+def _taught_cid(store: str, key: str, dev: str = "") -> str:
+    """The correctionId behind the armed override for one lookup, or ''."""
+    return str(_teach_override(store, key, dev).get("correctionId") or "")
+
+
+def _is_taught_pc_spot(scoped_key: str) -> bool:
+    """True when this PC_LEARNED entry was promoted from a correction."""
+    return bool(_taught_meta_of(PC_LEARNED.get(scoped_key)))
+
+
+def _is_taught_srv(store: str, key: str) -> bool:
+    """True when this SRV_MEM field/button entry came from a correction."""
+    if store not in ("SRV_MEM:f", "SRV_MEM:b"):
+        return False
+    bucket = "fields" if store == "SRV_MEM:f" else "buttons"
+    return bool(_taught_meta_of(SRV_MEM.get(bucket, {}).get(key)))
+
+
+def _protect_taught_spot(scoped_key: str, dev: str = "") -> bool:
+    """Refuse to overwrite or evict a user-taught PC tile spot.
+
+    Called from every path that would replace or drop a learned spot.  The
+    engine's own spots are disposable - it re-learns them - but a spot the
+    user personally taught is not the engine's to discard; it misses twice
+    and is then REPORTED (correction_stale), which is the teach loop's answer
+    to 'the thing you taught stopped working'.
+    """
+    if not _is_taught_pc_spot(scoped_key):
+        return False
+    meta = _taught_meta_of(PC_LEARNED.get(scoped_key))
+    cid = meta.get("correctionId", "")
+    if cid:
+        row = CORRECTIONS.record_miss(cid, "taught spot was about to be "
+                                      "overwritten by the engine")
+        if row.get("stale"):
+            record_event(
+                "correction_stale",
+                f"taught {scoped_key} spot keeps missing "
+                f"({row.get('misses')}x) - re-teach or un-teach it",
+                device=dev, recovered=False,
+                extra={"correctionId": cid})
+            log(f"{dev}: TAUGHT {scoped_key} spot reported STALE - kept, "
+                f"not deleted (correction {cid})")
+        else:
+            record_event(
+                "correction_protected",
+                f"engine guess for {scoped_key} discarded; user-taught spot "
+                f"kept", device=dev, recovered=True,
+                extra={"correctionId": cid})
+    return True
+
+
+def _protect_taught_srv(store: str, key: str, dev: str = "") -> bool:
+    """Same guard for SRV_MEM fields/buttons.  True = do not touch it."""
+    if not _is_taught_srv(store, key):
+        return False
+    bucket = "fields" if store == "SRV_MEM:f" else "buttons"
+    meta = _taught_meta_of(SRV_MEM.get(bucket, {}).get(key))
+    cid = meta.get("correctionId", "")
+    if cid:
+        row = CORRECTIONS.record_miss(cid, "taught spot was about to be "
+                                      "overwritten by the engine")
+        if row.get("stale"):
+            record_event(
+                "correction_stale",
+                f"taught {key} spot keeps missing ({row.get('misses')}x) - "
+                f"re-teach or un-teach it",
+                device=dev, recovered=False,
+                extra={"correctionId": cid})
+            log(f"{dev}: TAUGHT {key} spot reported STALE - kept, not "
+                f"deleted (correction {cid})")
+        else:
+            record_event(
+                "correction_protected",
+                f"engine guess for {key} discarded; user-taught spot kept",
+                device=dev, recovered=True,
+                extra={"correctionId": cid})
+    return True
+
+
+def _settle_teach_run(ok: bool, reason: str = "") -> list:
+    """Promote or reject the corrections this teach run armed.  Once.
+
+    Called at the end of every build-path run (which is what a teach run is).
+    With nothing armed - every ordinary run - it does nothing.  With overrides
+    armed, the SCREEN has already decided: `ok` is the run's own verdict.
+    Verified overrides are promoted into the store named by their key, each
+    tagged with provenance; anything not verified is rejected with the
+    observed reason and kept so the user can adjust and re-teach it.  A run
+    that never reached its step (crash, stop, phase never ran) cannot confirm
+    OR deny the answer, so the correction stays `proposed` for the next teach
+    run.
+
+    Every branch is idempotent: promotion marks the row verified, and the
+    overrides are cleared, so a second call is a no-op.
+    """
+    if not _TEACH_OVERRIDES:
+        return []
+    armed = [dict(item) for item in RUN.get("teachRun") or []]
+    results = []
+    for item in armed:
+        cid = str(item.get("correctionId") or "")
+        store = str(item.get("store") or "")
+        key = str(item.get("key") or "")
+        dev = str(item.get("device") or "")
+        row = CORRECTIONS.get(cid)
+        if not row:
+            continue
+        if row.get("status") == "verified":
+            results.append({"correctionId": cid, "promoted": True,
+                            "alreadyVerified": True})
+            continue
+        if not ok:
+            # Distinguish 'the screen disagreed' from 'the run never tried':
+            # a crash or a stop leaves no verdict to learn from, so the
+            # hypothesis survives for the next teach run.
+            if str(reason).strip().lower() in ("", "run crashed", "stopped"):
+                results.append({"correctionId": cid, "promoted": False,
+                                "pending": True, "reason": str(reason)[:120]})
+                continue
+            updated = CORRECTIONS.mark_rejected(
+                cid, str(reason or "step did not verify")[:200])
+            record_event(
+                "correction_rejected",
+                f"teach run could not verify {store}:{key} "
+                f"({str(reason)[:80]}) - nothing was written to memory",
+                device=dev, recovered=False,
+                extra={"correctionId": cid})
+            log(f"TEACH REJECTED {store}:{key} - {str(reason)[:100]}; "
+                f"correction {cid} kept for adjustment, nothing promoted")
+            results.append({"correctionId": cid, "promoted": False,
+                            "status": updated.get("status", "rejected"),
+                            "reason": str(reason)[:120]})
+            continue
+        ref = _promote_teach_override(store, key, dev, cid)
+        if not ref:
+            results.append({"correctionId": cid, "promoted": False,
+                            "reason": f"unknown store {store}"})
+            continue
+        updated = CORRECTIONS.mark_verified(cid, ref)
+        CORRECTIONS.record_hit(cid)
+        record_event(
+            "correction_verified",
+            f"teach run verified {store}:{key}; promoted to {ref} "
+            f"- user-taught entries outrank learned ones",
+            device=dev, recovered=True,
+            extra={"correctionId": cid, "promotion": ref})
+        log(f"TEACH VERIFIED {store}:{key} - promoted ({ref}); "
+            f"user-taught entries now outrank learned ones")
+        results.append({"correctionId": cid, "promoted": True,
+                        "promotion": ref,
+                        "status": updated.get("status", "verified")})
+    RUN["teachResults"] = results
+    _TEACH_OVERRIDES.clear()
+    return results
+
+
+def _promote_teach_override(store: str, key: str, dev: str,
+                            cid: str) -> str:
+    """Write ONE verified override into its store, tagged and scoped.
+
+    Returns the promotion_ref handle (which `revert` needs to undo exactly
+    this entry), or '' when the store is unknown.  Scoping follows the teach
+    run's own arming: a device-scoped override stays on that device (PC tile
+    spots are per device; a placement lands on that project+device), and a
+    device-type-scoped one lands on the type key (`_pc_spot_key`).
+    """
+    override = _teach_override(store, key, dev)
+    if not override:
+        return ""
+    meta = _taught_meta(cid, dev)
+    if store == "pc_tile":
+        scoped = _pc_spot_key(key, dev)
+        fx, fy = override.get("fx"), override.get("fy")
+        if fx is None or fy is None:
+            return ""
+        PC_LEARNED[scoped] = {"fx": round(float(fx), 4),
+                              "fy": round(float(fy), 4), **meta}
+        try:
+            with open(PC_LEARNED_FILE, "w") as f:
+                json.dump(PC_LEARNED, f, indent=2)
+        except Exception as e:
+            log(f"pc_tiles save failed on promotion: {e}")
+        return promotion_ref("PC_LEARNED", scoped, "dtype", "")
+    if store == "srv_field":
+        fx, fy = override.get("fx"), override.get("fy")
+        if fx is None or fy is None:
+            return ""
+        SRV_MEM["fields"][key] = {"fx": round(float(fx), 4),
+                                  "fy": round(float(fy), 4),
+                                  "kind": str(override.get("kind") or "single"),
+                                  "misses": 0, **meta}
+        _save_srv_mem()
+        return promotion_ref("SRV_MEM:f", key, "dtype", "")
+    if store == "srv_button":
+        fx, fy = override.get("fx"), override.get("fy")
+        if fx is None or fy is None:
+            return ""
+        SRV_MEM["buttons"][key] = {"fx": round(float(fx), 4),
+                                   "fy": round(float(fy), 4), **meta}
+        _save_srv_mem()
+        return promotion_ref("SRV_MEM:b", key, "dtype", "")
+    if store == "placement":
+        fx, fy = override.get("fx"), override.get("fy")
+        if fx is None or fy is None:
+            return ""
+        project = str(RUN.get("project", "default") or "default")
+        prior = ((DEV_MEM.get(project) or {}).get(key) or {})
+        DEV_MEM.setdefault(project, {})[key] = {
+            "fx": round(float(fx), 4), "fy": round(float(fy), 4),
+            "type": str(prior.get("type", "") or ""),
+            "model": str(prior.get("model") or ""),
+            "verified": True, "layout": LAYOUT_VERSION, **meta}
+        if LAST_GEOM:
+            DEV_MEM["_geom"] = dict(LAST_GEOM)
+        save_dev_mem()
+        # The composite is the KEY here: parse_promotion hands it back
+        # to _undo_promotion, which splits project:device again.
+        return promotion_ref("DEV_MEM", f"{project}:{key}",
+                             "device", "")
+    if store == "capability":
+        family, _, model = str(key).partition("::")
+        row = CAPABILITIES.mark(family, model,
+                                str(override.get("label")
+                                    or "user-confirmed unsupported"),
+                                proven=True)
+        if not row:
+            return ""
+        return promotion_ref("CAPABILITY", key, "model", "")
+    return ""
+
+
+def _undo_promotion(row: dict) -> dict:
+    """Remove the ONE entry a correction promoted - and only that one.
+
+    The stores this reaches are defined further down the file; they are read at
+    call time, so the ordering does not matter.  Entries another run re-learned
+    on its own are deliberately left alone: deleting memory the engine has
+    since re-verified would be a worse surprise than a stale spot.  A
+    correction that never promoted is a no-op, not an error.
+    """
+    ref = parse_promotion(str((row or {}).get("promotedTo", "") or ""))
+    store = ref.get("store", "")
+    key = ref.get("key", "")
+    if not store or not key:
+        return {"undone": False, "reason": "this correction never promoted"}
+    removed = False
+    if store == "PC_LEARNED":
+        removed = PC_LEARNED.pop(key, None) is not None
+        if removed:
+            try:
+                with open(PC_LEARNED_FILE, "w") as f:
+                    json.dump(PC_LEARNED, f, indent=2)
+            except Exception as exc:
+                log(f"pc_tiles save failed on revert: {exc}")
+    elif store == "SRV_MEM:f":
+        removed = SRV_MEM["fields"].pop(key, None) is not None
+        if removed:
+            _save_srv_mem()
+    elif store == "SRV_MEM:b":
+        removed = SRV_MEM["buttons"].pop(key, None) is not None
+        if removed:
+            _save_srv_mem()
+    elif store == "CAPABILITY":
+        family, _, model = key.partition("::")
+        removed = CAPABILITIES.remove(family, model)
+    elif store == "DEV_MEM":
+        # A taught placement was stored under its own project; undo
+        # exactly that entry and nothing else.
+        project, _, name = str(key).partition(":")
+        entry = ((DEV_MEM.get(project) or {}).get(name) or {})
+        if entry.get("taught"):
+            DEV_MEM[project].pop(name, None)
+            removed = True
+            save_dev_mem()
+        else:
+            removed = False
+    return {"undone": removed, "store": store, "key": key}
 
 
 def _safe_path(name: str) -> str:
@@ -278,6 +851,43 @@ def save_dev_mem():
 
 def remember_device(project: str, name: str, fx: float, fy: float,
                     dtype: str = "", model: str = "", verified: bool = False):
+    existing = ((DEV_MEM.get(project) or {}).get(name) or {})
+    if isinstance(existing, dict) and existing.get("taught"):
+        # A user taught this placement and a teach run verified it.  Reusing
+        # the same spot just refreshes metadata; a DIFFERENT spot is a miss
+        # against the correction - counted and, at the stale threshold,
+        # reported (correction_stale) rather than silently overwritten.
+        try:
+            same = (abs(float(existing.get("fx", 0)) - float(fx or 0)) <= 0.01
+                    and abs(float(existing.get("fy", 0)) - float(fy or 0)) <= 0.01)
+        except (TypeError, ValueError):
+            same = False
+        cid = str(existing.get("correctionId") or "")
+        if same:
+            existing.update({"type": dtype, "model": model or "",
+                             "verified": bool(verified),
+                             "layout": LAYOUT_VERSION})
+            if LAST_GEOM:
+                DEV_MEM["_geom"] = dict(LAST_GEOM)
+            save_dev_mem()
+            return
+        if cid:
+            row = CORRECTIONS.record_miss(cid, "canvas no longer matches the "
+                                          "taught placement")
+            if row.get("stale"):
+                record_event("correction_stale",
+                             f"taught placement of {name} keeps missing "
+                             f"({row.get('misses')}x) - re-teach or un-teach it",
+                             device=name, recovered=False,
+                             extra={"correctionId": cid})
+            else:
+                record_event("correction_protected",
+                             f"engine re-placement of {name} discarded; "
+                             f"user-taught spot kept", device=name,
+                             recovered=True, extra={"correctionId": cid})
+        log(f"{name}: TAUGHT placement kept at ({existing.get('fx')},"
+            f"{existing.get('fy')}) - engine wanted ({fx},{fy})")
+        return
     DEV_MEM.setdefault(project, {})[name] = {
         "fx": round(fx, 4), "fy": round(fy, 4), "type": dtype,
         "model": model or "",
@@ -431,6 +1041,22 @@ LLM = {
 LLM_MAX_CALLS_PER_RUN = 5
 LLM_MAX_CALLS_PER_DEVICE = 2
 LLM_TIMEOUT_S = 20
+
+# AI SUGGEST (app-driven, offline) -------------------------------------
+# The app asks the sidecar to (1) PROPOSE fixes for what the journal says
+# keeps failing and (2) EVALUATE each proposal with an independent second
+# Gemini call.  This runs OUTSIDE any build: no Packet Tracer window, no
+# typing, no store writes - the only output is proposal rows the app shows,
+# and label/capability ones that pass both stages become `proposed`
+# CORRECTIONS the next teach run has to verify on screen.  Never
+# auto-promoted: an AI answer is a hypothesis exactly like a user's typed
+# one, just a cheaper hypothesis.
+AI_SUGGEST_MAX_PROPOSALS = 4
+AI_SUGGEST_EVALUATORS = 1     # independent evaluation calls per proposal
+AI_SUGGEST_MIN_SCORE = 3      # 1..5 from the evaluator; below this = dropped
+AI_SUGGEST_MAX_LINES = 3      # commands per CLI proposal (mirrors _llm_prompt)
+AI_SUGGEST: dict = {"running": False,
+                    "last": None, "error": "", "finished": ""}
 LLM_ASKED: set = set()          # (device, command key) already asked this run
 LLM_PER_DEVICE: dict = {}       # device -> calls used this run
 # `key <secret>` / `password <secret>` / `secret <secret>` / `md5 <secret>`
@@ -537,8 +1163,16 @@ def _llm_request(prompt: str) -> str:
 
 
 def _llm_prompt(project: str, dev: str, dtype: str, line: str, sample: str,
-                mode: str) -> str:
-    return (
+                mode: str, blockers: list | None = None,
+                rejected: list | None = None) -> str:
+    """Build the recovery prompt, including what earlier runs already tried.
+
+    Without [blockers] and [rejected] this prompt was stateless: the same
+    line produced the same question every run, received the same unusable
+    answer, and nothing carried over.  Both sections are bounded so prompt
+    growth stays predictable (top-N blockers, short one-liners).
+    """
+    text = (
         "You are repairing a Cisco IOS configuration typed into Packet "
         "Tracer. Packet Tracer rejects some real IOS commands.\n"
         "Answer with STRICT JSON only, no prose, no code fences:\n"
@@ -551,6 +1185,21 @@ def _llm_prompt(project: str, dev: str, dtype: str, line: str, sample: str,
         f"terminal error seen: {sample}\n"
         f"project: {project}\n"
     )
+    if blockers:
+        text += (
+            "\nKnown blockers from previous runs. These steps have failed "
+            "repeatedly and never recovered. Do NOT propose them again - "
+            "propose a supported alternative, or answer with an empty "
+            "commands list if Packet Tracer genuinely cannot do it:\n"
+            + "\n".join(blockers[:JOURNAL_BLOCKER_LIMIT]) + "\n"
+        )
+    if rejected:
+        text += (
+            "\nAlready tried and REJECTED for this exact line - do not "
+            "repeat these:\n"
+            + "\n".join(f"- {item}" for item in rejected[:6]) + "\n"
+        )
+    return text
 
 
 def _llm_try_fix(win, project: str, dev: str, dtype: str, line: str,
@@ -563,15 +1212,41 @@ def _llm_try_fix(win, project: str, dev: str, dtype: str, line: str,
     key = command_key(line)
     if (dev, key) in LLM_ASKED or not llm_available(dev):
         return []
+    # PERSISTED REJECTIONS: asking again about a line the model has already
+    # failed on twice burns budget for a question whose answer is known.
+    # Checked BEFORE any bookkeeping so a skipped ask costs nothing.
+    if LLM_MEMORY.blocked(key, mode, sample):
+        history = LLM_MEMORY.row(key, mode, sample)
+        RUN["llm_asks_skipped"] = RUN.get("llm_asks_skipped", 0) + 1
+        log(f"{dev}: skipping Gemini ask for '{line[:70]}' - rejected "
+            f"{int(history.get('rejections', 0))}x before "
+            f"({str(history.get('lastReason', ''))[:60]})")
+        record_event("llm_ask_skipped",
+                     f"not asking again about '{line[:80]}': the model has "
+                     f"been rejected for this line "
+                     f"{int(history.get('rejections', 0))}x before",
+                     device=dev, recovered=False,
+                     extra={"rejections": history.get("rejections", 0),
+                            "reason": history.get("lastReason", "")})
+        return []
     LLM_ASKED.add((dev, key))
     LLM_PER_DEVICE[dev] = LLM_PER_DEVICE.get(dev, 0) + 1
     LLM["calls"] += 1
     RUN["llm_calls"] = RUN.get("llm_calls", 0) + 1
 
+    history = LLM_MEMORY.row(key, mode, sample)
+    rejected_hint = []
+    if history:
+        rejected_hint.append(
+            f"{int(history.get('rejections', 0))} earlier attempt(s) for this "
+            f"line were rejected ({str(history.get('lastReason', ''))[:80]})")
+
     try:
         answer = _llm_request(_llm_prompt(project, dev, dtype,
                                           llm_redact(line), llm_redact(sample),
-                                          mode))
+                                          mode,
+                                          blockers=blocker_lines(project),
+                                          rejected=rejected_hint))
     except Exception as exc:
         answer = ""
         log(f"{dev}: Gemini request failed ({str(exc)[:90]})")
@@ -580,6 +1255,8 @@ def _llm_try_fix(win, project: str, dev: str, dtype: str, line: str,
     if not commands:
         LLM["rejected"] += 1
         RUN["llm_fixes_rejected"] = RUN.get("llm_fixes_rejected", 0) + 1
+        LLM_MEMORY.record(key, mode, sample,
+                          "no usable Gemini suggestion", dev)
         record_event("llm_fix_rejected",
                      f"no usable Gemini suggestion for '{line[:80]}'",
                      device=dev, recovered=False)
@@ -614,6 +1291,10 @@ def _llm_try_fix(win, project: str, dev: str, dtype: str, line: str,
     if not (typed and after_count <= before_count):
         LLM["rejected"] += 1
         RUN["llm_fixes_rejected"] = RUN.get("llm_fixes_rejected", 0) + 1
+        LLM_MEMORY.record(
+            key, mode, sample,
+            "suggestion did not clear the error: "
+            + "; ".join(commands[:3]), dev)
         record_event("llm_fix_rejected",
                      f"Gemini suggestion did not clear '{line[:80]}'",
                      device=dev, recovered=False,
@@ -622,11 +1303,411 @@ def _llm_try_fix(win, project: str, dev: str, dtype: str, line: str,
 
     LLM["applied"] += 1
     RUN["llm_fixes_applied"] = RUN.get("llm_fixes_applied", 0) + 1
+    # A verified fix retires the persisted block for this exact triple, so a
+    # later run may ask again if the screen changes.
+    LLM_MEMORY.clear(key, mode, sample)
     record_event("llm_fix_applied",
                  f"Gemini suggestion verified for '{line[:80]}'",
                  device=dev, recovered=True,
                  extra={"commands": commands[:3], "model": LLM["model"]})
     return commands
+
+
+def _blocker_prompt(project: str, dev: str, dtype: str, action: str,
+                    reason: str, blockers: list) -> str:
+    """Phase-level prompt for a step that keeps failing."""
+    text = (
+        "A Packet Tracer automation step keeps failing the same way across "
+        "runs. Diagnose the most likely cause and give at most 3 IOS "
+        "commands that would fix it, or an empty list when this is an "
+        "environment/UI problem no command can fix.\n"
+        "Answer with STRICT JSON only, no prose, no code fences:\n"
+        '{"commands": [], "explanation": "..."}\n\n'
+        f"project: {project}\n"
+        f"device: {dev} ({dtype})\n"
+        f"failing action: {action}\n"
+        f"evidence from the previous run(s): {reason}\n"
+    )
+    if blockers:
+        text += ("\nOther known blockers (context only):\n"
+                 + "\n".join(blockers[:6]) + "\n")
+    return text
+
+
+def _llm_escalate_blocker(project: str, dev: str, dtype: str, action: str,
+                          reason: str) -> dict:
+    """One phase-level ask about a step that keeps failing. Never types.
+
+    [_llm_try_fix] only ever sees one terminal *line*, so it cannot diagnose
+    "this whole action never verifies".  This is the escalation the
+    repeat-offender policy calls for.  It returns a diagnosis for the record
+    and deliberately sends no keystrokes: an unverified suggestion must not
+    become a blind action, which is the same fail-closed rule the CLI mode
+    proof follows.
+    """
+    if not llm_available(dev):
+        return {"asked": False, "reason": "no LLM budget or not configured"}
+    ask_key = (dev, f"blocker|{action}")
+    if ask_key in LLM_ASKED:
+        return {"asked": False, "reason": "already escalated this run"}
+    commands, explanation, failed = [], "", ""
+    try:
+        LLM_ASKED.add(ask_key)
+        LLM_PER_DEVICE[dev] = LLM_PER_DEVICE.get(dev, 0) + 1
+        LLM["calls"] += 1
+        RUN["llm_calls"] = RUN.get("llm_calls", 0) + 1
+        answer = _llm_request(_blocker_prompt(
+            project, dev, dtype, action, reason, blocker_lines(project)))
+        match = re.search(r"\{.*\}", str(answer or ""), re.S)
+        parsed = {}
+        if match:
+            try:
+                parsed = json.loads(match.group(0))
+            except Exception:
+                parsed = {}
+        if isinstance(parsed, dict):
+            commands = _llm_parse_commands(json.dumps(parsed))
+            explanation = str(parsed.get("explanation", ""))[:240]
+        else:
+            failed = "answer was not usable JSON"
+    except Exception as exc:
+        failed = str(exc)[:120]
+        log(f"{dev}: blocker escalation failed ({failed})")
+    if failed:
+        LLM["rejected"] += 1
+        RUN["llm_fixes_rejected"] = RUN.get("llm_fixes_rejected", 0) + 1
+    return {"asked": True, "commands": commands, "explanation": explanation,
+            "error": failed}
+
+
+def _ai_target_kind_of_failure(kind: str) -> dict:
+    """What an AI proposal for this failure kind may aim at.
+
+    Only the taxonomy's teachable kinds get proposals; the plan (target,
+    default scope, verification evidence) comes from the same
+    CORRECTION_TAXONOMY the correction sheet uses, so an AI proposal and a
+    user correction land in exactly the same pipeline.
+    """
+    plan = correction_plan(kind)
+    if not plan.get("teachable"):
+        return {}
+    return {"target": plan.get("target", "label"),
+            "scope": plan.get("scope", "dtype"),
+            "store": plan.get("store", ""),
+            "verify": plan.get("verify", "")}
+
+
+def _ai_failure_context(project: str) -> list:
+    """The journal's worst recurring failures, as proposal inputs.
+
+    Unrecovered signatures only: something that already recovered is not a
+    fix worth teaching.  Bounded so one prompt can never blow up.
+    """
+    st = journal_stats()
+    out = []
+    for sig, row in st.get("signatures", []):
+        if row.get("recovered"):
+            continue
+        kind = str(sig).split("|", 1)[0]
+        aim = _ai_target_kind_of_failure(kind)
+        if not aim:
+            continue
+        out.append({"kind": kind, "signature": sig,
+                    "count": int(row.get("count", 0)),
+                    "lastSeen": str(row.get("last", ""))[:19],
+                    "detail": sig.split("|", 1)[1] if "|" in sig else sig,
+                    **aim})
+        if len(out) >= 6:
+            break
+    return out
+
+
+def _ai_proposal_prompt(failures: list, capabilities: list) -> str:
+    """The PROPOSE prompt: real failure context in, structured rows out."""
+    text = (
+        "You propose fixes for steps that keep failing when an automation "
+        "engine drives Cisco Packet Tracer.\n"
+        "Answer with STRICT JSON only, no prose, no code fences:\n"
+        '{"proposals": [{"failureKind": "...", "target": "label|point|cli|'
+        'skip", "label": "...", "cli": ["..."], "pointHint": "words only", '
+        '"reason": "why this helps"}], "explanation": "..."}\n'
+        "Rules: at most 4 proposals. 'label' = the exact on-screen text of "
+        "the tile/button/field row to use instead (2-60 chars). 'point' = "
+        "describe WHERE in words only (the engine measures pixels itself; "
+        "never invent coordinates). 'cli' = 1-3 real IOS commands, each one "
+        "line under 120 chars. 'skip' = declare the step impossible; say "
+        "why in reason. A proposal MUST name the failureKind it fixes.\n\n"
+    )
+    text += "Recurring failures (kind | times unrecovered | what was seen):\n"
+    for f in failures:
+        text += f"- {f['kind']} | {f['count']}x | {f['detail'][:120]}\n"
+    if capabilities:
+        text += ("\nAlready PROVEN impossible on this model (do not propose "
+                 "these again):\n" + "\n".join(capabilities[:8]) + "\n")
+    return text
+
+
+def _ai_parse_proposals(answer: str, failures: list) -> list:
+    """Read the proposer's JSON; keep only rows tied to a known failure."""
+    match = re.search(r"\{.*\}", str(answer or ""), re.S)
+    if not match:
+        return []
+    try:
+        data = json.loads(match.group(0))
+    except Exception:
+        return []
+    proposals = data.get("proposals") if isinstance(data, dict) else None
+    if not isinstance(proposals, list):
+        return []
+    known = {f["kind"]: f for f in failures}
+    out = []
+    for raw in proposals[:AI_SUGGEST_MAX_PROPOSALS + 2]:
+        if not isinstance(raw, dict):
+            continue
+        kind = str(raw.get("failureKind", "")).strip()[:60]
+        f = known.get(kind)
+        if not f:
+            continue
+        target = str(raw.get("target", "")).strip().lower()
+        if target not in ("label", "point", "cli", "skip"):
+            target = str(f.get("target", ""))
+        if target not in ("label", "point", "cli", "skip"):
+            continue
+        out.append({
+            "failureKind": kind,
+            "target": target,
+            "label": str(raw.get("label", "")).strip()[:80],
+            "cli": [str(c).strip()[:120]
+                    for c in (raw.get("cli") or [])[:AI_SUGGEST_MAX_LINES]
+                    if str(c).strip()],
+            "pointHint": str(raw.get("pointHint", "")).strip()[:200],
+            "reason": str(raw.get("reason", "")).strip()[:200],
+            "explanation": str(data.get("explanation", "")).strip()[:200],
+            "scope": f.get("scope", "dtype"),
+            "store": f.get("store", ""),
+            "verify": f.get("verify", ""),
+            "count": f.get("count", 0),
+        })
+    return out[:AI_SUGGEST_MAX_PROPOSALS]
+
+
+def _ai_screen_proposal(p: dict) -> str:
+    """Static screening BEFORE the evaluator sees a proposal.
+
+    Returns '' when the proposal may pass to evaluation, else the reason it
+    is dead on arrival: wrong shape for its target, secret-looking text, or
+    a command family already proven unsupported.  Cheap checks first so the
+    expensive second opinion is only spent on plausible rows.
+    """
+    if p.get("target") == "cli":
+        cmds = p.get("cli") or []
+        if not cmds:
+            return "no commands given"
+        proven = CAPABILITIES.proven_families()
+        for cmd in cmds:
+            low = llm_redact(cmd).lower()
+            if "<redacted>" in low:
+                return "command contains a secret-looking token"
+            if len(cmd) > 120 or any(not 32 <= ord(ch) < 127 for ch in cmd):
+                return "command is not a plain single line"
+            family = CapabilityMap.head(cmd)
+            if any(row.get("family") == family for row in proven):
+                return f"family '{family}' is proven unsupported on this model"
+        return ""
+    label = str(p.get("label", "")).strip()
+    if p.get("target") == "label":
+        if not (2 <= len(label) <= 60):
+            return "label must be 2-60 characters of on-screen text"
+        if "<redacted>" in llm_redact(label).lower():
+            return "label contains a secret-looking token"
+        return ""
+    if p.get("target") == "point":
+        # Words are fine; digits mean the model is inventing pixels.
+        if not label and not p.get("pointHint"):
+            return "point proposal carries no description"
+        if re.search(r"\d", label + " " + str(p.get("pointHint", ""))):
+            return "point proposal must be words, not coordinates"
+        return ""
+    if p.get("target") == "skip":
+        return "" if p.get("reason") else "a skip must say why"
+    return "unknown proposal target"
+
+
+def _ai_evaluate_prompt(p: dict, failures: list) -> str:
+    """The EVALUATE prompt: judge one proposal against the same evidence."""
+    f = next((x for x in failures if x["kind"] == p["failureKind"]), {})
+    proposed = json.dumps({"target": p["target"],
+                           "label": p.get("label", ""),
+                           "cli": p.get("cli", []),
+                           "point": p.get("pointHint", ""),
+                           "reason": p.get("reason", "")})
+    text = (
+        "You evaluate ONE proposed fix for a recurring Packet Tracer "
+        "automation failure. Be sceptical: approve only what the evidence "
+        "actually supports.\n"
+        "Answer with STRICT JSON only, no prose, no code fences:\n"
+        '{"verdict": "accept|reject", "score": 1-5, "concern": "the single '
+        'biggest risk, or empty"}\n'
+        "Score meaning: 5 obviously correct, 4 likely correct, 3 plausible "
+        "but unproven, 2 dubious, 1 contradicts the evidence. Only scores "
+        "of 3 or more are worth a user's verification run.\n\n"
+        f"failure kind: {p['failureKind']} (seen {f.get('count', '?')}x "
+        f"unrecovered)\n"
+        f"what was seen: {str(f.get('detail', ''))[:160]}\n"
+        f"proposed fix: {proposed}\n"
+    )
+    return text
+
+
+def _ai_evaluate_proposal(p: dict, failures: list) -> dict:
+    """Independent Gemini verdict(s) for one proposal. Never raises."""
+    scores, concerns, error = [], [], ""
+    for _ in range(AI_SUGGEST_EVALUATORS):
+        try:
+            answer = _llm_request(_ai_evaluate_prompt(p, failures))
+            match = re.search(r"\{.*\}", str(answer or ""), re.S)
+            data = json.loads(match.group(0)) if match else {}
+            score = int(data.get("score", 0) or 0)
+            scores.append(max(0, min(5, score)))
+            verdict = str(data.get("verdict", "")).strip().lower()
+            if verdict == "reject" and scores and scores[-1] >= 3:
+                scores[-1] = 2          # an explicit reject caps the score
+            concerns.append(str(data.get("concern", "")).strip()[:160])
+        except Exception as exc:
+            error = str(exc)[:120]
+            scores.append(0)
+    score = max(scores) if scores else 0
+    return {"score": score,
+            "concern": next((c for c in concerns if c), ""),
+            "error": error}
+
+
+def _ai_proposal_to_correction(p: dict) -> dict:
+    """Turn an accepted proposal into a PROPOSED correction, or {}.
+
+    Only what a teach run can actually verify becomes a correction: labels
+    (tiles/buttons/field rows) and capability skips.  Points are advice
+    only - the AI never measures pixels, the user does.  CLI proposals are
+    advice until the CLI teach store exists.
+    """
+    if p.get("target") == "label":
+        return CORRECTIONS.propose(
+            failure_kind=p["failureKind"], project=_last_project(),
+            target={"kind": "label", "label": p.get("label", ""),
+                    "scope": p.get("scope", "dtype")},
+            evidence={"source": "ai_suggest",
+                      "reason": p.get("reason", "")[:180],
+                      "evaluation": "gemini"})
+    if p.get("target") == "skip" and p.get("store") == "capability":
+        return CORRECTIONS.propose(
+            failure_kind=p["failureKind"], project=_last_project(),
+            target={"kind": "skip", "text": p.get("reason", "")[:200],
+                    "scope": "model"},
+            evidence={"source": "ai_suggest",
+                      "reason": p.get("reason", "")[:180],
+                      "evaluation": "gemini"})
+    return {}
+
+
+def _last_project() -> str:
+    """The project the most recent run aimed at, for proposal scoping."""
+    return str(RUN.get("project", "") or "default")
+
+
+def ai_suggest_fixes(project: str = "") -> dict:
+    """One offline suggest+evaluate pass.  Writes only `proposed` rows.
+
+    Stage 1 (propose): journal failures -> Gemini proposals, statically
+    screened.  Stage 2 (evaluate): each survivor gets an independent
+    Gemini verdict; below AI_SUGGEST_MIN_SCORE it is dropped WITH its
+    concern so the app can show why.  Surviving label/skip rows are recorded
+    as `proposed` corrections - they change nothing until a teach run
+    verifies them on screen.  Point/CLI rows stay advice-only for now.
+    """
+    if AI_SUGGEST.get("running"):
+        return {"ok": False, "error": "already running"}
+    if not (LLM["enabled"] and str(LLM["apiKey"]).strip()):
+        return {"ok": False,
+                "error": "no Gemini key - add one in Settings first"}
+    project = str(project or _last_project() or "default")
+    failures = _ai_failure_context(project)
+    if not failures:
+        return {"ok": True, "proposals": [],
+                "message": "no recurring unrecovered failures to fix"}
+    with LOCK:
+        AI_SUGGEST.update({"running": True, "error": "", "last": None,
+                           "finished": ""})
+    record_event("ai_suggest_started",
+                 f"AI suggest pass over {len(failures)} recurring "
+                 f"failure(s) for '{project}'", recovered=True)
+
+    def _run():
+        try:
+            capabilities = [f"{r.get('family')} ({r.get('reason', '')[:60]})"
+                            for r in CAPABILITIES.proven_families()]
+            answer = _llm_request(
+                _ai_proposal_prompt(failures, capabilities))
+            proposals = _ai_parse_proposals(answer, failures)
+            results = []
+            for p in proposals:
+                screened = _ai_screen_proposal(p)
+                if screened:
+                    results.append({**p, "accepted": False,
+                                    "screenedOut": screened})
+                    continue
+                evaluation = _ai_evaluate_proposal(p, failures)
+                accepted = (evaluation["score"] >= AI_SUGGEST_MIN_SCORE
+                            and not evaluation["error"])
+                row = {**p, "accepted": accepted,
+                       "score": evaluation["score"],
+                       "concern": evaluation["concern"]}
+                if accepted:
+                    correction = _ai_proposal_to_correction(p)
+                    if correction:
+                        row["correctionId"] = correction.get("id", "")
+                        row["recordedAs"] = "proposed"
+                results.append(row)
+            with LOCK:
+                AI_SUGGEST["last"] = {
+                    "ts": _now(), "project": project,
+                    "proposals": results,
+                    "acceptedCount": sum(1 for r in results
+                                         if r.get("accepted")),
+                }
+                AI_SUGGEST["finished"] = _now()
+            record_event("ai_suggest_finished",
+                         f"AI suggest pass: "
+                         f"{sum(1 for r in results if r.get('accepted'))}/"
+                         f"{len(results)} proposal(s) accepted and recorded "
+                         f"as proposed corrections",
+                         recovered=True)
+        except Exception as exc:
+            with LOCK:
+                AI_SUGGEST["error"] = str(exc)[:160]
+                AI_SUGGEST["finished"] = _now()
+            record_event("ai_suggest_finished",
+                         f"AI suggest pass failed: {str(exc)[:120]}",
+                         recovered=False)
+        finally:
+            with LOCK:
+                AI_SUGGEST["running"] = False
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"ok": True, "started": True,
+            "message": "AI suggest pass started; poll /ai_suggest"}
+
+
+def ai_suggest_status() -> dict:
+    """JSON-safe state: run flag, last pass, and the LLM counters."""
+    with LOCK:
+        out = dict(AI_SUGGEST)
+    out["llm"] = llm_status()
+    return out
+
+
+def _now() -> str:
+    """Local timestamp helper (learning_memory keeps its own copy)."""
+    return time.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def learned_cli_lines(project: str, device: str, cfg: str,
@@ -670,7 +1751,25 @@ def learned_cli_lines(project: str, device: str, cfg: str,
                          f"used remembered replacement for '{line[:100]}'",
                          device=device, recovered=True)
         else:
-            out.append(line)
+            # No project-scoped command memory hit, but the strategy store may
+            # still hold the verified replacement for a tactic it quarantined.
+            # Asking for it explicitly (rather than letting the ban filter
+            # just drop the line) is what turns a ban into a fix.
+            strategy_fix = LEARNING.replacement_for(
+                "cli_fallback", "command", {**context, "source": line}, [line])
+            if (isinstance(strategy_fix, list) and strategy_fix
+                    and strategy_fix != [line]):
+                out.extend([str(value)[:180] for value in strategy_fix[:8]])
+                log(f"{device}: quarantined command replaced by its verified "
+                    f"replacement for '{line[:100]}'")
+                record_event(
+                    "learned_command_fix",
+                    f"used the verified replacement for a quarantined line "
+                    f"'{line[:100]}'",
+                    device=device, recovered=True,
+                    extra={"replacement": strategy_fix[:3]})
+            else:
+                out.append(line)
     # Learned replacements are another input path and can contain old
     # wrapper commands saved before the verified mode state machine existed.
     # Sanitize them at the final boundary as well.
@@ -726,6 +1825,18 @@ def _session_cli_context(project: str, device: str,
         "model": remembered.get("model", ""),
         "layout": LAYOUT_VERSION,
     }
+
+
+def _device_model(device: str) -> str:
+    """Best-known Packet Tracer model for a device name ('' when unknown)."""
+    wanted = str(device or "").strip()
+    if not wanted:
+        return ""
+    for devices in (DEV_MEM or {}).values():
+        entry = (devices or {}).get(wanted)
+        if isinstance(entry, dict) and entry.get("model"):
+            return str(entry["model"])[:40]
+    return ""
 
 
 def _immediate_cli_fix(project: str, device: str, dtype: str,
@@ -921,6 +2032,10 @@ def end_activity(kind: str):
     with LOCK:
         if kind == "build":
             JOB.running = False
+            # A teach run's overrides must not outlive the run that armed
+            # them.  This is the release point every build path goes through,
+            # so clearing here covers a clean finish, a stop and a crash.
+            _TEACH_OVERRIDES.clear()
         elif kind == "audit":
             audit = globals().get("AUDIT")
             if isinstance(audit, dict):
@@ -1060,6 +2175,43 @@ def toggle_pause(source: str = "user") -> str:
         return "running"
     request_pause(source)
     return "paused"
+
+
+def _status_payload_locked() -> dict:
+    """The whole /status body.  The caller must already hold LOCK.
+
+    This deliberately takes no locks of its own.  LOCK is a plain
+    ``threading.Lock`` - not reentrant - and the HTTP handler calls this while
+    holding it, so anything in here that re-acquired LOCK would deadlock.  It
+    is not a theoretical hazard: this function used to call
+    ``pause_snapshot()``, which does ``with LOCK``, and because the sidecar
+    serves with a single-threaded ``HTTPServer`` that one call wedged the
+    ENTIRE process - /status never answered, and neither did /health or
+    anything else, for the life of the server.  `activity_snapshot()` had
+    already been given the same treatment for the same reason.
+
+    Extracted from the handler so the property "building this while holding
+    LOCK cannot block" is directly testable.
+    """
+    return {
+        "running": JOB.running,
+        "activity": _active_activity_locked() or None,
+        "stopRequested": JOB.stop_requested,
+        # pause fields inlined, never via pause_snapshot() - see above.
+        "pause": {"paused": bool(JOB.paused),
+                  "pauseRequested": bool(JOB.pause_requested),
+                  "pauseSource": JOB.pause_source or None},
+        "sessionId": LEARNING.session_id,
+        "learning": LEARNING.summary(),
+        "learningEvents": LEARNING.events(40),
+        # The corrections list is a user-facing summary (counts plus the
+        # newest rows), so the app can surface verified/rejected/stale
+        # corrections without a second endpoint.
+        "corrections": CORRECTIONS.summary(),
+        "teachRun": RUN.get("teachRun") or [],
+        "teachResults": RUN.get("teachResults") or [],
+        "log": JOB.log[-80:],
+    }
 
 
 def pause_snapshot() -> dict:
@@ -1203,8 +2355,36 @@ JOURNAL_FILE = os.path.join(os.path.dirname(__file__), "failures.jsonl")
 EXPERIENCE_FILE = os.path.join(os.path.dirname(__file__),
                                "experience_memory.jsonl")
 
+# Journals grow with every run and were never rotated.  This is a safety
+# valve rather than a scheduled job: at the cap the active file is archived
+# to a single `.1` and started fresh.  The cap is roughly 60k events - years
+# of normal use - so the history blockers learn from is not truncated in
+# practice, and a long-lived install cannot grow the file without limit.
+JOURNAL_MAX_BYTES = 16 * 1024 * 1024
+
 # Per-run counters (reset each run_plan); served on /run_summary.
 RUN: dict = {}
+
+
+def _rotate_jsonl(path: str, max_bytes: int = JOURNAL_MAX_BYTES) -> bool:
+    """Archive a journal once it passes the cap. Never raises."""
+    try:
+        if os.path.getsize(path) < max_bytes:
+            return False
+        archive = path + ".1"
+        try:
+            if os.path.exists(archive):
+                os.remove(archive)
+        except Exception:
+            pass
+        os.replace(path, archive)
+        with LOCK:
+            _JSONL_CACHE.pop(path, None)
+        log(f"journal rotated: {os.path.basename(path)} archived to "
+            f"{os.path.basename(archive)}")
+        return True
+    except Exception:
+        return False
 
 # PERFORMANCE COUNTERS --------------------------------------------------
 # A build run is dominated by terminal reads (each one screenshots the
@@ -1303,7 +2483,9 @@ def _write_experience(evt: dict):
 def _run_reset():
     global LEARNING
     LEARNING = SessionLearningController(STRATEGY_STORE)
-    for k in ("devices_done", "devices_skipped", "errors_recovered",
+    for k in ("llm_asks_skipped", "repeat_offender_escalations",
+              "known_blockers_skipped_count",
+              "devices_done", "devices_skipped", "errors_recovered",
               "errors_unrecovered", "setup_no", "saves_retried",
               "model_autotunes", "links_red", "admin_heals",
               "pcs_configured", "pings_ok", "pings_failed",
@@ -1344,6 +2526,14 @@ def _run_reset():
     RUN["session_correction_applications"] = {}
     RUN["phase"] = "starting"
     RUN["sessionId"] = LEARNING.session_id
+    # Ledger-derived context is per-project and filled in by run_plan once
+    # the project name is known; cleared here so a stale copy can never leak
+    # from the previous run.
+    RUN["previousRun"] = {}
+    RUN["repeatOffenders"] = []
+    RUN["repeat_offenders_escalated"] = []
+    RUN["known_blockers_skipped"] = []
+    SKIPPED_ACTIONS.clear()
     # A fresh run starts unpaused; the pause counters document how much of
     # the last run was spent parked (visible on /run_summary).
     RUN["paused_events"] = 0
@@ -1356,6 +2546,12 @@ def _run_reset():
     _CLI_PROOF_MISSES.clear()
     RUN["pkt"] = {}
     RUN["srv_probe"] = {}
+    # Teaching-loop context is per-run too: a stale armed list here would
+    # mislead /status and, worse, let a later ordinary run settle a
+    # correction that run never attempted.
+    RUN["teachRun"] = []
+    RUN["teachResults"] = []
+    RUN["project"] = ""
     RUN["coordinate_space"] = {}
     _SRV_SHADOW_SEEN.clear()
     perf_reset()
@@ -1422,6 +2618,8 @@ def record_event(kind: str, detail: str, device: str = "",
     _EventCounter.total += 1
     _write_experience(evt)
     try:
+        _rotate_jsonl(JOURNAL_FILE)
+        _rotate_jsonl(EXPERIENCE_FILE)
         with open(JOURNAL_FILE, "a", encoding="utf-8") as f:
             f.write(json.dumps(evt) + "\n")
     except Exception as e:
@@ -1429,22 +2627,181 @@ def record_event(kind: str, detail: str, device: str = "",
     log(f"EVENT {kind}: {evt['detail'][:100]}")
 
 
-def _journal_rows(limit: int = 3000) -> list:
+# PARSED-ROW CACHE -----------------------------------------------------
+# /stats, /suggest, /events and /learning each parsed these two files end to
+# end, and the planner's blocker read adds another pass on top.  The files
+# only change when an event is appended, so key the parse on (mtime, size):
+# a write is always observed and a repeated read is free.  Counting only -
+# no read is added or removed vs. before.
+_JSONL_CACHE: dict = {}
+_BLOCKERS_CACHE: dict = {}
+
+
+def _jsonl_cached(path: str) -> list:
+    """Parse a JSONL file, re-reading only when it actually changed."""
     try:
-        with open(JOURNAL_FILE, encoding="utf-8") as f:
-            rows = [json.loads(l) for l in f if l.strip()]
+        stat = os.stat(path)
+        stamp = (stat.st_mtime_ns, stat.st_size)
     except Exception:
         return []
-    return rows[-limit:]
+    with LOCK:
+        hit = _JSONL_CACHE.get(path)
+        if hit and hit[0] == stamp:
+            return hit[1]
+    try:
+        with open(path, encoding="utf-8") as f:
+            rows = [json.loads(l) for l in f if l.strip()]
+    except Exception:
+        rows = []
+    with LOCK:
+        _JSONL_CACHE[path] = (stamp, rows)
+    return rows
+
+
+def _journal_rows(limit: int = 3000) -> list:
+    return _jsonl_cached(JOURNAL_FILE)[-limit:]
 
 
 def _experience_rows(limit: int = 200) -> list:
-    try:
-        with open(EXPERIENCE_FILE, encoding="utf-8") as f:
-            rows = [json.loads(l) for l in f if l.strip()]
-    except Exception:
-        return []
-    return rows[-max(1, min(1000, limit)):]
+    return _jsonl_cached(EXPERIENCE_FILE)[-max(1, min(1000, limit)):]
+
+
+# BLOCKERS: the cross-run loop-closer -----------------------------------
+# A blocker is a recurring UNRECOVERED failure signature.  The kinds below
+# are run bookkeeping rather than mistakes: every run emits them and none of
+# them says anything a later run could act on, so including them would bury
+# the real ones in noise.
+JOURNAL_NOISE_KINDS = {
+    "phase_state", "inventory_done", "audit_done", "run_finished",
+    "cli_transition_skipped", "cli_plan_compiled", "run_started",
+}
+JOURNAL_BLOCKER_MIN_COUNT = 2
+JOURNAL_BLOCKER_LIMIT = 12
+BLOCKER_TTL_S = 20.0
+# Actions that finished in a state nobody has to retry.
+RESOLVED_ACTION_STATUSES = {"verified", "reused", "skipped", "recovered",
+                           "cached", "done"}
+
+
+def _journal_signature(event: dict) -> str:
+    """Stable 'the same mistake' identity: kind + normalized detail."""
+    return (str(event.get("kind", "?"))
+            + ":" + str(event.get("detail", "") or "").strip().lower()[:70])
+
+
+def _unverified_actions() -> list:
+    """Every action result that did not end verified, reused or skipped.
+
+    Shape matches the ledger's `stillFailed` rows.  `reason` prefers what the
+    screen actually showed so a repeat offender is matched on evidence
+    rather than on a status word.
+    """
+    out = []
+    for row in (RUN.get("action_results") or {}).values():
+        if not isinstance(row, dict):
+            continue
+        status = str(row.get("status", ""))
+        if status in RESOLVED_ACTION_STATUSES:
+            continue
+        out.append({
+            "action": str(row.get("action", "")),
+            "device": str(row.get("device", "")),
+            "reason": str(row.get("observed") or status or "unrecorded"),
+        })
+    out.sort(key=lambda item: (item["action"], item["device"]))
+    return out
+
+
+def _compute_blockers(project: str = "",
+                      limit: int = JOURNAL_BLOCKER_LIMIT) -> list:
+    """Recurring unrecovered failures, plus this project's repeat offenders.
+
+    `journal_suggestions()` turns the same data into advice for a human;
+    this is the machine-readable form the planner and the in-run Gemini
+    prompt consume, so a step the engine already knows is bad stops being
+    regenerated on the next run.
+    """
+    agg: dict = {}
+    for event in _journal_rows():
+        kind = str(event.get("kind", "?") or "?")
+        if kind in JOURNAL_NOISE_KINDS:
+            continue
+        sig = _journal_signature(event)
+        row = agg.setdefault(sig, {
+            "kind": kind,
+            "pattern": str(event.get("detail", "") or "")[:70].strip().lower(),
+            "count": 0, "recovered": 0, "last": "", "reason": "",
+            "devices": [], "repeat": False,
+        })
+        row["count"] += 1
+        if event.get("recovered"):
+            row["recovered"] += 1
+        stamp = str(event.get("ts", ""))
+        if stamp >= row["last"]:
+            row["last"] = stamp
+            row["reason"] = str(event.get("detail", ""))[:200]
+        device = str(event.get("device", "") or "").strip()
+        if device and device not in row["devices"] and len(row["devices"]) < 6:
+            row["devices"].append(device)
+    out = [row for row in agg.values()
+           if row["count"] >= JOURNAL_BLOCKER_MIN_COUNT
+           and row["recovered"] == 0]
+    out.sort(key=lambda row: (row["count"], row["last"]), reverse=True)
+    out = out[:limit]
+
+    # REPEAT OFFENDERS: the ledger knows *where* the last run stopped, which
+    # the journal cannot (it has no project).  These are the steps that have
+    # now failed the same way in consecutive runs - the exact complaint this
+    # layer exists to answer.
+    if project:
+        previous = RUN_LEDGER.previous(project)
+        for item in RUN_LEDGER.repeat_offenders(project)[:limit]:
+            out.append({
+                "kind": "repeat_offender",
+                "pattern": f"{item.get('action')} on {item.get('device')}",
+                "count": int(item.get("runs", 0)),
+                "recovered": 0,
+                "last": str(previous.get("ts", "")),
+                "reason": str(item.get("reason", "")),
+                "devices": [item["device"]] if item.get("device") else [],
+                "repeat": True,
+            })
+    return out
+
+
+def known_blockers(project: str = "", limit: int = JOURNAL_BLOCKER_LIMIT,
+                   ttl: float = BLOCKER_TTL_S) -> list:
+    """[_compute_blockers] behind a short TTL memo (called per LLM ask)."""
+    key = f"{project or ''}|{int(limit)}"
+    now = time.time()
+    with LOCK:
+        hit = _BLOCKERS_CACHE.get(key)
+        if hit and now - hit[0] < ttl:
+            return [dict(row) for row in hit[1]]
+    rows = _compute_blockers(project, limit)
+    with LOCK:
+        _BLOCKERS_CACHE[key] = (now, [dict(row) for row in rows])
+    return rows
+
+
+def blocker_lines(project: str = "",
+                  limit: int = JOURNAL_BLOCKER_LIMIT) -> list:
+    """Blockers rendered as prompt-ready one-liners."""
+    out = []
+    for row in known_blockers(project, limit):
+        where = ", ".join(row.get("devices") or [])
+        if row.get("repeat"):
+            # Name the step first: "config_servers on SRV1" is what the
+            # planner and the user need to recognise, not the OCR text.
+            out.append(f"- [repeat_offender] {row.get('pattern')} - "
+                       f"{row.get('reason')} (failed the same way in "
+                       f"{row.get('count')} consecutive runs)")
+            continue
+        out.append(f"- [{row.get('kind')}] "
+                   f"{row.get('reason') or row.get('pattern')} "
+                   f"(seen {row.get('count')}x, never recovered"
+                   f"{'; devices: ' + where if where else ''})")
+    return out
 
 
 DIAGNOSTICS_DIR = os.path.join(os.path.dirname(__file__), "diagnostics")
@@ -1552,7 +2909,7 @@ def journal_stats() -> dict:
         agg["count"] += 1
         if rec:
             agg["recovered"] += 1
-        sig = k + ":" + (e.get("detail", "") or "")[:70].strip().lower()
+        sig = _journal_signature(e)
         s = sigs.setdefault(sig, {"count": 0, "recovered": 0, "last": ""})
         s["count"] += 1
         if rec:
@@ -3054,8 +4411,10 @@ def place_nodes(rect, nodes, project: str = "default"):
             spec = DEVICE_PALETTE["router"]
         group, only, models, col, pal_key = spec
         if not click_by_names(list(group), f"group for {name}"):
+            # CAL fallback only: the category list is already rendered at
+            # this point, so a short settle is enough (was 1.0s idle).
             click_frac(rect, *CAL.get(pal_key, CAL["pal_router"]),
-                       f"1/3 category {ntype} for {name}", pause=1.0)
+                       f"1/3 category {ntype} for {name}", pause=0.6)
         if only and not click_by_names(list(only),
                                        f"{ntype} type for {name}"):
             log(f"{ntype} TYPE by name missed, CAL model fallback")
@@ -3072,12 +4431,12 @@ def place_nodes(rect, nodes, project: str = "default"):
                                    min(1.0, gy + 0.06),
                                    f"slot{i}_before.png")
         click_frac(rect, gx, gy, f"3/3 canvas slot for {name} (click 1 arm)",
-                   pause=0.5)
+                   pause=0.35)
         click_frac(rect, gx, gy, f"3/3 canvas slot for {name} (click 2 drop)",
-                   pause=0.8)
+                   pause=0.6)
         # escape placement mode before next device
         _press_esc()
-        _interruptible_sleep(0.4)
+        _interruptible_sleep(0.25)
         slot_after = _shot_region(rect, max(0.0, gx - 0.06),
                                   max(0.0, gy - 0.06),
                                   min(1.0, gx + 0.06),
@@ -3102,14 +4461,25 @@ def place_nodes(rect, nodes, project: str = "default"):
                                     "fx": gx, "fy": gy})
         RUN["devices_placed"] = RUN.get("devices_placed", 0) + 1
         RUN["node_outcomes"][name] = "placed" if verified else "uncertain"
-        shot(f"placed_{name}.png")
+        # Success evidence already lives in the slot_before/after region
+        # diff above; only spend a full screenshot on uncertain drops.
+        if not verified:
+            shot(f"placed_{name}.png")
         remember_device(project, name, gx, gy, ntype, model, verified)
         log(f"placed {name} slot {i} at ({gx:.3f},{gy:.3f}) - "
             f"remembered ({'verified' if verified else 'uncertain'} for next time)")
 
 
 def _spot(project: str, name: str, slot: int):
-    """Remembered device spot preferred, grid fallback."""
+    """Remembered device spot preferred, grid fallback.
+
+    A taught placement outranks both: it is the user saying where the device
+    actually is, and it is only ever armed for the one teach run that has to
+    prove it before it is stored.
+    """
+    taught = _teach_point("placement", name, name)
+    if taught:
+        return taught[0], taught[1], True
     mem = recall_device(project, name)
     if mem:
         return float(mem["fx"]), float(mem["fy"]), True
@@ -3245,8 +4615,12 @@ def select_cable(kind: str = CABLE_COPPER) -> bool:
     """
     kind = (kind or CABLE_COPPER).strip().lower()
     names, cal_key = CABLE_PALETTE.get(kind, CABLE_PALETTE[CABLE_COPPER])
-    if (click_by_names(["Connections"], "connections group") and
-            click_by_names(list(names), f"{kind} cable")):
+    # Short timeouts: during linking the palette is already open, so a hit
+    # returns immediately; only a genuine miss pays the timeout, and the CAL
+    # column fallback below still runs. (Was the 4.0s default on both.)
+    if (click_by_names(["Connections"], "connections group",
+                        timeout_s=1.5) and
+            click_by_names(list(names), f"{kind} cable", timeout_s=1.5)):
         return True
     try:
         w = find_pt_window()
@@ -3254,9 +4628,9 @@ def select_cable(kind: str = CABLE_COPPER) -> bool:
     except Exception as exc:
         log(f"cable '{kind}': palette unavailable ({exc})")
         return False
-    click_frac(rect, *CAL["pal_conn"], "palette connections")
+    click_frac(rect, *CAL["pal_conn"], "palette connections", pause=0.35)
     click_frac(rect, CAL.get(cal_key, CAL["conn_copper_col"]),
-               CAL["model_row"], f"cable {kind} (CAL column)")
+               CAL["model_row"], f"cable {kind} (CAL column)", pause=0.35)
     return True
 
 
@@ -3375,8 +4749,10 @@ def _link_endpoint(rect, dev, spec, j, which):
     """
     fx, fy, _ = _spot(JOB.project, dev, JOB.slot_of[dev])
     x, y = to_abs(rect, fx, fy)
+    # Short settle: the port pick below polls (UIA up to 2.5s, then OCR),
+    # so waiting here only idles on the fast path (was 0.7s).
     click_frac(rect, fx, fy,
-               f"link {j} endpoint {dev} ({which})", pause=0.7)
+               f"link {j} endpoint {dev} ({which})", pause=0.5)
     if stopped():
         return False
     if click_by_names(iface_port_wants(spec),
@@ -4058,6 +5434,25 @@ def place_links(rect, links, slot_of: dict, project: str = "default",
             ok_b = False
             if ok_a:
                 ok_b = _link_endpoint(rect, b, bIf, j, f"{b}:{bIf}")
+            if not (ok_a and ok_b):
+                # Fail fast: _link_endpoint already Esc-cancelled the
+                # dangling cable, so there is nothing to settle, diff or
+                # photograph - record the miss and retry immediately
+                # instead of paying the settle sleep + screenshots.
+                record_event("link_attempt_failed",
+                             f"{a}:{aIf} <-> {b}:{bIf} attempt {attempt} "
+                             f"(a={'ok' if ok_a else 'miss'}, "
+                             f"b={'ok' if ok_b else 'miss'}, diff=skipped, "
+                             f"line=skipped)",
+                             recovered=False,
+                             extra={"expected": f"{a}:{aIf} <-> {b}:{bIf}",
+                                    "observed": f"a={ok_a}, b={ok_b}, "
+                                               f"endpoint missed",
+                                    "attempt": attempt})
+                if attempt < 3:
+                    log(f"link {j} attempt {attempt} endpoint missed - "
+                        f"retrying ({3 - attempt} attempt(s) left)")
+                continue
             _interruptible_sleep(0.5)
             after_p = _shot_region(rect, 0.05, 0.12, 0.95, 0.82,
                                    f"link{j}_after.png")
@@ -4091,7 +5486,10 @@ def place_links(rect, links, slot_of: dict, project: str = "default",
                 log(f"link {j} attempt {attempt} failed - retrying "
                     f"({3 - attempt} attempt(s) left)")
                 _interruptible_sleep(0.6)
-        shot(f"link_{j}.png")
+        # Success evidence already lives in link_{j}_canvas_after.png;
+        # only spend a full screenshot on still-unwired links.
+        if not wired:
+            shot(f"link_{j}.png")
         RUN.setdefault("link_results", {})[str(j)] = {
             "a": a, "aIf": aIf, "b": b, "bIf": bIf,
             "cable": cable,
@@ -4466,6 +5864,15 @@ def _record_unsupported(device: str, reason: str, dropped: list) -> None:
     RUN.setdefault("unsupported_features", []).extend(dropped)
     RUN["unsupported_features_count"] = \
         RUN.get("unsupported_features_count", 0) + len(dropped)
+    # LEARN THE PLATFORM GAP: the live CLI just proved this family is not
+    # implemented, so record it against the model and let the planner stop
+    # proposing it instead of rediscovering it every run.  Marking a
+    # capability is deliberately NOT a way to drop commands: runtime elision
+    # still only ever happens through the explicit families above, each of
+    # which is reported in `unsupported_features`.
+    model = _device_model(device)
+    for line in (dropped or [])[:6]:
+        CAPABILITIES.mark(CapabilityMap.head(line), model, reason, proven=True)
 
 
 def _drop_empty_interface_blocks(lines: list) -> list:
@@ -7266,16 +8673,21 @@ def paste_to_device(rect, dev: str, slot: int, cfg: str, delay_ms: int,
                 sample or "terminal command error",
                 fb if still <= after_count else None)
             command_context = {**learning_context, "source": line}
+            # A verified fallback is recorded as the *replacement* for the
+            # line that failed, so a quarantined command still has something
+            # known-good to use instead of just being banned.
+            verified_fallback = fb if (fb and still <= after_count) else None
             LEARNING.failure("cli_fallback", "command", command_context,
                             [line], sample or "terminal command error",
-                            persistent=True)
-            if fb and still <= after_count:
+                            persistent=True, replaces=verified_fallback)
+            if verified_fallback:
                 LEARNING.success("cli_fallback", "command", command_context,
-                                 fb, "fallback verified", persistent=True)
+                                 verified_fallback, "fallback verified",
+                                 persistent=True)
                 _remember_immediate_cli_fix(
-                    project, dev, dtype, line, fb)
-                if len(fb) == 1 and fb[0] != line:
-                    session_replacements[line] = fb[0]
+                    project, dev, dtype, line, verified_fallback)
+                if len(verified_fallback) == 1 and verified_fallback[0] != line:
+                    session_replacements[line] = verified_fallback[0]
             elif fb:
                 LEARNING.failure("cli_fallback", "command", command_context,
                                 fb, "fallback still produced terminal error",
@@ -7674,11 +9086,23 @@ def _pc_spot_key(key: str, dev: str = "") -> str:
 
 
 def _learned_spot(key: str, dev: str = ""):
+    # A taught point goes first and deliberately bypasses the strategy store's
+    # quarantine: a spot the engine gave up on is exactly what the user is
+    # teaching a replacement for, and gating the replacement on the old
+    # verdict would make the correction unverifiable.
+    taught = _teach_point("pc_tile", key, dev)
+    if taught:
+        return taught
     scoped = _pc_spot_key(key, dev)
     e = PC_LEARNED.get(scoped)
     if isinstance(e, dict):
         try:
             spot = (float(e["fx"]), float(e["fy"]))
+            # A user-taught spot outranks the strategy store's verdict: the
+            # engine's quarantine reflects ITS guesses, not the correction
+            # the user verified through a teach run.
+            if _taught_meta_of(e):
+                return spot
             allowed = LEARNING.choose(
                 "ui_coordinate", key, _learning_context_for_device(dev),
                 [{"fx": round(spot[0], 4), "fy": round(spot[1], 4)}])
@@ -7688,8 +9112,13 @@ def _learned_spot(key: str, dev: str = ""):
     return None
 
 
-def _learn_spot(key: str, fx: float, fy: float, dev: str = ""):
+def _learn_spot(key: str, fx: float, fy: float, dev: str = ""):  # noqa: C901
     scoped = _pc_spot_key(key, dev)
+    if _protect_taught_spot(scoped, dev):
+        # The user taught this spot and a teach run verified it; an
+        # engine re-learn from a later ordinary run must not silently
+        # replace it. Misses are reported via correction_stale instead.
+        return
     old = PC_LEARNED.get(scoped)
     PC_LEARNED[scoped] = {"fx": round(fx, 4), "fy": round(fy, 4)}
     try:
@@ -7843,6 +9272,19 @@ def _pc_open_desktop_app(win, dev: str, tile_key: str, tile_names: list,
     it, and try the next strategy.
     """
     r = win.rectangle()
+
+    # TAUGHT LABEL FIRST.  A label is more durable than a coordinate because
+    # _click_text_in_window re-finds the rendered text on every run - which is
+    # the repo's own fix for the titlebar/DPI offset that made calibrated
+    # fractions land ~35px low.  A taught point stays the coordinate fallback,
+    # so a tile with no readable text can still be taught.
+    taught_tile = _teach_label("pc_tile", tile_key, dev)
+    if taught_tile:
+        tile_names = [taught_tile] + [name for name in (tile_names or [])
+                                      if name != taught_tile]
+        words = re.findall(r"[a-z0-9]+", taught_tile.lower())
+        tile_words = words + [word for word in (tile_words or [])
+                              if word not in words]
 
     def click_frac_win(fx, fy):
         _safe_click(r.left + int((r.right - r.left) * fx),
@@ -8332,6 +9774,24 @@ def _config_pc_desktop(rect, dev: str, slot: int, ipcfg: dict,
                 "row_source": row_source,
             }
             return ok_dhcp
+        # FAIL FAST on a plan with no usable IP: typing mask/gateway alone
+        # leaves the confusing half-filled panel from the user screenshot
+        # (blank IPv4 + 10.0.0.2 gateway). The validator now blocks such
+        # plans, but an old/side-loaded plan must not half-configure.
+        _plan_ip = str((ipcfg or {}).get("ip", "")).strip()
+        if not _plan_ip or _plan_ip == "0.0.0.0":
+            log(f"{dev}: plan has no usable IP ({_plan_ip!r}) - refusing to "
+                f"type mask/gateway alone (would leave blank-IP panel)")
+            record_event("pc_config_failed",
+                         f"plan missing IP for {dev} - not typing partial "
+                         f"config (check addressing)",
+                         device=dev, recovered=False)
+            RUN.setdefault("pc_config_results", {})[dev] = {
+                "status": "failed", "values": dict(ipcfg or {}),
+                "verified_rows": {}, "row_source": row_source,
+                "reason": "missing_ip_in_plan",
+            }
+            return False
         keys = ("ip", "mask", "gw")
         if str(ipcfg.get("dns", "")).strip() not in {"", "0.0.0.0"}:
             keys = (*keys, "dns")
@@ -8592,15 +10052,108 @@ def _audit_reachability(rect, devices: list, names: list, project: str) -> dict:
 
 
 # SERVER SERVICES -----------------------------------------------------
-# Server-PT has a Services TAB (HTTP, DHCP, DNS, AAA, EMAIL, FTP, ...)
-# with a left service list and per-service panels (On/Off radios, label
-# + value-box rows, Add/Save buttons). All automation here is
-# OCR-driven and bounded: every step verifies, failures are logged and
-# journalled, never looped.
 _SVC_TITLES = {"dhcp": "dhcp", "dns": "dns", "http": "http",
                "aaa": "aaa", "email": "email", "ftp": "ftp",
                "ntp": "ntp", "tftp": "tftp", "syslog": "syslog",
                "dhcpv6": "dhcpv6", "iot": "iot", "prp": "prp"}
+
+# Post-build verification state (one at a time; the PT UI is single-owner).
+VERIFY_STATE: dict = {"running": False, "report": None}
+
+
+def _verify_run_async(plan: dict) -> None:
+    """Thread body for /verify/run: keep VERIFY_STATE fresh, never crash."""
+    try:
+        VERIFY_STATE["report"] = verify_plan_live(plan)
+    except Exception as e:  # noqa: BLE001 - report, don't kill the thread
+        import pt_verify
+        log(f"VERIFY thread failed: {e}")
+        VERIFY_STATE["report"] = {"ok": False, "error": str(e),
+                                  **pt_verify.summarize([]), "tests": []}
+    finally:
+        VERIFY_STATE["running"] = False
+
+
+def verify_plan_live(plan: dict) -> dict:
+    """Post-build verification: run the plan's derived test list against the
+    live Packet Tracer canvas and report pass/fail per test.
+
+    Uses the same proven _pc_ping path the Analyze audit uses, so every
+    result carries real screen evidence.  Never mutates configuration.
+    """
+    import pt_verify
+
+    tests = pt_verify.derive_tests(plan)
+    if not tests:
+        return {"ok": False,
+                "error": "no testable devices: the plan has no PCs or laptops",
+                **pt_verify.summarize([]), "tests": []}
+
+    acquired, busy = begin_activity("audit")
+    if not acquired:
+        return {"ok": False, "error": f"busy - {busy} active",
+                "activity": activity_snapshot(), **pt_verify.summarize([]),
+                "tests": []}
+    project = str(plan.get("project") or plan.get("projectName") or "default")
+    try:
+        w = focus_pt()
+        rect = rect_of(w)
+        log(f"VERIFY: {len(tests)} test(s) on '{project}'")
+        devs = DEV_MEM.get(project, {})
+        names = sorted(devs) if devs else \
+            sorted(str(n.get("name") or "")
+                   for n in (plan.get("nodes") or []) if n.get("name"))
+
+        # group tests by source device; targets resolved to IPs from the plan
+        ips = pt_verify.ip_index(plan)
+        by_src: dict[str, list] = {}
+        for t in tests:
+            if t.get("kind") == "custom" or not t.get("src"):
+                continue
+            by_src.setdefault(str(t["src"]), []).append(t)
+
+        rows: list = []
+        for src in sorted(by_src):
+            if stopped():
+                break
+            slot = names.index(src) if src in names else -1
+            if slot < 0:
+                log(f"VERIFY: {src} not on canvas - skipped")
+                continue
+            targets = []
+            for t in by_src[src]:
+                dst = str(t.get("dst") or "")
+                if t.get("kind") == "gateway":
+                    ip = pt_verify.gateway_ip_for(plan, src, dst)
+                else:
+                    ip = ips.get(dst)
+                t["_dstIp"] = ip or dst
+                targets.append(t["_dstIp"])
+            targets = [t for i, t in enumerate(targets)
+                       if t and targets.index(t) == i][:6]
+            log(f"VERIFY: {src} -> {targets}")
+            _pc_ping(rect, src, slot, targets, project,
+                     results=rows, count_run=False)
+
+        shaped = pt_verify.shape_results(rows, tests, ips=ips)
+        report = {"ok": True, "project": project,
+                  **pt_verify.summarize(shaped), "tests": shaped}
+        # ledger: one compact verification row per run
+        try:
+            RUN_LEDGER.record(project, ok=report["ok"] and not report["failed"],
+                              final_phase="verify",
+                              counters={"verifyPassed": report["passed"],
+                                        "verifyFailed": report["failed"],
+                                        "verifySkipped": report["skipped"]})
+        except Exception as e:  # noqa: BLE001 - ledger must never fail the run
+            log(f"VERIFY: ledger write failed: {e}")
+        return report
+    except Exception as e:  # noqa: BLE001 - report, don't crash the sidecar
+        log(f"VERIFY failed: {e}")
+        return {"ok": False, "error": str(e), **pt_verify.summarize([]),
+                "tests": []}
+    finally:
+        end_activity("audit")
 
 
 def _win_words(win, psm: int = 6) -> tuple:
@@ -9056,6 +10609,11 @@ def _save_srv_mem():
 
 
 def _srv_learned_field(key: str, dev: str = "") -> dict:
+    # Taught row first, quarantine bypassed - see _learned_spot.
+    taught = _teach_point("srv_field", key, dev)
+    if taught:
+        return {"fx": taught[0], "fy": taught[1],
+                "kind": _teach_kind("srv_field", key, dev)}
     e = SRV_MEM["fields"].get(key)
     if isinstance(e, dict):
         try:
@@ -9071,7 +10629,10 @@ def _srv_learned_field(key: str, dev: str = "") -> dict:
                 candidate = {"fx": round(out["fx"], 4),
                              "fy": round(out["fy"], 4),
                              "kind": out["kind"]}
-                if not LEARNING.choose(
+                # A user-taught spot outranks the strategy store's verdict:
+                # the engine's own quarantine reflects ITS guesses, not the
+                # correction the user personally verified through a teach run.
+                if not _taught_meta_of(e) and not LEARNING.choose(
                         "field_row", key,
                         _learning_context_for_device(dev), [candidate]):
                     # Keep a sentinel so the older miss counter can still
@@ -9109,9 +10670,17 @@ def _srv_learn_field(key: str, fx: float, fy: float, kind: str,
 
 
 def _srv_field_miss(key: str, dev: str = "") -> bool:
-    """Count a failed fill against a learned spot; evict at 2 misses."""
+    """Count a failed fill against a learned spot; evict at 2 misses.
+
+    A user-taught spot is NEVER evicted here.  It misses into
+    CORRECTIONS.record_miss instead, and at CORRECTION_REPORT_AFTER the
+    correction is flagged stale and reported (correction_stale) - the
+    user's entry is reported, not silently discarded.
+    """
     e = SRV_MEM["fields"].get(key)
     if not isinstance(e, dict):
+        return False
+    if _protect_taught_srv("SRV_MEM:f", key, dev):
         return False
     LEARNING.failure(
         "field_row", key, _learning_context_for_device(dev),
@@ -9134,13 +10703,16 @@ def _srv_field_miss(key: str, dev: str = "") -> bool:
 
 
 def _srv_learned_button(key: str, dev: str = "") -> dict:
+    taught = _teach_point("srv_button", key, dev)
+    if taught:
+        return {"fx": taught[0], "fy": taught[1], "learned": True}
     e = SRV_MEM["buttons"].get(key)
     if isinstance(e, dict):
         try:
             fx, fy = float(e["fx"]), float(e["fy"])
             if 0 < fx < 1 and 0 < fy < 1:
                 candidate = {"fx": round(fx, 4), "fy": round(fy, 4)}
-                if not LEARNING.choose(
+                if not _taught_meta_of(e) and not LEARNING.choose(
                         "server_button", key,
                         _learning_context_for_device(dev), [candidate]):
                     return {}
@@ -9152,6 +10724,9 @@ def _srv_learned_button(key: str, dev: str = "") -> dict:
 
 def _srv_learn_button(key: str, fx, fy, dev: str = ""):
     if fx is None or fy is None:
+        return
+    if _protect_taught_srv("SRV_MEM:b", key, dev):
+        # A verified user-taught button spot is not the engine's to replace.
         return
     SRV_MEM["buttons"][key] = {"fx": round(fx, 4), "fy": round(fy, 4)}
     _save_srv_mem()
@@ -9165,6 +10740,10 @@ def _srv_learn_button(key: str, fx, fy, dev: str = ""):
 
 
 def _srv_evict_button(key: str, dev: str = ""):
+    if _protect_taught_srv("SRV_MEM:b", key, dev):
+        # Reported via correction_stale when it stops verifying - not
+        # silently dropped.
+        return
     old = SRV_MEM["buttons"].pop(key, None)
     if old is not None:
         _save_srv_mem()
@@ -11155,6 +12734,293 @@ def _pkt_start_operation(operation: str, fn, *args, **kwargs):
     threading.Thread(target=worker, daemon=True).start()
 
 
+# OFFLINE GENERATOR -----------------------------------------------------
+# A .pkt can also be produced WITHOUT Packet Tracer: pkt_builder compiles
+# the same plan the executor drives the GUI with into save-file XML, using
+# a machine-local template library extracted from the user's own saves
+# (pkt_template_build), and pkt_codec encodes the verified container.
+# The file carries its provenance in the report and the companion manifest,
+# so a generated file can never be mistaken for a Packet Tracer save.
+
+
+def pkt_generate(plan: dict, project: str = "", filename: str = "",
+                 replace: bool = False) -> dict:
+    """Compile a plan into a .pkt next to the other artifacts.
+
+    The filename is reduced to its basename and re-sanitized, so a request
+    can only ever land in the artifact directory.  Raises ValueError for a
+    plan with no steps and BuildError/FileExistsError like generate_pkt_file.
+    """
+    plan = plan if isinstance(plan, dict) else {}
+    if not [step for step in (plan.get("steps") or [])
+            if isinstance(step, dict)]:
+        raise ValueError("plan has no steps to build")
+    project = (str(project or plan.get("project") or "default").strip()
+               or "default")
+    requested = os.path.basename(str(filename or "").strip())
+    stem = _safe_stem(os.path.splitext(requested)[0]) if requested \
+        else _safe_stem(project)
+    name = f"{stem}.pkt"
+    path = os.path.join(_pkt_out_dir(), name)
+    if os.path.exists(path) and replace:
+        # Same rule as a forced save_verified: the old file is kept as a
+        # backup rather than silently overwritten.
+        backup = _pkt_backup(path)
+        log(f"PKT generate replacing {path}; backup kept at {backup}")
+    result = pkt_builder.generate_pkt_file(plan, path, project=project,
+                                           replace=replace, log=log)
+    manifest = _pkt_write_manifest(path, {
+        "project": project,
+        "sidecarVersion": VERSION,
+        "generator": "offline",
+        "purpose": "companion record: the plan facts this generated file "
+                   "was built from (no configuration or credential text)",
+        "planned": {"deviceCount": result["deviceCount"],
+                    "linkCount": result["linkCount"]},
+        "warnings": result["warnings"],
+    })
+    result["manifest"] = manifest
+    result["operation"] = "generate"
+    # OFFLINE LEARNING: turn this run's warnings (model substitutions and
+    # slot remaps) into durable, repeatable knowledge about what THIS
+    # machine's template library actually does. Learning must never fail a
+    # build, so a store error is reported, not raised.
+    try:
+        result["learning"] = pkt_learning.record_generation(project,
+                                                          result)
+    except Exception as exc:  # noqa: BLE001 - never block a build
+        result["learning"] = {"error": str(exc)}
+    PKT_STATE["report"] = result
+    return result
+
+
+def pkt_templates_build(paths, out_dir: str = "") -> dict:
+    """Extract the machine-local template library from the user's saves."""
+    wanted = [str(path).strip() for path in (paths or []) if str(path).strip()]
+    if not wanted:
+        raise ValueError("no .pkt files were given")
+    return pkt_template_build.extract_templates(
+        wanted, out_dir or pkt_template_build.TEMPLATE_DIR, log=log)
+
+
+def pkt_templates_harvest(roots=None, *, samples: bool = True,
+                          out_dir: str = "") -> dict:
+    """Add every model found in local .pkt files to the template library.
+
+    With no roots this reads Packet Tracer's own `saves` tree, which is what
+    makes a plan's requested model (1941, 4331, ASA, access point, WLC...) a
+    real template instead of a nearest-match substitution.  Nothing is
+    replaced: an already-known model keeps its block.
+    """
+    wanted = [str(root).strip() for root in (roots or []) if str(root).strip()]
+    if samples:
+        wanted.extend(pkt_template_build.default_sample_roots())
+    if not wanted:
+        raise ValueError(
+            "no .pkt files or folders to harvest; save a topology from "
+            "Packet Tracer, or point this at a folder of .pkt files")
+    return pkt_template_build.harvest_templates(
+        wanted, out_dir or pkt_template_build.TEMPLATE_DIR, log=log)
+
+
+_AUDIT_OFFLINE_UNESCAPE = (("&lt;", "<"), ("&gt;", ">"), ("&amp;", "&"))
+
+
+def _pkt_config_lines(block: bytes) -> list[str]:
+    """Decoded <LINE> texts of a device's saved running config."""
+    config = re.search(rb"<RUNNINGCONFIG>(.*?)</RUNNINGCONFIG>", block, re.S)
+    if not config:
+        return []
+    lines = []
+    for raw in re.findall(rb"<LINE>(.*?)</LINE>", config.group(1), re.S):
+        text = raw.decode("utf-8", "replace")
+        for entity, char in _AUDIT_OFFLINE_UNESCAPE:
+            text = text.replace(entity, char)
+        lines.append(text.strip())
+    return lines
+
+
+def _pkt_interface_facts(block: bytes) -> dict:
+    """Saved per-interface state of one device, paired with its config.
+
+    The XML stores no port names; exactly like the template extractor, the
+    device's own interface lines (in order) are paired with the <PORT>
+    elements of the same family, in document order.  Returns
+    ``{interface_name: {family, power, ip, subnet, clock, shutdown,
+    no_shutdown, index}}``.
+    """
+    def val(port: bytes, tag: str) -> str:
+        m = re.search(rb"<" + tag.encode() + rb">([^<]*)</"
+                      + tag.encode() + rb">", port)
+        return m.group(1).decode("utf-8", "replace") if m else ""
+
+    ports = []
+    for start, end in pkt_template_build.iter_port_spans(block):
+        port = block[start:end]
+        ports.append({
+            "family": pkt_template_build._family_of_type(
+                val(port, "TYPE")),
+            "power": val(port, "POWER").lower() == "true",
+            "ip": val(port, "IP"),
+            "subnet": val(port, "SUBNET"),
+        })
+    by_family: dict[str, list[dict]] = {}
+    for port in ports:
+        if port["family"]:
+            by_family.setdefault(port["family"], []).append(port)
+
+    facts: dict[str, dict] = {}
+    current = ""
+    blocks: dict[str, list[str]] = {}
+    for line in _pkt_config_lines(block):
+        match = re.match(r"^interface\s+(\S+)\s*$", line, re.I)
+        if match:
+            current = match.group(1)
+            blocks[current] = []
+            continue
+        if current:
+            blocks[current].append(line.strip())
+    for name, sub in blocks.items():
+        lowered = [s.lower() for s in sub]
+        family = pkt_builder._family_from_request(
+            pkt_builder.normalize_port_name(name))
+        siblings = by_family.get(family, [])
+        # nth interface of this family in the config -> nth port element
+        ordinal = sum(1 for known in facts
+                      if pkt_builder._family_from_request(
+                          pkt_builder.normalize_port_name(known)) == family)
+        port = siblings[ordinal] if ordinal < len(siblings) else None
+        clock = ""
+        for text in sub:
+            m = re.match(r"^clock rate\s+(\d+)$", text, re.I)
+            if m:
+                clock = m.group(1)
+        facts[name] = {
+            "family": family,
+            "index": ordinal,
+            "power": port["power"] if port else None,
+            "ip": port["ip"] if port else "",
+            "subnet": port["subnet"] if port else "",
+            "clock": clock,
+            "shutdown": "shutdown" in lowered and "no shutdown" not in lowered,
+            "no_shutdown": "no shutdown" in lowered,
+            "ip_in_config": any(re.match(r"^ip address\s+\S+\s+\S+$", s)
+                                for s in lowered),
+        }
+    return facts
+
+
+def _cli_kind(kind: str) -> bool:
+    return str(kind or "").strip().lower() in ("router", "switch",
+                                               "multilayer switch")
+
+
+def pkt_audit_network(path: str, project: str = "") -> dict:
+    """Audit a saved .pkt OFFLINE: no Packet Tracer, no window, no clicks.
+
+    Reads what the file can prove: devices, models, saved configs, per-port
+    state, links.  Runtime-only things (service panels, pings, canvas red
+    dots) are reported as out of scope in ``note`` - open a live audit for
+    those.  Findings carry ``fix_cli`` lines as ADVICE; nothing is typed
+    anywhere.  The report lands in AUDIT['report'] so the app's existing
+    audit card renders it unchanged.
+    """
+    path = _pkt_path(path, must_exist=True)
+    project = (project or "default").strip() or "default"
+    xml = pkt_builder.decode_pkt_file(path)
+    devices_report = []
+    for block in re.findall(rb"<DEVICE>.*?</DEVICE>", xml, re.S):
+        name_match = re.search(
+            rb'<NAME translate="true">([^<]*)</NAME>', block)
+        name = name_match.group(1).decode("utf-8", "replace") \
+            if name_match else ""
+        type_match = re.search(
+            rb'<TYPE customModel="[^"]*" model="([^"]*)">([^<]*)<', block)
+        model = type_match.group(1).decode("utf-8", "replace") \
+            if type_match else ""
+        kind = type_match.group(2).decode("utf-8", "replace") \
+            if type_match else ""
+        config_lines = _pkt_config_lines(block)
+        facts = _pkt_interface_facts(block)
+        interfaces = []
+        findings = []
+        counter = {"n": 0}
+
+        def add(severity: str, text: str, fix_cli=None):
+            counter["n"] += 1
+            findings.append({
+                "id": f"{name}:offline:{counter['n']}",
+                "severity": severity,
+                "text": text,
+                "fix_cli": list(fix_cli or []),
+                "fix_pc": False,
+                "offline_advice": True,
+            })
+
+        for ifname, fact in facts.items():
+            power = fact["power"]
+            status = ("up" if power else "administratively down") \
+                if power is not None else "unknown"
+            interfaces.append({"name": ifname, "status": status,
+                               "ip": fact["ip"],
+                               "clock": fact["clock"]})
+            if not _cli_kind(kind):
+                continue
+            if fact["shutdown"]:
+                add("high", f"{ifname} is shut down in the saved config",
+                    fix_cli=[f"interface {ifname}", "no shutdown"])
+            elif fact["no_shutdown"] and power is False:
+                add("high", f"{ifname} should be up ('no shutdown') but its "
+                            "saved port state is down - the file was saved "
+                            "with the interface off; it will open down",
+                    fix_cli=[f"interface {ifname}", "no shutdown"])
+            if fact["ip_in_config"] and not fact["ip"]:
+                match = re.search(
+                    rf"interface\s+{re.escape(ifname)}.*?ip address\s+(\S+)\s+(\S+)",
+                    "\n".join(config_lines), re.I | re.S)
+                wanted_ip = match.group(1) if match else ""
+                wanted_mask = match.group(2) if match else ""
+                add("high", f"{ifname} has 'ip address' in its config but "
+                            "the saved port carries no IP - Packet Tracer "
+                            "starts it unconfigured",
+                    fix_cli=[f"interface {ifname}",
+                             f"ip address {wanted_ip} {wanted_mask}".strip()])
+            elif fact["ip"] and not fact["ip_in_config"]:
+                add("info", f"{ifname} carries saved IP {fact['ip']} but the "
+                            "running config has no 'ip address' for it")
+
+        devices_report.append({
+            "name": name,
+            "type": kind or "device",
+            "model": model,
+            "interfaces": interfaces,
+            "config_lines": len(config_lines),
+            "findings": findings,
+            "services": [],
+            "probes": [],
+            "ipcfg": {},
+        })
+
+    red_indicators: list = []
+    summary = _audit_summary(devices_report, red_indicators)
+    return {
+        "mode": "offline",
+        "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "path": path,
+        "project": project,
+        "devices": devices_report,
+        "summary": summary,
+        "red_dots": 0,
+        "reachability": {},
+        "scope": [f"offline read of {os.path.basename(path)}"],
+        "note": "Offline audit: read from the saved file - no Packet "
+                "Tracer was opened. Service panels (DHCP/DNS/...), pings "
+                "and canvas indicators are runtime state and are NOT "
+                "visible here. Findings are advice only; run a live audit "
+                "and apply fixes from it to change the real devices.",
+    }
+
+
 # NETWORK AUDIT ---------------------------------------------------------
 # Analyzes an ALREADY-BUILT network (no plan needed): reads each device's
 # interface table (+ OSPF on routers) via the CLI/OCR engine, reads PC
@@ -12227,6 +14093,74 @@ def validate_run(plan: dict, project: str, slot_of: dict,
     return report
 
 
+# REPEAT-OFFENDER POLICY -------------------------------------------------
+# Steps that have failed the *same way* in consecutive runs are escalated
+# once with phase context and then dropped from further repair attempts.
+# Dropping is only ever done out loud: the skip is an event, a run-summary
+# list and a log line, so a smaller network is never a silent one.
+SKIPPED_ACTIONS: set = set()
+
+
+def _skip_known_blocker(action: str, device: str, item: dict) -> None:
+    """Stop retrying a step that has already failed the same way twice."""
+    key = f"{action}:{device}"
+    if key in SKIPPED_ACTIONS:
+        return
+    SKIPPED_ACTIONS.add(key)
+    runs = int((item or {}).get("runs", 0))
+    reason = str((item or {}).get("reason", ""))[:120]
+    label = (f"{action} on {device} - failed the same way in {runs} "
+             f"consecutive runs ({reason})")
+    RUN.setdefault("known_blockers_skipped", []).append(label)
+    RUN["known_blockers_skipped_count"] = \
+        RUN.get("known_blockers_skipped_count", 0) + 1
+    record_event("known_blocker_skipped", label, device=device,
+                 recovered=False,
+                 extra={"action": action, "runs": runs, "reason": reason})
+    log(f"KNOWN BLOCKER: not retrying {action} on {device} - it has failed "
+        f"the same way in {runs} consecutive runs (reported, not hidden)")
+
+
+def _apply_repeat_offender_policy(project: str, pending: list,
+                                  type_of: dict | None = None) -> list:
+    """Escalate each known repeat offender once, then drop it from retries.
+
+    Returns the pending items still worth a retry.  Items are keyed
+    "action:device" exactly like the ledger, so a match is evidence-based
+    rather than name-guessing.
+    """
+    offenders = {f"{item.get('action')}:{item.get('device')}": item
+                 for item in (RUN.get("repeatOffenders") or [])}
+    if not offenders:
+        return pending
+    escalated = RUN.setdefault("repeat_offenders_escalated", [])
+    for action, dev in list(pending):
+        item = offenders.get(f"{action}:{dev}")
+        if not item:
+            continue
+        if f"{action}:{dev}" not in escalated:
+            escalated.append(f"{action}:{dev}")
+            escalation = _llm_escalate_blocker(
+                project, dev, str((type_of or {}).get(dev, "")), action,
+                str(item.get("reason", "")))
+            RUN["repeat_offender_escalations"] = \
+                RUN.get("repeat_offender_escalations", 0) + 1
+            record_event(
+                "known_blocker_escalated",
+                f"{action} on {dev} has failed the same way in "
+                f"{int(item.get('runs', 0))} consecutive runs - escalated "
+                f"once with phase context",
+                device=dev, recovered=False,
+                extra={"action": action, "runs": int(item.get("runs", 0)),
+                       "asked": escalation.get("asked"),
+                       "diagnosis": str(escalation.get("explanation", ""))[:120],
+                       "suggested": "; ".join(escalation.get("commands") or [])[:120]},
+            )
+        _skip_known_blocker(action, dev, item)
+    return [pair for pair in pending
+            if f"{pair[0]}:{pair[1]}" not in SKIPPED_ACTIONS]
+
+
 def _failed_action_names() -> list:
     """Unverified work items from the last pass.
 
@@ -12241,9 +14175,16 @@ def _failed_action_names() -> list:
         if ":" not in key:
             continue
         action, dev = key.split(":", 1)
+        # A step the repeat-offender policy has already given up on must not
+        # be handed back to the repair loop, or the pass cap would be spent
+        # re-living the same failure.
+        if key in SKIPPED_ACTIONS:
+            continue
         out.append((action, dev))
     for idx, row in (RUN.get("link_results", {}) or {}).items():
         if isinstance(row, dict) and row.get("status") != "verified":
+            if f"create_links:{idx}" in SKIPPED_ACTIONS:
+                continue
             out.append(("create_links", str(idx)))
     return out
 
@@ -12262,6 +14203,9 @@ def _auto_repair_pass(rect, steps: list, slot_of: dict, type_of: dict,
     that are known-benign.
     """
     pending = _failed_action_names()
+    if not pending:
+        return True
+    pending = _apply_repeat_offender_policy(project, pending, type_of)
     if not pending:
         return True
     remaining = MAX_REPAIR_PASSES - passes_done
@@ -12430,6 +14374,39 @@ def run_plan(plan: dict):
             log("stop requested before Packet Tracer focus")
             return
         project = str(plan.get("project", "default"))
+        RUN["project"] = project
+        # PREVIOUS RUN: `_run_reset` above wiped phases, action results, link
+        # results and node outcomes, so the ledger is the only way to know
+        # where the last attempt died.  Loading it here lets the whole run
+        # pre-empt a step that has already failed the same way twice.
+        try:
+            RUN["previousRun"] = RUN_LEDGER.previous(project)
+            RUN["repeatOffenders"] = RUN_LEDGER.repeat_offenders(project)
+        except Exception as e:
+            log(f"run ledger read failed: {e}")
+            RUN["previousRun"], RUN["repeatOffenders"] = {}, []
+        if RUN["repeatOffenders"]:
+            names = ", ".join(f"{i.get('action')} on {i.get('device')}"
+                              for i in RUN["repeatOffenders"][:4])
+            log(f"PREVIOUS RUN: {len(RUN['repeatOffenders'])} step(s) have "
+                f"failed the same way in consecutive runs: {names} - each "
+                f"gets one escalation, then it is reported instead of "
+                f"retried forever")
+        elif RUN["previousRun"]:
+            log("PREVIOUS RUN: " + (
+                "finished OK" if RUN["previousRun"].get("ok") else
+                f"stopped at '{RUN['previousRun'].get('finalPhase') or '?'}'"))
+        # TEACH RUN: the user's correction is applied through scoped, one-shot
+        # overrides so the step can be re-attempted and the screen read BEFORE
+        # anything is written to a store.  `armed` is empty on every ordinary
+        # run, and this is the only place overrides are ever set.
+        armed = _load_teach_overrides(plan.get("teach"))
+        RUN["teachRun"] = armed
+        if armed:
+            log("TEACH RUN: applying " + ", ".join(
+                f"{item['store']}:{item['key']}" for item in armed[:4])
+                + " as a one-shot override - nothing is saved unless the "
+                  "step verifies on screen")
         phase_update("preflight", "running",
                      expected="Packet Tracer focused, visible, and safe to control")
         recalled = DEV_MEM.get(project, {})
@@ -12457,6 +14434,7 @@ def run_plan(plan: dict):
             phase_update("preflight", "failed",
                          expected="preflight completes", observed="stop requested")
             log("stopped after proof")
+            _settle_teach_run(False, "stopped")
             return
         phase_update("preflight", "verified",
                      expected="Packet Tracer focused and visible",
@@ -12926,6 +14904,35 @@ def run_plan(plan: dict):
                      recovered=RUN["ok"])
         log(f"plan finished ({'OK' if RUN['ok'] else 'WITH ISSUES'}) - "
             f"CHECK shots/before.png vs after.png + PT canvas")
+        # LEDGER: write the record the next run reads.  This is the piece the
+        # reset at the top of run_plan throws away, and without it run N+1
+        # cannot know that run N stopped at the same step again.
+        try:
+            RUN_LEDGER.record(
+                project,
+                ok=bool(RUN.get("ok")),
+                final_phase=str(RUN.get("phase", "")),
+                still_failed=_unverified_actions(),
+                repair_passes=int(RUN.get("repair_passes", 0)),
+                cli_block_reasons=RUN.get("cli_block_reasons") or {},
+                counters={
+                    "errors_recovered": RUN.get("errors_recovered", 0),
+                    "errors_unrecovered": RUN.get("errors_unrecovered", 0),
+                    "links_red": RUN.get("links_red", 0),
+                    "links_failed": RUN.get("links_failed", 0),
+                    "pings_failed": RUN.get("pings_failed", 0),
+                    "srv_failed": RUN.get("srv_failed", 0),
+                    "cli_context_blocks": RUN.get("cli_context_blocks", 0),
+                    "repair_passes": RUN.get("repair_passes", 0),
+                    "known_blockers_skipped": RUN.get(
+                        "known_blockers_skipped_count", 0),
+                },
+            )
+        except Exception as e:
+            log(f"run ledger write failed: {e}")
+        if RUN.get("known_blockers_skipped"):
+            log("KNOWN BLOCKERS SKIPPED (reported, not retried): "
+                + "; ".join(RUN["known_blockers_skipped"][:4]))
         # CLI BLOCKS: which evidence was missing, aggregated.  The journal
         # before this change had 592 unrecovered blocks and no way to tell
         # whether they were empty reads, ambiguous glyphs, or wrong modes.
@@ -12935,6 +14942,18 @@ def run_plan(plan: dict):
             log("CLI BLOCKS: " + ", ".join(f"{k}={v}" for k, v in top))
         # ARTIFACT: a green run leaves a .pkt plus its companion manifest.
         _save_run_artifact()
+        # TEACH SETTLEMENT: the run has spoken - promote what verified,
+        # reject what did not. `_settle_teach_run` is a no-op on every
+        # ordinary run (nothing armed), so this costs nothing.
+        try:
+            _settle_teach_run(
+                bool(RUN.get("ok")),
+                "" if RUN.get("ok") else
+                ("step did not verify: " + "; ".join(
+                    f"{a}:{d}" for a, d in _failed_action_names()[:3]))
+                if _failed_action_names() else "validation failed")
+        except Exception as e:
+            log(f"teach settlement failed: {e}")
         # Cost split for this run: reads/spawns/ms.  Printed as one log line
         # (visible in the app) and served on /run_summary.perf.
         RUN["perfSummary"] = perf_summary_line()
@@ -12943,6 +14962,13 @@ def run_plan(plan: dict):
         log(f"ERROR: {e}")
         RUN["ok"] = False
         record_event("run_crashed", str(e), recovered=False)
+        # A crashed teach run reached no verdict, so its corrections
+        # stay `proposed` for the next teach run - neither promoted
+        # nor rejected behind the user's back.
+        try:
+            _settle_teach_run(False, "run crashed")
+        except Exception as settle_exc:
+            log(f"teach settlement on crash failed: {settle_exc}")
     finally:
         end_activity("build")
 
@@ -12964,22 +14990,19 @@ class H(BaseHTTPRequestHandler):
                         "activity": activity_snapshot()})
         elif self.path == "/status":
             with LOCK:
-                self._json({"running": JOB.running,
-                            "activity": _active_activity_locked() or None,
-                            "stopRequested": JOB.stop_requested,
-                            "pause": pause_snapshot(),
-                            "sessionId": LEARNING.session_id,
-                            "learning": LEARNING.summary(),
-                            "learningEvents": LEARNING.events(40),
-                            "log": JOB.log[-80:]})
+                self._json(_status_payload_locked())
         elif self.path == "/cal_get":
             self._json({"ok": True, "cal": cal_flat()})
         elif self.path == "/shots":
+            # `shots` stays the plain name list (20 newest) that this endpoint
+            # already served; `details` adds the size and time the chat needs
+            # so its picker can show what it is about to attach.
             try:
                 files = sorted(os.listdir(SHOTS)) if os.path.isdir(SHOTS) else []
             except Exception:
                 files = []
-            self._json({"ok": True, "shots": files[-20:]})
+            self._json({"ok": True, "shots": files[-20:],
+                        "details": shot_listing()})
         elif self.path == "/inspect":
             try:
                 items = inspect_pt()
@@ -13023,7 +15046,33 @@ class H(BaseHTTPRequestHandler):
                             "report": TOPOLOGY.get("report")})
         elif self.path == "/stats":
             self._json({"ok": True, **journal_stats(),
-                        "learning": STRATEGY_STORE.summary()})
+                        "learning": STRATEGY_STORE.summary(),
+                        "llmMemory": LLM_MEMORY.summary(),
+                        "capabilities": CAPABILITIES.summary(),
+                        "corrections": CORRECTIONS.summary(),
+                        "ledger": RUN_LEDGER.summary()})
+        elif self.path.startswith("/corrections"):
+            # The teaching loop's read side.  `summary` is the counts,
+            # `pending` what still needs a teach run, `stale` the user-taught
+            # entries that stopped verifying (must be shown, never dropped),
+            # `thrash` the elements corrected repeatedly, and `taxonomy` the
+            # map that tells the app whether an event can be corrected at all.
+            from urllib.parse import urlparse, parse_qs
+            query = parse_qs(urlparse(self.path).query)
+            kind = str(query.get("kind", [""])[0] or "")
+            summary = CORRECTIONS.summary()
+            body = {
+                "ok": True,
+                "summary": summary,
+                "corrections": summary.get("corrections", []),
+                "pending": CORRECTIONS.pending(),
+                "stale": CORRECTIONS.stale_rows(),
+                "thrash": CORRECTIONS.thrash_rows(),
+                "taxonomy": taxonomy_snapshot(),
+            }
+            if kind:
+                body["plan"] = correction_plan(kind)
+            self._json(body)
         elif self.path == "/learning":
             rows = _experience_rows()
             self._json({"ok": True, "count": len(rows),
@@ -13031,8 +15080,22 @@ class H(BaseHTTPRequestHandler):
                         "session": LEARNING.session_id,
                         "learning": LEARNING.summary(),
                         "events": LEARNING.events(100)})
-        elif self.path == "/suggest":
-            self._json({"ok": True, "suggestions": journal_suggestions()})
+        elif self.path.startswith("/shot"):
+            from urllib.parse import urlparse, parse_qs
+            query = parse_qs(urlparse(self.path).query)
+            shot = read_shot(str(query.get("name", [""])[0] or ""))
+            self._json({"ok": bool(shot), **shot})
+        elif self.path.startswith("/suggest"):
+            from urllib.parse import urlparse, parse_qs
+            query = parse_qs(urlparse(self.path).query)
+            project = str(query.get("project", [""])[0] or "")
+            # `suggestions` stays exactly as it was for the Memory screen;
+            # `blockers` is the machine-readable form the planner consumes.
+            self._json({"ok": True,
+                        "suggestions": journal_suggestions(),
+                        "blockers": known_blockers(project),
+                        "blockerLines": blocker_lines(project),
+                        "capabilities": CAPABILITIES.proven_families()})
         elif self.path.startswith("/events"):
             from urllib.parse import urlparse, parse_qs
             q = parse_qs(urlparse(self.path).query)
@@ -13054,6 +15117,11 @@ class H(BaseHTTPRequestHandler):
             # Last saved artifact: path, companion manifest, and the
             # planned-vs-recorded comparison for it.
             self._json({"ok": True, "report": PKT_STATE.get("report")})
+        elif self.path == "/pkt/templates/status":
+            # What the offline generator can build with today: which device
+            # models and cable kinds the machine-local library covers.
+            self._json({"ok": True,
+                        "report": pkt_template_build.library_status()})
         else:
             self._json({"error": "not found"}, 404)
 
@@ -13159,6 +15227,414 @@ class H(BaseHTTPRequestHandler):
             finally:
                 end_activity("calibration")
             return
+        if self.path in ("/corrections", "/corrections/revert"):
+            # PROPOSE only.  Recording a correction must never change what the
+            # engine does - that is what the teach run and its verification are
+            # for.  `revert` is the way back out and removes exactly the one
+            # entry the correction promoted.
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception as exc:
+                self._json({"ok": False, "error": f"bad json: {exc}"}, 400)
+                return
+            try:
+                if self.path == "/corrections":
+                    row = CORRECTIONS.propose(
+                        failure_kind=str(req.get("failureKind")
+                                         or req.get("kind") or ""),
+                        project=str(req.get("project") or ""),
+                        device=str(req.get("device") or ""),
+                        dtype=str(req.get("dtype") or ""),
+                        model=str(req.get("model") or ""),
+                        action=str(req.get("action") or ""),
+                        layout=int(req.get("layout") or 0),
+                        target=req.get("target") or {},
+                        evidence=req.get("evidence") or {},
+                    )
+                    if not row:
+                        self._json({"ok": False,
+                                    "error": "could not record correction"}, 400)
+                        return
+                    self._json({"ok": True, "correction": row,
+                                "plan": correction_plan(row["failureKind"])})
+                    return
+                cid = str(req.get("id") or "")
+                row = CORRECTIONS.get(cid)
+                if not row:
+                    self._json({"ok": False,
+                                "error": f"no such correction: {cid}"}, 404)
+                    return
+                undone = _undo_promotion(row)
+                row = CORRECTIONS.revert(cid)
+                record_event("correction_reverted",
+                             f"user un-taught {row.get('failureKind')} on "
+                             f"{row.get('device') or 'any device'} "
+                             f"({undone.get('store') or 'nothing promoted'})",
+                             device=str(row.get("device") or ""),
+                             recovered=True)
+                self._json({"ok": True, "correction": row, "undone": undone})
+            except Exception as exc:
+                log(f"corrections ERROR: {exc}")
+                self._json({"ok": False, "error": str(exc)}, 500)
+            return
+        if self.path == "/teach":
+            # Start ONE bounded teach run for a recorded correction.
+            #
+            # The caller has to name the engine element it applies to (`store`
+            # + `key`) and the single action to re-attempt, because a
+            # correction that cannot say where it applies cannot be verified -
+            # and an unverifiable correction is exactly what this loop exists
+            # to refuse.  Nothing is saved here: the run either verifies the
+            # step and promotes it, or rejects it.
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception as exc:
+                self._json({"ok": False, "error": f"bad json: {exc}"}, 400)
+                return
+            cid = str(req.get("correctionId") or req.get("id") or "")
+            row = CORRECTIONS.get(cid)
+            if not row:
+                self._json({"ok": False,
+                            "error": f"no such correction: {cid}"}, 404)
+                return
+            if row.get("status") == "reverted":
+                self._json({"ok": False,
+                            "error": "this correction was un-taught"}, 409)
+                return
+            store = str(req.get("store") or "").strip()
+            key = str(req.get("key") or "").strip()
+            steps = req.get("steps")
+            if not store or not key or not isinstance(steps, list) or not steps:
+                self._json({"ok": False,
+                            "error": "a teach run needs store, key and a "
+                                     "non-empty steps list"}, 400)
+                return
+            if len(steps) > 4:
+                # A teach run is meant to be tiny.  If it needs more than a
+                # handful of steps it is a build, and a build is not a
+                # verification.
+                self._json({"ok": False,
+                            "error": "a teach run takes at most 4 steps"}, 400)
+                return
+            target = row.get("target") or {}
+            entry = {
+                "store": store,
+                "key": key,
+                "device": str(row.get("device") or ""),
+                "correctionId": cid,
+                "label": target.get("label"),
+                "cli": target.get("cli"),
+                "fieldKind": str(req.get("fieldKind") or ""),
+            }
+            for axis in ("fx", "fy", "clickAbove"):
+                if target.get(axis) is not None:
+                    entry[axis] = target[axis]
+            plan = {
+                "project": str(req.get("project") or row.get("project")
+                               or "default"),
+                "mode": str(req.get("mode") or "fixes"),
+                "steps": steps,
+                "teach": [entry],
+                "teachOf": cid,
+            }
+            acquired, busy = begin_activity("build")
+            if not acquired:
+                self._json({"ok": False,
+                            "error": f"busy - {busy} active",
+                            "activity": activity_snapshot()}, 409)
+                return
+            CORRECTIONS._data["corrections"][cid]["teachRunAt"] = (
+                time.strftime("%Y-%m-%d %H:%M:%S"))
+            CORRECTIONS._save_locked()
+            threading.Thread(target=run_plan, args=(plan,),
+                             daemon=True).start()
+            self._json({"ok": True, "correctionId": cid,
+                        "teach": {"store": store, "key": key,
+                                  "device": entry["device"]},
+                        "message": "Teach run started; nothing is saved "
+                                   "unless the step verifies. Poll /status."})
+            return
+        if self.path == "/pkt/deep_audit":
+            # Deep offline audit: services, VLANs, AAA state + findings.
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception as exc:
+                self._json({"ok": False, "error": f"bad json: {exc}"}, 400)
+                return
+            try:
+                report = pkt_audit.audit(str(req.get("path") or ""),
+                                         str(req.get("project") or ""))
+            except FileNotFoundError as exc:
+                self._json({"ok": False, "error": str(exc)}, 404)
+                return
+            except (ValueError, pkt_codec.PktFormatError) as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+                return
+            except Exception as exc:  # noqa: BLE001
+                self._json({"ok": False, "error": str(exc)}, 500)
+                return
+            self._json({"ok": True, "report": report})
+            return
+        if self.path == "/pkt/diff":
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception as exc:
+                self._json({"ok": False, "error": f"bad json: {exc}"}, 400)
+                return
+            try:
+                report = pkt_audit.diff(str(req.get("pathA") or ""),
+                                        str(req.get("pathB") or ""))
+            except (FileNotFoundError, ValueError,
+                    pkt_codec.PktFormatError) as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+                return
+            self._json({"ok": True, "report": report})
+            return
+        if self.path == "/pkt/grade":
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception as exc:
+                self._json({"ok": False, "error": f"bad json: {exc}"}, 400)
+                return
+            plan = req.get("plan")
+            if not isinstance(plan, dict):
+                self._json({"ok": False, "error": "missing plan"}, 400)
+                return
+            try:
+                report = pkt_audit.grade(str(req.get("path") or ""), plan)
+            except FileNotFoundError as exc:
+                self._json({"ok": False, "error": str(exc)}, 404)
+                return
+            except (ValueError, pkt_codec.PktFormatError) as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+                return
+            self._json({"ok": True, "report": report})
+            return
+        if self.path == "/pkt/audit":
+            # OFFLINE audit of a saved .pkt: reads the file, never opens
+            # Packet Tracer.  Synchronous and bounded (a file read), so it
+            # takes no activity lock - unlike /audit, which drives the GUI.
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception as exc:
+                self._json({"ok": False, "error": f"bad json: {exc}"}, 400)
+                return
+            try:
+                report = pkt_audit_network(
+                    str(req.get("path") or ""),
+                    str(req.get("project") or "default"))
+            except FileNotFoundError as exc:
+                self._json({"ok": False, "error": str(exc)}, 404)
+                return
+            except (ValueError, pkt_codec.PktFormatError) as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+                return
+            except Exception as exc:  # noqa: BLE001 - last-resort report
+                self._json({"ok": False, "error": str(exc)}, 500)
+                return
+            self._json({"ok": True, "report": report})
+            return
+        if self.path == "/pkt/generate":
+            # Build a .pkt straight from a plan - no Packet Tracer, no GUI,
+            # no screen.  Runs synchronously: it is bounded file work, not a
+            # UI automation, so it neither needs nor takes the activity lock.
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception as exc:
+                self._json({"ok": False, "error": f"bad json: {exc}"}, 400)
+                return
+            plan = req.get("plan")
+            if not isinstance(plan, dict) and isinstance(req.get("steps"),
+                                                         list):
+                plan = req  # the body itself is the plan
+            # A machine that has never built a .pkt has no template library,
+            # and without one generation cannot work at all. Build it from the
+            # bundled sample saves on first use, rather than failing and
+            # telling the user to supply their own files.
+            try:
+                pkt_template_build.ensure_library()
+            except Exception:  # noqa: BLE001 - the generate below reports it
+                pass
+            try:
+                result = pkt_generate(
+                    plan if isinstance(plan, dict) else {},
+                    project=str(req.get("project") or ""),
+                    filename=str(req.get("filename") or ""),
+                    replace=bool(req.get("replace")))
+            except (ValueError, pkt_builder.BuildError) as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+                return
+            except FileExistsError as exc:
+                self._json({"ok": False, "error": str(exc)}, 409)
+                return
+            except Exception as exc:  # noqa: BLE001 - last-resort report
+                self._json({"ok": False, "error": str(exc)}, 500)
+                return
+            self._json({"ok": True, "report": result})
+            return
+        if self.path == "/pkt/templates/build":
+            # (Re)build the template library from the user's own .pkt files.
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception as exc:
+                self._json({"ok": False, "error": f"bad json: {exc}"}, 400)
+                return
+            try:
+                manifest = pkt_templates_build(req.get("paths") or [],
+                                               out_dir=str(req.get("outDir")
+                                                           or ""))
+            except (ValueError, pkt_template_build.TemplateError) as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+                return
+            except Exception as exc:  # noqa: BLE001 - last-resort report
+                self._json({"ok": False, "error": str(exc)}, 500)
+                return
+            self._json({"ok": True, "report": manifest})
+            return
+        if self.path == "/pkt/templates/harvest":
+            # Extend the library with every model found in local .pkt files
+            # (Packet Tracer's own samples by default), so a plan's requested
+            # model exists as a real template instead of being substituted.
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception as exc:
+                self._json({"ok": False, "error": f"bad json: {exc}"}, 400)
+                return
+            try:
+                result = pkt_templates_harvest(
+                    req.get("roots") or [],
+                    samples=bool(req.get("samples", True)),
+                    out_dir=str(req.get("outDir") or ""))
+            except (ValueError, pkt_template_build.TemplateError) as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+                return
+            except Exception as exc:  # noqa: BLE001 - last-resort report
+                self._json({"ok": False, "error": str(exc)}, 500)
+                return
+            if not result.get("ok"):
+                self._json(result, 404)
+                return
+            self._json({"ok": True, "report": result})
+            return
+        if self.path == "/pkt/learning":
+            # OFFLINE learning summary: what this machine has proven it
+            # does when generating .pkt files, with no Packet Tracer.
+            self._json({"ok": True, "report": pkt_learning.summary()})
+            return
+        if self.path == "/tools/list":
+            # The tools the model may ask for. Read tools never change
+            # anything; modify tools only ever return a proposal.
+            self._json(net_tools.list_tools())
+            return
+        if self.path == "/tools/call":
+            # ONE entry point for every model tool call. The audit is
+            # loaded from the capture named in the request, so the model
+            # itself never touches the file.
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception as exc:
+                self._json({"ok": False, "error": f"bad json: {exc}"}, 400)
+                return
+            try:
+                audit = {}
+                path = str(req.get("path") or "")
+                if path:
+                    audit = pkt_audit_network(
+                        path, project=str(req.get("project") or ""))
+                    if isinstance(audit, dict) and "report" in audit:
+                        audit = audit["report"]
+                result = net_tools.call(
+                    str(req.get("name") or ""),
+                    req.get("args") or {},
+                    audit if isinstance(audit, dict) else {},
+                )
+            except net_tools.ToolError as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+                return
+            except Exception as exc:  # noqa: BLE001 - last-resort report
+                self._json({"ok": False, "error": str(exc)}, 500)
+                return
+            self._json({"ok": True, "result": result})
+            return
+        if self.path == "/pkt/identify":
+            # What IS this file? The chat asks first so a wrong format
+            # gets a plain answer instead of a decode failure.
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception:
+                req = {}
+            path = str(req.get("path") or "")
+            kind = pkt_fix.describe_format(path)
+            self._json({
+                "ok": True,
+                "kind": kind,
+                "isPkt": kind == "pkt",
+                "message": "" if kind == "pkt"
+                           else pkt_fix.unsupported_message(path),
+            })
+            return
+        if self.path == "/pkt/apply_fixes":
+            # THE FIX GATE. Only the fixes in this body are applied, and a
+            # separate result file is encrypted - the source is never
+            # touched. No Packet Tracer, no window, no clicks.
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception as exc:
+                self._json({"ok": False, "error": f"bad json: {exc}"}, 400)
+                return
+            try:
+                result = pkt_fix.apply_fixes(
+                    str(req.get("path") or req.get("source") or ""),
+                    list(req.get("fixes") or []),
+                    out_name=str(req.get("outName") or ""),
+                    project=str(req.get("project") or ""),
+                    out_dir=str(req.get("outDir") or ""),
+                )
+            except pkt_fix.FixError as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+                return
+            except Exception as exc:  # noqa: BLE001 - last-resort report
+                self._json({"ok": False, "error": str(exc)}, 500)
+                return
+            self._json(result)
+            return
+        if self.path == "/pkt/reject":
+            # A rejection is recorded and nothing else happens - the audit
+            # ledger has to show the decision either way.
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception as exc:
+                self._json({"ok": False, "error": f"bad json: {exc}"}, 400)
+                return
+            row = pkt_fix.record_decision(
+                req.get("fix") or {},
+                str(req.get("decision") or "rejected"),
+                str(req.get("capture") or ""),
+            )
+            self._json({"ok": True, "entry": row, "applied": False})
+            return
+        if self.path == "/pkt/undo":
+            # Restore the state before an applied change, as a new file.
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception as exc:
+                self._json({"ok": False, "error": f"bad json: {exc}"}, 400)
+                return
+            try:
+                self._json(pkt_fix.undo(str(req.get("entryId") or "")))
+            except pkt_fix.FixError as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+            return
+        if self.path == "/pkt/ledger":
+            # The audit ledger: captures, decisions, applied changes,
+            # exports and undos, queryable from the chat.
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception:
+                req = {}
+            self._json({"ok": True,
+                        "report": pkt_fix.ledger(int(req.get("limit") or 200))})
+            return
         if self.path == "/start":
             try:
                 plan = json.loads(body.decode() or "{}")
@@ -13173,6 +15649,26 @@ class H(BaseHTTPRequestHandler):
             threading.Thread(target=run_plan, args=(plan,),
                              daemon=True).start()
             self._json({"ok": True})
+        elif self.path == "/ai_suggest":
+            # AI suggest + evaluate: Gemini proposes fixes for the journal's
+            # recurring failures and a second Gemini call judges each one.
+            # Nothing is typed and nothing is promoted - accepted proposals
+            # become `proposed` corrections a teach run must still verify.
+            if self.command == "POST":
+                try:
+                    req = json.loads(body.decode() or "{}")
+                except Exception as exc:
+                    self._json({"ok": False, "error": f"bad json: {exc}"},
+                               400)
+                    return
+                result = ai_suggest_fixes(
+                    project=str(req.get("project") or ""))
+                self._json(result, 409 if not result.get("ok") and
+                           "already running" in str(result.get("error"))
+                           else 200)
+                return
+            self._json({"ok": True, **ai_suggest_status()})
+            return
         elif self.path == "/llm_config":
             try:
                 req = json.loads(body.decode() or "{}")
@@ -13362,6 +15858,66 @@ class H(BaseHTTPRequestHandler):
                              daemon=True).start()
             self._json({"ok": True, "msg": f"auditing '{project}' - poll "
                         "/audit_report"})
+        elif self.path == "/verify/derive":
+            # Offline: what WOULD be tested for this plan (no Packet Tracer).
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception as e:
+                self._json({"ok": False, "error": f"bad json: {e}"}, 400)
+                return
+            plan = req.get("plan") if isinstance(req.get("plan"), dict) else req
+            try:
+                tests = pt_verify.derive_tests(plan if isinstance(plan, dict)
+                                               else {})
+            except Exception as e:  # noqa: BLE001
+                self._json({"ok": False, "error": str(e)}, 500)
+                return
+            self._json({"ok": True, "tests": tests,
+                        **pt_verify.summarize([])})
+        elif self.path == "/verify/run":
+            # LIVE post-build verification: pings every derived test through
+            # Packet Tracer and reports pass/fail evidence. Runs in a thread
+            # (it drives the GUI); the app polls /verify/report.
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception as e:
+                self._json({"ok": False, "error": f"bad json: {e}"}, 400)
+                return
+            plan = req.get("plan") if isinstance(req.get("plan"), dict) else req
+            if not isinstance(plan, dict) or not plan:
+                self._json({"ok": False, "error": "missing plan"}, 400)
+                return
+            if VERIFY_STATE.get("running"):
+                self._json({"ok": False, "error": "verification already running"},
+                           409)
+                return
+            VERIFY_STATE["running"] = True
+            VERIFY_STATE["report"] = None
+            threading.Thread(target=_verify_run_async, args=(plan,),
+                             daemon=True).start()
+            self._json({"ok": True, "msg": "verification running - poll "
+                        "/verify/report"})
+        elif self.path == "/verify/report":
+            rep = VERIFY_STATE.get("report")
+            self._json({"ok": True, "running": bool(VERIFY_STATE.get("running")),
+                        "report": rep})
+        elif self.path == "/dry_run":
+            # Walk the plan WITHOUT Packet Tracer: pure logic, instant, no
+            # focus steal - the chat shows what a live run would do and the
+            # risks it already sees, before anything is typed.
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception as exc:
+                self._json({"ok": False, "error": f"bad json: {exc}"}, 400)
+                return
+            plan = req.get("plan") if isinstance(req.get("plan"), dict) else req
+            if not isinstance(plan, dict) or not plan:
+                self._json({"ok": False, "error": "missing plan"}, 400)
+                return
+            try:
+                self._json(pt_dryrun.dry_run_plan(plan))
+            except Exception as exc:  # noqa: BLE001
+                self._json({"ok": False, "error": f"dry run failed: {exc}"}, 500)
         else:
             self._json({"error": "not found"}, 404)
 

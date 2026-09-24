@@ -7,6 +7,8 @@ import '../models/build_attempt.dart';
 import '../models/build_record.dart';
 import '../services/autopilot_service.dart';
 import '../services/memory_service.dart';
+import '../widgets/correction_badges.dart';
+import '../theme/app_palette.dart';
 
 class MemoryScreen extends StatefulWidget {
   const MemoryScreen({super.key});
@@ -27,6 +29,9 @@ class _MemoryScreenState extends State<MemoryScreen> {
   List<Map<String, dynamic>> _events = [];
   List<Map<String, dynamic>> _experiences = [];
   Map<String, dynamic>? _learningMemory;
+  CorrectionSnapshot _corrections = const CorrectionSnapshot.empty();
+  bool _correctionsBusy = false;
+  String? _correctionsNote;
   bool _learnLoading = false;
   bool _learningRefreshing = false;
   String? _learnError;
@@ -41,9 +46,89 @@ class _MemoryScreenState extends State<MemoryScreen> {
     super.initState();
     _refresh();
     _refreshLearning();
+    _refreshCorrections();
     _learningTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (mounted) _refreshLearning(quiet: true);
+      if (mounted) {
+        _refreshLearning(quiet: true);
+        // Cheaper than the journal poll: once a minute the teaching-loop
+        // state re-syncs, so a stale badge never outlives the run that
+        // cleared it.
+        _correctionsTick++;
+        if (_correctionsTick >= 20) {
+          _correctionsTick = 0;
+          _refreshCorrections(quiet: true);
+        }
+      }
     });
+  }
+
+  int _correctionsTick = 0;
+
+  /// Read /corrections. Best-effort: the card hides when the sidecar is
+  /// offline and shows what happened on revert failures.
+  Future<void> _refreshCorrections({bool quiet = false}) async {
+    if (_correctionsBusy) return;
+    _correctionsBusy = true;
+    if (!quiet && mounted) setState(() {});
+    try {
+      final snap = await AutopilotService().correctionSnapshot();
+      if (!mounted) return;
+      setState(() {
+        _corrections = snap;
+        _correctionsNote = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _correctionsNote = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      _correctionsBusy = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  /// Un-teach a verified (possibly stale) correction: removes the promoted
+  /// entry and flips the row to reverted. Kept next to the row it acts on.
+  Future<void> _revertCorrection(CorrectionRow row) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Un-teach this correction?'),
+        content: Text(
+          'Removes the entry it promoted on the sidecar '
+          '(${row.summaryLine}) and marks it reverted.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Un-teach'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await AutopilotService().revertCorrection(row.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Un-taught ${row.summaryLine}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not un-teach: ${e.toString().replaceFirst("Exception: ", "")}',
+          ),
+        ),
+      );
+    }
+    await _refreshCorrections();
   }
 
   @override
@@ -222,11 +307,11 @@ class _MemoryScreenState extends State<MemoryScreen> {
           const SizedBox(height: 4),
           Text(
             'Cross-run problem stats: $kindLine',
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
+            style: TextStyle(fontSize: 12, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
           ),
           const SizedBox(height: 8),
           Card(
-            color: Colors.blue.shade50,
+            color: AppPalette.accentFill(Theme.of(context).colorScheme),
             child: Padding(
               padding: const EdgeInsets.all(10),
               child: Column(
@@ -267,6 +352,30 @@ class _MemoryScreenState extends State<MemoryScreen> {
             ),
           const SizedBox(height: 8),
           if (_learnLoading) const LinearProgressIndicator(),
+          // TEACHING-LOOP CORRECTIONS: stale ones are taught fixes that
+          // stopped verifying; rejected ones a teach run disproved. Both are
+          // reported here instead of failing silently.
+          CorrectionsCard(
+            snapshot: _corrections,
+            onRefresh: _correctionsBusy ? null : () => _refreshCorrections(),
+            onRevert: _revertCorrection,
+          ),
+          if (_correctionsBusy && _corrections.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 2),
+              child: Text(
+                'Reading corrections from the sidecar...',
+                style: TextStyle(fontSize: 11, color: Colors.black45),
+              ),
+            ),
+          if (_correctionsNote != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                _correctionsNote!,
+                style: const TextStyle(fontSize: 11, color: Colors.red),
+              ),
+            ),
           if (_learnError != null)
             Text(
               'Sidecar offline - start sidecar/pt_autopilot.py to read '
@@ -275,7 +384,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
             ),
           for (final s in _suggestions)
             Card(
-              color: Colors.amber.shade50,
+              color: AppPalette.warningFill(Theme.of(context).colorScheme),
               child: ListTile(
                 leading: const Icon(Icons.auto_awesome),
                 title: Text(s, style: const TextStyle(fontSize: 13)),
@@ -306,7 +415,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
           ),
           const SizedBox(height: 8),
           Card(
-            color: Colors.grey.shade100,
+            color: AppPalette.infoFill(Theme.of(context).colorScheme),
             child: Padding(
               padding: const EdgeInsets.all(10),
               child: Column(
@@ -357,7 +466,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
           const SizedBox(height: 8),
           if (_experiences.isNotEmpty)
             Card(
-              color: Colors.blueGrey.shade50,
+              color: AppPalette.infoFill(Theme.of(context).colorScheme),
               child: Padding(
                 padding: const EdgeInsets.all(8),
                 child: Column(
@@ -404,7 +513,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
                           style: TextStyle(
                             fontSize: 11,
                             color: e['recovered'] == false
-                                ? Colors.red.shade700
+                                ? AppPalette.danger(Theme.of(context).colorScheme)
                                 : Colors.black87,
                           ),
                         ),

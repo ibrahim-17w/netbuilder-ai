@@ -1,5 +1,7 @@
 // Universal intent model: target-agnostic network description.
 // Adapters compile this into GNS3 / Cisco / PT / Terraform.
+import 'dart:ui' show Offset;
+
 class NetNode {
   final String name;
   final String type; // router, switch, pc, server, firewall, cloud
@@ -345,22 +347,32 @@ class InterfaceAddr {
   final String iface;
   final String ipCidr; // e.g. 192.168.1.1/24
 
+  /// Optional IPv6 address for this interface, e.g. 2001:db8:1::1/64.
+  /// Router interfaces get it spelled out; endpoints are left null and use
+  /// SLAAC/autoconfig against the router advertisement instead.
+  final String? ip6Cidr;
+
   const InterfaceAddr({
     required this.node,
     required this.iface,
     required this.ipCidr,
+    this.ip6Cidr,
   });
 
   Map<String, dynamic> toJson() => {
     'node': node,
     'iface': iface,
     'ipCidr': ipCidr,
+    if (ip6Cidr != null) 'ip6Cidr': ip6Cidr,
   };
 
   factory InterfaceAddr.fromJson(Map<String, dynamic> j) => InterfaceAddr(
     node: j['node'] as String,
     iface: j['iface'] as String,
     ipCidr: j['ipCidr'] as String,
+    ip6Cidr: j['ip6Cidr'] is String && (j['ip6Cidr'] as String).isNotEmpty
+        ? j['ip6Cidr'] as String
+        : null,
   );
 }
 
@@ -522,6 +534,10 @@ class NetworkIntent {
   final String planningSource;
   final SecurityIntent security;
 
+  /// Drag positions for the topology canvas, keyed by node name.
+  /// A null value means "auto-layout this node". Persisted with the plan.
+  final Map<String, Offset?> layout;
+
   const NetworkIntent({
     required this.projectName,
     this.nodes = const [],
@@ -535,6 +551,7 @@ class NetworkIntent {
     this.confidence = 0.5,
     this.planningSource = 'local',
     this.security = const SecurityIntent(),
+    this.layout = const {},
   });
 
   Map<String, dynamic> toJson({bool includeSecrets = true}) => {
@@ -552,6 +569,12 @@ class NetworkIntent {
     'confidence': confidence,
     'planningSource': planningSource,
     'security': security.toJson(includeSecrets: includeSecrets),
+    if (layout.isNotEmpty)
+      'layout': layout.map((k, v) => MapEntry(
+          k,
+          v == null
+              ? null
+              : {'x': v.dx, 'y': v.dy})),
   };
 
   /// Safe copy for third-party planners.  Credentials remain in the local
@@ -585,6 +608,13 @@ class NetworkIntent {
     security: SecurityIntent.fromJson(
       Map<String, dynamic>.from((j['security'] as Map?) ?? const {}),
     ),
+    layout: ((j['layout'] as Map?) ?? const {}).map((k, v) => MapEntry(
+      k.toString(),
+      v == null
+          ? null
+          : Offset(((v as Map)['x'] as num?)?.toDouble() ?? 0,
+              ((v)['y'] as num?)?.toDouble() ?? 0),
+    )),
   );
 
   NetworkIntent copyWith({
@@ -600,6 +630,7 @@ class NetworkIntent {
     double? confidence,
     String? planningSource,
     SecurityIntent? security,
+    Map<String, Offset?>? layout,
   }) => NetworkIntent(
     projectName: projectName ?? this.projectName,
     nodes: nodes ?? this.nodes,
@@ -613,6 +644,7 @@ class NetworkIntent {
     confidence: confidence ?? this.confidence,
     planningSource: planningSource ?? this.planningSource,
     security: security ?? this.security,
+    layout: layout ?? this.layout,
   );
 
   /// PT model catalog for best-fit selection.
@@ -650,15 +682,25 @@ class NetworkIntent {
     final securityWords =
         lower.contains('ipsec') ||
         lower.contains('site-to-site') ||
+        lower.contains('vpn') ||
+        lower.contains('tunnel') ||
         lower.contains('tacacs') ||
+        lower.contains('radius') ||
         lower.contains('aaa') ||
+        lower.contains('centralized authentication') ||
         lower.contains('port security') ||
+        lower.contains('user ports') ||
         lower.contains('dhcp snooping') ||
-        lower.contains('time-based acl');
+        lower.contains('rogue dhcp') ||
+        lower.contains('time-based acl') ||
+        lower.contains('extended acl') ||
+        lower.contains('network security');
     return securityWords &&
         (lower.contains('branch') ||
             lower.contains('headquarters') ||
-            lower.contains('hq_') ||
+            lower.contains('main office') ||
+            lower.contains('remote office') ||
+            lower.contains('hq') ||
             lower.contains('br_') ||
             lower.contains('wan'));
   }
@@ -681,14 +723,65 @@ class NetworkIntent {
     final isAllFeaturesLab =
         lower.contains('srv1') || lower.contains('all-features-lab');
     String? firstMatch(RegExp pattern) => pattern.firstMatch(text)?.group(1);
+    // "08:00-17:00", "9:00 to 17:00", "from 8 until 16", "9 am to 5 pm" and
+    // the Arabic connectors a translated brief arrives with.
     final hoursMatch = RegExp(
-      r'(\d{1,2}:\d{2})\s*(?:to|-)\s*(\d{1,2}:\d{2})',
+      r'(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*(?:to|-|until|through|till|الى|الي|حتي)\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)',
       caseSensitive: false,
     ).firstMatch(text);
-    final credentialMatch = RegExp(
-      r'(?:username|user|login)\s+([A-Za-z0-9_.-]+)[^\n.]{0,80}?(?:password|pass)\s+([^\s,.]+)',
+    // "username labadmin password X", "the username is labadmin and the
+    // password is X", "اسم المستخدم labadmin كلمة المرور X" (bridged): all the
+    // same request.  Credentials are read from the brief, never invented.
+    //
+    // Two guards keep a *description* out of this: a bare 'user'/'login' must
+    // be followed by an explicit separator (so "user ports ... password" is
+    // not a credential), and neither half may be one of the words itself (so
+    // "the router asks for username and password" is not one either).
+    const credentialStopWords = {
+      'name',
+      'user',
+      'username',
+      'password',
+      'pass',
+      'secret',
+      'login',
+      'account',
+      'and',
+      'or',
+      'the',
+      'with',
+    };
+    final credentialPattern = RegExp(
+      r'(username|user|login|account)\s*((?:is|:|=)\s*)?([A-Za-z0-9_.-]+)'
+      r'[\s\S]{0,80}?(?:password|pass|secret)\s*(?:is|:|=)?\s*([^\s,.;:]+)',
       caseSensitive: false,
-    ).firstMatch(text);
+    );
+    RegExpMatch? credentialMatch;
+    // A rejected match must not consume the text it covered: 'the user ports
+    // and the password policy' can swallow a real 'username labadmin with
+    // password X' sitting inside it, so a rejection re-scans from one
+    // character later instead of moving past the whole match.
+    var cursor = 0;
+    while (cursor < text.length) {
+      final m = credentialPattern.firstMatch(text.substring(cursor));
+      if (m == null) break;
+      final keyword = m.group(1)!.toLowerCase();
+      final separator = (m.group(2) ?? '').trim();
+      final user = m.group(3)!;
+      final pass = m.group(4)!;
+      if (keyword == 'user' && separator.isEmpty) {
+        cursor += m.start + 1;
+        continue;
+      }
+      if (credentialStopWords.contains(user.toLowerCase()) ||
+          credentialStopWords.contains(pass.toLowerCase()) ||
+          RegExp(r'[\u0600-\u06ff]').hasMatch('$user$pass')) {
+        cursor += m.start + 1;
+        continue;
+      }
+      credentialMatch = m;
+      break;
+    }
     final ftpCredentialMatch = RegExp(
       r'\bftp\s+(?:user|username)\s+([A-Za-z0-9_.-]+)[^\n.]{0,80}?(?:password|pass)\s+([^\s,.]+)',
       caseSensitive: false,
@@ -700,9 +793,15 @@ class NetworkIntent {
     final emailDomain = emailDomainMatch
         ?.group(1)
         ?.replaceFirst(RegExp(r'[.,;]+$'), '');
-    final key = firstMatch(
+    String? key = firstMatch(
       RegExp(
-        r'(?:pre[- ]shared|preshared)\s+key\s*[:=]?\s*([^\s,.]+)',
+        r'(?:pre[- ]?shared|preshared|psk)\s*(?:key)?\s*(?:is|:|=)?\s*([^\s,.]+)',
+        caseSensitive: false,
+      ),
+    );
+    key ??= firstMatch(
+      RegExp(
+        r'\bkey\s*(?:is|:|=)\s*([^\s,.]+)',
         caseSensitive: false,
       ),
     );
@@ -840,20 +939,40 @@ class NetworkIntent {
 
     final officeHours = hoursMatch == null
         ? 'weekdays 08:00-17:00'
-        : 'weekdays ${hoursMatch.group(1)}-${hoursMatch.group(2)}';
+        : 'weekdays ${hoursMatch.group(1)!.trim()}-${hoursMatch.group(2)!.trim()}';
     final hasTacacs = lower.contains('tacacs');
-    final hasTelnet = lower.contains('telnet');
+    final hasRadius = lower.contains('radius');
+    final hasTelnet =
+        lower.contains('telnet') || lower.contains('vty');
+    // Layer-2 security is what the brief asked for even when it names no
+    // command: 'secure the access ports' is the same request as
+    // 'enable port security on every user port'.
+    final layer2Security = lower.contains('layer 2 security') ||
+        lower.contains('layer-2 security') ||
+        lower.contains('access ports') ||
+        lower.contains('user ports');
+    // Secrets are read from the brief or left open; the profile never invents
+    // a password for a device it is about to configure.
     final security = SecurityIntent(
       portSecurity:
-          lower.contains('port security') || lower.contains('port-security'),
-      dhcpSnooping: lower.contains('dhcp snooping'),
+          lower.contains('port security') ||
+          lower.contains('port-security') ||
+          lower.contains('sticky mac') ||
+          lower.contains('mac address') ||
+          layer2Security,
+      dhcpSnooping:
+          lower.contains('dhcp snooping') ||
+          lower.contains('rogue dhcp') ||
+          lower.contains('fake dhcp') ||
+          lower.contains('untrusted dhcp') ||
+          layer2Security,
       dhcpTrustedInterface: 'f0/1',
-      aaa: lower.contains('aaa') || hasTacacs,
-      aaaProtocol: hasTacacs ? 'tacacs+' : 'tacacs+',
+      aaa: lower.contains('aaa') || hasTacacs || hasRadius,
+      aaaProtocol: 'tacacs+',
       aaaServer: 'AAA1',
       aaaRouter: 'HQ_Router',
-      aaaUsername: credentialMatch?.group(1),
-      aaaPassword: credentialMatch?.group(2),
+      aaaUsername: credentialMatch?.group(3),
+      aaaPassword: credentialMatch?.group(4),
       telnet: hasTelnet,
       managerIp: '192.168.1.50',
       officeHours: officeHours,
@@ -863,11 +982,17 @@ class NetworkIntent {
       branchNetwork: '192.168.2.0/24',
       protectedServerIp: '192.168.1.100',
       allowedWebServerIp: '192.168.1.102',
-      ipsecVpn: lower.contains('ipsec') || lower.contains('site-to-site'),
+      ipsecVpn:
+          lower.contains('ipsec') ||
+          lower.contains('site-to-site') ||
+          lower.contains('vpn') ||
+          lower.contains('tunnel'),
       vpnPeerA: '10.1.1.1',
       vpnPeerB: '10.1.1.2',
-      vpnEncryption: lower.contains('aes') ? 'aes' : null,
-      vpnHash: lower.contains('sha') ? 'sha' : null,
+      // Both ends must agree, so the algorithms are explicit rather than
+      // left to each side's fallback.
+      vpnEncryption: lower.contains('3des') ? '3des' : 'aes',
+      vpnHash: lower.contains('md5') ? 'md5' : 'sha',
       vpnPreSharedKey: key,
       vpnLocalNetwork: '192.168.1.0/24',
       vpnRemoteNetwork: '192.168.2.0/24',
@@ -883,8 +1008,11 @@ class NetworkIntent {
 
     final questions = <String>[
       if (credentialMatch == null)
-        'Provide the TACACS+ username and password; they were not supplied.',
-      if (key == null) 'Provide the IPSec pre-shared key; it was not supplied.',
+        'Provide the TACACS+ username and password; they were not supplied, '
+            'and the plan never invents a credential.',
+      if (key == null)
+        'Provide the IPSec pre-shared key; it was not supplied, so the tunnel '
+            'is staged but cannot establish.',
       if (hoursMatch == null)
         'Confirm office hours; the plan currently assumes weekdays 08:00-17:00.',
     ];
@@ -913,10 +1041,389 @@ class NetworkIntent {
     );
   }
 
+  // --- Offline wording bridge -------------------------------------------
+  //
+  // The offline planner has no model to rephrase a brief for it, so wording
+  // the parser does not literally expect used to produce an empty or wrong
+  // plan.  `bridgeBrief` rewrites only the phrases the parser keys on:
+  // Arabic words into their English equivalents, Arabic-Indic digits into
+  // 0-9, "192.168.1.1 255.255.255.0" into "192.168.1.1/24" and
+  // "two routers" into "2 routers".  Everything else passes through as-is,
+  // and Latin case is preserved (a password's case must survive).
+
+  /// Right-to-left marks, tashkeel, and the Arabic letters that have several
+  /// spellings (أ/إ/آ -> ا, ى -> ي, ة -> ه), folded so one table entry
+  /// matches every way a brief may be written.
+  static String _foldArabic(String s) => s
+      .replaceAll(RegExp(r'[\u200e\u200f\u202a-\u202e\u061c]'), ' ')
+      .replaceAll(RegExp(r'[\u064b-\u0652\u0670\u0640]'), '')
+      .replaceAll(RegExp(r'[\u0623\u0625\u0622\u0671]'), '\u0627')
+      .replaceAll('\u0649', '\u064a')
+      .replaceAll('\u0629', '\u0647')
+      .replaceAll('\u060c', ',');
+
+  /// ٢٣ (Arabic-Indic) and ۲۳ (Extended Arabic-Indic) are the same numbers.
+  static String _asciiDigits(String s) => s.replaceAllMapped(
+    RegExp(r'[\u0660-\u0669\u06f0-\u06f9]'),
+    (m) {
+      final c = m.group(0)!.codeUnitAt(0);
+      return '${c >= 0x06f0 ? c - 0x06f0 : c - 0x0660}';
+    },
+  );
+
+  /// The prefix length of a dotted mask, or null when it is not a mask.
+  static int? _maskToPrefix(String mask) {
+    final parts = mask.split('.').map(int.parse).toList();
+    if (parts.length != 4) return null;
+    var bits = 0;
+    var seenZero = false;
+    for (final p in parts) {
+      if (p > 255) return null;
+      for (var b = 7; b >= 0; b--) {
+        final one = (p >> b) & 1 == 1;
+        if (one && seenZero) return null;
+        if (one) {
+          bits++;
+        } else {
+          seenZero = true;
+        }
+      }
+    }
+    return bits;
+  }
+
+  /// "10.1.1.0 255.255.255.252", "10.1.1.0 subnet mask 255.255.255.252" and
+  /// their Arabic spellings become one CIDR, so a single regex serves every
+  /// brief - including the address tables course briefs are written as.
+  static String _bridgeMasks(String s) => s.replaceAllMapped(
+    RegExp(
+      r'(\d{1,3}(?:\.\d{1,3}){3})[\s,;:]*(?:/|subnet\s+mask|netmask|mask|prefix|qina3|قناع(?:\s+الشبكه)?)?[\s,;:]*(\d{1,3}(?:\.\d{1,3}){3})',
+    ),
+    (m) {
+      final prefix = _maskToPrefix(m.group(2)!);
+      if (prefix == null || prefix == 0) return m.group(0)!;
+      return '${m.group(1)!}/$prefix';
+    },
+  );
+
+  /// Arabic phrases -> the English words the rest of this parser already
+  /// keys on.  Keys are written in folded form (see [_foldArabic]) and the
+  /// table is applied longest-first, so 'جهاز التوجيه' (router) wins before
+  /// the bare 'جهاز' (pc) underneath it.
+  static const List<List<String>> _phraseBridge = [
+    // devices
+    ['اجهزه التوجيه', 'routers'],
+    ['جهاز التوجيه', 'router'],
+    ['الموجه الرئيسي', 'core router'],
+    ['الموجهات', 'routers'],
+    ['موجهات', 'routers'],
+    ['الموجه', 'router'],
+    ['موجه', 'router'],
+    ['الراوتر', 'router'],
+    ['راوتر', 'router'],
+    ['المبدلات', 'switches'],
+    ['مبدلات', 'switches'],
+    ['المبدله', 'switch'],
+    ['مبدله', 'switch'],
+    ['المبدل', 'switch'],
+    ['مبدل', 'switch'],
+    ['السويتش', 'switch'],
+    ['سويتش', 'switch'],
+    ['الخوادم', 'servers'],
+    ['خوادم', 'servers'],
+    ['الخادم', 'server'],
+    ['خادم', 'server'],
+    ['سيرفر', 'server'],
+    ['اجهزه الموظفين', 'pcs'],
+    ['الاجهزه', 'pcs'],
+    ['اجهزه', 'pcs'],
+    ['جهاز', 'pc'],
+    ['حاسوب محمول', 'laptop'],
+    ['لابتوب', 'laptop'],
+    ['حاسوب', 'pc'],
+    ['كمبيوتر', 'pc'],
+    ['جدار ناري', 'firewall'],
+    ['الفايروول', 'firewall'],
+    ['نقطه وصول', 'access point'],
+    ['اكسس بوينت', 'access point'],
+    ['هاتف ip', 'ip phone'],
+    ['هاتف', 'ip phone'],
+    ['طابعه', 'printer'],
+    ['سحابه', 'cloud'],
+    ['مودم', 'modem'],
+    ['واي فاي', 'wireless'],
+    ['لاسلكي', 'wireless'],
+    ['تابلت', 'tablet'],
+    ['جوال', 'smartphone'],
+    // security, services and the words that decide the security profile
+    ['خادم aaa', 'aaa server'],
+    ['خادم dhcp', 'dhcp server'],
+    ['خادم الويب', 'web server'],
+    ['خادم ويب', 'web server'],
+    ['خادم dns', 'dns server'],
+    ['خادم البريد', 'mail server'],
+    ['خادم ftp', 'ftp server'],
+    ['امن المنافذ', 'port security'],
+    ['تامين المنافذ', 'port security'],
+    ['امن الشبكه', 'network security'],
+    ['امن الشبكات', 'network security'],
+    ['حمايه الشبكه', 'network security'],
+    ['التنصت علي dhcp', 'dhcp snooping'],
+    ['تنصت dhcp', 'dhcp snooping'],
+    ['خوادم وهميه', 'rogue dhcp servers'],
+    ['خادم وهمي', 'rogue dhcp server'],
+    ['منفذ موثوق', 'trusted port'],
+    ['منافذ المستخدمين', 'user ports'],
+    ['قائمه التحكم بالوصول', 'access list'],
+    ['التحكم بالوصول', 'access control'],
+    ['تحكم بالوصول', 'access control'],
+    ['المصادقه المركزيه', 'centralized authentication'],
+    ['مصادقه مركزيه', 'centralized authentication'],
+    ['مصادقه', 'authentication'],
+    ['تاكاكس', 'tacacs'],
+    ['نفق ipsec', 'ipsec vpn'],
+    ['نفق', 'vpn tunnel'],
+    ['موقع الي موقع', 'site-to-site'],
+    ['بين الفرعين', 'site-to-site'],
+    ['مفتاح مشترك', 'pre-shared key'],
+    ['مفتاح اولي', 'pre-shared key'],
+    ['اسم المستخدم', 'username'],
+    ['كلمه المرور', 'password'],
+    ['كلمه السر', 'password'],
+    ['كلمه مرور', 'password'],
+    ['تشفير', 'encryption'],
+    ['اوقات الدوام', 'office hours'],
+    ['وقت الدوام', 'office hours'],
+    ['ساعات العمل', 'office hours'],
+    ['الدوام الرسمي', 'office hours'],
+    ['الفرع الرئيسي', 'headquarters'],
+    ['الفرع الفرعي', 'branch'],
+    ['فرع رئيسي', 'headquarters'],
+    ['فرع فرعي', 'branch'],
+    ['الشبكه العامه', 'wan'],
+    ['شبكه عامه', 'wan'],
+    ['وصله تسلسليه', 'serial link'],
+    ['تسلسليه', 'serial'],
+    ['تسلسلي', 'serial'],
+    ['قناع الشبكه', 'subnet mask'],
+    ['العنونه', 'addressing'],
+    ['بوابه افتراضيه', 'default gateway'],
+    ['بوابه', 'gateway'],
+    ['توجيه ديناميكي', 'dynamic routing'],
+    ['توجيه ثابت', 'static route'],
+    ['اوسبف', 'ospf'],
+    // English spellings the parser should accept as the same request
+    ['business hours', 'office hours'],
+    ['working hours', 'office hours'],
+    ['work hours', 'office hours'],
+    ['site to site', 'site-to-site'],
+    ['site2site', 'site-to-site'],
+    ['centralised authentication', 'centralized authentication'],
+    // Plain-English wordings that used to fall through the parser.
+    ['half a dozen', '6'],
+    ['half dozen', '6'],
+    ['a pair of', '2'],
+    ['a couple of', '2'],
+    ['point-to-point', 'serial link'],
+    ['point to point', 'serial link'],
+    ['guest wi-fi', 'wireless'],
+    ['guest wifi', 'wireless'],
+    ['guest wlan', 'wireless'],
+    ['trunk between the switches', 'switch trunk'],
+    ['trunk between switches', 'switch trunk'],
+    ['tacacs+', 'tacacs'],
+  ];
+
+  /// Numbers a brief may spell out instead of typing - English and Arabic.
+  static const Map<String, int> _numberWords = {
+    'one': 1,
+    'single': 1,
+    'two': 2,
+    'couple': 2,
+    'three': 3,
+    'four': 4,
+    'five': 5,
+    'six': 6,
+    'seven': 7,
+    'eight': 8,
+    'nine': 9,
+    'ten': 10,
+    'pair': 2,
+    'pairs': 2,
+    'dozen': 12,
+    'واحد': 1,
+    'اثنان': 2,
+    'اثنين': 2,
+    'اثنتين': 2,
+    'ثلاثه': 3,
+    'ثلاث': 3,
+    'اربعه': 4,
+    'اربع': 4,
+    'خمسه': 5,
+    'خمس': 5,
+    'سته': 6,
+    'ست': 6,
+    'سبعه': 7,
+    'سبع': 7,
+    'ثمانيه': 8,
+    'ثمان': 8,
+    'تسعه': 9,
+    'تسع': 9,
+    'عشره': 10,
+    'عشر': 10,
+  };
+
+  static bool _isAscii(String s) => s.codeUnits.every((c) => c < 128);
+
+  /// "two switches" -> "2 switches", "اثنين موجه" -> "2 router".
+  static String _bridgeNumberWords(String s) => s
+      .split(' ')
+      .map((token) {
+        final bare = token
+            .replaceAll(RegExp(r'[^A-Za-z0-9\u0600-\u06ff]'), '')
+            .toLowerCase();
+        final n = _numberWords[bare];
+        return n == null ? token : '$n';
+      })
+      .join(' ');
+
+  /// How many identical sites a brief describes - "2 branch offices",
+  /// "three floors", "2 sites" - or null when it describes one.  The digits
+  /// must sit directly on the site word ("2 offices", not "2 routers in the
+  /// office"), and a count of one is not an expansion.
+  static int? siteCount(String text) {
+    final m = RegExp(
+      r'(\d{1,3})\s*(?:separate\s+|identical\s+|different\s+|remote\s+|branch\s+)?'
+      r'(?:offices?|branches|sites?|floors?|buildings?|classrooms?|departments?|locations?)\b',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (m == null) return null;
+    final n = int.parse(m.group(1)!);
+    return (n < 2 || n > 25) ? null : n;
+  }
+
+  /// The device counts that belong to ONE site of a brief worded as
+  /// "... each with a router, a switch and 3 pcs".
+  ///
+  /// The clause runs from the cue to the end of the sentence or to a
+  /// 'plus/also' aside, so "plus one server at headquarters" keeps its own
+  /// global count instead of being multiplied with everything else.
+  /// Returns null when the brief has no per-site cue at all.
+  static Map<String, int>? perSiteCounts(String text) {
+    final cue = RegExp(
+      r'\b(?:each|per\s+(?:site|office|branch|floor|building|location|classroom|department))\b',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (cue == null) return null;
+    var clause = text.substring(cue.end);
+    final aside = RegExp(
+      r'[,;]?\s*(?:plus|as well as|in addition|additionally|also|and an additional)\b',
+      caseSensitive: false,
+    ).firstMatch(clause);
+    if (aside != null) clause = clause.substring(0, aside.start);
+    final stop = clause.indexOf(RegExp(r'[.;\n]'));
+    if (stop >= 0) clause = clause.substring(0, stop);
+    final lower = clause.toLowerCase();
+
+    /// "3 pcs" and a bare "a switch" both mean something per site.
+    int countOf(List<String> words) {
+      for (final w in words) {
+        final m = RegExp(
+          '(\\d{1,3})\\s*${RegExp.escape(w)}s?\\b',
+        ).firstMatch(lower);
+        if (m != null) return int.parse(m.group(1)!);
+      }
+      for (final w in words) {
+        if (RegExp('\\b${RegExp.escape(w)}\\b').hasMatch(lower)) return 1;
+      }
+      return 0;
+    }
+
+    final counts = <String, int>{'router': countOf(['router', 'gateway'])};
+    counts['switch'] = countOf(['switch']);
+    counts['pc'] = countOf(['pc', 'workstation', 'desktop']);
+    counts['server'] = countOf(['server']);
+    for (final kind in deviceKinds) {
+      if (const ['router', 'switch', 'pc', 'server'].contains(kind.type)) {
+        continue;
+      }
+      counts[kind.type] = countOf(kind.keywords);
+    }
+    return counts;
+  }
+
+  /// Rewrite a brief into the wording this parser understands.
+  static String bridgeBrief(String raw) {
+    var s = _bridgeMasks(_asciiDigits(_foldArabic(raw)));
+    final entries = [..._phraseBridge]
+      ..sort((a, b) => b[0].length.compareTo(a[0].length));
+    for (final e in entries) {
+      if (_isAscii(e[0])) {
+        s = s.replaceAll(
+          RegExp(RegExp.escape(e[0]), caseSensitive: false),
+          e[1],
+        );
+      } else if (s.contains(e[0])) {
+        s = s.replaceAll(e[0], e[1]);
+      }
+    }
+    return _bridgeNumberWords(s).replaceAll(RegExp(r'[ \t]+'), ' ');
+  }
+
+  /// Does this brief name a device kind (or an explicit device label like
+  /// R1/PC3) anywhere? Derived from [deviceKinds] so it cannot drift from the
+  /// parser's own vocabulary.
+  ///
+  /// Used to tell "a new lab that names no devices" (where the parser's
+  /// router+switch fallback is right) apart from "a short follow-up like
+  /// 'ok build the packet tracer file'" - where inventing a default lab would
+  /// silently REPLACE the plan built from the user's real request.
+  static final RegExp namesAnyDevice = RegExp(
+    '(?:\\b(?:'
+        '${deviceKinds
+            .expand((k) => k.keywords)
+            // Plural-tolerant: "2 routers" must count, and \brouter\b alone
+            // would not match it.
+            .map((k) => '${RegExp.escape(k)}(?:es|s)?')
+            .join('|')}'
+        ')\\b)',
+  );
+
+  /// True when [lower] mentions a device kind or a label like R1 / SW2 /
+  /// PC3 / SRV1. Pure; see [namesAnyDevice].
+  static bool namesAnyDeviceIn(String lower) =>
+      namesAnyDevice.hasMatch(lower) ||
+      RegExp(r'\b(?:R|SW|PC|SRV)\d{1,2}\b').hasMatch(lower);
+
+  /// What the chat's standing plan becomes after one more turn.
+  ///
+  /// A follow-up that names no device ("ok build the packet tracer file",
+  /// "now add port security") keeps [previous], the plan parsed from the
+  /// user's real request: [parseSimple]'s empty-brief fallback would
+  /// otherwise invent a fresh router+switch lab and silently replace it. A
+  /// brief that DOES name devices is a new or extended request and re-plans.
+  static NetworkIntent planAfterFollowUp({
+    required NetworkIntent? previous,
+    required NetworkIntent parsed,
+    required String brief,
+  }) {
+    final namesDevices = namesAnyDeviceIn(brief.toLowerCase());
+    if (previous != null &&
+        previous.nodes.isNotEmpty &&
+        !namesDevices &&
+        parsed.nodes.length <= previous.nodes.length) {
+      return previous;
+    }
+    return parsed;
+  }
+
   /// Very small heuristic parser so the app works offline without Gemini.
   /// Handles: "2 routers 1 switch", "192.168.1.0/24", "ospf", vlan numbers,
-  /// explicit models ("use 4331") or best-fit router choice.
-  static NetworkIntent parseSimple(String projectName, String text) {
+  /// explicit models ("use 4331") or best-fit router choice - and, through
+  /// [bridgeBrief], the same request written in Arabic, with Arabic-Indic
+  /// digits, with a dotted mask or with the numbers spelled out.
+  static NetworkIntent parseSimple(String projectName, String rawText) {
+    final text = bridgeBrief(rawText);
     final lower = text.toLowerCase();
     if (_looksLikeSecurityBranchLab(lower)) {
       return _parseSecurityBranchLab(projectName, text);
@@ -951,6 +1458,25 @@ class NetworkIntent {
       serverCount = int.parse(serverMatch.group(1)!);
     }
     if (lower.contains('server') && serverCount == 0) serverCount = 1;
+    // An AAA/TACACS+/RADIUS request with no server named still means an AAA
+    // server exists to configure - without this, the role had no owner and
+    // the router's `tacacs-server host` block was silently dropped.
+    if (serverCount == 0 &&
+        (lower.contains('aaa') ||
+            RegExp(r'\btacacs\+?\b|\bradius\b').hasMatch(lower))) {
+      serverCount = 1;
+    }
+    // Any service role named with no server count still provisions one
+    // server to own it - "1 router with dns and http" used to plan the
+    // router and silently drop the services (nothing anywhere to run them).
+    if (serverCount == 0) {
+      const roleWordsAny = [
+        'dhcp', 'dhcpv6', 'dns', 'http', 'https', 'web', 'email',
+        'mail server', 'ftp', 'ntp', 'tftp', 'syslog', 'iot', 'prp',
+        'snmp', 'vm management', 'vm',
+      ];
+      if (roleWordsAny.any(lower.contains)) serverCount = 1;
+    }
 
     // Every other device kind the catalog knows, counted the same way:
     // "2 firewalls", "3 IP phones", "1 wireless controller".  A bare mention
@@ -981,6 +1507,30 @@ class NetworkIntent {
     if (wirelessCount == 0 &&
         RegExp(r'\b(wifi|wi-fi|wireless|wlan)\b').hasMatch(lower)) {
       kindCounts['wireless'] = 1;
+    }
+
+    // "two branch offices, each with a router, a switch and 3 pcs" is two of
+    // everything the per-site clause names - R1/SW1 at the first site and
+    // R2/SW2 at the second, instead of one site with the word 'two' ignored.
+    // A kind whose global count is already higher keeps it: the clause can
+    // only raise a count, never shrink the plan.
+    final sites = siteCount(text);
+    final perSite = sites == null ? null : perSiteCounts(text);
+    if (perSite != null) {
+      int perSiteTotal(int count, String type) {
+        final per = perSite[type] ?? 0;
+        if (per <= 0) return count;
+        final total = per * sites!;
+        return total > count ? total : count;
+      }
+
+      routerCount = perSiteTotal(routerCount, 'router');
+      switchCount = perSiteTotal(switchCount, 'switch');
+      pcCount = perSiteTotal(pcCount, 'pc');
+      serverCount = perSiteTotal(serverCount, 'server');
+      for (final type in kindCounts.keys.toList()) {
+        kindCounts[type] = perSiteTotal(kindCounts[type]!, type);
+      }
     }
 
     // Explicit labels are authoritative when the user names devices rather
@@ -1137,6 +1687,24 @@ class NetworkIntent {
         ),
       );
     }
+    // Also understand plain English descriptions that omit router names:
+    // "Connect the routers to each other using GigabitEthernet0/1 on both
+    // sides." This is unambiguous only for a two-router plan.
+    final unnamedRouterPair = RegExp(
+      r'\bconnects?\s+(?:the\s+)?routers?\s+to\s+each\s+other[^.]*?\b([gf])\s*(\d+/\d+)\s+on\s+both(?:\s+sides)?\b',
+    ).firstMatch(normText);
+    if (unnamedRouterPair != null && routers.length == 2) {
+      final iface = '${unnamedRouterPair.group(1)!}${unnamedRouterPair.group(2)!}';
+      linksExplicit.add(
+        NetLink(
+          a: routers[0].name,
+          aIf: iface,
+          b: routers[1].name,
+          bIf: iface,
+          cable: lower.contains('crossover') ? 'copper-cross' : null,
+        ),
+      );
+    }
     // "PC1 connects to SW1 FastEthernet0/2" (end-device side has only
     // Fa0 - same for "SRV1 connects to SW1 FastEthernet0/4"), and
     // "PH1 Port 1 connects to SW1 FastEthernet0/5" for the kinds whose
@@ -1157,6 +1725,52 @@ class NetworkIntent {
           aIf: '${m.group(3)!}${m.group(4)!}',
           b: pc,
           bIf: endpointPort(pc), // PC-PT: one port; phone/AP: Port 1
+        ),
+      );
+    }
+    // Accept both ordinary imperative and abbreviated endpoint-first forms:
+    // "Connect PC1 to SW1 FastEthernet0/2" and
+    // "PC2 to SW1 FastEthernet0/3". The older parser only accepted
+    // "PC1 connects to SW1 FastEthernet0/2".
+    final endpointFirstLink = RegExp(
+      r'\b(\w+)\s+(?:connects?\s+)?to\s+(\w+)\s*([gf])\s*(\d+/\d+)',
+    );
+    for (final m in endpointFirstLink.allMatches(normText)) {
+      final ep = node(m.group(1)!);
+      final sw = node(m.group(2)!);
+      if (ep == null || sw == null) continue;
+      if (!endpoints.any((p) => p.name.toLowerCase() == ep.toLowerCase()) ||
+          !switches.any((s) => s.name.toLowerCase() == sw.toLowerCase())) {
+        continue;
+      }
+      linksExplicit.add(
+        NetLink(
+          a: sw,
+          aIf: '${m.group(3)!}${m.group(4)!}',
+          b: ep,
+          bIf: endpointPort(ep),
+        ),
+      );
+    }
+    // Some natural descriptions put the switch port first:
+    // "SW1 FastEthernet0/2 to PC1". Accept that direction too.
+    final switchFirstLink = RegExp(
+      r'\b(\w+)\s*([gf])\s*(\d+/\d+)\s*(?:connects?\s+to|to)\s+(\w+)\b',
+    );
+    for (final m in switchFirstLink.allMatches(normText)) {
+      final sw = node(m.group(1)!);
+      final ep = node(m.group(4)!);
+      if (sw == null || ep == null) continue;
+      if (!switches.any((s) => s.name.toLowerCase() == sw.toLowerCase()) ||
+          !endpoints.any((p) => p.name.toLowerCase() == ep.toLowerCase())) {
+        continue;
+      }
+      linksExplicit.add(
+        NetLink(
+          a: sw,
+          aIf: '${m.group(2)!}${m.group(3)!}',
+          b: ep,
+          bIf: endpointPort(ep),
         ),
       );
     }
@@ -1195,8 +1809,15 @@ class NetworkIntent {
       r'(serial|\bwan\b|leased[- ]line|back[- ]to[- ]back|frame relay|dsl)',
     ).hasMatch(lower);
 
-    // Naive chain fallback only when the instruction specified nothing.
+    // Deterministic layout fallback, used only when the brief cabled
+    // nothing explicitly.  The rules below exist so that a brief written as
+    // a device list - "2 routers 2 switches 1 server and 4 pcs" - produces
+    // the topology that list describes: every switch is uplinked to a router
+    // (the LAN side), never left floating, and the end devices are spread
+    // across the switches instead of piling onto the first one.
     if (links.isEmpty) {
+      // Routers chain through their transit links first, so the LAN
+      // interfaces handed out below never collide with the WAN pair.
       for (var i = 0; i + 1 < routers.length; i++) {
         final wanIf = wantsSerialWan ? 's0/0/0' : '${rIf}0/0';
         links.add(
@@ -1210,29 +1831,93 @@ class NetworkIntent {
           ),
         );
       }
-      if (routers.isNotEmpty && switches.isNotEmpty) {
+      // One LAN uplink per switch, spread over the routers in order:
+      // SW1 -> R1, SW2 -> R2, SW3 -> R1, ...  A two-site brief therefore
+      // gets a LAN on each side of the WAN, and each router-switch link is
+      // its own subnet further down.
+      final routerUplinks = <String, int>{};
+      for (var i = 0; i < switches.length; i++) {
+        final r = routers.isEmpty ? null : routers[i % routers.length];
+        if (r == null) {
+          // A plan with switches and no router at all - "two switches and
+          // three pcs" - is one layer-2 network: SW1 feeds the others on its
+          // last ports, so the access ports stay free for the devices.
+          if (i == 0) continue;
+          links.add(
+            NetLink(
+              a: switches.first.name,
+              aIf: 'f0/${25 - i}',
+              b: switches[i].name,
+              bIf: 'f0/24',
+            ),
+          );
+          continue;
+        }
+        final n = (routerUplinks[r.name] = (routerUplinks[r.name] ?? 0) + 1);
         links.add(
           NetLink(
-            a: routers.first.name,
-            aIf: '${rIf}0/1',
-            b: switches.first.name,
+            a: r.name,
+            aIf: '${rIf}0/$n',
+            b: switches[i].name,
             bIf: 'f0/1',
           ),
         );
       }
-      for (var i = 0; i < endpoints.length; i++) {
-        if (switches.isEmpty && routers.isEmpty) break;
-        final sw = switches.isNotEmpty
-            ? switches.first.name
-            : routers.first.name;
-        links.add(
-          NetLink(
-            a: sw,
-            aIf: 'f0/${i + 2}',
-            b: endpoints[i].name,
-            bIf: endpointPort(endpoints[i].name),
-          ),
-        );
+      // End devices: user devices split evenly across the switches (SW1
+      // first, so the first LAN is the busier one), and the servers stay on
+      // the first switch's LAN - a brief that names servers and switches but
+      // not their location means "the server room", not "one per switch".
+      final userDevices = endpoints
+          .where((n) => n.type != 'server')
+          .toList();
+      final serverDevices = endpoints
+          .where((n) => n.type == 'server')
+          .toList();
+      final portOf = <String, int>{};
+      void attach(String host, List<NetNode> devices, {String? prefix}) {
+        for (final device in devices) {
+          if (prefix == null) {
+            final port = (portOf[host] = (portOf[host] ?? 1) + 1);
+            links.add(
+              NetLink(
+                a: host,
+                aIf: 'f0/$port',
+                b: device.name,
+                bIf: endpointPort(device.name),
+              ),
+            );
+          } else {
+            final port = (portOf[host] = (portOf[host] ?? 0) + 1);
+            links.add(
+              NetLink(
+                a: host,
+                aIf: '$prefix$port',
+                b: device.name,
+                bIf: endpointPort(device.name),
+              ),
+            );
+          }
+        }
+      }
+
+      if (switches.isNotEmpty) {
+        final per = userDevices.length ~/ switches.length;
+        final extra = userDevices.length % switches.length;
+        var taken = 0;
+        for (var s = 0; s < switches.length; s++) {
+          final count = per + (s < extra ? 1 : 0);
+          attach(
+            switches[s].name,
+            userDevices.sublist(taken, taken + count),
+          );
+          taken += count;
+        }
+        attach(switches.first.name, serverDevices);
+      } else if (routers.isNotEmpty) {
+        // No switch to hang them off: the router itself is the LAN, on the
+        // interfaces its own family names.
+        attach(routers.first.name, userDevices, prefix: '${rIf}0/');
+        attach(routers.first.name, serverDevices, prefix: '${rIf}0/');
       }
     }
 
@@ -1339,9 +2024,14 @@ class NetworkIntent {
       );
     }
     // LAN links: the ROUTER side gets .1 (the PC default gateway).
-    // Switches stay layer-2, but each PC/server hanging off that switch
-    // gets .10, .11, ... of the same subnet - the sidecar types these
-    // into the device's Desktop > IP Configuration.
+    // Switches stay layer-2, but every Desktop > IP Configuration device
+    // hanging off that switch (pc, server, laptop, printer) gets .10,
+    // .11, ... of the same subnet - the sidecar types these into the
+    // device's Desktop > IP Configuration. The kind check must match
+    // PacketTracerAdapter.autopilotPlan's config_pcs filter
+    // (deviceKindOf(type)?.ipConfig), otherwise the plan carries a device
+    // with ip 0.0.0.0 and the executor leaves its IPv4 row empty while
+    // still typing mask/gateway.
     for (final l in links.where(routerToSwitch)) {
       final aNode = nodes.firstWhere((n) => n.name == l.a);
       final sub = nextSubnet(false);
@@ -1358,8 +2048,8 @@ class NetworkIntent {
       for (final pl in links) {
         final aN = nodes.firstWhere((n) => n.name == pl.a);
         final bN = nodes.firstWhere((n) => n.name == pl.b);
-        final aIsEndpoint = aN.type == 'pc' || aN.type == 'server';
-        final bIsEndpoint = bN.type == 'pc' || bN.type == 'server';
+        final aIsEndpoint = deviceKindOf(aN.type)?.ipConfig ?? false;
+        final bIsEndpoint = deviceKindOf(bN.type)?.ipConfig ?? false;
         if (!aIsEndpoint && !bIsEndpoint) continue;
         final epName = aIsEndpoint ? pl.a : pl.b;
         final otherName = aIsEndpoint ? pl.b : pl.a;
@@ -1375,9 +2065,65 @@ class NetworkIntent {
       }
     }
 
+    // A router hanging off a firewall is a routed transit, not a LAN: both
+    // ends need addresses or the ASA has no inside interface and the router
+    // has no path out.  Addressed from the transit pool AFTER the links
+    // above, so explicit CIDRs still land on router-router/LAN links first.
+    for (final l in links) {
+      final aNode = nodes.firstWhere((n) => n.name == l.a);
+      final bNode = nodes.firstWhere((n) => n.name == l.b);
+      final routerIsA = aNode.type == 'router' && bNode.type == 'firewall';
+      final routerIsB = aNode.type == 'firewall' && bNode.type == 'router';
+      if (!routerIsA && !routerIsB) continue;
+      final k = transitPool++;
+      final sub = '10.0.0.${k * 4}/30';
+      addressing.add(
+        InterfaceAddr(
+          node: routerIsA ? l.a : l.b,
+          iface: routerIsA ? l.aIf : l.bIf,
+          ipCidr: hostIn(sub, 1),
+        ),
+      );
+      addressing.add(
+        InterfaceAddr(
+          node: routerIsA ? l.b : l.a,
+          iface: routerIsA ? l.bIf : l.aIf,
+          ipCidr: hostIn(sub, 2),
+        ),
+      );
+    }
+
+    // A plan with no router at all is still a network: one layer-2 segment
+    // (the switches are cabled to each other), so every device on it is
+    // addressed in the base subnet.  There is no gateway to point at - the
+    // devices reach each other without one - and none is invented.
+    if (routers.isEmpty) {
+      var hostIdx = 0;
+      for (final ep in endpoints) {
+        if (!(deviceKindOf(ep.type)?.ipConfig ?? false)) continue;
+        addressing.add(
+          InterfaceAddr(
+            node: ep.name,
+            iface: endpointPort(ep.name),
+            ipCidr: hostIn(base, 10 + hostIdx),
+          ),
+        );
+        hostIdx++;
+      }
+    }
+
     final vlanMatches = RegExp(r'vlan\s*(\d+)').allMatches(lower);
     for (final m in vlanMatches) {
       vlans.add(int.parse(m.group(1)!));
+    }
+    // "VLAN 10 and 20", "vlans 10, 20, 30" - a list after one keyword.
+    for (final m in RegExp(
+      r'\bvlans?\s*(\d{1,4}(?:\s*(?:,|and|&|\+|\/)\s*\d{1,4})+)',
+    ).allMatches(lower)) {
+      for (final d in RegExp(r'\d{1,4}').allMatches(m.group(1)!)) {
+        final v = int.parse(d.group(0)!);
+        if (v > 0 && v <= 4094 && !vlans.contains(v)) vlans.add(v);
+      }
     }
 
     if (lower.contains('ospf')) {
@@ -1408,6 +2154,15 @@ class NetworkIntent {
       'syslog': 'syslog',
       'iot': 'iot',
       'prp': 'prp',
+      'snmp': 'snmp',
+      'vm management': 'vm',
+      'vm': 'vm',
+      'cme': 'cme',
+      'callmanager': 'cme',
+      'call manager': 'cme',
+      'voice': 'cme',
+      'tacacs': 'aaa',
+      'tacacs+': 'aaa',
     };
     final roles = <String, List<String>>{};
     final serviceRules = <String, Map<String, dynamic>>{};
@@ -1424,17 +2179,53 @@ class NetworkIntent {
     if (servers.isNotEmpty) {
       final fragments = text.toLowerCase().split(RegExp(r'[\n.]'));
       for (final frag in fragments) {
-        final found = roleWords.entries
-            .where((e) => frag.contains(e.key))
-            .map((e) => e.value)
-            .toSet()
-            .toList();
-        if (found.isEmpty) continue;
+        // Collect the roles in the order they were *said*, not in map order:
+        // "1 server is dhcp and the other is AAA" must give dhcp the first
+        // server and AAA the second.
+        final hits = <MapEntry<int, String>>[];
+        roleWords.forEach((word, role) {
+          final at = frag.indexOf(word);
+          if (at >= 0) hits.add(MapEntry(at, role));
+        });
+        if (hits.isEmpty) continue;
+        hits.sort((a, b) => a.key.compareTo(b.key));
+        final found = <String>[];
+        for (final hit in hits) {
+          if (!found.contains(hit.value)) found.add(hit.value);
+        }
         var named = servers
             .where((s) => frag.contains(s.name.toLowerCase()))
             .map((s) => s.name)
             .toList();
-        if (named.isEmpty) named = [servers.first.name];
+        if (named.isEmpty) {
+          // No server was named, so the wording decides. "the other",
+          // "one ... the other", "server 2" all mean the roles are spread
+          // across servers. Without this, every role landed on the first
+          // server and the rest were left with an empty Services tab - the
+          // reported bug: "both servers has the AAA service tab empty".
+          final distributes = RegExp(
+            r'\bthe other\b|\banother\b|\bone\b[^.]{0,30}\bother\b|'
+            r'\bserver\s*\d\b|\beach\b',
+            caseSensitive: false,
+          ).hasMatch(frag);
+          final free = servers
+              .map((s) => s.name)
+              .where((name) => !(roles[name]?.isNotEmpty ?? false))
+              .toList();
+          if (distributes && found.length > 1 &&
+              free.length >= found.length) {
+            // One role per server, in the order they were said.
+            for (var i = 0; i < found.length; i++) {
+              final target = free[i];
+              roles.putIfAbsent(target, () => []);
+              if (!roles[target]!.contains(found[i])) {
+                roles[target]!.add(found[i]);
+              }
+            }
+            continue;
+          }
+          named = [servers.first.name];
+        }
         for (final n in named) {
           roles.putIfAbsent(n, () => []);
           for (final r in found) {
@@ -1520,6 +2311,186 @@ class NetworkIntent {
       }
     }
 
+    // WIRELESS RULES: "an AP with SSID CORP and WEP key 1234567890" -
+    // attach the SSID/WEP/WPA phrase to the first AP or wireless router so
+    // the builder can write the wireless ENGINE blocks (pkt_builder's
+    // _wireless_elements).
+    final wirelessDevices = nodes
+        .where((n) =>
+            n.type == 'wireless' ||
+            n.type == 'wireless-router' ||
+            n.type == 'ap')
+        .toList();
+    if (wirelessDevices.isNotEmpty) {
+      final ssidMatch = RegExp(
+        'ssid\\s*(?:name\\s*)?(["\']?)([a-z0-9_. -]{2,32}?)\\1(?=[\\s,.,]|\\s*(?:with|using|and|key|wep|wpa|hidden|\$))',
+        caseSensitive: false,
+      ).firstMatch(text);
+      final ssid = ssidMatch == null
+          ? null
+          : (ssidMatch.group(2) ?? '').trim();
+      final wepMatch = RegExp(
+        'wep(?:\\s+key)?\\s*["\']?([0-9a-f]{5,26})["\']?',
+        caseSensitive: false,
+      ).firstMatch(text);
+      final wantsWpa2 = lower.contains('wpa2') ||
+          lower.contains('wpa') ||
+          lower.contains('wpa3');
+      if (ssidMatch != null || wepMatch != null || wantsWpa2) {
+        final rule = <String, dynamic>{
+          if (ssidMatch != null)
+            'ssid': ssid,
+          if (wepMatch != null) 'wep': wepMatch.group(1),
+          if (wantsWpa2) 'wpa2': true,
+          if (lower.contains('hidden') || lower.contains('hide ssid'))
+            'broadcast': false,
+        };
+        if (rule.isNotEmpty) {
+          final idx = nodes.indexOf(wirelessDevices.first);
+          final n = nodes[idx];
+          nodes[idx] = NetNode(
+            name: n.name,
+            type: n.type,
+            model: n.model,
+            mgmtIp: n.mgmtIp,
+            services: n.services,
+            serviceRules: {
+              ...n.serviceRules,
+              'wireless': rule,
+            },
+          );
+        }
+      }
+    }
+
+    // SECURITY INTENT for the generic path: the security-lab profile above
+    // fills SecurityIntent, but a plain brief ("build this network with an
+    // AAA server (radius) and a firewall") also asked for controls - and
+    // without this block its AAA stopped at the server tab while the router
+    // was never pointed at the server.
+    final hasAaaWord = lower.contains('aaa') ||
+        RegExp(r'\btacacs\+?\b').hasMatch(lower) ||
+        RegExp(r'\bradius\b').hasMatch(lower);
+    final aaaServers = nodes
+        .where((n) => n.type == 'server' && n.services.contains('aaa'))
+        .toList();
+    String? aaaServerName;
+    if (aaaServers.isNotEmpty) {
+      aaaServerName = aaaServers.first.name;
+    } else if (hasAaaWord && servers.isNotEmpty) {
+      // The role parser above only binds 'aaa' to a server when the wording
+      // let it; a brief that names AAA without a server role wins a role on
+      // the first server so the control is actually buildable.
+      final first = servers.first;
+      final idx = nodes.indexOf(first);
+      final newServices = [...first.services, if (!first.services.contains('aaa')) 'aaa'];
+      nodes[idx] = NetNode(
+        name: first.name,
+        type: first.type,
+        model: first.model,
+        mgmtIp: first.mgmtIp,
+        services: newServices,
+        serviceRules: first.serviceRules,
+      );
+      aaaServerName = first.name;
+    }
+    final wantsPortSecurity = lower.contains('port security') ||
+        lower.contains('port-security') ||
+        lower.contains('sticky mac');
+    final wantsSnooping = lower.contains('dhcp snooping') ||
+        lower.contains('rogue dhcp') ||
+        lower.contains('fake dhcp');
+    final wantsTelnet = lower.contains('telnet') || lower.contains('vty') ||
+        hasAaaWord; // AAA without a named purpose is vty/login control
+    final protocol = RegExp(r'\bradius\b').hasMatch(lower) ? 'radius' : 'tacacs+';
+    // "AAA using key S3cret" / "shared key cisco123": the shared secret is
+    // read wherever the word 'key' appears, and both ends inherit it (the
+    // router writes `tacacs|radius-server key` from this same field).
+    final sharedKey = RegExp(
+      r'\b(?:shared\s+)?key\s+([^\s,;.]+)',
+      caseSensitive: false,
+    ).firstMatch(lower)?.group(1);
+    if (hasAaaWord || wantsPortSecurity || wantsSnooping) {
+      final security = SecurityIntent(
+        portSecurity: wantsPortSecurity,
+        dhcpSnooping: wantsSnooping,
+        aaa: hasAaaWord,
+        aaaProtocol: protocol,
+        aaaServer: aaaServerName,
+        // The first router is the authenticating device; a single-router
+        // plan makes this unambiguous, and multi-router briefs that care
+        // name the router in the security-lab profile instead.  A routerless
+        // brief ("a TACACS+ server for authentication") keeps the server
+        // side buildable and leaves the client router for later.
+        aaaRouter: routers.isNotEmpty ? routers.first.name : null,
+        aaaPassword: sharedKey,
+        telnet: wantsTelnet,
+        extendedAcl: lower.contains('extended acl') ||
+            lower.contains('acl') ||
+            lower.contains('access-list') ||
+            (lower.contains('block') && lower.contains('branch')),
+      );
+      return NetworkIntent(
+        projectName: projectName.isEmpty ? 'net1' : projectName,
+        nodes: nodes,
+        links: links,
+        addressing: addressing,
+        vlans: vlans,
+        routing: routing,
+        notes: [
+          'parsed offline from: $rawText',
+          'base $base',
+          'router model $routerModel, switch model $switchModel (best-fit; say "use 4331" to override)',
+        ],
+        assumptions: [
+          ..._genericAssumptions(
+            switches: switches,
+            perSite: perSite,
+            sites: sites,
+            wantsSerialWan: wantsSerialWan,
+            kindCounts: kindCounts,
+          ),
+          if (hasAaaWord)
+            'AAA runs $protocol: ${aaaServerName ?? 'the first server'} holds the accounts${routers.isNotEmpty ? ' and ${routers.first.name} authenticates logins against it' : ''}. Supply the shared key in the request to pin it on both ends (default: cisco).',
+        ],
+        confidence: 0.55,
+        planningSource: 'local',
+        security: security,
+      );
+    }
+
+    // IPv6 dual-stack: when the brief mentions IPv6, every router
+    // interface gets an address derived from its IPv4 subnet octet inside
+    // 2001:db8:<vlan>::/64 (documentation space), with SLAAC serving the
+    // endpoints - the same shape the adapter renders into IOS.
+    final wantsV6 = lower.contains('ipv6') || lower.contains('dual stack');
+    if (wantsV6) {
+      final v6Addressing = <InterfaceAddr>[];
+      var v6Net = 1;
+      for (final a in addressing) {
+        final owner = nodes.firstWhere(
+          (n) => n.name == a.node,
+          orElse: () => const NetNode(name: '', type: ''),
+        );
+        String? v6;
+        if (owner.type == 'router' || owner.type == 'firewall') {
+          v6 = '2001:db8:$v6Net::${hostIn(a.ipCidr, 1).split('/').first.split('.').last}/64';
+          v6Net++;
+        }
+        v6Addressing.add(
+          InterfaceAddr(
+            node: a.node,
+            iface: a.iface,
+            ipCidr: a.ipCidr,
+            ip6Cidr: v6,
+          ),
+        );
+      }
+      addressing
+        ..clear()
+        ..addAll(v6Addressing);
+    }
+
     return NetworkIntent(
       projectName: projectName.isEmpty ? 'net1' : projectName,
       nodes: nodes,
@@ -1528,31 +2499,53 @@ class NetworkIntent {
       vlans: vlans,
       routing: routing,
       notes: [
-        'parsed offline from: $text',
+        'parsed offline from: $rawText',
         'base $base',
         'router model $routerModel, switch model $switchModel (best-fit; say "use 4331" to override)',
       ],
-      assumptions: [
-        'Unspecified links use the deterministic local topology layout.',
-        'Unspecified router and switch models use the best-fit Packet Tracer models.',
-        if (wantsSerialWan)
-          'The router-to-router WAN is Serial0/0/0 with the first router as the clocking (DCE) end; the executor fits the serial module and reports the port it actually receives.',
-        if ((kindCounts['wireless'] ?? 0) > 0 ||
-            (kindCounts['tablet'] ?? 0) > 0 ||
-            (kindCounts['smartphone'] ?? 0) > 0 ||
-            (kindCounts['tv'] ?? 0) > 0)
-          'Wireless clients are placed and associate with the access point; no cable is created for them (Packet Tracer pairs them over the wireless link).',
-        if ((kindCounts['cloud'] ?? 0) > 0 || (kindCounts['modem'] ?? 0) > 0)
-          'The internet edge is a Cloud-PT / Modem-PT device cabled to the first router, or to the firewall when one was requested.',
-        if ((kindCounts['firewall'] ?? 0) > 0)
-          'A Firewall-PT (ASA) device is placed and cabled, but its ASA-specific configuration is left to the user: ASA syntax is not IOS, so no IOS config is generated for it.',
-        if ((kindCounts['wlc'] ?? 0) > 0)
-          'The wireless LAN controller is placed but not cabled: its PT port name varies between builds, so the link is left to you rather than guessed.',
-        if ((kindCounts['iot'] ?? 0) > 0)
-          'IoT devices are placed and join through the home gateway / IoT registration server; their wireless association is not scripted.',
-      ],
+      assumptions: _genericAssumptions(
+        switches: switches,
+        perSite: perSite,
+        sites: sites,
+        wantsSerialWan: wantsSerialWan,
+        kindCounts: kindCounts,
+      ),
       confidence: 0.55,
       planningSource: 'local',
     );
+  }
+
+  /// The assumption strings of the generic layout, shared by the plain
+  /// return path and the security-aware one so the two never drift.
+  static List<String> _genericAssumptions({
+    required List<NetNode> switches,
+    required dynamic perSite,
+    required int? sites,
+    required bool wantsSerialWan,
+    required Map<String, int> kindCounts,
+  }) {
+    return [
+      'Unspecified links use the deterministic local topology layout.',
+      'Unspecified router and switch models use the best-fit Packet Tracer models.',
+      if (switches.length > 1)
+        'Layout: each switch is uplinked to a router in order (SW1 to R1, SW2 to R2, ...) and the PCs are split evenly across the switches; servers stay on the first switch LAN.',
+      if (perSite != null)
+        'The brief describes $sites sites, so the devices named after "each" were multiplied by $sites.',
+      if (wantsSerialWan)
+        'The router-to-router WAN is Serial0/0/0 with the first router as the clocking (DCE) end; the executor fits the serial module and reports the port it actually receives.',
+      if ((kindCounts['wireless'] ?? 0) > 0 ||
+          (kindCounts['tablet'] ?? 0) > 0 ||
+          (kindCounts['smartphone'] ?? 0) > 0 ||
+          (kindCounts['tv'] ?? 0) > 0)
+        'Wireless clients are placed and associate with the access point; no cable is created for them (Packet Tracer pairs them over the wireless link).',
+      if ((kindCounts['cloud'] ?? 0) > 0 || (kindCounts['modem'] ?? 0) > 0)
+        'The internet edge is a Cloud-PT / Modem-PT device cabled to the first router, or to the firewall when one was requested.',
+      if ((kindCounts['firewall'] ?? 0) > 0)
+        'A Firewall-PT (ASA) device is placed, cabled and given a generated ASA base config (inside/outside interfaces, stateful inspection, and a default route); adjust security levels or ACLs in Packet Tracer for anything beyond that.',
+      if ((kindCounts['wlc'] ?? 0) > 0)
+        'The wireless LAN controller is placed but not cabled: its PT port name varies between builds, so the link is left to you rather than guessed.',
+      if ((kindCounts['iot'] ?? 0) > 0)
+        'IoT devices are placed and join through the home gateway / IoT registration server; their wireless association is not scripted.',
+    ];
   }
 }

@@ -394,17 +394,41 @@ class RulePacksService {
       .toList();
 
   /// Build the context block injected into Gemini prompt.
+  ///
+  /// [knownBlockers] and [unsupportedCapabilities] are the cross-run failure
+  /// signal: what real runs kept failing to do, and what Packet Tracer has
+  /// already proven it cannot do on this setup. Without them the planner
+  /// regenerated the same unusable steps on every run.
   static String contextBlock({
     required String target,
     required List<String> pastBuildSummaries,
     required List<String> learnedRules,
     required Map<String, String> preferences,
     List<String> recentAttemptSummaries = const [],
+    List<String> knownBlockers = const [],
+    List<String> unsupportedCapabilities = const [],
   }) {
     final sb = StringBuffer();
     sb.writeln('## Target rules ($target)');
     for (final p in forTarget(target)) {
       sb.writeln('- [${p.id}] ${p.rule}');
+    }
+    if (knownBlockers.isNotEmpty) {
+      sb.writeln('## Known blockers from previous runs');
+      sb.writeln(
+        'These steps have already failed, repeatedly and without ever '
+        'recovering. Do NOT generate them again. Propose a supported '
+        'alternative, or leave the step out and explain the omission.',
+      );
+      for (final line in knownBlockers.take(12)) {
+        sb.writeln(line.startsWith('-') ? line : '- $line');
+      }
+    }
+    if (unsupportedCapabilities.isNotEmpty) {
+      sb.writeln('## Packet Tracer cannot do these (proven on this setup)');
+      for (final line in unsupportedCapabilities.take(12)) {
+        sb.writeln(line.startsWith('-') ? line : '- $line');
+      }
     }
     if (learnedRules.isNotEmpty) {
       sb.writeln('## Learned from user corrections');

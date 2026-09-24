@@ -60,6 +60,41 @@ try {
         throw "Extraction finished but net_builder.exe was not found."
     }
 
+    # Everything the app writes lives beside the install, so a recipient never
+    # has to pick a folder or edit a path. Creating them here is what makes the
+    # app work on first run without any manual setting.
+    $dataRoot = Join-Path $target 'data'
+    $folders = [ordered]@{
+        config = Join-Path $target 'config'
+        output = Join-Path $target 'output'
+        logs   = Join-Path $target 'logs'
+        cache  = Join-Path $target 'cache'
+        data   = $dataRoot
+    }
+    foreach ($folder in $folders.Values) {
+        New-Item -ItemType Directory -Path $folder -Force | Out-Null
+    }
+
+    # The app reads this on start and adopts these paths as its defaults.
+    # Written fresh on every install, so a moved or renamed install can never
+    # leave the app pointing at a folder that is gone.
+    $installInfo = [ordered]@{
+        schemaVersion = 1
+        installedAt   = (Get-Date).ToString('o')
+        installRoot   = $target
+        outputDir     = $folders.output
+        logsDir       = $folders.logs
+        cacheDir      = $folders.cache
+        dataDir       = $folders.data
+        engineBase    = 'http://127.0.0.1:5005'
+    }
+    $installInfo |
+        ConvertTo-Json |
+        Set-Content -LiteralPath (Join-Path $folders.config 'install.json') `
+            -Encoding UTF8
+    Write-InstallLog ("Created config, output, logs, cache and data folders " +
+        "under $target.")
+
     $shell = New-Object -ComObject WScript.Shell
     $desktop = [Environment]::GetFolderPath('Desktop')
     $start = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'

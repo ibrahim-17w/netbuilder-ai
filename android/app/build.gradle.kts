@@ -6,7 +6,10 @@ plugins {
 
 android {
     namespace = "com.netbuilder.net_builder"
-    compileSdk = flutter.compileSdkVersion
+    // flutter_plugin_android_lifecycle requires consumers to compile
+    // against API 36; pin it explicitly so a pinned plugin cannot drag it
+    // back down and fail the AAR metadata check.
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

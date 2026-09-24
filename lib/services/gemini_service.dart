@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/network_intent.dart';
 
@@ -10,6 +11,65 @@ import '../models/network_intent.dart';
 class GeminiService {
   final http.Client _client;
   GeminiService({http.Client? client}) : _client = client ?? http.Client();
+
+  /// Stable hash of (instruction + target): the planner cache key. Identical
+  /// asks reuse the stored plan instead of re-hitting the API. FNV-1a is
+  /// enough here - the value stored under it is the plan itself, not a secret.
+  static String briefKey(String instruction, String target) {
+    var h = 0x811c9dc5;
+    for (final unit in utf8.encode('$target\n\n$instruction')) {
+      h ^= unit;
+      h = (h * 0x01000193) & 0xFFFFFFFF;
+    }
+    return h.toRadixString(16).padLeft(8, '0');
+  }
+
+  static String _cacheKey(String instruction, String target) =>
+      'planner_cache_${briefKey(instruction, target)}';
+
+  /// Cached plan for a brief (null on miss). Set by [generateIntent] after a
+  /// successful API call; cleared by [invalidateCachedPlan] when a build
+  /// fails so the next attempt re-plans.
+  static Future<NetworkIntent?> cachedPlan(
+    String instruction,
+    String target,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_cacheKey(instruction, target));
+      if (raw == null || raw.isEmpty) return null;
+      final intent = NetworkIntent.fromJson(
+        Map<String, dynamic>.from(jsonDecode(raw) as Map),
+      );
+      return intent.copyWith(planningSource: 'gemini-cache');
+    } catch (_) {
+      return null; // corrupt cache entries behave like a miss
+    }
+  }
+
+  static Future<void> invalidateCachedPlan(
+    String instruction,
+    String target,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_cacheKey(instruction, target));
+    } catch (_) {}
+  }
+
+  static Future<void> _storeCachedPlan(
+    String instruction,
+    String target,
+    NetworkIntent intent,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _cacheKey(instruction, target),
+        jsonEncode(intent.toJson(includeSecrets: false)),
+      );
+    } catch (_) {}
+  }
 
   String _url(String model) =>
       'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent';
@@ -104,17 +164,22 @@ router, switch, pc, server, laptop, printer, firewall (ASA), wireless
 (access point), wireless-router, wlc, phone (IP phone), tablet, smartphone,
 tv, cloud, modem, iot.
 Server roles for a "server" node: dhcp, dhcpv6, dns, http, ftp, email, aaa,
-ntp, tftp, syslog, iot.
+ntp, tftp, syslog, iot, snmp, vm.
 Hard rules:
 - a router-to-router WAN is Serial0/0/0 on both ends with "cable":"serial"
   and exactly ONE clocking end ("dce":"a", or the DCE device's name);
 - wireless-only clients (tablet, smartphone, tv) are never given a cable;
-- a firewall sits between the LAN and the internet/cloud, and its ASA
-  configuration is left to the user - never describe it as IOS;
-- only router and switch nodes get CLI configuration;
+- a firewall sits between the LAN and the internet/cloud; the app generates
+  its ASA base config (inside/outside, inspection, routes) automatically, so
+  place it and cable it - but never describe ASA syntax as IOS;
+- only router and switch nodes get IOS CLI configuration;
 - address router LAN interfaces with the first usable host (.1), put
   wired end devices at .10 onward of the same subnet, and never overlap
   subnets between links;
+- EVERY pc, server, laptop and printer node MUST have exactly one
+  addressing entry: the first endpoint on a LAN is .10 (never skip it),
+  the next .11, and so on; the gateway for those devices is the router
+  .1 on the same LAN (never .2, never 0.0.0.0);
 - use the cable kind the interfaces demand: copper for LAN links,
   "copper-cross" for like-device links, "serial" where Serial ports
   carry the link, "fiber" only on fiber ports.
@@ -201,19 +266,22 @@ questions. The app will validate this plan before anything is executed.
           .replaceFirst(RegExp(r'\s*```$'), '')
           .trim();
       final data = jsonDecode(cleaned) as Map<String, dynamic>;
+      final candidateProject =
+          (offlineCandidate['projectName'] as String?)?.trim() ?? 'net1';
+      final modelProject = (data['projectName'] as String?)?.trim();
       final intent = NetworkIntent.fromJson(data);
       if (intent.nodes.isEmpty) {
         throw Exception('Gemini plan contains no devices');
       }
-      final candidateProject =
-          (offlineCandidate['projectName'] as String?)?.trim() ?? 'net1';
-      final modelProject = (data['projectName'] as String?)?.trim();
-      return intent.copyWith(
+      final planned = intent.copyWith(
         projectName: modelProject == null || modelProject.isEmpty
             ? candidateProject
             : modelProject,
         planningSource: 'gemini',
       );
+      // cache the successful plan: identical asks skip the API next time
+      await _storeCachedPlan(instruction, target, planned);
+      return planned;
     } on FormatException catch (e) {
       throw Exception('Gemini returned invalid plan JSON: ${e.message}');
     }

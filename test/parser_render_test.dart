@@ -123,13 +123,19 @@ SRV1 connects to SW1 FastEthernet0/2. SRV1 is the DHCP and DNS server.''';
     expect(srv.services, containsAll(['dhcp', 'dns']));
 
     final svc = PacketTracerAdapter.serverServices(intent, 'SRV1');
-    expect(svc['dhcp'], {
-      'gateway': '192.168.10.1',
-      'dnsServer': '192.168.10.10', // serves its own DNS
-      'startIp': '192.168.10.100',
-      'mask': '255.255.255.0',
-      'maxUsers': '100',
-    });
+    // The builder reads pools out of 'pools' and nothing else: a pool with
+    // flat keys is silently dropped, which is why the DHCP tab used to come
+    // out switched on but empty.
+    expect(svc['dhcp']!['pools'], [
+      {
+        'poolName': 'LAN',
+        'gateway': '192.168.10.1',
+        'dnsServer': '192.168.10.10', // serves its own DNS
+        'startIp': '192.168.10.100',
+        'mask': '255.255.255.0',
+        'maxUsers': '100',
+      },
+    ]);
     expect(
       (svc['dns']!['records'] as List).any(
         (row) => row['name'] == 'srv1' && row['address'] == '192.168.10.10',

@@ -10,22 +10,34 @@ import '../models/network_intent.dart';
 import '../services/adapters/gns3_adapter.dart';
 import '../services/adapters/packet_tracer_adapter.dart';
 import '../services/autopilot_service.dart';
+import '../services/gemini_service.dart';
 import '../services/memory_service.dart';
 import '../services/privacy_search_service.dart';
 import '../services/settings_service.dart';
 import '../services/validator_service.dart';
+import '../widgets/correction_badges.dart';
+import '../widgets/verification_report.dart';
+import '../theme/app_palette.dart';
 
 class BuilderDetailScreen extends StatefulWidget {
   final BuildRecord record;
   final NetworkIntent intent;
   final String configText;
   final bool monitorSidecar;
+
+  /// The brief that produced this plan; the feedback loop uses it to
+  /// invalidate the planner cache when the build fails. Empty when unknown
+  /// (older records).
+  final String brief;
+  final String target;
   const BuilderDetailScreen({
     super.key,
     required this.record,
     required this.intent,
     required this.configText,
     this.monitorSidecar = true,
+    this.brief = '',
+    this.target = 'packet-tracer',
   });
 
   @override
@@ -53,6 +65,20 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
   bool _auditing = false;
   final Set<String> _selectedFixes = {};
   final Map<String, List<TextEditingController>> _pcFixFields = {};
+  // AI suggest + evaluate: Gemini proposes fixes for the journal's
+  // recurring failures, a second Gemini call judges each one, and
+  // accepted label/skip proposals become `proposed` corrections that a
+  // teach run has to verify on screen. Nothing is auto-promoted.
+  bool _aiSuggesting = false;
+  Map<String, dynamic>? _aiSuggest;
+  // Teaching-loop state for the badges: stale/rejected/pending corrections
+  // from /corrections, plus the last teach run's verdicts from /status.
+  CorrectionSnapshot _corrections = const CorrectionSnapshot.empty();
+  TeachRunSnapshot _teachRun = const TeachRunSnapshot.empty();
+  int _correctionsTick = 0;
+  // Post-build verification (PDU/ping evidence from the live canvas).
+  Map<String, dynamic>? _verifyReport;
+  bool _verifying = false;
 
   @override
   void initState() {
@@ -67,6 +93,59 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
     _statusTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (mounted) unawaited(_refreshSidecarState());
     });
+  }
+
+  /// Refresh the stale/rejected/pending correction badges.  Throttled to
+  /// every 5th status tick (10 s) - the corrections file only changes when
+  /// a teach run or a learn attempt settles something.
+  Future<void> _refreshCorrections({bool force = false}) async {
+    if (!force) {
+      _correctionsTick++;
+      if (_correctionsTick % 5 != 0) return;
+    }
+    try {
+      final snap = await AutopilotService().correctionSnapshot();
+      if (!mounted) return;
+      setState(() => _corrections = snap);
+    } catch (_) {
+      // Badges are additive; a missed poll just leaves them as they were.
+    }
+  }
+
+  /// Badge strip for one AI proposal: PENDING while it waits for a teach
+  /// run, VERIFIED/REJECTED once the run settled it, STALE when a taught
+  /// fix later stopped verifying, `x<n>` when the same element keeps being
+  /// corrected. Lookup order: pending first (the common case), then stale,
+  /// then rejected.
+  Widget _proposalBadges(Map<String, dynamic> p) {
+    final cid = p['correctionId']?.toString() ?? '';
+    CorrectionRow? row;
+    if (cid.isNotEmpty) {
+      for (final r in [
+        ..._corrections.pending,
+        ..._corrections.stale,
+        ..._corrections.rejected,
+      ]) {
+        if (r.id == cid) {
+          row = r;
+          break;
+        }
+      }
+    }
+    final teach = cid.isEmpty ? null : _teachRun.byId[cid];
+    if (row == null && teach == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: CorrectionBadges(
+        stale: row?.stale == true && row?.status == 'verified',
+        rejected: row?.status == 'rejected' || teach?.promoted == false,
+        pending: row?.status == 'proposed' && teach == null,
+        verified: teach?.promoted == true ||
+            (row?.status == 'verified' && row?.stale != true),
+        thrash: (row?.thrash ?? 0) > 0,
+        thrashCount: row?.thrash ?? 0,
+      ),
+    );
   }
 
   bool _executionPreflight(String target) {
@@ -122,10 +201,14 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       setState(() {
         _sidecarState = state;
         _sidecarIsPaused = _sidecarPaused(status);
+        // /status carries the last teach run's verdicts; deriving them here
+        // costs nothing extra and keeps the proposal badges current.
+        _teachRun = TeachRunSnapshot.fromJson(status);
         if (showInLog || _log.trim().isEmpty) {
           _log = 'Live sidecar status: $state';
         }
       });
+      unawaited(_refreshCorrections());
     } catch (e) {
       if (!mounted) return;
       final message = e.toString().replaceFirst('Exception: ', '');
@@ -154,18 +237,93 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
     }
   }
 
-  /// Audit an ALREADY-BUILT network: the sidecar opens every remembered
-  /// device, reads its live state (interfaces, OSPF, PC IPs) and scans
-  /// the canvas for red links - then we show selectable fixes.
-  Future<void> _runAudit() async {
+  /// AI fix suggestions: push the user's Gemini key (same one builds use),
+  /// then start one suggest+evaluate pass and poll until it finishes.
+  /// The sidecar proposes fixes for recurring failures and evaluates each
+  /// with an independent second call; accepted label/skip proposals are
+  /// recorded as `proposed` corrections. Nothing is typed or promoted -
+  /// a teach run still has to verify a correction on screen.
+  Future<void> _runAiSuggest() async {
+    setState(() => _busy = true);
+    try {
+      final svc = AutopilotService();
+      if (!await svc.healthy) {
+        if (!mounted) return;
+        setState(() => _log = AutopilotService.startHint);
+        return;
+      }
+      await _pushLlmConfig();
+      final res = await svc.aiSuggest(project: widget.intent.projectName);
+      if (res['ok'] != true) {
+        if (!mounted) return;
+        setState(() => _log =
+            'AI suggestions unavailable: ${res['error'] ?? 'unknown'}');
+        return;
+      }
+      if (res['started'] != true) {
+        if (!mounted) return;
+        setState(() =>
+            _log = res['message']?.toString() ??
+                'Nothing for the AI to fix right now.');
+        return;
+      }
+      if (!mounted) return;
+      setState(() {
+        _aiSuggesting = true;
+        _log = 'AI is proposing and evaluating fixes for recurring '
+            'failures (two Gemini passes)...';
+      });
+      for (var i = 0; i < 60; i++) {
+        await Future.delayed(const Duration(seconds: 2));
+        if (!mounted) return;
+        try {
+          final st = await svc.aiSuggestStatus();
+          if (st['running'] == true) continue;
+          if (!mounted) return;
+          setState(() {
+            _aiSuggesting = false;
+            _aiSuggest =
+                st['last'] == null ? null : Map<String, dynamic>.from(st['last'] as Map);
+            _log = st['error']?.toString().isNotEmpty == true
+                ? 'AI suggest pass failed: ${st['error']}'
+                : 'AI suggestions ready (${_aiSuggest?['acceptedCount'] ?? 0} '
+                  'accepted - see the AI suggestions card).';
+          });
+          // Accepted proposals just became PENDING corrections on the
+          // sidecar - pull them in now instead of waiting for the tick.
+          unawaited(_refreshCorrections(force: true));
+          return;
+        } catch (_) {
+          // transient sidecar hiccup - keep polling
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _aiSuggesting = false;
+        _log = 'AI suggest pass timed out - check the sidecar log.';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() =>
+          _log = 'AI suggestions failed: ${e.toString().replaceFirst('Exception: ', '')}');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Audit an ALREADY-BUILT network. `offline: true` reads the most recent
+  /// generated/saved .pkt directly - no Packet Tracer, no windows. The live
+  /// mode opens each device and reads its real runtime state.
+  Future<void> _runAudit({bool offline = false}) async {
     setState(() {
       _busy = true;
       _auditing = true;
       _audit = null;
       _selectedFixes.clear();
-      _log =
-          'Auditing network - opening each device and reading its '
-          'state (this opens/closes PT windows)...';
+      _log = offline
+          ? 'Auditing offline - reading the saved .pkt (no Packet Tracer)...'
+          : 'Auditing network - opening each device and reading its '
+              'state (this opens/closes PT windows)...';
     });
     try {
       final svc = AutopilotService();
@@ -175,6 +333,31 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
           _log = AutopilotService.startHint;
           _auditing = false;
         });
+        return;
+      }
+      if (offline) {
+        final path = await _latestPktPath();
+        if (path == null) {
+          if (!mounted) return;
+          setState(() {
+            _log = 'No .pkt found in the sidecar\'s output folder '
+                '(pkt_output). Generate or save one first.';
+            _auditing = false;
+          });
+          return;
+        }
+        final rep = await svc.pktAudit(path,
+            project: widget.intent.projectName);
+        if (!mounted) return;
+        setState(() {
+          _audit = rep;
+          _auditing = false;
+        });
+        _prepareAuditSelection();
+        setState(() => _log =
+            'Offline audit finished (read from ${rep['path'] ?? 'the file'}). '
+            'Findings are ADVICE ONLY - Packet Tracer was not opened. Run a '
+            'live audit to apply fixes to the real devices.');
         return;
       }
       await svc.auditStart(widget.intent.projectName);
@@ -215,6 +398,15 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// The .pkt the offline audit should read: the last generated/saved
+  /// artifact the sidecar remembers (generate or save_verified).
+  Future<String?> _latestPktPath() async {
+    final svc = AutopilotService();
+    final report = await svc.pktReport();
+    final path = (report?['path'] ?? '').toString();
+    return path.isEmpty ? null : path;
   }
 
   void _prepareAuditSelection() {
@@ -392,7 +584,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
             if ((_audit?['scope'] as List? ?? []).isNotEmpty)
               Text(
                 'Evidence: ${(_audit!['scope'] as List).join(' · ')}',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 11, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
               ),
             if ((_audit?['error'] ?? '').toString().isNotEmpty)
               Text(
@@ -411,8 +603,22 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
               ),
             for (final devRaw in devices) _buildDeviceAudit(devRaw as Map),
             const SizedBox(height: 8),
+            if (_audit?['mode'] == 'offline')
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  'Offline mode: findings are advice only - nothing can be '
+                  'applied from here. Run a live audit (Audit Network) to '
+                  'fix the real devices.',
+                  style: TextStyle(fontSize: 12, color: Colors.deepOrange),
+                ),
+              ),
             ElevatedButton(
-              onPressed: _selectedFixes.isEmpty || _busy ? null : _applyFixes,
+              onPressed: _audit?['mode'] == 'offline' ||
+                      _selectedFixes.isEmpty ||
+                      _busy
+                  ? null
+                  : _applyFixes,
               child: Text('Apply ${_selectedFixes.length} selected fix(es)'),
             ),
           ],
@@ -474,7 +680,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
                 '${(probe['evidence'] as List? ?? []).isEmpty ? '' : ' · ${(probe['evidence'] as List).take(3).join(' | ')}'}',
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 11, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
               ),
             ),
           ),
@@ -487,24 +693,45 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
             ),
           ),
         for (final fRaw in findings)
-          CheckboxListTile(
-            dense: true,
-            value: _selectedFixes.contains(fRaw['id']),
-            onChanged: (v) => setState(() {
-              v == true
-                  ? _selectedFixes.add(fRaw['id'] as String)
-                  : _selectedFixes.remove(fRaw['id']);
-            }),
-            title: Text(
-              fRaw['text'].toString(),
-              style: const TextStyle(fontSize: 13),
+          if (_audit?['mode'] == 'offline')
+            ListTile(
+              dense: true,
+              leading: Icon(
+                fRaw['severity'] == 'high'
+                    ? Icons.error_outline
+                    : Icons.info_outline,
+                color: fRaw['severity'] == 'high'
+                    ? Colors.red
+                    : AppPalette.mutedText(Theme.of(context).colorScheme),
+                size: 20,
+              ),
+              title: Text(fRaw['text'].toString(),
+                  style: const TextStyle(fontSize: 13)),
+              subtitle: Text(
+                'advice only'
+                '${((fRaw['fix_cli'] as List? ?? []).isNotEmpty) ? ' - suggested commands: ${(fRaw['fix_cli'] as List).join(' → ')}' : ''}',
+                style: const TextStyle(fontSize: 11),
+              ),
+            )
+          else
+            CheckboxListTile(
+              dense: true,
+              value: _selectedFixes.contains(fRaw['id']),
+              onChanged: (v) => setState(() {
+                v == true
+                    ? _selectedFixes.add(fRaw['id'] as String)
+                    : _selectedFixes.remove(fRaw['id']);
+              }),
+              title: Text(
+                fRaw['text'].toString(),
+                style: const TextStyle(fontSize: 13),
+              ),
+              subtitle: Text(
+                '${fRaw['severity']}'
+                '${fRaw['fix_pc'] == true ? ' - fill PC IP below' : ((fRaw['fix_cli'] as List? ?? []).isNotEmpty ? ' - auto-fix available' : ' - informational')}',
+                style: const TextStyle(fontSize: 11),
+              ),
             ),
-            subtitle: Text(
-              '${fRaw['severity']}'
-              '${fRaw['fix_pc'] == true ? ' - fill PC IP below' : ((fRaw['fix_cli'] as List? ?? []).isNotEmpty ? ' - auto-fix available' : ' - informational')}',
-              style: const TextStyle(fontSize: 11),
-            ),
-          ),
         if (_pcFixFields[name] != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -558,8 +785,8 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
     final failed = reachability['failed'] ?? 0;
     return Card(
       color: failed is num && failed > 0
-          ? Colors.red.shade50
-          : Colors.green.shade50,
+          ? AppPalette.dangerFill(Theme.of(context).colorScheme)
+          : AppPalette.successFill(Theme.of(context).colorScheme),
       margin: const EdgeInsets.only(top: 8),
       child: Padding(
         padding: const EdgeInsets.all(8),
@@ -595,12 +822,12 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
             for (final item in skipped)
               Text(
                 'Skipped ${item['source']}: ${item['reason']}',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 12, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
               ),
             if (reachability['note'] != null)
               Text(
                 reachability['note'].toString(),
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 11, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
               ),
           ],
         ),
@@ -662,6 +889,12 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
           evidenceJson: evidence,
           correction: attempt.correction,
         );
+      }
+      // FEEDBACK LOOP: a failed build invalidates the cached plan for its
+      // brief, so the next attempt re-plans with the failure in view instead
+      // of replaying the same broken plan from cache.
+      if (!ok && widget.brief.isNotEmpty) {
+        await GeminiService.invalidateCachedPlan(widget.brief, widget.target);
       }
     }
   }
@@ -764,6 +997,24 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
                 '${blockReasons.isEmpty ? '' : '  blocked: '
                     '${blockReasons.entries.map((e) => '${e.key}=${e.value}').join(', ')}'}'
                 '\n';
+      // CROSS-RUN LEARNING: what the engine escalated once and then stopped
+      // retrying, plus the lines it stopped re-asking the model about. A
+      // skipped step is always named here - a smaller network with an
+      // explanation, never a silently incomplete one.
+      final skippedBlockers =
+          (summary['known_blockers_skipped'] as List? ?? const [])
+              .map((e) => e.toString())
+              .toList();
+      final escalations = summary['repeat_offender_escalations'] ?? 0;
+      final llmSkipped = summary['llm_asks_skipped'] ?? 0;
+      final learningLine =
+          (skippedBlockers.isEmpty && escalations == 0 && llmSkipped == 0)
+          ? ''
+          : 'LEARNING LOOP: escalated=$escalations '
+                'skippedKnownBlockers=${skippedBlockers.length} '
+                'llmAsksSkipped=$llmSkipped\n'
+                '${skippedBlockers.map((s) => '  SKIPPED: $s').join('\n')}'
+                '${skippedBlockers.isEmpty ? '' : '\n'}';
       // The .pkt the run left behind, plus what it should contain. The file
       // is only saved for a green run, so an error here never hides a build
       // failure - it explains why no file was produced.
@@ -822,6 +1073,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
                   'llm rejected=${summary['llm_fixes_rejected'] ?? 0}  '
                   '$validationLine\n'
                   '$cliProofLine'
+                  '$learningLine'
                   '$artifactLine'
                   'AUTO-LEARNED $learned new rule(s) from recurring '
                   'patterns - saved to memory.',
@@ -850,6 +1102,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
             'llm rejected=${summary['llm_fixes_rejected'] ?? 0}  '
             '$validationLine\n'
             '$cliProofLine'
+            '$learningLine'
             '$artifactLine'
             'Outcome saved to memory. '
             '${ok ? "" : "See the Memory tab - recurring problems become suggested rules."}';
@@ -859,6 +1112,64 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
     } finally {
       _watching = false;
     }
+  }
+
+  /// Rows for the AI suggestions card: each proposal with its evaluation
+  /// score, the evaluator's concern, and where it was recorded.
+  List<Widget> _aiSuggestRows() {
+    final proposals =
+        (_aiSuggest?['proposals'] as List? ?? const [])
+            .whereType<Map>()
+            .map((m) => Map<String, dynamic>.from(m))
+            .toList();
+    if (proposals.isEmpty) {
+      return const [Text('No usable proposals for the current failures.',
+          style: TextStyle(fontSize: 12))];
+    }
+    return [
+      for (final p in proposals)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: _aiProposalRow(p),
+        ),
+    ];
+  }
+
+  /// One proposal row: verdict glyph, what it proposes, its AI score and
+  /// (when present) why the evaluator or screener turned it down - plus the
+  /// teaching-loop badge strip for its correction id.
+  Widget _aiProposalRow(Map<String, dynamic> p) {
+    final what = (p['target'] == 'cli')
+        ? (p['cli'] as List? ?? []).join(' ; ')
+        : (p['label']?.toString().isNotEmpty == true
+            ? p['label']
+            : p['pointHint'] ?? p['reason'] ?? '');
+    final score =
+        p['score'] != null ? '  (AI score ${p['score']}/5)' : '';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "${p['accepted'] == true ? '\u2713' : '\u2717'} "
+          "${p['failureKind']}: $what$score",
+          style: const TextStyle(fontSize: 12),
+        ),
+        if (p['screenedOut'] != null)
+          Text('  rejected before evaluation: ${p['screenedOut']}',
+              style: const TextStyle(
+                  fontSize: 11, fontStyle: FontStyle.italic)),
+        if (p['accepted'] == true && p['correctionId'] != null)
+          const Text('  saved as a proposed correction - verify it '
+              'with a teach run',
+              style: TextStyle(fontSize: 11)),
+        if (p['accepted'] != true &&
+            p['concern']?.toString().isNotEmpty == true)
+          Text('  why not: ${p['concern']}',
+              style: const TextStyle(
+                  fontSize: 11, fontStyle: FontStyle.italic)),
+        _proposalBadges(p),
+      ],
+    );
   }
 
   Future<void> _saveCorrection() async {
@@ -1460,6 +1771,134 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
     }
   }
 
+  /// Post-build verification: run the plan's derived test list in the live
+  /// Packet Tracer window (gateway + service pings from every endpoint) and
+  /// show pass/fail evidence per test. Read-only: it types pings, nothing else.
+  Future<void> _verifyBuild() async {
+    setState(() {
+      _verifying = true;
+      _verifyReport = null;
+    });
+    try {
+      final svc = AutopilotService();
+      if (!await svc.healthy) {
+        if (!mounted) return;
+        setState(() =>
+            _log = AutopilotService.startHint);
+        return;
+      }
+      final plan = PacketTracerAdapter.autopilotPlan(widget.intent);
+      await svc.verifyRun(plan);
+      // poll until the runner finishes (bounded: 25 tests * ~12s)
+      for (var i = 0; i < 150; i++) {
+        await Future.delayed(const Duration(seconds: 4));
+        if (!mounted) return;
+        final rep = await svc.verifyReport();
+        if (rep != null) {
+          setState(() => _verifyReport = rep);
+          if (rep['error'] != null) break;
+          if ((rep['total'] ?? 0) > 0) break; // a finished report has tests
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _log = 'Verification failed: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _verifying = false);
+    }
+  }
+
+  /// Offline .pkt generation: the same plan the autopilot would drive the
+  /// GUI with, compiled straight to a save file by the sidecar - no Packet
+  /// Tracer, no mouse, no screen. A timestamped filename means a repeat
+  /// click never overwrites an earlier artifact.
+  Future<void> _generatePkt() async {
+    setState(() {
+      _busy = true;
+      _log = 'Generating .pkt offline (no Packet Tracer needed)...';
+    });
+    try {
+      final svc = AutopilotService();
+      final ok = await svc.healthy;
+      if (!ok) {
+        if (!mounted) return;
+        setState(() => _log = AutopilotService.startHint);
+        return;
+      }
+      final plan = PacketTracerAdapter.autopilotPlan(widget.intent);
+      final stamp = DateTime.now()
+          .toIso8601String()
+          .replaceAll(RegExp(r'[^0-9]'), '')
+          .substring(0, 12);
+      final res = await svc.pktGenerate(plan, filename: 'netbuilder-$stamp.pkt');
+      if (!mounted) return;
+      final warnings = (res['warnings'] as List?) ?? const [];
+      final path = (res['path'] ?? '').toString();
+      final warningText = warnings.isEmpty
+          ? 'No warnings.'
+          : 'Warnings:\n- ${warnings.join('\n- ')}';
+      final substituted = warnings.any(
+        (w) => w.toString().contains('instead of'),
+      );
+      final learning = res['learning'];
+      final learningText = (learning is Map && learning['note'] != null)
+          ? "\nOffline learning (#${learning['generations']}): "
+                "${learning['note']}"
+          : '';
+      setState(() {
+        _log = 'Generated: $path\n'
+            'devices: ${res['deviceCount']}, links: ${res['linkCount']}\n'
+            '$warningText\n'
+            '${substituted ? 'A model this plan asked for was not in the library, '
+                'so the nearest match was used. Press "Extend model library" to '
+                'read the models Packet Tracer ships with, then generate again.\n' : ''}'
+            'Open it in Packet Tracer to verify, then run Analyze on it.'
+            '$learningText';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _log = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Read every .pkt Packet Tracer ships with (plus anything the sidecar
+  /// already knows) into the template library, so a plan's requested model
+  /// becomes a real template instead of a nearest-match substitution.
+  /// Additive only: an existing model keeps its block.
+  Future<void> _harvestModels() async {
+    setState(() {
+      _busy = true;
+      _log = 'Reading local .pkt files for device models...';
+    });
+    try {
+      final svc = AutopilotService();
+      if (!await svc.healthy) {
+        if (!mounted) return;
+        setState(() => _log = AutopilotService.startHint);
+        return;
+      }
+      final res = await svc.pktTemplatesHarvest();
+      if (!mounted) return;
+      final added = ((res['added'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .toList();
+      setState(() {
+        _log = 'Model library now covers ${res['deviceCount']} models, '
+            'read from ${res['scanned']} .pkt file(s).'
+            '${added.isEmpty ? '\nNo new models: this machine already had them all.' : '\nAdded ${added.length}:\n- ${added.take(40).join('\n- ')}'}'
+            '${added.length > 40 ? '\n- ...' : ''}';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _log = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Widget _calSlider(
     String label,
     double value,
@@ -1501,7 +1940,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
           Text(widget.record.instruction),
           const SizedBox(height: 8),
           Card(
-            color: Colors.blue.shade50,
+            color: AppPalette.accentFill(Theme.of(context).colorScheme),
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
@@ -1538,8 +1977,8 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
           for (final i in issues)
             Card(
               color: i.severity == 'error'
-                  ? Colors.red.shade50
-                  : Colors.amber.shade50,
+                  ? AppPalette.dangerFill(Theme.of(context).colorScheme)
+                  : AppPalette.warningFill(Theme.of(context).colorScheme),
               child: Padding(
                 padding: const EdgeInsets.all(8),
                 child: Text('[${i.severity}] ${i.message}'),
@@ -1564,7 +2003,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
           ),
           Container(
             padding: const EdgeInsets.all(8),
-            color: Colors.grey.shade100,
+            color: AppPalette.infoFill(Theme.of(context).colorScheme),
             child: SelectableText(widget.configText),
           ),
           const SizedBox(height: 8),
@@ -1593,10 +2032,10 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
           const SizedBox(height: 8),
           Card(
             color: _sidecarState.startsWith('Busy')
-                ? Colors.amber.shade50
+                ? AppPalette.warningFill(Theme.of(context).colorScheme)
                 : _sidecarState.startsWith('Idle')
-                ? Colors.green.shade50
-                : Colors.blueGrey.shade50,
+                ? AppPalette.successFill(Theme.of(context).colorScheme)
+                : AppPalette.infoFill(Theme.of(context).colorScheme),
             child: Padding(
               padding: const EdgeInsets.all(10),
               child: Text('Sidecar live status: $_sidecarState'),
@@ -1618,6 +2057,18 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
               ElevatedButton(
                 onPressed: _busy ? null : _ptCablesOnly,
                 child: const Text('Cables + CLI only'),
+              ),
+              ElevatedButton(
+                onPressed: _busy ? null : _generatePkt,
+                child: const Text('Generate .pkt (no PT)'),
+              ),
+              ElevatedButton(
+                onPressed: (_busy || _verifying) ? null : _verifyBuild,
+                child: const Text('Verify (ping tests)'),
+              ),
+              OutlinedButton(
+                onPressed: _busy ? null : _harvestModels,
+                child: const Text('Extend model library'),
               ),
               OutlinedButton(
                 onPressed: _busy ? null : _checkSidecar,
@@ -1669,7 +2120,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
             child: OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 foregroundColor: _sidecarIsPaused
-                    ? Colors.green.shade800
+                    ? AppPalette.success(Theme.of(context).colorScheme)
                     : Colors.amber.shade900,
                 side: BorderSide(
                   color: _sidecarIsPaused
@@ -1709,28 +2160,54 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'Safety: press Esc or this STOP button to cancel all autopilot work. '
             'If needed, move the mouse to a screen corner for the emergency failsafe.',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
+            style: TextStyle(fontSize: 12, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'Pause: press F9 (anywhere) or PAUSE AUTOPILOT to hold the run at '
             'a safe boundary with all progress kept; pause again to resume.',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
+            style: TextStyle(fontSize: 12, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
           ),
           const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _busy || _auditing ? null : _runAudit,
-            icon: const Icon(Icons.fact_check),
-            label: Text(
-              _auditing
-                  ? 'Auditing network (opens each device)...'
-                  : 'Audit Network (analyze an already-built network)',
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _busy || _auditing
+                      ? null
+                      : () => _runAudit(offline: true),
+                  icon: const Icon(Icons.description),
+                  label: Text(
+                    _auditing
+                        ? 'Auditing offline...'
+                        : 'Audit .pkt (offline, no PT)',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _busy || _auditing ? null : _runAudit,
+                  icon: const Icon(Icons.fact_check),
+                  label: Text(
+                    _auditing
+                        ? 'Auditing network (opens each device)...'
+                        : 'Audit Network (live)',
+                  ),
+                ),
+              ),
+            ],
           ),
           if (_audit != null) _buildAuditCard(),
+          const SizedBox(height: 8),
+          VerificationReport(
+            report: _verifyReport,
+            busy: _verifying,
+            onRerun: _verifyBuild,
+          ),
           const SizedBox(height: 8),
           SelectableText(_log),
           const SizedBox(height: 12),
@@ -1849,6 +2326,50 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          // TEACHING-LOOP ALERTS: stale corrections (taught but no longer
+          // verifying) and rejected ones (a teach run disproved them) shown
+          // right where the user decides what to fix next.
+          CorrectionsCard(
+            snapshot: _corrections,
+            onRefresh: () => _refreshCorrections(force: true),
+          ),
+          const SizedBox(height: 12),
+          // AI FIX SUGGESTIONS: uses the Gemini key from Settings. Proposals
+          // are evaluated by a second Gemini call; accepted ones only ever
+          // become `proposed` corrections - teach runs still verify them.
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('AI fix suggestions (Gemini):',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Proposes fixes for steps that keep failing, then judges '
+                    'each proposal with a second AI pass. Accepted label/skip '
+                    'fixes are saved as PROPOSED corrections - run Verify to '
+                    'prove one on screen. Point/CLI suggestions stay as advice.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    ElevatedButton(
+                      onPressed:
+                          (_busy || _aiSuggesting) ? null : _runAiSuggest,
+                      child: Text(_aiSuggesting
+                          ? 'AI thinking...'
+                          : 'Suggest fixes with AI'),
+                    ),
+                  ]),
+                  if (_aiSuggest != null) ..._aiSuggestRows(),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 12),
           const Text(

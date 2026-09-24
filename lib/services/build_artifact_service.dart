@@ -6,6 +6,7 @@ import 'adapters/cisco_adapter.dart';
 import 'adapters/gns3_adapter.dart';
 import 'adapters/packet_tracer_adapter.dart';
 import 'adapters/terraform_adapter.dart';
+import 'secret_vault.dart';
 
 /// The in-memory representation needed to reopen a saved build.
 ///
@@ -30,13 +31,35 @@ class BuildArtifactService {
   /// Restores a history record into the same detail inputs produced by a new
   /// build. Invalid or legacy data fails clearly instead of opening an empty
   /// editor that looks like a successful load.
+  ///
+  /// Secrets are NOT in the stored intent (the database never holds them);
+  /// [restoreAsync] pulls them back out of the OS keychain.  The sync
+  /// [restore] stays for legacy callers and records saved before the vault
+  /// existed - those records may still carry secrets inline.
   static RestoredBuild restore(BuildRecord record) {
+    return _restoreFromJson(record, jsonDecode(record.intentJson.trim()));
+  }
+
+  /// Same as [restore], but re-injects AAA/VPN secrets from the OS keychain
+  /// so reopened builds recompile with the exact credentials they had.
+  static Future<RestoredBuild> restoreAsync(BuildRecord record) async {
     final raw = record.intentJson.trim();
     if (raw.isEmpty) {
       throw const FormatException('Saved project has no plan data.');
     }
-
     final decoded = jsonDecode(raw);
+    if (decoded is! Map) {
+      throw const FormatException('Saved project plan must be a JSON object.');
+    }
+    final secrets = await SecretVault.load(record.projectName);
+    final merged = SecretVault.inject(
+      Map<String, dynamic>.from(decoded),
+      secrets,
+    );
+    return _restoreFromJson(record, merged);
+  }
+
+  static RestoredBuild _restoreFromJson(BuildRecord record, dynamic decoded) {
     if (decoded is! Map) {
       throw const FormatException('Saved project plan must be a JSON object.');
     }

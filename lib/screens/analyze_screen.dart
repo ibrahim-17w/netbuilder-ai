@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/network_intent.dart';
 import '../services/autopilot_service.dart';
 import '../services/validator_service.dart';
+import '../theme/app_palette.dart';
 
 /// Read-only network review with an explicit approval gate before fixes.
 class AnalyzeScreen extends StatefulWidget {
@@ -210,10 +211,10 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                     child: Text('• $text'),
                   ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'The app will verify the result after the run. '
                   'It will not apply unselected findings.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  style: TextStyle(fontSize: 12, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
                 ),
               ],
             ),
@@ -416,7 +417,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                   '${service['name']}: ${(service['evidence'] as List).join(' | ')}',
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                  style: TextStyle(fontSize: 11, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
                 ),
               ),
             ),
@@ -431,7 +432,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                 '${(probe['evidence'] as List? ?? []).isEmpty ? '' : ' · ${(probe['evidence'] as List).take(3).join(' | ')}'}',
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 11, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
               ),
             ),
           ),
@@ -534,8 +535,8 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     final failed = reachability['failed'] ?? 0;
     return Card(
       color: failed is num && failed > 0
-          ? Colors.red.shade50
-          : Colors.green.shade50,
+          ? AppPalette.dangerFill(Theme.of(context).colorScheme)
+          : AppPalette.successFill(Theme.of(context).colorScheme),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -571,12 +572,12 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
             for (final item in skipped)
               Text(
                 'Skipped ${item['source']}: ${item['reason']}',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 12, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
               ),
             if (reachability['note'] != null)
               Text(
                 reachability['note'].toString(),
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 11, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
               ),
           ],
         ),
@@ -659,8 +660,8 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
             for (final issue in _planIssues)
               Card(
                 color: issue.severity == 'error'
-                    ? Colors.red.shade50
-                    : Colors.amber.shade50,
+                    ? AppPalette.dangerFill(Theme.of(context).colorScheme)
+                    : AppPalette.warningFill(Theme.of(context).colorScheme),
                 child: ListTile(
                   dense: true,
                   leading: Icon(
@@ -727,7 +728,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                         'Evidence: ${(_report!['scope'] as List).join(' · ')}',
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.grey.shade700,
+                          color: AppPalette.mutedText(Theme.of(context).colorScheme),
                         ),
                       ),
                     if (error.isNotEmpty)

@@ -1,8 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Tester build: allow the app to reach a sidecar / GNS3 / Gemini
+         endpoint on the network, and allow cleartext http to a local
+         endpoint (127.0.0.1:5005).  Optional features only - the chat
+         and the offline planner work with no network at all. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- The saved API keys live in flutter_secure_storage, whose values are
+         encrypted with a device-keystore key that is never backed up. A
+         restored copy cannot be decrypted - which is what made a stored key
+         look like it had vanished - so the store is kept out of cloud backup
+         and out of device-to-device transfer. -->
     <application
-        android:label="net_builder"
+        android:label="NetBuilder AI"
+        android:usesCleartextTraffic="true"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules">
         <activity
             android:name=".MainActivity"
             android:exported="true"

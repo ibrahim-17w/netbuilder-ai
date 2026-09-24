@@ -24,6 +24,8 @@ class ValidatorService {
     'dhcpv6',
     'iot',
     'prp',
+    'snmp',
+    'vm',
   };
 
   static List<int>? _ipv4(String raw) {
@@ -146,6 +148,33 @@ class ValidatorService {
         );
       } else {
         nets[ip] = '${a.node} ${a.iface}';
+      }
+    }
+
+    // Every Desktop > IP Configuration device (pc, server, laptop,
+    // printer) must have exactly one usable addressing entry. Without it
+    // the executor types mask/gateway but leaves the IPv4 row empty
+    // (user screenshot: blank IP with 10.0.0.2 gateway) - fail the plan
+    // here instead of producing that half-configured panel.
+    final addrByNode = <String, List<InterfaceAddr>>{};
+    for (final a in intent.addressing) {
+      addrByNode.putIfAbsent(a.node.toLowerCase(), () => []).add(a);
+    }
+    for (final node in intent.nodes) {
+      if (!(deviceKindOf(node.type)?.ipConfig ?? false)) continue;
+      final addrs = addrByNode[node.name.toLowerCase()] ?? const [];
+      final usable = addrs.where((a) {
+        final ip = a.ipCidr.split('/').first.trim();
+        return _ipv4(ip) != null && ip != '0.0.0.0';
+      }).toList();
+      if (usable.isEmpty) {
+        issues.add(
+          ValidationIssue(
+            'error',
+            '${node.name} needs Desktop > IP Configuration but has no addressing entry; '
+            'assign ${node.name} the next free .10+ host on its switch LAN.',
+          ),
+        );
       }
     }
 
@@ -331,14 +360,23 @@ class ValidatorService {
     // checks will remain incomplete until the user supplies the value.
     final security = intent.security;
 
-    // Packet Tracer IOS emulation gaps in the security intent: the crypto and
-    // time-range feature sets are absent, so these controls must be reported
-    // as unsupported rather than silently dropped from the plan.
+    // Packet Tracer emulation gaps in the security intent.  These are
+    // reported rather than silently dropped from the plan, and the wording
+    // says exactly what is missing: PT does ship the IPsec feature set, but
+    // its ISR images only accept the crypto commands once the Security
+    // Technology package is licensed - the crypto block is written into the
+    // config, yet the executor logs it as skipped instead of typing it.
     if (security.ipsecVpn) {
       issues.add(
         const ValidationIssue(
           'warning',
-          'Packet Tracer does not implement crypto isakmp, crypto ipsec, or crypto map, so the requested IPsec/site-to-site VPN cannot be configured or verified here; it will be reported as unsupported instead of silently skipped.',
+          'The IPsec/site-to-site VPN block is generated into the config, but a '
+          'stock Packet Tracer ISR image rejects crypto isakmp / crypto ipsec / '
+          'crypto map until the Security Technology package is licensed, so the '
+          'live executor reports the block as skipped. To make it take effect: '
+          'license boot module c2900 technology-package securityk9, then '
+          'reload, then re-run - the same commands are already in the config '
+          'view for pasting by hand.',
         ),
       );
     }
@@ -347,7 +385,10 @@ class ValidatorService {
       issues.add(
         ValidationIssue(
           'warning',
-          'Packet Tracer does not implement time-range, so the office-hours VTY restriction ($officeHours) cannot be enforced on the device; it will be reported as unsupported.',
+          'Packet Tracer does not implement time-range, so the office-hours VTY '
+          'restriction ($officeHours) cannot be enforced on the device; the '
+          'plain manager-only ACL is applied instead and the time window is '
+          'reported as unsupported.',
         ),
       );
     }

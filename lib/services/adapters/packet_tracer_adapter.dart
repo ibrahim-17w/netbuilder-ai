@@ -57,6 +57,17 @@ class PacketTracerAdapter {
     final out = <String, String>{'ip': prefix[0], 'mask': mask, 'gw': gw};
     final dns = _dnsServerIp(intent);
     if (dns != null) out['dns'] = dns;
+    // Dual-stack plan: endpoints run SLAAC against the router
+    // advertisements instead of a spelled-out address (see the builder's
+    // IPV6_ENABLED/IPV6_ADDRESS_AUTOCONFIG port fields).
+    final anyV6 = intent.addressing.any(
+      (a) => a.ip6Cidr != null &&
+          intent.nodes.any(
+            (n) => n.name == a.node &&
+                (n.type == 'router' || n.type == 'firewall'),
+          ),
+    );
+    if (anyV6) out['ipv6'] = 'true';
     return out;
   }
 
@@ -136,13 +147,21 @@ class PacketTracerAdapter {
               ],
             };
           } else {
+            // The builder reads pools out of 'pools' and nothing else, so a
+            // pool described with flat keys is silently dropped and the DHCP
+            // tab ends up switched on but empty - the reported bug.
             out['dhcp'] = {
-              'gateway': gw,
-              // serve our own DNS when this box is also the DNS server
-              'dnsServer': node.services.contains('dns') ? srvIp : gw,
-              'startIp': '$prefix.100',
-              'mask': mask,
-              'maxUsers': '100',
+              'pools': [
+                {
+                  'poolName': 'LAN',
+                  'gateway': gw,
+                  // serve our own DNS when this box is also the DNS server
+                  'dnsServer': node.services.contains('dns') ? srvIp : gw,
+                  'startIp': '$prefix.100',
+                  'mask': mask,
+                  'maxUsers': '100',
+                },
+              ],
               ...explicit,
             };
           }
@@ -150,7 +169,15 @@ class PacketTracerAdapter {
           final explicit = explicitRules('dns');
           final inferred = <Map<String, String>>[];
           final seenNames = <String>{};
-          for (final addressed in intent.addressing) {
+          // A router's LAN address is the one worth publishing: the transit
+          // serial address is claimed first in the addressing list, so
+          // without this the record for R1 pointed at its WAN IP.
+          final ordered = [...intent.addressing]..sort((a, b) {
+            int rank(InterfaceAddr addr) =>
+                addr.iface.toLowerCase().startsWith('s') ? 1 : 0;
+            return rank(a).compareTo(rank(b));
+          });
+          for (final addressed in ordered) {
             final addressedNode = intent.nodes.firstWhere(
               (candidate) => candidate.name == addressed.node,
               orElse: () => NetNode(name: addressed.node, type: ''),
@@ -174,9 +201,104 @@ class PacketTracerAdapter {
           // Packet Tracer's standard HTTP panel exposes HTTP reliably; do
           // not invent an HTTPS requirement unless the prompt supplied one.
           out['http'] = {'on': true, ...explicitRules('http')};
+        case 'dhcpv6':
+          final explicit = explicitRules('dhcpv6');
+          if (explicit.containsKey('pools')) {
+            out['dhcpv6'] = explicit;
+            break;
+          }
+          // One stateful pool on this server's own LAN prefix.
+          final p6 = srvIp.split('.');
+          out['dhcpv6'] = {
+            'pools': [
+              {
+                'poolName': 'LAN6',
+                'prefix': '2001:db8:${p6.length == 4 ? p6[2] : '1'}::',
+                'prefixLength': '64',
+                'dnsServer': node.services.contains('dns') ? srvIp : '',
+                'domainName': 'lab.local',
+              },
+            ],
+            ...explicit,
+          };
+        case 'snmp':
+          final explicit = explicitRules('snmp');
+          out['snmp'] = {
+            'enabled': true,
+            'agentIp': srvIp,
+            'readCommunity': explicit['readCommunity'] ?? 'public',
+            'writeCommunity': explicit['writeCommunity'] ?? 'private',
+            'version': explicit['version'] ?? '2c',
+            ...explicit,
+          };
+        case 'vm':
+          final explicit = explicitRules('vm');
+          out['vm'] = {
+            'vms': explicit['vms'] ??
+                [
+                  {'id': 'vm1', 'path': 'vm1', 'status': '1'},
+                ],
+            ...explicit,
+          };
+        case 'iot':
+          final explicit = explicitRules('iot');
+          out['iot'] = {
+            'registration': explicit['registration'] ?? true,
+            'users': explicit['users'] ??
+                [
+                  {'username': 'admin', 'password': 'cisco'},
+                ],
+            ...explicit,
+          };
         case 'aaa':
           final secAaa = intent.security;
           final explicit = explicitRules('aaa');
+          // The client entry is what makes the server usable: PT's AAA
+          // server only answers a router it lists by IP, with the same
+          // shared key the router sends (the router side writes
+          // `tacacs-server|radius-server key <key>`).
+          final isRadius = secAaa.aaaProtocol.trim().toLowerCase().startsWith(
+            'radius',
+          );
+          final serverType = isRadius ? 'RADIUS' : 'TACACS';
+          final clients = <Map<String, String>>[];
+          if (secAaa.requested &&
+              secAaa.aaa &&
+              secAaa.aaaRouter != null) {
+            final routerIp = intent.addressing
+                .where((a) => a.node == secAaa.aaaRouter)
+                .where((a) => !a.iface.toLowerCase().startsWith('s'))
+                .map((a) => a.ipCidr.split('/').first)
+                .where((ip) => ip != '0.0.0.0')
+                .toList();
+            if (routerIp.isNotEmpty) {
+              clients.add({
+                'hostIp': routerIp.first,
+                // Same key on both ends: the router side writes it from the
+                // same field, defaulting to 'cisco' when none was supplied.
+                'key': (secAaa.aaaPassword != null &&
+                        secAaa.aaaPassword!.isNotEmpty)
+                    ? secAaa.aaaPassword!
+                    : 'cisco',
+                'serverType': serverType,
+                'description': secAaa.aaaRouter!,
+              });
+            }
+          }
+          // Saying "one server is AAA" names the role but not the client
+          // router, the shared key or the accounts - and Packet Tracer leaves
+          // AAA Off with an empty tab when there is no client entry. Derive
+          // the client from the addressing the plan already has and use
+          // documented defaults for the rest, so the tab is genuinely
+          // configured rather than switched on and left blank.
+          if (clients.isEmpty && gw != '0.0.0.0') {
+            clients.add({
+              'hostIp': gw,
+              'key': 'cisco',
+              'serverType': serverType,
+              'description': 'router on this LAN',
+            });
+          }
           out['aaa'] = {
             'users': secAaa.requested && secAaa.aaa
                 ? secAaa.aaaUsername != null && secAaa.aaaPassword != null
@@ -188,8 +310,12 @@ class PacketTracerAdapter {
                         ]
                       : <Map<String, String>>[]
                 : [
+                    // Two accounts, so there is something to log in with and
+                    // something to prove the server distinguishes them.
                     {'username': 'admin', 'password': 'cisco'},
+                    {'username': 'operator', 'password': 'cisco123'},
                   ],
+            'clients': clients,
             ...explicit,
           };
         case 'email':
@@ -198,6 +324,20 @@ class PacketTracerAdapter {
           out[role] = {
             'on': true,
             'verification': explicit.isEmpty ? 'state_only' : 'rules',
+            ...explicit,
+          };
+        case 'cme':
+          // Cisco Unified CME runs ON a router (telephony-service), not in a
+          // server's Services tab.  This case only supplies the parameters;
+          // CiscoAdapter.voiceConfig compiles the actual IOS config onto the
+          // gateway router, and each 7960 registers against it.
+          final explicit = explicitRules('cme');
+          out['cme'] = {
+            'on': true,
+            'verification': 'state_only',
+            'router': explicit['router'],
+            'directoryNumberBase': explicit['directoryNumberBase'] ?? '2001',
+            'sourceAddress': srvIp,
             ...explicit,
           };
         default:
@@ -226,7 +366,16 @@ class PacketTracerAdapter {
       },
       {
         'action': 'paste_cli',
-        'configs': deviceConfigs(intent),
+        // Firewalls speak ASA, not IOS, so they are never typed at live -
+        // but their generated config still travels in the plan and lands in
+        // the saved device inside the .pkt (see CiscoAdapter.firewallConfigs).
+        'configs': {
+          ...deviceConfigs(intent),
+          ...CiscoAdapter.firewallConfigs(intent),
+          // CME telephony config lands on the voice gateway router when the
+          // plan carries phones + a cme-role server.
+          ...CiscoAdapter.voiceConfig(intent),
+        },
         'typing_delay_ms': 25,
         'verify_hostname': true,
       },
@@ -294,15 +443,18 @@ class PacketTracerAdapter {
     }
     for (final n in intent.nodes.where((n) => n.type == 'router')) {
       if (s.aaa && n.name == (s.aaaRouter ?? n.name)) {
+        final proto = s.aaaProtocol.trim().toLowerCase().startsWith('radius')
+            ? 'radius'
+            : 'tacacs';
         checks.add({
           'device': n.name,
           'command':
-              'show running-config | include aaa|tacacs|login authentication|transport input',
+              'show running-config | include aaa|tacacs|radius|login authentication|transport input',
           'expected': 'aaa',
           'kind': 'aaa',
           'requiredMarkers': [
             'aaa new-model',
-            'tacacs',
+            proto,
             'login authentication',
             'transport input telnet',
           ],

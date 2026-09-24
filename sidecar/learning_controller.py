@@ -11,14 +11,33 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import threading
 import time
 import uuid
 from copy import deepcopy
 
 
-SCHEMA = 1
+# v2 split a strategy's key into transferable identity + volatile metadata.
+# v1 hashed the whole context, so a spot verified on SRV1/office-net became
+# invisible from SRV1/office-net2 or SRV2 - which is why re-running the same
+# instruction never got any faster.  Stored rows are re-keyed on load.
+SCHEMA = 2
 DECAY_DAYS = 14
+# A tactic that never once worked is evicted rather than kept forever.  Decay
+# is multiplicative with a 0.05 floor, so without this a never-successful row
+# stays in the file (and keeps being scored) indefinitely - Sep 9 entries were
+# still voting in a 45 KB store.
+NEVER_SUCCEEDED_TTL_DAYS = 30
+NEVER_SUCCEEDED_MIN_FAILURES = 5
+# A device *type* and *model* define whether a tactic may transfer at all: a
+# spot learned for a router must never be applied to a PC.  Project name, the
+# exact device name, the canvas layout version and the (always "unknown") PT
+# version are environment detail, not identity.
+IDENTITY_FIELDS = ("type", "model")
+VOLATILE_FIELDS = ("project", "device", "layout")
+# Same identity, different project: usable, but ranked below a local hit.
+CROSS_PROJECT_PENALTY = 0.85
 SAFE_KINDS = {
     "cli_fallback",
     "ui_coordinate",
@@ -40,6 +59,17 @@ def _canonical(value) -> str:
 
 def _short_hash(value) -> str:
     return hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest()[:24]
+
+
+def _identity(context) -> dict:
+    """The part of a context that decides whether a strategy may transfer."""
+    ctx = context if isinstance(context, dict) else {}
+    return {field: _safe_json(ctx.get(field, "")) for field in IDENTITY_FIELDS}
+
+
+def _project(context) -> str:
+    ctx = context if isinstance(context, dict) else {}
+    return str(ctx.get("project", "") or "")
 
 
 def _safe_json(value):
@@ -66,16 +96,108 @@ class StrategyStore:
         try:
             with open(self.path, encoding="utf-8") as stream:
                 data = json.load(stream)
-            if isinstance(data, dict) and isinstance(data.get("strategies"), dict):
-                self._data = {
-                    "schema": SCHEMA,
-                    "strategies": data["strategies"],
-                }
         except FileNotFoundError:
             return
         except Exception:
             # A corrupted memory file must never stop Packet Tracer work.
             self._data = {"schema": SCHEMA, "strategies": {}}
+            return
+        if not (isinstance(data, dict)
+                and isinstance(data.get("strategies"), dict)):
+            return
+        try:
+            schema = int(data.get("schema", 1))
+        except Exception:
+            schema = 1
+        if schema >= SCHEMA:
+            self._data = {"schema": SCHEMA, "strategies": data["strategies"]}
+            self._prune()
+            return
+        # MIGRATION v1 -> v2.  Every field the new key needs is already in
+        # each stored context, so the rows are re-keyed in place and the
+        # duplicates that collapse together are merged by summing counters.
+        self._data = {"schema": SCHEMA,
+                      "strategies": self._migrate_v1(data["strategies"])}
+        try:
+            backup = self.path + ".v1.bak"
+            if not os.path.exists(backup):
+                shutil.copyfile(self.path, backup)
+        except Exception:
+            pass
+        self._prune()
+        self._write_locked()
+
+    @classmethod
+    def _migrate_v1(cls, rows: dict) -> dict:
+        """Re-key v1 rows onto identity, merging what collapses together.
+
+        Idempotent: running it on already-merged rows produces the same file,
+        because the key is derived only from kind/scope/identity/candidate.
+        """
+        out: dict = {}
+        for row in (rows or {}).values():
+            if not isinstance(row, dict):
+                continue
+            row = deepcopy(row)
+            context = row.get("context") if isinstance(
+                row.get("context"), dict) else {}
+            key = cls._static_key(str(row.get("kind", "")),
+                                  str(row.get("scope", "")), context,
+                                  row.get("candidate"))
+            row["id"] = key
+            # Volatile context is kept as metadata for tie-breaking only.
+            for field in VOLATILE_FIELDS:
+                row[field] = _safe_json(context.get(field, ""))
+            row["deviceName"] = _safe_json(context.get("device", ""))
+            row.pop("ptVersion", None)
+            existing = out.get(key)
+            if existing is None:
+                out[key] = row
+                continue
+            for counter in ("attempts", "successes", "failures"):
+                existing[counter] = (int(existing.get(counter, 0))
+                                     + int(row.get(counter, 0)))
+            merged = cls._confidence(existing)
+            existing["confidence"] = merged
+            existing["quarantined"] = bool(
+                (existing.get("quarantined") or row.get("quarantined"))
+                and merged < 0.55)
+            if str(row.get("last_seen", "")) >= str(existing.get("last_seen", "")):
+                for label in ("last_seen", "last_seen_epoch", "last_detail"):
+                    existing[label] = row.get(label)
+            for label in ("last_success", "last_failure"):
+                if str(row.get(label, "")) >= str(existing.get(label, "")):
+                    existing[label] = row.get(label, "")
+            if row.get("replacement_verified"):
+                existing["replacement"] = row.get("replacement")
+                existing["replacement_verified"] = True
+        return out
+
+    def _prune(self):
+        """Evict tactics that never once worked and have gone cold.
+
+        Guarded so a row with at least one success is never removed, however
+        old it is.
+        """
+        rows = self._data.get("strategies") or {}
+        cutoff = time.time() - NEVER_SUCCEEDED_TTL_DAYS * 86400
+        doomed = []
+        for key, row in rows.items():
+            if not isinstance(row, dict):
+                continue
+            if int(row.get("successes", 0)) > 0:
+                continue
+            if int(row.get("failures", 0)) < NEVER_SUCCEEDED_MIN_FAILURES:
+                continue
+            try:
+                seen = float(row.get("last_seen_epoch") or 0)
+            except Exception:
+                seen = 0.0
+            if 0 < seen < cutoff:
+                doomed.append(key)
+        for key in doomed:
+            rows.pop(key, None)
+        return len(doomed)
 
     @staticmethod
     def _confidence(row: dict) -> float:
@@ -109,13 +231,18 @@ class StrategyStore:
             json.dump(self._data, stream, indent=2, sort_keys=True)
         os.replace(temp, self.path)
 
-    def _key(self, kind: str, scope: str, context: dict, candidate) -> str:
+    @staticmethod
+    def _static_key(kind: str, scope: str, context, candidate) -> str:
+        """Identity-only key: transferable across projects and renaming."""
         return _short_hash({
-            "kind": kind,
-            "scope": scope,
-            "context": _safe_json(context),
+            "kind": str(kind or ""),
+            "scope": str(scope or ""),
+            "identity": _identity(context),
             "candidate": _safe_json(candidate),
         })
+
+    def _key(self, kind: str, scope: str, context: dict, candidate) -> str:
+        return self._static_key(kind, scope, context, candidate)
 
     def get(self, kind: str, scope: str, context: dict, candidate):
         key = self._key(kind, scope, context, candidate)
@@ -127,7 +254,8 @@ class StrategyStore:
             return deepcopy(row)
 
     def record(self, kind: str, scope: str, context: dict, candidate,
-               outcome: str, persist: bool = True, detail: str = "") -> dict:
+               outcome: str, persist: bool = True, detail: str = "",
+               replaces=None) -> dict:
         candidate = _safe_json(candidate)
         context = _safe_json(context)
         key = self._key(kind, scope, context, candidate)
@@ -162,13 +290,67 @@ class StrategyStore:
                 row["quarantined"] = True
             if outcome == "success" and row["confidence"] >= 0.55:
                 row["quarantined"] = False
+            # A verified replacement is what makes a ban actionable.  Without
+            # it the only durable reaction to repeated failure is to stop
+            # using a tactic and fall through - never to learn a better one.
+            if outcome == "failure" and replaces is not None:
+                replacement = _safe_json(replaces)
+                if (_canonical(replacement)
+                        != _canonical(_safe_json(row.get("candidate")))):
+                    row["replacement"] = replacement
+                    row["replacement_verified"] = True
+            # Volatile context is metadata for tie-breaking only - it is
+            # deliberately not part of the key.
+            for field in VOLATILE_FIELDS:
+                if context.get(field) not in (None, ""):
+                    row[field] = _safe_json(context.get(field))
+            row["deviceName"] = _safe_json(context.get("device", ""))
+            row.pop("ptVersion", None)
             if persist and kind in SAFE_KINDS:
+                self._prune()
                 self._write_locked()
             return deepcopy(row)
 
+    def affinity(self, row, project: str = "") -> float:
+        """Rank a strategy learned here above one learned elsewhere.
+
+        Called `PREFERENCE`, not a filter, on purpose: the whole point of the
+        identity split is that a spot proven in another project is still
+        usable, just less trusted than a local one.
+        """
+        if not isinstance(row, dict) or not project:
+            return 1.0
+        learned_in = str(row.get("project", "") or "")
+        if not learned_in or learned_in == project:
+            return 1.0
+        return CROSS_PROJECT_PENALTY
+
+    def replacement_for(self, row: dict):
+        """The verified alternative recorded against a quarantined tactic."""
+        if not isinstance(row, dict):
+            return None
+        if not row.get("replacement_verified"):
+            return None
+        candidate = row.get("replacement")
+        if candidate is None:
+            return None
+        if _canonical(_safe_json(candidate)) == _canonical(
+                _safe_json(row.get("candidate"))):
+            return None
+        return deepcopy(candidate)
+
     def candidates(self, kind: str, scope: str, context: dict,
                    candidates: list, banned: set | None = None) -> list:
+        """Order candidates best-first; a quarantined one is dropped.
+
+        Return value stays a *filter plus ordering* (callers use it as
+        `if not candidates(...)`) - never a substitution.  A caller that
+        wants the verified replacement for a banned tactic asks
+        [replacement_for] explicitly, so a different coordinate can never be
+        handed back as if it were the one the caller measured.
+        """
         banned = banned or set()
+        project = _project(context)
         scored = []
         for candidate in candidates:
             key = _canonical(_safe_json(candidate))
@@ -179,7 +361,8 @@ class StrategyStore:
                 continue
             confidence = float((row or {}).get("confidence", 0.5))
             successes = int((row or {}).get("successes", 0))
-            scored.append((confidence, successes, candidate))
+            scored.append((self.affinity(row, project) * confidence,
+                           successes, candidate))
         scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
         return [candidate for _, _, candidate in scored]
 
@@ -252,16 +435,33 @@ class SessionLearningController:
         return row
 
     def failure(self, kind: str, scope: str, context: dict, candidate,
-                detail: str = "", persistent: bool = True) -> dict:
+                detail: str = "", persistent: bool = True,
+                replaces=None) -> dict:
         bucket = self._bucket(kind, scope, context)
         with self._lock:
             self._banned.setdefault(bucket, set()).add(
                 self._candidate_key(candidate))
         effective_persist = bool(persistent and kind in SAFE_KINDS)
         self.store.record(kind, scope, context, candidate, "failure",
-                          persist=effective_persist, detail=detail)
+                          persist=effective_persist, detail=detail,
+                          replaces=replaces)
         return self._event("failure", kind, scope, context, candidate, detail,
                            effective_persist)
+
+    def replacement_for(self, kind: str, scope: str, context: dict, source):
+        """A verified alternative for a tactic this session will not retry."""
+        row = self.store.get(kind, scope, context, source)
+        if not row:
+            return None
+        replacement = self.store.replacement_for(row)
+        if replacement is None:
+            return None
+        bucket = self._bucket(kind, scope, context)
+        with self._lock:
+            if self._candidate_key(replacement) in self._banned.get(
+                    bucket, set()):
+                return None
+        return replacement
 
     def success(self, kind: str, scope: str, context: dict, candidate,
                 detail: str = "", persistent: bool = True) -> dict:
