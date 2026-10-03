@@ -241,7 +241,10 @@ class ChatMarkdownView extends StatelessWidget {
           child: Table(
             defaultColumnWidth: const IntrinsicColumnWidth(),
             border: TableBorder.all(
-              color: (base.color ?? Colors.black).withValues(alpha: 0.20),
+              // From the theme, not from the ink: the answer's own text colour
+              // can be anything (white in a user bubble), and a black rule
+              // around it disappears on a dark surface.
+              color: Theme.of(context).colorScheme.outlineVariant,
               width: 0.6,
             ),
             children: [

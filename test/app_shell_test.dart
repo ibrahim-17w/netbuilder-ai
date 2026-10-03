@@ -64,6 +64,8 @@ void main() {
         reason: '"$label" must be reachable by name',
       );
     }
+    // The brand lives once, on the rail.
+    expect(find.text('NetBuilder'), findsOneWidget);
     expect(find.text('All features'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -144,14 +146,17 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
-    expect(find.text('Start with one of these'), findsOneWidget);
-    expect(find.text('Design a small office network'), findsOneWidget);
+    // The welcome screen asks the question an assistant is for, and offers
+    // the openers as pills - not a pile of cards.
+    expect(find.text('How can I help?'), findsOneWidget);
+    expect(find.text('Troubleshoot connectivity'), findsOneWidget);
+    expect(find.text('Create a network'), findsOneWidget);
 
-    // The openers are the last thing in a scrollable empty state, so a short
-    // window needs a scroll to reach them - as a person would.
-    await tester.ensureVisible(find.text('Plan a VLAN lab'));
+    // The openers are the last thing in a scrollable welcome screen, so a
+    // short window needs a scroll to reach them - as a person would.
+    await tester.ensureVisible(find.text('Create a network'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Plan a VLAN lab'));
+    await tester.tap(find.text('Create a network'));
     await tester.pumpAndSettle();
 
     final composer = tester.widget<TextField>(
@@ -159,7 +164,10 @@ void main() {
         (w) => w is TextField && w.decoration?.labelText == 'Message',
       ),
     );
-    expect(composer.controller!.text, contains('VLAN lab'));
+    // Tapping a card fills the composer instead of sending: the user keeps
+    // their own first message and can edit the wording.
+    expect(composer.controller!.text, isNotEmpty);
+    expect(composer.controller!.text.toLowerCase(), contains('network'));
   });
 
   testWidgets('the chat names the conversation and can start another one',
@@ -167,17 +175,21 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('message(s)'), findsOneWidget);
-    expect(find.text('New chat'), findsOneWidget);
-    expect(find.byTooltip('Clear this conversation'), findsOneWidget);
+    // The bar says which conversation this is and nothing else: a model
+    // status tag, a message count and a project chip all used to sit here,
+    // and the chat read like a dashboard rather than a conversation.
+    expect(find.byTooltip('New chat'), findsOneWidget);
+    expect(find.byTooltip('Clear this conversation'), findsNothing,
+        reason: 'clear is destructive and moved into the tools sheet');
+    expect(find.textContaining('message(s)'), findsNothing);
 
-    await tester.tap(find.text('New chat'));
+    await tester.tap(find.byTooltip('New chat'));
     await tester.pumpAndSettle();
 
     // A fresh conversation is a fresh transcript under its own name, and the
-    // empty state comes back with the openers.
+    // welcome screen comes back.
     expect(find.textContaining('chat '), findsWidgets);
-    expect(find.text('Start with one of these'), findsOneWidget);
+    expect(find.text('How can I help?'), findsOneWidget);
   });
 
   testWidgets('a sent message gets its own name, time and actions',

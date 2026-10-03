@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:net_builder/services/diagnostics_service.dart';
 
@@ -113,6 +115,111 @@ Interface: 192.168.1.10 --- 0xb
     test('a table with no devices is empty rather than full of junk', () {
       expect(DiagnosticsService.parseArp(''), isEmpty);
       expect(DiagnosticsService.parseArp('No ARP Entries Found.'), isEmpty);
+    });
+  });
+
+  group('a target is never read as shell syntax', () {
+    test('the names an engineer actually types are accepted', () {
+      expect(DiagnosticsService.normalizeHost('example.com'), 'example.com');
+      expect(DiagnosticsService.normalizeHost('  10.0.0.1  '), '10.0.0.1');
+      expect(DiagnosticsService.normalizeHost('router-1_lab'), 'router-1_lab');
+      expect(DiagnosticsService.normalizeHost('fe80::1'), 'fe80::1');
+      expect(DiagnosticsService.normalizeHost('8.8.8.8'), '8.8.8.8');
+    });
+
+    test('punctuation, whitespace, options and control bytes are refused', () {
+      // Each of these is a target a shell would do something else with. The
+      // point of the list is not that they fail today: it is that a value like
+      // this never reaches a program at all, so there is no quoting to get
+      // wrong.
+      for (final bad in <String>[
+        'example.com & calc',
+        'host; rm -rf /',
+        'a | tee b',
+        r'example.com > out.txt',
+        r'example.com `id`',
+        r'example.com $(id)',
+        r'example.com && curl evil.test',
+        r'C:\Windows\System32\cmd.exe',
+        r'example.com" & calc & "',
+        'example.com\ncalc',
+        'example.com\r\nHost: x',
+        'example.com\t-x',
+        '   ',
+        '',
+        // An option, not a host: `ping -f` is a flood ping.
+        '-f',
+        '-w 1000',
+        'a' * 300,
+      ]) {
+        expect(
+          DiagnosticsService.normalizeHost(bad),
+          isNull,
+          reason: 'refused before anything is started: $bad',
+        );
+      }
+    });
+
+    test('an injection payload in the host executes nothing', () async {
+      const service = DiagnosticsService();
+      final marker = File(
+        '${Directory.systemTemp.path}'
+        '/nb-diag-injection-${DateTime.now().microsecondsSinceEpoch}',
+      );
+      addTearDown(() {
+        if (marker.existsSync()) marker.deleteSync();
+      });
+      // Exactly what the old `cmd /c` / `sh -c` path would have run: the
+      // payload, then a second command that writes a file.
+      final payload = Platform.isWindows
+          ? 'example.com & echo injected>"${marker.path}"'
+          : 'example.com; echo injected >"${marker.path}"';
+
+      final ping = await service.ping(payload);
+      expect(ping.transmitted, 0);
+      expect(ping.received, 0);
+      expect(ping.error, isNotEmpty);
+      expect(ping.summary, contains('no ping was run'));
+
+      final trace = await service.traceroute(payload);
+      expect(trace.exitCode, -1, reason: 'no process was started');
+      expect(trace.output, isEmpty);
+      expect(trace.error, contains('not a host name'));
+
+      expect(marker.existsSync(), isFalse,
+          reason: 'the second command never ran, because there was no shell');
+    });
+
+    test('the socket and DNS probes refuse the same targets', () async {
+      const service = DiagnosticsService(timeout: Duration(seconds: 2));
+      const payload = 'example.com & calc';
+
+      final dns = await service.lookup(payload);
+      expect(dns.addresses, isEmpty);
+      expect(dns.error, contains('not a host name'));
+
+      final port = await service.checkPort(payload, 22);
+      expect(port.open, isFalse);
+      expect(port.error, contains('not a host name'));
+
+      final reverse = await service.reverseLookup('2001:db8::1 & calc');
+      expect(reverse.addresses, isEmpty);
+      expect(reverse.error, contains('not a host name'));
+    });
+
+    test('a real target is still probed normally', () async {
+      const service = DiagnosticsService(timeout: Duration(seconds: 2));
+      final dns = await service.lookup('localhost');
+      expect(dns.ok, isTrue);
+      expect(dns.addresses, isNotEmpty);
+
+      // Whether the port answers is not the assertion; that the probe ran
+      // against the host and not against a rejected name is.
+      final port = await service.checkPort('127.0.0.1', 9);
+      expect(port.host, '127.0.0.1');
+      expect(port.error, isNot(contains('not a host name')));
+
+      expect(await service.localInterfaces(), isNotEmpty);
     });
   });
 

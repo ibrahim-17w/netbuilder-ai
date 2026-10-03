@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart';
+import '../theme/app_kit.dart';
+import '../theme/app_palette.dart';
 
 /// Post-build verification report: one row per derived test with a
 /// pass/fail/skip chip, the target, and the evidence line. Consumes the
@@ -32,10 +33,13 @@ class VerificationReport extends StatelessWidget {
     if (report == null && !busy) {
       return const SizedBox.shrink();
     }
-    return AppSection(
+    return AppPanel(
+      icon: Icons.network_check,
       title: 'Verification',
-      trailing: (onRerun != null)
-          ? TextButton.icon(
+      subtitle: 'Every derived ping test, with the evidence it produced.',
+      actions: (onRerun != null)
+          ? [
+              TextButton.icon(
               onPressed: busy ? null : onRerun,
               icon: busy
                   ? const SizedBox(
@@ -46,7 +50,8 @@ class VerificationReport extends StatelessWidget {
                   : const Icon(Icons.refresh, size: 18),
               label: const Text('Re-run tests'),
             )
-          : null,
+          ]
+          : const [],
       children: busy
           ? const [
               Padding(
@@ -73,26 +78,19 @@ class VerificationReport extends StatelessWidget {
                     ?.copyWith(fontWeight: FontWeight.w600),
               ),
               if (report?['error'] != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    report!['error'].toString(),
-                    style: TextStyle(color: theme.colorScheme.error),
-                  ),
+                AppBanner(
+                  dense: true,
+                  tone: AppTone.danger,
+                  message: report!['error'].toString(),
                 ),
               const SizedBox(height: 8),
-              ...tests.map(_row),
+              for (final t in tests) _row(context, t),
             ],
     );
   }
 
-  Widget _row(Map<String, dynamic> t) {
+  Widget _row(BuildContext context, Map<String, dynamic> t) {
     final status = (t['status'] as String? ?? 'skipped').toLowerCase();
-    final color = switch (status) {
-      'passed' => const Color(0xFF2E7D32),
-      'failed' => const Color(0xFFC62828),
-      _ => const Color(0xFF9E9E9E),
-    };
     final glyph = switch (status) {
       'passed' => 'PASS',
       'failed' => 'FAIL',
@@ -103,22 +101,14 @@ class VerificationReport extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              glyph,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: color,
-              ),
-            ),
+          AppTag(
+            label: glyph,
+            tone: switch (status) {
+              'passed' => AppTone.success,
+              'failed' => AppTone.danger,
+              _ => AppTone.neutral,
+            },
+            mono: true,
           ),
           const SizedBox(width: 8),
           Expanded(

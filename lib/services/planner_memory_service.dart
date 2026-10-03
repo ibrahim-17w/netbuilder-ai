@@ -19,6 +19,17 @@ class PlannerMemoryService {
     'subnet',
     'base_cidr',
   ];
+  // Design levers a seasoned engineer keeps consistent across a lab. These
+  // map onto fields the plan already carries (notes, addressing), so learning
+  // them needs no schema change and cannot invent anything the user did not
+  // say.
+  static const List<String> transitKeys = ['transit', 'wan_link', 'p2p'];
+  static const List<String> managementVlanKeys = [
+    'management_vlan',
+    'mgmt_vlan',
+  ];
+  static const List<String> ospfAreaKeys = ['ospf_area', 'area'];
+  static const List<String> stpModeKeys = ['stp', 'spanning_tree'];
 
   /// Return a copy of [intent] with the learned corrections applied.
   static NetworkIntent apply(
@@ -39,6 +50,10 @@ class PlannerMemoryService {
       if (routerModelKeys.contains(key)) wanted['router_model'] = value;
       if (switchModelKeys.contains(key)) wanted['switch_model'] = value;
       if (baseSubnetKeys.contains(key)) wanted['base_subnet'] = value;
+      if (transitKeys.contains(key)) wanted['transit'] = value.toLowerCase();
+      if (managementVlanKeys.contains(key)) wanted['management_vlan'] = value;
+      if (ospfAreaKeys.contains(key)) wanted['ospf_area'] = value;
+      if (stpModeKeys.contains(key)) wanted['stp'] = value.toLowerCase();
     });
 
     // Free-text rules read the same levers out of sentence wording, e.g.
@@ -70,6 +85,35 @@ class PlannerMemoryService {
         }
       }
       if (RegExp(r'\bdns\b').hasMatch(r)) wanted['add_dns'] = 'true';
+      // Transit-link style: "/31" or "31-bit" means point-to-point /31;
+      // "\/30" the classic two-address transit.
+      if (r.contains('transit') || r.contains('wan link') ||
+          r.contains('point-to-point') || r.contains('p2p')) {
+        if (RegExp(r'\b/?31\b').hasMatch(r) || r.contains('31-bit')) {
+          wanted.putIfAbsent('transit', () => 'p2p31');
+        } else if (RegExp(r'\b/?30\b').hasMatch(r)) {
+          wanted.putIfAbsent('transit', () => 'p2p30');
+        }
+      }
+      // Management VLAN preference, e.g. "management on vlan 99".
+      final mgmt = RegExp(r'management\s+(?:on\s+)?vlan\s+(\d{1,4})')
+          .firstMatch(r);
+      if (mgmt != null) {
+        wanted.putIfAbsent('management_vlan', () => mgmt.group(1)!);
+      }
+      // Explicit OSPF area, e.g. "ospf area 0" / "area 10".
+      final area = RegExp(r'\barea\s+(\d{1,4})\b').firstMatch(r);
+      if (area != null && (r.contains('ospf') || r.contains('area'))) {
+        wanted.putIfAbsent('ospf_area', () => area.group(1)!);
+      }
+      // Spanning-tree mode, e.g. "use rapid-pvst".
+      if (r.contains('rapid-pvst') || r.contains('rapid pvst')) {
+        wanted.putIfAbsent('stp', () => 'rapid-pvst');
+      } else if (r.contains('pvst')) {
+        wanted.putIfAbsent('stp', () => 'pvst');
+      } else if (r.contains('mst')) {
+        wanted.putIfAbsent('stp', () => 'mst');
+      }
     }
 
     var out = intent;
@@ -108,6 +152,38 @@ class PlannerMemoryService {
     // 4. Default service, e.g. "always add a DNS server".
     if (wanted['add_dns'] == 'true') {
       out = _withService(out, 'server', 'dns');
+    }
+
+    // 5. Design conventions the user has taught us.  These annotate the plan
+    //    (as notes) rather than silently rewriting addressing: a preference
+    //    like "use /31 transit links" is advice the config generator reads,
+    //    and it must be visible on the plan card so the user can see it was
+    //    applied.  Nothing is invented - each note is a value the user gave.
+    final designNotes = <String>[];
+    final transit = wanted['transit'];
+    if (transit == 'p2p31') {
+      designNotes.add('Transit links: /31 point-to-point (learned convention)');
+    } else if (transit == 'p2p30') {
+      designNotes.add('Transit links: /30 (learned convention)');
+    }
+    final mgmtVlan = wanted['management_vlan'];
+    if (mgmtVlan != null && mgmtVlan.isNotEmpty) {
+      designNotes.add('Management VLAN: $mgmtVlan (learned convention)');
+    }
+    final area = wanted['ospf_area'];
+    if (area != null && area.isNotEmpty) {
+      designNotes.add('OSPF area: $area (learned convention)');
+    }
+    final stp = wanted['stp'];
+    if (stp != null && stp.isNotEmpty) {
+      designNotes.add('Spanning tree: $stp (learned convention)');
+    }
+    if (designNotes.isNotEmpty) {
+      final merged = [...out.notes];
+      for (final note in designNotes) {
+        if (!merged.contains(note)) merged.add(note);
+      }
+      out = out.copyWith(notes: merged);
     }
 
     return out;

@@ -1,23 +1,94 @@
 import 'dart:convert';
+
+import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 
-/// Talks to the local PT Autopilot sidecar (sidecar/pt_autopilot.py).
-/// Sidecar runs on http://127.0.0.1:5005 and drives the PT window.
-/// Flutter never clicks the OS directly; the sidecar does (Windows-only).
+import 'settings_service.dart';
+import 'sidecar_supervisor.dart';
+
+/// Talks to the PT Autopilot sidecar (sidecar/pt_autopilot.py), which drives
+/// the Packet Tracer window. Flutter never clicks the OS directly; the sidecar
+/// does (Windows-only).
 ///
-/// If the sidecar is not running you get a friendly SocketException hint,
-/// NOT a raw ClientException dump.
+/// The address is the user's, not a constant: [baseProvider] is called for
+/// every request so an address changed in Settings takes effect immediately
+/// and no call can quietly fall back to loopback behind the user's back.
+/// Loopback is only the last resort, for a client built with neither.
+///
+/// If the engine is not running you get a friendly hint naming the address
+/// that did not answer, NOT a raw ClientException dump.
 class AutopilotService {
-  final String base;
-  final http.Client _client;
-  AutopilotService({this.base = 'http://127.0.0.1:5005', http.Client? c})
-    : _client = c ?? http.Client();
+  /// The address used when nothing else says where the engine is. A
+  /// last-resort default for a bare client, never a decision this class makes
+  /// for the app: main.dart provides one instance bound to the settings.
+  static const loopbackBase = 'http://127.0.0.1:5005';
 
-  /// Shown when nothing answers. The app starts the engine itself, so this
-  /// is the fallback for the case where it could not (no Python, wrong
-  /// address, or the engine is on another machine).
-  static const startHint =
-      'Sidecar not running on 127.0.0.1:5005.\n'
+  final String? _baseOverride;
+  final String Function()? baseProvider;
+  final http.Client _client;
+
+  AutopilotService({
+    String? base,
+    this.baseProvider,
+    http.Client? c,
+  }) : _baseOverride = base?.trim(),
+       _client = c ?? http.Client();
+
+  /// Where the next request goes. Resolved per call, so a settings change is
+  /// picked up without rebuilding anything.
+  String get base => resolveBase();
+
+  String resolveBase() {
+    final override = _baseOverride;
+    if (override != null && override.isNotEmpty) return override;
+    try {
+      final provided = baseProvider?.call().trim() ?? '';
+      if (provided.isNotEmpty) return provided;
+    } catch (_) {
+      // A resolver that throws must not take every screen down with it.
+    }
+    return loopbackBase;
+  }
+
+  /// The app-scoped client, for any screen or action that needs one.
+  ///
+  /// main.dart provides the single instance the whole app uses. A widget that
+  /// is mounted without that provider (a test, a preview) still gets a client
+  /// bound to whatever settings it can see, rather than a hardcoded address.
+  static AutopilotService of(BuildContext context) {
+    final shared = context.read<AutopilotService?>();
+    if (shared != null) return shared;
+    final settings = context.read<SettingsService?>();
+    return AutopilotService(baseProvider: () => settings?.engineBase ?? '');
+  }
+
+  /// Shown when nothing answers, naming [base] - the address that was asked,
+  /// not a constant that may have been edited out of the settings.
+  String get hint => startHintFor(base);
+
+  /// The hint with no address of its own. Kept for callers that only want the
+  /// generic wording; anything talking to an engine should use [hint].
+  static String get startHint => startHintFor(loopbackBase);
+
+  static String startHintFor(String base) {
+    // A remote engine cannot be started from here at all, so the Python
+    // steps would send the user to install something on the wrong machine.
+    if (!SettingsService.isLoopbackEngineBase(base)) {
+      return 'The engine at $base is not answering. That address is not this '
+          'machine, so this app does not start an engine for it - start the '
+          'sidecar on that host, or set the engine address in Settings back '
+          'to ${SettingsService.defaultEngineBase()}.';
+    }
+    return SidecarSupervisor.canRunLocally
+        ? desktopStartHintFor(base)
+        : SidecarSupervisor.phoneEngineMessage;
+  }
+
+  static String get desktopStartHint => desktopStartHintFor(loopbackBase);
+
+  static String desktopStartHintFor(String base) =>
+      'Sidecar not running on $base.\n'
       'The app starts it automatically when it can; if that failed:\n'
       '1) install Python 3 from python.org (tick "Add python.exe to PATH")\n'
       '2) pip install -r sidecar/requirements.txt (once)\n'
@@ -234,7 +305,7 @@ class AutopilotService {
   }
 
   /// Ask the active run to hold at the next safe boundary. Progress is
-  /// kept; Stop remains the destructive action. F9 does the same globally.
+  /// kept; Stop remains the destructive action.
   Future<Map<String, dynamic>> pause() async {
     return _pauseOperation('/pause');
   }
@@ -462,10 +533,18 @@ class AutopilotService {
 
   /// Hand the app's Gemini credential to the sidecar for this run only.
   /// The sidecar keeps it in memory: it is never written to disk or logged.
+  ///
+  /// The auto-learning switches travel with the key so one call configures
+  /// the whole behaviour. Omitted switches keep their sidecar value; when
+  /// [autoLearn] is null the sidecar leaves its current setting alone.
   Future<Map<String, dynamic>> pushLlmConfig({
     required String apiKey,
     required String model,
     required bool enabled,
+    bool? autoLearn,
+    bool? autoSuggest,
+    bool? autoTeach,
+    bool offDevice = false,
   }) async {
     try {
       final r = await _client
@@ -476,6 +555,10 @@ class AutopilotService {
               'apiKey': apiKey,
               'model': model,
               'enabled': enabled,
+              'autoLearn': ?autoLearn,
+              'autoSuggest': ?autoSuggest,
+              'autoTeach': ?autoTeach,
+              if (offDevice) 'offDevice': true,
             }),
           )
           .timeout(const Duration(seconds: 10));
@@ -486,6 +569,35 @@ class AutopilotService {
       return decoded is Map ? Map<String, dynamic>.from(decoded) : {};
     } catch (e) {
       throw Exception(_friendly(e));
+    }
+  }
+
+  /// Every learning store's health: row counts and (the otherwise invisible
+  /// case) whether a store failed to parse and silently loaded empty.
+  Future<Map<String, dynamic>> memoryHealth() async {
+    try {
+      final r = await _client
+          .get(Uri.parse('$base/memory/health'))
+          .timeout(const Duration(seconds: 10));
+      final decoded = jsonDecode(r.body);
+      return decoded is Map ? Map<String, dynamic>.from(decoded) : {};
+    } catch (e) {
+      throw Exception(_friendly(e));
+    }
+  }
+
+  /// Steps the planner must not re-emit verbatim for a project: the
+  /// (action, device) pairs that failed the same way in consecutive runs.
+  Future<List<Map<String, dynamic>>> excludedActions({
+    String project = '',
+  }) async {
+    try {
+      final j = await knownBlockers(project: project);
+      return (j['excludedActions'] as List? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    } catch (_) {
+      return const [];
     }
   }
 
@@ -1234,7 +1346,7 @@ class AutopilotService {
         s.contains('Connection refused') ||
         s.contains('refused the network connection') ||
         s.contains('ClientException')) {
-      return startHint;
+      return hint;
     }
     return s;
   }

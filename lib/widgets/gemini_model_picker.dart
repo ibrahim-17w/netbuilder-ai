@@ -85,7 +85,7 @@ class _GeminiModelPickerDialogState extends State<GeminiModelPickerDialog> {
         recommended: recommended,
         note: models.isEmpty
             ? 'This key listed no chat models. Enable the Gemini API for its '
-                'AI Studio project, or type a model id below.'
+                  'AI Studio project, or type a model id below.'
             : '',
       );
     } catch (e) {
@@ -103,7 +103,8 @@ class _GeminiModelPickerDialogState extends State<GeminiModelPickerDialog> {
         models: models,
         recommended: models.first,
         usedFallback: true,
-        note: '${e.toString().replaceFirst('Exception: ', '')} '
+        note:
+            '${e.toString().replaceFirst('Exception: ', '')} '
             'Showing the known stable models instead.',
       );
     }
@@ -111,31 +112,45 @@ class _GeminiModelPickerDialogState extends State<GeminiModelPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    // A fixed 560x480 box is taller than a landscape phone and wider than a
+    // 360dp window, so the dialog either overflowed or forced a scroll it did
+    // not need. The list is what flexes; the dialog is bounded by the window.
+    final media = MediaQuery.of(context);
     return AlertDialog(
       icon: const Icon(Icons.auto_awesome_outlined),
       title: const Text('Choose a Gemini model'),
-      content: SizedBox(
-        width: 560,
-        height: 480,
-        child: FutureBuilder<GeminiModelsResult>(
-          future: _future,
-          builder: (context, snap) {
-            if (snap.connectionState != ConnectionState.done) {
-              return const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: AppTheme.s12),
-                    Text('Detecting the models this key can use...'),
-                  ],
-                ),
-              );
-            }
-            final result =
-                snap.data ?? const GeminiModelsResult(models: [], recommended: null);
-            return _list(context, result);
-          },
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.s16,
+        vertical: AppTheme.s24,
+      ),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 560,
+          maxHeight: (media.size.height * 0.62).clamp(240.0, 480.0),
+        ),
+        child: SizedBox(
+          width: 560,
+          child: FutureBuilder<GeminiModelsResult>(
+            future: _future,
+            builder: (context, snap) {
+              if (snap.connectionState != ConnectionState.done) {
+                return const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: AppTheme.s12),
+                      Text('Detecting the models this key can use...'),
+                    ],
+                  ),
+                );
+              }
+              final result =
+                  snap.data ??
+                  const GeminiModelsResult(models: [], recommended: null);
+              return _list(context, result);
+            },
+          ),
         ),
       ),
       actions: [
@@ -154,10 +169,12 @@ class _GeminiModelPickerDialogState extends State<GeminiModelPickerDialog> {
     final filtered = query.isEmpty
         ? models
         : models
-            .where((m) =>
-                m.name.toLowerCase().contains(query) ||
-                m.label.toLowerCase().contains(query))
-            .toList();
+              .where(
+                (m) =>
+                    m.name.toLowerCase().contains(query) ||
+                    m.label.toLowerCase().contains(query),
+              )
+              .toList();
     final chosen = _custom ?? widget.currentModel;
 
     return Column(
@@ -262,7 +279,8 @@ class _GeminiModelPickerDialogState extends State<GeminiModelPickerDialog> {
                         [
                           if (m.label != m.name) m.label,
                           if (m.facts.isNotEmpty) m.facts,
-                          if (m.preview || m.experimental) 'preview/experimental',
+                          if (m.preview || m.experimental)
+                            'preview/experimental',
                         ].join('  ·  '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -292,7 +310,8 @@ class _GeminiModelPickerDialogState extends State<GeminiModelPickerDialog> {
           decoration: const InputDecoration(
             labelText: 'Or type any model id',
             hintText: 'gemini-2.5-flash',
-            helperText: 'A model released after this build still works - the '
+            helperText:
+                'A model released after this build still works - the '
                 'field accepts anything.',
             isDense: true,
           ),

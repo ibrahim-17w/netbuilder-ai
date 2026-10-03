@@ -17,7 +17,9 @@ void main() {
     // Attaching lives behind the single media picker, and the capture actions
     // live behind the tools control; neither needs another screen.
     expect(find.byIcon(Icons.send), findsOneWidget);
-    expect(find.textContaining('Context '), findsOneWidget);
+    // Nothing is painted under the transcript but the box itself; the
+    // token report is asked for in the tools sheet.
+    expect(find.textContaining('Context '), findsNothing);
 
     await tester.tap(find.byTooltip('Attach'));
     await tester.pumpAndSettle();

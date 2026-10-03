@@ -86,13 +86,90 @@ def links(xml: bytes) -> List[dict]:
             continue
         a = ref_to_name.get(refs[0].decode(), "?")
         b = ref_to_name.get(refs[1].decode(), "?")
+        # A LINK block names the medium at the top of the link (eCopper /
+        # eSerial / eFiber) and the cable kind inside the CABLE block
+        # (eStraightThrough / eCrossOver / ...).  The kind is what decides
+        # whether the link can carry traffic BETWEEN THESE TWO DEVICES at all,
+        # so it is part of the inventory, not decoration.
+        outer = re.search(rb"<TYPE>([^<]*)</TYPE>", block)
+        kinds = re.findall(rb"<TYPE>([^<]*)</TYPE>", body)
+        medium = (outer.group(1) if outer else (kinds[0] if kinds else b""))
+        medium = medium.decode("utf-8", "replace") if isinstance(medium, bytes) \
+            else str(medium)
+        kind = kinds[-1].decode("utf-8", "replace") if kinds else ""
+        if not kind:
+            kind = medium
+            medium = "eCopper" if kind.lower().startswith("ecopper") else medium
         out.append({
             "a": a,
             "aIf": ports[0].decode("utf-8", "replace") if ports else "",
             "b": b,
             "bIf": ports[1].decode("utf-8", "replace") if len(ports) > 1
                    else "",
+            "medium": medium,
+            "cable": kind,
         })
+    return out
+
+
+# Device kinds whose port is a SWITCH port - the port a straight-through
+# copper cable exists for.  Everything else presents a host/DTE-style port.
+_SWITCH_LIKE = ("switch", "hub", "bridge", "cloud", "modem", "controller")
+
+
+def _switch_like(kind: str) -> bool:
+    k = (kind or "").strip().lower()
+    return any(word in k for word in _SWITCH_LIKE)
+
+
+def cable_findings(cable_rows: List[dict], devs: List[dict]) -> List[dict]:
+    """Links whose CABLE KIND cannot carry traffic between those two devices.
+
+    A copper straight-through is only correct between a switch port and a
+    non-switch port.  Two routers (or two switches, or two hosts, or a host
+    plugged straight into a router) need a CROSSOVER: with a straight-through,
+    Packet Tracer holds BOTH ports down, draws the cable red and drops every
+    packet that has to cross it - the file looks perfect and the whole transit
+    network is dead in simulation.  Generators that leave the cable kind to a
+    default ship exactly that, and an audit that does not look at the cable
+    says "nothing to fix" about a lab that cannot pass a single ping.
+    """
+    kinds = {d["name"]: d.get("kind", "") for d in devs}
+    out = []
+    for row in cable_rows:
+        a = row.get("a", "?")
+        b = row.get("b", "?")
+        if a == "?" or b == "?" or a == b:
+            continue
+        medium = str(row.get("medium") or "eCopper").lower()
+        cable = str(row.get("cable") or "").lower()
+        if "copper" not in medium:
+            continue
+        same_shape = _switch_like(kinds.get(a, "")) == _switch_like(kinds.get(b, ""))
+        if same_shape and cable == "estraightthrough":
+            out.append({
+                "severity": "high",
+                "device": f"{a}-{b}",
+                "text": (
+                    f"The cable between {a} and {b} is a copper "
+                    "straight-through, but both ends are the same kind of "
+                    f"device ({kinds.get(a, '?')}/{kinds.get(b, '?')}) - "
+                    "Packet Tracer holds the link down, so nothing can cross "
+                    "it. Remedy: wire it with a Copper Cross-Over cable "
+                    "(Connections > Copper Cross-Over), then it comes up."
+                ),
+            })
+        elif not same_shape and cable == "ecrossover":
+            out.append({
+                "severity": "medium",
+                "device": f"{a}-{b}",
+                "text": (
+                    f"The cable between {a} and {b} is a Copper Cross-Over, "
+                    "but one end is a switch port and the other is not - a "
+                    "straight-through is the cable this pair needs. Packet "
+                    "Tracer may hold the link down."
+                ),
+            })
     return out
 
 
@@ -139,11 +216,23 @@ _SERVICE_PROBES = (
 
 
 def server_services(xml: bytes) -> Dict[str, List[dict]]:
-    """device name -> [{service, enabled, detail}] for every server panel."""
+    """device name -> [{service, enabled, detail}] for every server panel.
+
+    Only SERVER devices are reported.  A PC-Client block also carries service
+    elements from its template, so reading them here reported a DHCP pool and
+    an empty AAA panel on every PC in the lab - evidence about devices the plan
+    never configured.
+    """
     out: Dict[str, List[dict]] = {}
     for block in re.findall(rb"<DEVICE>.*?</DEVICE>", xml, re.S):
         name = _text(block, "NAME")
         if not name:
+            continue
+        m = re.search(rb'<TYPE customModel="[^"]*" model="([^"]*)">([^<]*)<',
+                      block)
+        kind = m.group(2).decode("utf-8", "replace") if m else ""
+        model = m.group(1).decode("utf-8", "replace") if m else ""
+        if not _is_server(kind, model):
             continue
         rows = []
         for tag, svc, extra in _SERVICE_PROBES:
@@ -155,8 +244,14 @@ def server_services(xml: bytes) -> Dict[str, List[dict]]:
             enabled = b"<ENABLED>1" in body
             detail = ""
             if extra == "aaa":
-                users = len(re.findall(rb"<USERNAME>", body))
-                clients = len(re.findall(rb"<CLIENT_NAME>", body))
+                # The ACS tab stores accounts as <USERS><USER><NAME> and the
+                # router client entry as <ACS_CLIENTS><CLIENT><HOST_IP>. It
+                # used to count <USERNAME> (the FTP/email account tag) and
+                # <CLIENT_NAME> (a tag this save format never writes), so a
+                # fully configured AAA server was always reported as
+                # "0 user(s), 0 client(s)".
+                users = len(re.findall(rb"<USER><NAME>", body))
+                clients = len(re.findall(rb"<CLIENT><HOST_IP>", body))
                 detail = f"{users} user(s), {clients} client(s)"
             elif tag == "DHCP_SERVERS":
                 pools = len(re.findall(rb"<DHCP_SERVER><ENABLED>", body))
@@ -172,18 +267,45 @@ def server_services(xml: bytes) -> Dict[str, List[dict]]:
     return out
 
 
+def _is_server(kind: str, model: str) -> bool:
+    """True for a Server-PT (or a generic 'Server') device."""
+    k = (kind or "").strip().lower()
+    m = (model or "").strip().lower()
+    return k == "server" or m.startswith("server")
+
+
 def aaa_state(xml: bytes) -> Dict[str, dict]:
-    """Per-device AAA panel state: enabled, users, clients (with type)."""
+    """Per-SERVER AAA panel state: enabled, users, clients (with type).
+
+    Scoped to server devices for the same reason [server_services] is: a
+    PC-Client block carries an empty ACS panel from its template, and a row
+    saying "AAA off, no users" for every PC reads as a finding about devices
+    the plan never touched.
+    """
     out: Dict[str, dict] = {}
     for block in re.findall(rb"<DEVICE>.*?</DEVICE>", xml, re.S):
         name = _text(block, "NAME")
         m = re.search(rb"<ACS_SERVER[^>]*>(.*?)</ACS_SERVER>", block, re.S)
         if not m or not name:
             continue
+        tm = re.search(rb'<TYPE customModel="[^"]*" model="([^"]*)">([^<]*)<',
+                       block)
+        kind = tm.group(2).decode("utf-8", "replace") if tm else ""
+        model = tm.group(1).decode("utf-8", "replace") if tm else ""
+        if not _is_server(kind, model):
+            continue
         body = m.group(1)
-        # the builder writes <USER><NAME>; real PT saves may use <USERNAME>
-        users = re.findall(rb"<(?:USERNAME|NAME)>([^<]*)</(?:USERNAME|NAME)>",
-                           body)
+        # The builder writes <USER><NAME> inside <USERS>; a real PT save may
+        # use <USERNAME>.  Counting a bare <NAME> anywhere in the panel also
+        # picked up unrelated rows, so the two are matched inside their own
+        # list element.
+        users: List[bytes] = []
+        um = re.search(rb"<USERS>(.*?)</USERS>", body, re.S)
+        if um:
+            users = re.findall(
+                rb"<(?:USERNAME|NAME)>([^<]*)</(?:USERNAME|NAME)>", um.group(1))
+        else:
+            users = re.findall(rb"<USERNAME>([^<]*)</USERNAME>", body)
         clients = []
         for cm in re.finditer(
                 rb"<CLIENT>(.*?)</CLIENT>", body, re.S):
@@ -224,6 +346,11 @@ def audit(path: str, project: str = "") -> dict:
                          "device": device, "text": text})
 
     by_name = {d["name"]: d for d in devs}
+    # A cable that cannot carry traffic between its two devices is the single
+    # most expensive thing an offline audit can miss: every packet is dropped
+    # and the file still looks complete.
+    for row in cable_findings(cable_rows, devs):
+        add(row["severity"], row["device"], row["text"])
     for name, state in aaa.items():
         if state["enabled"] and not state["users"]:
             add("high", name, "AAA is ON but has no user accounts - logins "

@@ -81,6 +81,35 @@ def test_passing_check_records_privileged_mode():
     assert extra["typed"] in (True, "True"), extra
 
 
+def test_advisory_check_is_reported_but_cannot_fail_the_run():
+    """The IPsec probes are advice, not verdicts.
+
+    Packet Tracer's ISR images elide `crypto isakmp`/`crypto ipsec`/`crypto
+    map` until the Security Technology package is licensed, so a probe that
+    expects QM_IDLE can never pass on the image the app is driving. It is
+    still run and still reported - and it must not turn a correct build into
+    a failed verification.
+    """
+    ok, events = _drive(
+        [{"device": "BR_Router", "label": "BR_Router IPSec IKE state",
+          "command": "show crypto isakmp sa", "expected": "qm_idle",
+          "kind": "ike", "advisory": True,
+          "trafficTarget": "192.168.1.10"}],
+        prompt_text="BR_Router#",
+        term_texts=["", "no crypto isakmp sa entries"])
+    assert ok is True
+    checks = [e for e in events if e[0] == "security_check"]
+    assert checks, [e[0] for e in events]
+    _kind, recovered, extra = checks[0]
+    assert recovered is False
+    assert pt.RUN["security_failed"] == 0, pt.RUN["security_failed"]
+    assert pt.RUN["security_advisory"] == 1
+    # The result keeps the flag, so the report can show it as advice.
+    assert pt.RUN["security_checks"][0]["advisory"] is True
+    # The reason is still recorded - advice with evidence, never silence.
+    assert extra["reason"]
+
+
 def test_evidence_reason_is_a_readable_string():
     ok, evidence = pt._security_check_evidence(
         {"kind": "generic", "requiredMarkers": ["enabled"]},

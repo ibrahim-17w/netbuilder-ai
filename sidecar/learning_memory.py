@@ -51,6 +51,12 @@ REJECTION_BLOCK_AFTER = 2
 # A command head must fail unrecovered on the same model this many times
 # before it is offered to the planner as a suspected platform gap.
 CAPABILITY_SUSPECT_AFTER = 3
+# Suspicion also aggregates ACROSS models/installs: the same command family
+# failing on three different models is a Packet Tracer install-wide gap, not a
+# per-model quirk, and is proven without waiting for each model to hit the
+# per-row threshold.  Without this, a 2911 discovering "no serial" stayed
+# per-model and every other model rediscovered it separately.
+CAPABILITY_GLOBAL_PROVE_AFTER = 3
 
 _LOCK = threading.RLock()
 
@@ -373,9 +379,41 @@ class CapabilityMap(_JsonStore):
             # failure with a different label must not turn it back into a
             # mere suspicion.
             row["proven"] = bool(row.get("proven")) or bool(proven)
+            # CROSS-MODEL EVIDENCE: each model is its own row (its own key),
+            # so the "how many models" tally lives on a family-level registry
+            # rather than on one row.  Three different models seeing the same
+            # family fail is an install-wide gap and is promoted for every
+            # row of that family.
+            current_model = (str(model or "any").strip().lower()[:40]
+                             or "any")
+            seen = self._data.setdefault("families", {}).setdefault(
+                family, [])
+            if current_model not in seen and len(seen) < 20:
+                seen.append(current_model)
+            if (len(seen) >= CAPABILITY_GLOBAL_PROVE_AFTER
+                    and not row.get("proven")):
+                row["proven"] = True
+                row["reason"] = (reason or f"failed on {len(seen)} different "
+                                 f"models")[:200]
+                self._promote_family_locked(family, reason)
             self._trim_locked()
             self._save_locked()
             return dict(row)
+
+    def _promote_family_locked(self, family: str, reason: str = ""):
+        """Mark every row of a family proven once the family is proven.
+
+        Called with the lock held.  A family proven across models is proven
+        for the rows already recorded, so the planner stops proposing it in
+        any project, not only the one that tipped the threshold.
+        """
+        for other in self._data["unsupported"].values():
+            if str(other.get("family", "")) != family:
+                continue
+            if not other.get("proven"):
+                other["proven"] = True
+                if reason:
+                    other["reason"] = str(reason)[:200]
 
     def remove(self, family: str, model: str = "") -> bool:
         """Drop one row, for when a user un-teaches a capability claim."""
@@ -802,10 +840,19 @@ def _norm_target(target, default_scope: str = "") -> dict:
         if value:
             out[text_key] = value[:limit]
     for num_key in ("fx", "fy", "clickAbove"):
+        raw = src.get(num_key)
+        # `bool` is an `int` subclass, so `float(True)` would silently become
+        # 1.0 - a coordinate of "true" is a caller bug, not the top edge of the
+        # window, so it is dropped like any other non-number.
+        if isinstance(raw, bool):
+            continue
         try:
-            value = float(src.get(num_key))
+            value = float(raw)
         except (TypeError, ValueError):
             continue
+        # 0.0 and 1.0 are REAL fractions (the extreme edges) and must be kept:
+        # treating a falsy 0 as "absent" would aim the click at the window edge
+        # pixel the user never selected.  Only out-of-range values are dropped.
         if 0.0 <= value <= 1.0:
             out[num_key] = round(value, 4)
     return out
@@ -825,14 +872,17 @@ class CorrectionStore(_JsonStore):
                                "corrections": {}})
 
     @staticmethod
-    def identity(target: dict, device: str = "", dtype: str = "") -> str:
+    def identity(target: dict, device: str = "", dtype: str = "",
+                 model: str = "") -> str:
         """Stable identity of the thing being corrected, for thrash counting.
 
         Scoped the same way the promotion will be, so two corrections that
-        will land in different stores can never look like the same edit.  Note
-        that where the scope is `model` this uses the device TYPE: the finer
-        per-model key is applied by the target store at promotion time, and
-        this identity only has to be good enough to spot a repeat edit.
+        will land in different stores can never look like the same edit.  For
+        scope `model` this uses the actual MODEL when one is known, falling
+        back to the device type only when it is not: two different router
+        models taught the same thing are two different edits, and collapsing
+        them would both hide real thrash and let one model's correction look
+        like a repeat of another's.
         """
         src = dict(target or {})
         kind = str(src.get("kind", "label"))[:20]
@@ -841,8 +891,8 @@ class CorrectionStore(_JsonStore):
                      or "").strip().lower()[:60]
         if not anchor and src.get("fx") is not None:
             anchor = f"@{src.get('fx')},{src.get('fy')}"
-        where = {"device": device, "dtype": dtype, "model": dtype}.get(
-            scope, "")
+        where = {"device": device, "dtype": dtype,
+                 "model": (model or dtype)}.get(scope, "")
         return "|".join((kind, scope, str(where or "").strip().lower()[:60],
                          anchor))
 
@@ -865,7 +915,7 @@ class CorrectionStore(_JsonStore):
                 next_id = 1
             cid = f"c{next_id}"
             self._data["nextId"] = next_id + 1
-            identity = self.identity(norm, device, dtype)
+            identity = self.identity(norm, device, dtype, model)
             prior = [row for row in self._data["corrections"].values()
                      if isinstance(row, dict)
                      and row.get("identity") == identity

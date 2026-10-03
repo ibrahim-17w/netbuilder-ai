@@ -164,10 +164,15 @@ void main() {
   });
 
   test('validator accepts multiple hosts in one LAN', () {
+    // The cabling is deliberately boring: the test is about two hosts sharing
+    // a /24, and a plan whose devices are never linked now reports an island
+    // (all three stood alone here before), which would mask the rule under
+    // test. Shared switch, one LAN, nothing clever.
     final i = NetworkIntent(
       projectName: 'valid-lan',
       nodes: const [
         NetNode(name: 'R1', type: 'router'),
+        NetNode(name: 'SW1', type: 'switch'),
         NetNode(name: 'PC1', type: 'pc'),
         NetNode(name: 'PC2', type: 'pc'),
       ],
@@ -175,6 +180,11 @@ void main() {
         InterfaceAddr(node: 'R1', iface: 'g0/0', ipCidr: '192.168.10.1/24'),
         InterfaceAddr(node: 'PC1', iface: 'f0', ipCidr: '192.168.10.10/24'),
         InterfaceAddr(node: 'PC2', iface: 'f0', ipCidr: '192.168.10.11/24'),
+      ],
+      links: const [
+        NetLink(a: 'R1', aIf: 'g0/0', b: 'SW1', bIf: 'f0/1'),
+        NetLink(a: 'PC1', aIf: 'f0', b: 'SW1', bIf: 'f0/2'),
+        NetLink(a: 'PC2', aIf: 'f0', b: 'SW1', bIf: 'f0/3'),
       ],
     );
     expect(

@@ -24,8 +24,11 @@ import 'screens/settings_screen.dart';
 import 'services/build_artifact_service.dart';
 import 'services/memory_service.dart';
 import 'services/engine_status.dart';
+import 'services/layout_engine.dart';
+import 'services/layout_intent.dart';
 import 'services/settings_service.dart';
 import 'theme/app_theme.dart';
+import 'widgets/app_sidebar.dart';
 import 'widgets/whats_new.dart';
 
 void main() async {
@@ -38,6 +41,11 @@ void main() async {
   try {
     await memory.init();
   } catch (_) {}
+  // ONE engine client for the whole app, reading the address the user set.
+  // The address is resolved per request, so changing it in Settings takes
+  // effect everywhere at once - and no screen can quietly talk to loopback
+  // instead of the machine the user pointed the app at.
+  final autopilot = AutopilotService(baseProvider: () => settings.engineBase);
   // The app owns the engine's lifecycle: it starts it, follows the address
   // the user sets, and reports what happened. Nothing about this blocks the
   // first frame - a missing engine is a state the UI shows, not an error
@@ -50,6 +58,7 @@ void main() async {
       providers: [
         ChangeNotifierProvider.value(value: settings),
         ChangeNotifierProvider.value(value: memory),
+        Provider<AutopilotService>.value(value: autopilot),
       ],
       child: const NetBuilderApp(),
     ),
@@ -158,12 +167,57 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
     intent: _openIntent,
     record: _openRecord,
     project: _activeProject,
+    autopilot: AutopilotService.of(context),
     go: _go,
     push: _push,
     openChat: ({required project, prefill = ''}) =>
         _openChat(project: project, prefill: prefill),
     openDrawer: () => _scaffoldKey.currentState?.openDrawer(),
+    applyLayout: _applyLayout,
   );
+
+  /// Remember the drawing the user picked for the open plan, as a note, so the
+  /// next build of this plan uses exactly that picture. The note is the same
+  /// "layout: <style>" stamp a build already reads back, written through
+  /// [LayoutRequest.noteFor] so this path and the chat redraw cannot drift.
+  void _applyLayout(String style) {
+    final current = _openIntent;
+    if (current == null) return;
+    final cleaned = [
+      for (final n in current.notes)
+        if (!n.toLowerCase().startsWith('layout:')) n,
+    ];
+    // Picking a bare style from the gallery parks nothing unless the style is
+    // the grouped one, which needs devices to park. Servers are the group a
+    // person means by "grouped" far more often than anything else, and the
+    // gallery's grouped tile already draws exactly this.
+    final parked = style == 'grouped'
+        ? resolveSideNames(current, kinds: LayoutRequest.defaultSideKinds)
+        : const <String>[];
+    setState(() {
+      _openIntent = current.copyWith(notes: [
+        ...cleaned,
+        LayoutRequest.noteFor(
+          style,
+          sideKinds: parked.isEmpty
+              ? const <String>[]
+              : LayoutRequest.defaultSideKinds,
+          sideNames: parked,
+          sideEdge: 'left',
+        ),
+      ]);
+    });
+    _messengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Text(
+          parked.isEmpty
+              ? 'Layout set to "$style" - the next build uses it.'
+              : 'Layout set to grouped - the next build parks '
+                    '${parked.join(', ')} to the left.',
+        ),
+      ),
+    );
+  }
 
   Future<void> _showHub() async {
     final host = _shellContext;
@@ -202,44 +256,27 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
     }
   }
 
-  Future<void> _stopFromEscape() async {
-    // This binding works while the app is focused.  The sidecar also owns
-    // global listeners, so the same keys work while Packet Tracer is in
-    // front of Flutter: Esc = emergency stop, F9 = pause/resume.
-    try {
-      await AutopilotService().stop();
-      _messengerKey.currentState?.showSnackBar(
-        const SnackBar(content: Text('Emergency stop requested')),
-      );
-    } catch (_) {
-      _messengerKey.currentState?.showSnackBar(
-        const SnackBar(
-          content: Text('Emergency stop could not reach the sidecar.'),
+  /// The visible screen, with a short cross-fade so switching destinations
+  /// reads as moving between places rather than as the window repainting.
+  /// The outgoing screen stays mounted for the length of the fade, so a
+  /// half-finished list still paints instead of flashing empty.
+  Widget _shellBody() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 160),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeIn,
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.01),
+            end: Offset.zero,
+          ).animate(animation),
+          child: child,
         ),
-      );
-    }
-  }
-
-  Future<void> _togglePauseFromKey() async {
-    // F9 in-app: identical to the sidecar's global F9 and the Pause button.
-    try {
-      final res = await AutopilotService().pauseToggle();
-      if (!mounted) return;
-      final state = (res['state'] ?? '').toString();
-      _messengerKey.currentState?.showSnackBar(
-        SnackBar(
-          content: Text(state == 'paused'
-              ? 'Autopilot paused - F9 or the Pause button resumes'
-              : 'Autopilot resumed'),
-        ),
-      );
-    } catch (_) {
-      _messengerKey.currentState?.showSnackBar(
-        const SnackBar(
-          content: Text('Pause could not reach the sidecar.'),
-        ),
-      );
-    }
+      ),
+      child: KeyedSubtree(key: ValueKey(_destination), child: _screen()),
+    );
   }
 
   Widget _screen() {
@@ -345,10 +382,11 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
       scaffoldMessengerKey: _messengerKey,
       home: CallbackShortcuts(
         bindings: <ShortcutActivator, VoidCallback>{
-          const SingleActivator(LogicalKeyboardKey.escape): _stopFromEscape,
-          const SingleActivator(LogicalKeyboardKey.f9): _togglePauseFromKey,
           // The hub is the app's index: every feature, one keystroke away
-          // from whatever screen the user is on.
+          // from whatever screen the user is on. Run control is deliberately
+          // NOT bound to a bare key: a global Esc/F9 steals those keys from
+          // Packet Tracer and from every text field, and stopping a run
+          // belongs to the Stop button the user is looking at.
           const SingleActivator(LogicalKeyboardKey.keyK, control: true):
               _showHub,
           const SingleActivator(LogicalKeyboardKey.keyK, meta: true): _showHub,
@@ -366,15 +404,17 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
                 NetworkToolkitScreen(intent: _openIntent),
               ),
             ),
+            // ONE header for every screen: the destination's name and what
+            // it is for, the engine's live state, and the feature index. The
+            // toolkit's calculator used to sit here AND on the rail AND in
+            // the drawer - it now has one home (the sidebar), and this bar
+            // shows state instead of repeating navigation.
             appBar: AppBar(
-              title: const Text('NetBuilder AI - Network Engineer'),
+              title: _DestinationHeader(destination: _destination),
               actions: [
-                IconButton(
-                  tooltip: 'Network toolkit',
-                  icon: const Icon(Icons.calculate_outlined),
-                  onPressed: () => _push(
-                    NetworkToolkitScreen(intent: _openIntent),
-                  ),
+                const Padding(
+                  padding: EdgeInsets.only(right: AppTheme.s8),
+                  child: _EnginePill(),
                 ),
                 Padding(
                   padding: const EdgeInsets.only(right: AppTheme.s4),
@@ -388,25 +428,50 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
             ),
             body: LayoutBuilder(
               builder: (context, constraints) {
-                // A rail on a desktop, the hub button and the drawer on a
-                // phone. The rail is how "every screen is reachable" is
-                // visible rather than merely true.
-                final wide = constraints.maxWidth >= 1000;
-                if (!wide) return _screen();
+                // The sidebar on a desktop, a compact rail on a laptop, the
+                // drawer and the hub on a phone. This is how "every screen is
+                // reachable" is visible rather than merely true.
+                final width = constraints.maxWidth;
+                if (width < 1000) return _shellBody();
+                final expanded = width >= 1240;
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _AppRail(
-                      current: _destination,
-                      onSelect: _go,
-                      onHub: _showHub,
-                      onToolkit: () => _push(
-                        NetworkToolkitScreen(intent: _openIntent),
+                    if (expanded)
+                      AppSidebar(
+                        current: _destination,
+                        onSelect: _go,
+                        onHub: _showHub,
+                        onToolkit: () => _push(
+                          NetworkToolkitScreen(intent: _openIntent),
+                        ),
+                        planProject:
+                            _openIntent == null ? '' : _activeProject,
+                        planSummary: _openIntent == null
+                            ? ''
+                            : '${_openIntent!.nodes.length} device(s), '
+                                  '${_openIntent!.links.length} link(s)',
+                        planTarget: _openIntent == null
+                            ? ''
+                            : _openRecord?.target ?? '',
+                        onOpenWorkspace: _openIntent == null
+                            ? null
+                            : () => _go(AppDestination.execution),
+                      )
+                    else
+                      AppRail(
+                        current: _destination,
+                        onSelect: _go,
+                        onHub: _showHub,
+                        onToolkit: () => _push(
+                          NetworkToolkitScreen(intent: _openIntent),
+                        ),
+                        hasPlan: _openIntent != null,
                       ),
-                      hasPlan: _openIntent != null,
-                    ),
-                    const VerticalDivider(width: 1),
-                    Expanded(child: _screen()),
+                    // The sidebar and the rail carry their own edge; the
+                    // content starts with a clean line instead of a second
+                    // divider a pixel away from the first.
+                    Expanded(child: _shellBody()),
                   ],
                 );
               },
@@ -425,174 +490,69 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
   }
 }
 
-/// The desktop rail: every destination, plus the two ways of reaching
-/// everything else.
-class _AppRail extends StatelessWidget {
-  final AppDestination current;
-  final void Function(AppDestination) onSelect;
-  final VoidCallback onHub;
-  final VoidCallback onToolkit;
-  final bool hasPlan;
+/// The destination's name and promise, in the top bar. The bar used to be
+/// just the name; the second line is the sentence a person needs the first
+/// time they land on a screen, and it costs one line of height.
+class _DestinationHeader extends StatelessWidget {
+  final AppDestination destination;
 
-  const _AppRail({
-    required this.current,
-    required this.onSelect,
-    required this.onHub,
-    required this.onToolkit,
-    required this.hasPlan,
-  });
+  const _DestinationHeader({required this.destination});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final destinations = AppDestination.alwaysAvailable;
-    // A fixed-width column around a scrollable rail: the rail's own width is
-    // bounded here, which is what stops its extended labels from being laid
-    // out against an infinite width.
-    return SizedBox(
-      width: 236,
-      child: Material(
-        color: Theme.of(context).colorScheme.surface,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // On a narrow window only the name fits; the promise is in the hub
+        // and in the screen's own header.
+        final showDescription = constraints.maxWidth >= 460;
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppTheme.s12,
-              AppTheme.s12,
-              AppTheme.s12,
-              AppTheme.s8,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'WORKSPACE',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    letterSpacing: 0.8,
-                  ),
+            Text(destination.title),
+            if (showDescription)
+              Text(
+                destination.description,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
-                const SizedBox(height: AppTheme.s8),
-                FilledButton.tonalIcon(
-                  onPressed: onHub,
-                  icon: const Icon(Icons.grid_view_rounded, size: 18),
-                  label: const Text('All features'),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                vertical: AppTheme.s8,
-                horizontal: AppTheme.s8,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final destination in destinations)
-                    _RailTile(
-                      destination: destination,
-                      selected: destination == current,
-                      onTap: () => onSelect(destination),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const Divider(height: 1),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppTheme.s8,
-              AppTheme.s8,
-              AppTheme.s8,
-              AppTheme.s12,
-            ),
-            child: Row(
-              children: [
-                IconButton(
-                  tooltip: 'Network toolkit',
-                  onPressed: onToolkit,
-                  icon: const Icon(Icons.calculate_outlined),
-                ),
-                const SizedBox(width: AppTheme.s4),
-                Expanded(
-                  child: TextButton.icon(
-                    onPressed: hasPlan
-                        ? () => onSelect(AppDestination.execution)
-                        : null,
-                    icon: const Icon(Icons.play_circle_outline, size: 18),
-                    label: const Text('Run build'),
-                  ),
-                ),
-              ],
-            ),
-          ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 }
 
-/// One destination in the rail. Written out rather than using
-/// [NavigationRail] because the rail here is inside a scrollable column and
-/// a tile is a smaller, more predictable thing than a rail that assumes it
-/// owns a bounded height.
-class _RailTile extends StatelessWidget {
-  final AppDestination destination;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _RailTile({
-    required this.destination,
-    required this.selected,
-    required this.onTap,
-  });
+/// The engine's live state, in the top bar: one dot and one word, so "is
+/// Packet Tracer automation available?" is answered without opening
+/// anything. It reports only - starting and stopping the engine stays where
+/// the run is controlled, so this pill is not a second Start button.
+class _EnginePill extends StatelessWidget {
+  const _EnginePill();
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppTheme.s2),
-      child: Material(
-        color: selected
-            ? scheme.primary.withValues(alpha: 0.12)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(AppTheme.rMd),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppTheme.rMd),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppTheme.s12,
-              vertical: AppTheme.s10,
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  destination.icon,
-                  size: 18,
-                  color: selected ? scheme.primary : scheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: AppTheme.s12),
-                Expanded(
-                  child: Text(
-                    destination.title,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: selected ? scheme.primary : scheme.onSurface,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    final engine = EngineStatus.instance;
+    return AnimatedBuilder(
+      animation: engine,
+      builder: (context, _) {
+        final phase = engine.phase;
+        return AppStatusPill(
+          label: 'Engine',
+          detail: switch (phase) {
+            EngineState.up => 'up',
+            EngineState.down => 'down',
+            EngineState.checking || EngineState.starting => 'checking',
+            EngineState.unknown => 'idle',
+          },
+          ok: phase == EngineState.up,
+          warn: phase == EngineState.down,
+        );
+      },
     );
   }
 }

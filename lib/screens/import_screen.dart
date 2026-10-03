@@ -2,6 +2,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../services/autopilot_service.dart';
+import '../theme/app_kit.dart';
+import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
 
 /// Reverse mode: open existing .pkt files and learn what is inside.
@@ -34,6 +36,7 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 
   Future<void> _runAudit() async {
+    final engine = AutopilotService.of(context);
     final path = await _pick();
     if (path == null) return;
     setState(() {
@@ -42,7 +45,7 @@ class _ImportScreenState extends State<ImportScreen> {
       _auditReport = null;
     });
     try {
-      final report = await AutopilotService().pktDeepAudit(path);
+      final report = await engine.pktDeepAudit(path);
       setState(() => _auditReport = report);
     } catch (e) {
       _error(e);
@@ -52,6 +55,7 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 
   Future<void> _runDiff() async {
+    final engine = AutopilotService.of(context);
     final a = await _pick();
     if (a == null || !mounted) return;
     final b = await _pick();
@@ -61,7 +65,7 @@ class _ImportScreenState extends State<ImportScreen> {
       _diffReport = null;
     });
     try {
-      final report = await AutopilotService().pktDiff(a, b);
+      final report = await engine.pktDiff(a, b);
       setState(() => _diffReport = report);
     } catch (e) {
       _error(e);
@@ -71,6 +75,7 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 
   Future<void> _runGrade() async {
+    final engine = AutopilotService.of(context);
     final path = await _pick();
     if (path == null || !mounted) return;
     final intent = await widget.planLoader();
@@ -86,7 +91,7 @@ class _ImportScreenState extends State<ImportScreen> {
       _gradeReport = null;
     });
     try {
-      final report = await AutopilotService().pktGrade(path, intent);
+      final report = await engine.pktGrade(path, intent);
       setState(() => _gradeReport = report);
     } catch (e) {
       _error(e);
@@ -103,33 +108,50 @@ class _ImportScreenState extends State<ImportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Open & inspect .pkt files')),
-      body: DefaultTabController(
-        length: 3,
-        child: Column(
-          children: [
-            const TabBar(tabs: [
-              Tab(text: 'Audit'),
-              Tab(text: 'Diff'),
-              Tab(text: 'Grade'),
-            ]),
-            Expanded(
-              child: _busy
-                  ? const Center(child: CircularProgressIndicator())
-                  : TabBarView(children: [
-                      _auditTab(),
-                      _diffTab(),
-                      _gradeTab(),
-                    ]),
+    // No Scaffold or AppBar here: this screen is a destination inside the
+    // app shell, which already supplies both. A second AppBar here drew a
+    // second title bar inside the first one.
+    return DefaultTabController(
+      length: 3,
+      child: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppTheme.gutter(context),
+              AppTheme.s20,
+              AppTheme.gutter(context),
+              AppTheme.s12,
             ),
-          ],
-        ),
+            child: const AppPageHeader(
+              eyebrow: 'Inspect',
+              title: 'Open & inspect .pkt',
+              description:
+                  'Audit, diff and grade any saved .pkt without opening '
+                  'Packet Tracer. Everything here is read-only.',
+            ),
+          ),
+          const TabBar(tabs: [
+            Tab(text: 'Audit'),
+            Tab(text: 'Diff'),
+            Tab(text: 'Grade'),
+          ]),
+          Expanded(
+            child: _busy
+                ? const Center(child: CircularProgressIndicator())
+                : TabBarView(children: [_auditTab(), _diffTab(), _gradeTab()]),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _auditTab() => ListView(padding: const EdgeInsets.all(AppTheme.s16),
+  Widget _auditTab() => ListView(
+      padding: EdgeInsets.fromLTRB(
+        AppTheme.gutter(context),
+        AppTheme.s16,
+        AppTheme.gutter(context),
+        AppTheme.s32,
+      ),
       children: [
         _intro('Read any saved .pkt directly - no Packet Tracer opens. '
             'Shows devices, cabling, service panels, AAA state and a '
@@ -151,7 +173,13 @@ class _ImportScreenState extends State<ImportScreen> {
         ],
       ]);
 
-  Widget _diffTab() => ListView(padding: const EdgeInsets.all(AppTheme.s16),
+  Widget _diffTab() => ListView(
+      padding: EdgeInsets.fromLTRB(
+        AppTheme.gutter(context),
+        AppTheme.s16,
+        AppTheme.gutter(context),
+        AppTheme.s32,
+      ),
       children: [
         _intro('Compare two saves: devices and cables added or removed, '
             'config lines that changed, services switched on or off.'),
@@ -174,7 +202,13 @@ class _ImportScreenState extends State<ImportScreen> {
         ],
       ]);
 
-  Widget _gradeTab() => ListView(padding: const EdgeInsets.all(AppTheme.s16),
+  Widget _gradeTab() => ListView(
+      padding: EdgeInsets.fromLTRB(
+        AppTheme.gutter(context),
+        AppTheme.s16,
+        AppTheme.gutter(context),
+        AppTheme.s32,
+      ),
       children: [
         _intro('Score a saved .pkt against the plan that is open in the app: '
             'devices, cables, addresses, every planned service, and AAA on '
@@ -193,9 +227,9 @@ class _ImportScreenState extends State<ImportScreen> {
         ],
       ]);
 
-  Widget _intro(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: AppTheme.s12),
-        child: Text(text),
+  Widget _intro(String text) => AppBanner(
+        tone: AppTone.info,
+        message: text,
       );
 
   Widget _summaryCard(Map summary) => Card(
@@ -221,6 +255,7 @@ class _ImportScreenState extends State<ImportScreen> {
       );
 
   List<Widget> _findingRows(List findings) {
+    final scheme = Theme.of(context).colorScheme;
     if (findings.isEmpty) {
       return const [
         AppStatusPill(label: 'No findings - nothing looks wrong', ok: true),
@@ -234,13 +269,13 @@ class _ImportScreenState extends State<ImportScreen> {
             f['severity'] == 'high'
                 ? Icons.error
                 : f['severity'] == 'medium'
-                    ? Icons.warning_amber_rounded
-                    : Icons.info_outline,
+                ? Icons.warning_amber_rounded
+                : Icons.info_outline,
             color: f['severity'] == 'high'
-                ? const Color(0xFFC62828)
+                ? AppPalette.danger(scheme)
                 : f['severity'] == 'medium'
-                    ? const Color(0xFFEF6C00)
-                    : null,
+                ? AppPalette.warning(scheme)
+                : null,
           ),
           title: Text('${f['device']}: ${f['text']}',
               style: const TextStyle(fontSize: 13)),
@@ -270,6 +305,7 @@ class _ImportScreenState extends State<ImportScreen> {
 
   Widget _servicesCard(Map services) {
     final names = services.keys.toList()..sort();
+    final scheme = Theme.of(context).colorScheme;
     if (names.isEmpty) return const SizedBox.shrink();
     return Card(
       child: Padding(
@@ -289,7 +325,7 @@ class _ImportScreenState extends State<ImportScreen> {
                   style: TextStyle(
                     fontSize: 12.5,
                     color: row['enabled'] == true
-                        ? const Color(0xFF2E7D32)
+                        ? AppPalette.success(scheme)
                         : null,
                   ),
                 ),
@@ -316,7 +352,9 @@ class _ImportScreenState extends State<ImportScreen> {
     ];
   }
 
-  List<Widget> _configChangeRows(List changes) => [
+  List<Widget> _configChangeRows(List changes) {
+    final scheme = Theme.of(context).colorScheme;
+    return [
         for (final c in changes.whereType<Map>()) ...[
           Padding(
             padding: const EdgeInsets.only(top: AppTheme.s8, bottom: 4),
@@ -325,12 +363,15 @@ class _ImportScreenState extends State<ImportScreen> {
           ),
           for (final line in (c['added'] as List? ?? const []))
             Text('+ $line',
-                style: const TextStyle(fontSize: 12, color: Colors.green)),
+                style: TextStyle(
+                    fontSize: 12, color: AppPalette.success(scheme))),
           for (final line in (c['removed'] as List? ?? const []))
             Text('- $line',
-                style: const TextStyle(fontSize: 12, color: Colors.red)),
+                style: TextStyle(
+                    fontSize: 12, color: AppPalette.danger(scheme))),
         ],
       ];
+  }
 
   List<Widget> _serviceChangeRows(List changes) {
     if (changes.isEmpty) return [];
@@ -352,7 +393,7 @@ class _ImportScreenState extends State<ImportScreen> {
 
   Widget _scoreCard(Map report) => Card(
         color: (report['percent'] as num?) == 100.0
-            ? const Color(0xFFE8F5E9)
+            ? AppPalette.successFill(Theme.of(context).colorScheme)
             : null,
         child: Padding(
           padding: const EdgeInsets.all(AppTheme.s16),
@@ -378,7 +419,9 @@ class _ImportScreenState extends State<ImportScreen> {
   String get _lastSuffix =>
       _lastPath == null ? '' : '\n$_lastPath';
 
-  List<Widget> _requirementRows(List requirements) => [
+  List<Widget> _requirementRows(List requirements) {
+    final scheme = Theme.of(context).colorScheme;
+    return [
         for (final r in requirements.whereType<Map>())
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 3),
@@ -387,8 +430,8 @@ class _ImportScreenState extends State<ImportScreen> {
                 r['ok'] == true ? Icons.check_circle : Icons.cancel,
                 size: 18,
                 color: r['ok'] == true
-                    ? const Color(0xFF2E7D32)
-                    : const Color(0xFFC62828),
+                    ? AppPalette.success(scheme)
+                    : AppPalette.danger(scheme),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -398,4 +441,5 @@ class _ImportScreenState extends State<ImportScreen> {
             ]),
           ),
       ];
+  }
 }

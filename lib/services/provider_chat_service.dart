@@ -1,7 +1,11 @@
+import 'package:http/http.dart' as http;
+
 import '../models/chat_message.dart';
 import 'ai_provider.dart';
 import 'chat_service.dart';
 import 'context_budget.dart';
+import 'context_report.dart';
+import 'generation_control.dart';
 import 'tool_loop.dart';
 import 'tool_runtime.dart';
 import 'gemini_service.dart';
@@ -17,22 +21,69 @@ class ProviderChatService {
   final AiProviderConfig config;
   final String geminiKey;
   final String openaiKey;
+
+  /// The user's ceiling from Settings.
   final int? contextTokens;
+
+  /// The window the runtime really allocates, when the app could find out.
+  /// This - not [contextTokens] - is what the request is actually fitted to,
+  /// so a runtime that allocates 4k is never handed a 40k prompt it would
+  /// silently truncate.
+  final int? runtimeWindowTokens;
+  final String runtimeWindowSource;
+  final bool runtimeWindowAssumed;
+
+  /// Debug logging of every assembled request (Settings developer toggle).
+  final bool logRequests;
+
+  /// The transport both provider paths use. Null in the app (each service
+  /// makes its own); injectable so the whole facade - planning, assembling and
+  /// sending - can be exercised without a network.
+  final http.Client? client;
 
   ProviderChatService({
     required this.config,
     this.geminiKey = '',
     this.openaiKey = '',
     this.contextTokens,
+    this.runtimeWindowTokens,
+    this.runtimeWindowSource = 'configured budget',
+    this.runtimeWindowAssumed = false,
+    this.logRequests = false,
+    this.client,
   });
 
-  ChatService get _gemini => ChatService(contextTokens: contextTokens);
+  String get _providerLabel => isGemini ? 'Google Gemini' : 'OpenAI-compatible';
+
+  /// Remember what this request carried. Called on every real send (not on the
+  /// UI's preview plan), so the log is a record of traffic, not of repaints.
+  void _record(ContextPlan plan) {
+    final report = plan.report;
+    if (report == null) return;
+    // The setting is what decides whether a request is echoed to the debug
+    // console; without this line the toggle in Settings did nothing.
+    RequestLog.verbose = logRequests;
+    RequestLog.record(report.numbered(RequestLog.nextSequence()));
+  }
+
+  ChatService get _gemini => ChatService(
+    contextTokens: contextTokens,
+    client: client,
+  );
 
   /// The tool loop, when the engine offered tools.
   ///
   /// Leaving this null keeps exactly today's behaviour, so a missing sidecar
   /// can never change how chat works.
   ToolRuntime? toolRuntime;
+
+  /// True when a tool loop is wired up at all, loaded or not.
+  ///
+  /// [usesTools] answers a different question - whether the engine has actually
+  /// offered tools - and is what the chat branches on. This one is for the
+  /// question "is this engine capable of tools", which is a different thing to
+  /// ask when a sidecar is still starting.
+  bool get hasToolRuntime => toolRuntime != null;
 
   /// True when the model can investigate the network before it answers.
   bool get usesTools => toolRuntime?.available ?? false;
@@ -43,10 +94,25 @@ class ProviderChatService {
   /// what a caller wants when it needs to know which tool ran and what came
   /// back, not only what was said. With no engine it degrades to a single
   /// `final` event carrying the ordinary answer.
+  ///
+  /// It takes the SAME context arguments as [streamWithTools] and budgets them
+  /// the same way. It used to plan with the bare system prompt only, so this
+  /// path silently dropped the network picture, the session state, the
+  /// retrieved memories, the stored summary and every attachment - the same
+  /// question answered with tools and without them were two different
+  /// conversations.
   Stream<ToolLoopEvent> executeToolConversation({
     required List<ChatMessage> history,
     required String text,
     required String systemContext,
+    List<ChatImage> attachments = const [],
+    String networkContext = '',
+    String sessionState = '',
+    String memories = '',
+    String storedSummary = '',
+    ContextPlan? plan,
+    Future<void>? abortTrigger,
+    bool Function()? abortProbe,
   }) async* {
     final runtime = toolRuntime;
     final ready = runtime != null && await runtime.ensureLoaded();
@@ -56,23 +122,43 @@ class ProviderChatService {
         history: history,
         text: text,
         systemContext: systemContext,
+        attachments: attachments,
+        networkContext: networkContext,
+        sessionState: sessionState,
+        memories: memories,
+        storedSummary: storedSummary,
+        abortTrigger: abortTrigger,
+        abortProbe: abortProbe,
       )) {
         buffer.write(piece);
       }
-      yield ToolLoopEvent('final', buffer.toString());
+      yield ToolLoopEvent(ToolLoopEventKind.finalAnswer, buffer.toString());
       return;
     }
 
-    final messages = <Map<String, dynamic>>[
-      for (final m
-          in openAiMessages(
-            history: history,
-            text: text,
-            systemContext: systemContext,
-          ))
-        Map<String, dynamic>.from(m),
-    ];
-    yield* runtime.loop().run(messages);
+    final effective = plan ?? planContext(
+      history: history,
+      text: text,
+      systemContext: systemContext,
+      networkContext: networkContext,
+      sessionState: sessionState,
+      memories: memories,
+      storedSummary: storedSummary,
+      attachmentCount: attachments.length,
+    );
+    lastPlan = effective;
+    _record(effective);
+
+    final messages = await openAiRichMessages(
+      history: history,
+      text: text,
+      systemContext: systemContext,
+      plan: effective,
+      attachments: attachments,
+    );
+    yield* runtime
+        .loop(abortTrigger: abortTrigger, abortProbe: abortProbe)
+        .run(messages);
   }
 
   /// A turn where the model may run tools first (spec §3).
@@ -87,6 +173,13 @@ class ProviderChatService {
     required String text,
     required String systemContext,
     List<ChatImage> attachments = const [],
+    String networkContext = '',
+    String sessionState = '',
+    String memories = '',
+    String storedSummary = '',
+    ContextPlan? plan,
+    Future<void>? abortTrigger,
+    bool Function()? abortProbe,
   }) async* {
     final runtime = toolRuntime;
     final ready = runtime != null && await runtime.ensureLoaded();
@@ -96,33 +189,58 @@ class ProviderChatService {
         text: text,
         systemContext: systemContext,
         attachments: attachments,
+        networkContext: networkContext,
+        sessionState: sessionState,
+        memories: memories,
+        storedSummary: storedSummary,
+        abortTrigger: abortTrigger,
+        abortProbe: abortProbe,
       );
       return;
     }
 
-    final messages = <Map<String, dynamic>>[
-      for (final m
-          in openAiMessages(
-            history: history,
-            text: text,
-            systemContext: systemContext,
-          ))
-        Map<String, dynamic>.from(m),
-    ];
+    final effective = plan ?? planContext(
+      history: history,
+      text: text,
+      systemContext: systemContext,
+      networkContext: networkContext,
+      sessionState: sessionState,
+      memories: memories,
+      storedSummary: storedSummary,
+      attachmentCount: attachments.length,
+    );
+    lastPlan = effective;
+    _record(effective);
 
-    await for (final event in runtime.loop().run(messages)) {
+    final signal = AbortSignal(abortTrigger, isAbortedNow: abortProbe);
+    final messages = await openAiRichMessages(
+      history: history,
+      text: text,
+      systemContext: systemContext,
+      plan: effective,
+      attachments: attachments,
+    );
+
+    await for (final event in runtime
+        .loop(abortTrigger: abortTrigger, abortProbe: abortProbe)
+        .run(messages)) {
+      signal.throwIfAborted();
       switch (event.kind) {
-        case 'status':
+        case ToolLoopEventKind.status:
           // Progress is shown; the model's reasoning is not (spec §4).
           yield '\n\n▸ ${event.text}\n';
-        case 'limit':
+        case ToolLoopEventKind.limit:
           yield '\n\n${event.text}\n';
-        case 'error':
+        case ToolLoopEventKind.error:
           throw Exception(event.text);
-        case 'final':
+        case ToolLoopEventKind.finalAnswer:
           yield event.text;
+        default:
+          // 'result' is progress the UI renders as activity, not answer text.
+          break;
       }
     }
+    signal.throwIfAborted();
   }
 
   /// What the last request carried (Gemini knows the budget; the
@@ -145,22 +263,32 @@ class ProviderChatService {
   /// [ContextBudget] into the memory block appended to the system prompt.
   /// (The un-budgeted version of this method was the second reason the
   /// configured context length did not change what the chat remembered.)
+  ///
+  /// Text-only turns. [openAiRichMessages] is the same conversation for a turn
+  /// that carries images.
   List<Map<String, String>> openAiMessages({
     required List<ChatMessage> history,
     required String text,
     required String systemContext,
+    String networkContext = '',
+    String sessionState = '',
+    String memories = '',
+    String storedSummary = '',
+    int attachmentCount = 0,
     ContextPlan? plan,
   }) {
     final effective = plan ??
-        ContextBudget.plan(
+        planContext(
           history: history,
+          text: text,
           systemContext: systemContext,
-          pendingText: text,
-          budgetTokens: contextTokens,
+          networkContext: networkContext,
+          sessionState: sessionState,
+          memories: memories,
+          storedSummary: storedSummary,
+          attachmentCount: attachmentCount,
         );
-    final system = effective.memoryBlock.isEmpty
-        ? systemContext
-        : '$systemContext\n\n${effective.memoryBlock}';
+    final system = _assembleSystem(systemContext, effective);
     final messages = <Map<String, String>>[
       if (system.trim().isNotEmpty) {'role': 'system', 'content': system},
     ];
@@ -175,17 +303,151 @@ class ProviderChatService {
     return messages;
   }
 
+  /// [openAiMessages] for a turn that can carry images.
+  ///
+  /// The OpenAI shape for a turn with a picture is a `content` ARRAY of parts
+  /// (`{'type':'text'}` / `{'type':'image_url'}`), so that is what the current
+  /// user turn gets; a turn with no images keeps the plain string form, which
+  /// every gateway (and every local server) accepts.
+  ///
+  /// Attachments belong to the CURRENT turn only. Replaying every historical
+  /// screenshot would multiply the request for no benefit - the model already
+  /// has the earlier conclusion in the text - and the base64 is never written
+  /// to the database or to the request log: only the token cost is reported.
+  ///
+  /// The per-turn count and byte caps are the same ones the Gemini path uses
+  /// ([ChatService.maxImagesPerTurn] / `maxRequestBytes`), so a capture cannot
+  /// be too large on one provider and fine on the other.
+  Future<List<Map<String, dynamic>>> openAiRichMessages({
+    required List<ChatMessage> history,
+    required String text,
+    required String systemContext,
+    List<ChatImage> attachments = const [],
+    String networkContext = '',
+    String sessionState = '',
+    String memories = '',
+    String storedSummary = '',
+    int attachmentCount = 0,
+    ContextPlan? plan,
+  }) async {
+    final effective = plan ??
+        planContext(
+          history: history,
+          text: text,
+          systemContext: systemContext,
+          networkContext: networkContext,
+          sessionState: sessionState,
+          memories: memories,
+          storedSummary: storedSummary,
+          attachmentCount: attachmentCount,
+        );
+    final system = _assembleSystem(systemContext, effective);
+    final messages = <Map<String, dynamic>>[
+      if (system.trim().isNotEmpty) {'role': 'system', 'content': system},
+    ];
+    for (final m in effective.recentTurns) {
+      if (m.isError) continue;
+      if (m.text.trim().isEmpty) continue;
+      messages.add({'role': _role(m), 'content': m.text});
+    }
+
+    final images = await _inlineImages(attachments);
+    if (images.isEmpty) {
+      if (text.trim().isNotEmpty) {
+        messages.add({'role': 'user', 'content': text});
+      }
+      return messages;
+    }
+
+    // A turn of only screenshots still needs text: some gateways reject a part
+    // array that does not start with a text part, and the model has to be told
+    // what it is being asked about.
+    messages.add({
+      'role': 'user',
+      'content': [
+        {
+          'type': 'text',
+          'text': text.trim().isEmpty ? '(look at the attached image)' : text,
+        },
+        for (final image in images)
+          {
+            'type': 'image_url',
+            'image_url': {'url': 'data:${image.mimeType};base64,${image.data}'},
+          },
+      ],
+    });
+    return messages;
+  }
+
+  /// Read the attachments off disk, honouring the shared caps.
+  Future<List<({String mimeType, String data})>> _inlineImages(
+    List<ChatImage> attachments,
+  ) async {
+    if (attachments.isEmpty) return const [];
+    final reader = ChatService();
+    final out = <({String mimeType, String data})>[];
+    var bytes = 0;
+    for (final image in attachments.take(ChatService.maxImagesPerTurn)) {
+      final data = await reader.readBase64(image);
+      if (data.isEmpty) continue;
+      bytes += data.length;
+      out.add((mimeType: image.mimeType, data: data));
+    }
+    if (bytes > ChatService.maxRequestBytes) {
+      throw Exception(
+        'Those images are too large to send in one request '
+        '(${(bytes / (1024 * 1024)).round()} MB). Attach fewer or smaller ones.',
+      );
+    }
+    return out;
+  }
+
+  /// The system prompt in the order the model reads it: instructions first,
+  /// then the live network, then the structured state, then the compacted
+  /// memory and the long-term memories it recalled. That order is the spec's,
+  /// and it matters: an instruction the model reads after a wall of data is a
+  /// weaker instruction.
+  ///
+  /// Every block here is one the planner actually decided to send, and the
+  /// report lists the same sections, so "what did the model see" has one
+  /// answer.
+  String _assembleSystem(String systemContext, ContextPlan plan) {
+    final parts = <String>[
+      if (systemContext.trim().isNotEmpty) systemContext.trim(),
+      if (plan.networkBlock.isNotEmpty) plan.networkBlock.trim(),
+      if (plan.sessionStateBlock.isNotEmpty) plan.sessionStateBlock.trim(),
+      if (plan.memoryBlock.isNotEmpty) plan.memoryBlock.trim(),
+      if (plan.memoriesBlock.isNotEmpty) plan.memoriesBlock.trim(),
+    ];
+    return parts.join('\n\n');
+  }
+
   /// The planned conversation both provider paths share.
   ContextPlan planContext({
     required List<ChatMessage> history,
     required String text,
     required String systemContext,
+    String networkContext = '',
+    String sessionState = '',
+    String memories = '',
+    String storedSummary = '',
+    int attachmentCount = 0,
   }) =>
       ContextBudget.plan(
         history: history,
         systemContext: systemContext,
         pendingText: text,
+        networkContext: networkContext,
+        sessionState: sessionState,
+        memories: memories,
+        storedSummary: storedSummary,
+        attachmentCount: attachmentCount,
         budgetTokens: contextTokens,
+        runtimeWindowTokens: runtimeWindowTokens,
+        runtimeWindowSource: runtimeWindowSource,
+        runtimeWindowAssumed: runtimeWindowAssumed,
+        model: config.model,
+        provider: _providerLabel,
       );
 
   Stream<String> stream({
@@ -193,39 +455,82 @@ class ProviderChatService {
     required String text,
     required String systemContext,
     List<ChatImage> attachments = const [],
+    String networkContext = '',
+    String sessionState = '',
+    String memories = '',
+    String storedSummary = '',
+    Future<void>? abortTrigger,
+    bool Function()? abortProbe,
   }) {
-    if (isGemini) {
-      final client = _gemini;
-      final stream = client.stream(
-        apiKey: geminiKey,
-        model: config.model,
-        history: history,
-        text: text,
-        systemContext: systemContext,
-        attachments: attachments,
-        contextTokens: contextTokens,
-      );
-      return stream.map((piece) {
-        lastPlan = client.lastPlan;
-        return piece;
-      });
-    }
     final plan = planContext(
       history: history,
       text: text,
       systemContext: systemContext,
+      networkContext: networkContext,
+      sessionState: sessionState,
+      memories: memories,
+      storedSummary: storedSummary,
+      attachmentCount: attachments.length,
     );
     lastPlan = plan;
-    final messages = openAiMessages(
+    _record(plan);
+    if (isGemini) {
+      return _gemini.stream(
+        apiKey: geminiKey,
+        model: config.model,
+        history: plan.recentTurns,
+        text: text,
+        systemContext: _assembleSystem(systemContext, plan),
+        attachments: attachments,
+        contextTokens: contextTokens,
+        plan: plan,
+        systemContextIsAssembled: true,
+        abortTrigger: abortTrigger,
+        abortProbe: abortProbe,
+      );
+    }
+    return _openAiTurn(
       history: history,
       text: text,
       systemContext: systemContext,
       plan: plan,
+      attachments: attachments,
+      abortTrigger: abortTrigger,
+      abortProbe: abortProbe,
     );
-    return OpenAiChatService(
+  }
+
+  /// The OpenAI-compatible turn, as a stream.
+  ///
+  /// The plan is built (and recorded) by the caller so the report is filled in
+  /// the moment the turn is sent; the messages themselves are assembled when
+  /// the stream is listened to, because reading the attachments off disk is
+  /// async.
+  Stream<String> _openAiTurn({
+    required List<ChatMessage> history,
+    required String text,
+    required String systemContext,
+    required ContextPlan plan,
+    List<ChatImage> attachments = const [],
+    Future<void>? abortTrigger,
+    bool Function()? abortProbe,
+  }) async* {
+    final messages = await openAiRichMessages(
+      history: history,
+      text: text,
+      systemContext: systemContext,
+      plan: plan,
+      attachments: attachments,
+    );
+    yield* OpenAiChatService(
       config: config,
       apiKey: openaiKey,
-    ).stream(messages);
+      client: client,
+    ).streamMessages(
+      messages,
+      abortTrigger: abortTrigger,
+      abortProbe: abortProbe,
+    );
   }
 
   /// Image attachments are stored by the Gemini-side helper; the

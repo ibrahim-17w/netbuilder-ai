@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import '../models/network_intent.dart';
 import '../services/autopilot_service.dart';
 import '../services/validator_service.dart';
+import '../theme/app_kit.dart';
 import '../theme/app_palette.dart';
+import '../theme/app_theme.dart';
 
 /// Read-only network review with an explicit approval gate before fixes.
 class AnalyzeScreen extends StatefulWidget {
@@ -121,11 +123,11 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
           'running live endpoint pings...';
     });
     try {
-      final svc = AutopilotService();
+      final svc = AutopilotService.of(context);
       if (!await svc.healthy) {
         if (!mounted) return;
         setState(() {
-          _message = AutopilotService.startHint;
+          _message = svc.hint;
           _analyzing = false;
         });
         return;
@@ -214,7 +216,10 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                 Text(
                   'The app will verify the result after the run. '
                   'It will not apply unselected findings.',
-                  style: TextStyle(fontSize: 12, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppPalette.mutedText(Theme.of(context).colorScheme),
+                  ),
                 ),
               ],
             ),
@@ -293,10 +298,10 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
           'Approved. Applying $count fix(es) and preparing verification...';
     });
     try {
-      final svc = AutopilotService();
+      final svc = AutopilotService.of(context);
       if (!await svc.healthy) {
         if (!mounted) return;
-        setState(() => _message = AutopilotService.startHint);
+        setState(() => _message = svc.hint);
         return;
       }
       await svc.start({
@@ -349,6 +354,274 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     );
   }
 
+  // The numbers the results header reports, all derived from the one report
+  // so the strip and the panels below it cannot disagree.
+  ({int devices, int findings, int high, int redDots}) get _totals {
+    final summary = Map<String, dynamic>.from(
+      (_report?['summary'] as Map? ?? const {}),
+    );
+    final severity = Map<String, dynamic>.from(
+      (summary['severity'] as Map? ?? const {}),
+    );
+    final redDots = _report?['red_dots'] ?? 0;
+    return (
+      devices: (summary['device_count'] as num?)?.toInt() ?? _devices().length,
+      findings: (summary['finding_count'] as num?)?.toInt() ?? 0,
+      high: (severity['high'] as num?)?.toInt() ?? 0,
+      redDots: redDots is num ? redDots.toInt() : 0,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final totals = _totals;
+    final results = _report;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppToolbar(
+          leading: SizedBox(
+            width: 320,
+            child: TextField(
+              controller: _project,
+              enabled: !_busy,
+              decoration: const InputDecoration(
+                labelText: 'Packet Tracer project name',
+                hintText: 'office-net',
+                prefixIcon: Icon(Icons.folder_open_outlined, size: 18),
+              ),
+            ),
+          ),
+          actions: [
+            FilledButton.icon(
+              onPressed: _busy ? null : _analyze,
+              icon: Icon(
+                _analyzing ? Icons.hourglass_top : Icons.fact_check_outlined,
+                size: 18,
+              ),
+              label: Text(
+                _analyzing
+                    ? 'Analyzing and testing...'
+                    : 'Analyze + test network',
+              ),
+            ),
+          ],
+        ),
+        Expanded(
+          child: AppPage(
+            maxWidth: 1080,
+            children: [
+              AppPageHeader(
+                eyebrow: 'Inspect',
+                title: 'Analyze and fix',
+                description:
+                    'Analyze is read-only. It reads the live Packet Tracer '
+                    'devices, interfaces, routing state, PC/server '
+                    'addressing, server service panels, and red link '
+                    'indicators. Connectivity is tested with real Packet '
+                    'Tracer pings from endpoint command prompts.',
+              ),
+              // A screen reader has to be told when a multi-minute analysis
+              // starts and finishes: this line is the only place the state is
+              // reported.
+              if (_busy)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: AppTheme.s10),
+                  child: LinearProgressIndicator(
+                    semanticsLabel: 'Analysis in progress',
+                  ),
+                ),
+              AppPanel(
+                icon: _analyzing
+                    ? Icons.hourglass_top
+                    : Icons.radio_button_checked,
+                title: 'Status',
+                tone: _busy ? AppTone.accent : AppTone.neutral,
+                filled: _busy,
+                child: AppLiveText(
+                  text: _message,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+              if (_planIssues.isNotEmpty)
+                AppSection(
+                  title: 'Current plan checks',
+                  subtitle: 'What the validator says about the open plan.',
+                  children: [
+                    for (final issue in _planIssues)
+                      AppBanner(
+                        tone: issue.severity == 'error'
+                            ? AppTone.danger
+                            : AppTone.warning,
+                        title: issue.severity,
+                        message: issue.message,
+                      ),
+                  ],
+                ),
+              if (results != null) ...[
+                AppMetricGrid(
+                  metrics: [
+                    AppMetric(
+                      label: 'Devices',
+                      value: '${totals.devices}',
+                      icon: Icons.devices_other_outlined,
+                      tone: AppTone.accent,
+                    ),
+                    AppMetric(
+                      label: 'Findings',
+                      value: '${totals.findings}',
+                      icon: Icons.fact_check_outlined,
+                      tone: totals.findings == 0
+                          ? AppTone.success
+                          : AppTone.warning,
+                    ),
+                    AppMetric(
+                      label: 'High severity',
+                      value: '${totals.high}',
+                      icon: Icons.priority_high,
+                      tone: totals.high == 0 ? AppTone.success : AppTone.danger,
+                    ),
+                    AppMetric(
+                      label: 'Red links',
+                      value: '${totals.redDots}',
+                      icon: Icons.link_off,
+                      tone: totals.redDots == 0
+                          ? AppTone.success
+                          : AppTone.danger,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppTheme.s14),
+                _resultsPanel(results),
+                if ((results['reachability'] as Map? ?? {}).isNotEmpty)
+                  _buildReachability(
+                    Map<String, dynamic>.from(results['reachability'] as Map),
+                  ),
+                for (final dev in _devices()) _buildDevice(dev),
+                const SizedBox(height: AppTheme.s8),
+                _approvalBar(),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _resultsPanel(Map<String, dynamic> results) {
+    final summary = Map<String, dynamic>.from(
+      (results['summary'] as Map? ?? const {}),
+    );
+    final byType = Map<String, dynamic>.from(
+      (summary['by_type'] as Map? ?? const {}),
+    );
+    final severity = Map<String, dynamic>.from(
+      (summary['severity'] as Map? ?? const {}),
+    );
+    final interfaces = Map<String, dynamic>.from(
+      (summary['interfaces'] as Map? ?? const {}),
+    );
+    final services = Map<String, dynamic>.from(
+      (summary['services'] as Map? ?? const {}),
+    );
+    final error = (results['error'] ?? '').toString();
+    final note = (results['note'] ?? '').toString();
+    final scope = (results['scope'] as List? ?? const []);
+    return AppPanel(
+      icon: Icons.analytics_outlined,
+      title: 'Analysis results',
+      subtitle: 'Project: ${results['project'] ?? _project.text}',
+      actions: [
+        if (byType.isNotEmpty)
+          Wrap(
+            spacing: AppTheme.s6,
+            runSpacing: AppTheme.s6,
+            children: [
+              for (final entry in byType.entries)
+                AppTag(
+                  label: '${entry.key} ${entry.value}',
+                  tone: AppTone.neutral,
+                ),
+            ],
+          ),
+      ],
+      children: [
+        if (error.isNotEmpty)
+          AppBanner(tone: AppTone.danger, message: error),
+        if (summary.isNotEmpty) ...[
+          AppKeyValue(
+            label: 'Scope',
+            value:
+                '${summary['device_count'] ?? 0} device(s), '
+                '${summary['finding_count'] ?? 0} finding(s)',
+          ),
+          AppKeyValue(
+            label: 'Severity',
+            value:
+                'high ${severity['high'] ?? 0}, '
+                'medium ${severity['medium'] ?? 0}, '
+                'info ${severity['info'] ?? 0}',
+          ),
+          AppKeyValue(
+            label: 'Interfaces',
+            value:
+                'up ${interfaces['up'] ?? 0}, '
+                'down ${interfaces['down'] ?? 0}, '
+                'admin-down ${interfaces['administratively_down'] ?? 0}',
+          ),
+          if ((services['checked'] ?? 0) != 0)
+            AppKeyValue(
+              label: 'Services',
+              value:
+                  'checked ${services['checked']}, on ${services['on'] ?? 0}, '
+                  'off ${services['off'] ?? 0}, '
+                  'unknown ${services['unknown'] ?? 0}, '
+                  'saved tables ${services['saved_data'] ?? 0}, '
+                  'rules verified ${services['rules_verified'] ?? 0}, '
+                  'state only ${services['state_only'] ?? 0}',
+            ),
+          if (scope.isNotEmpty)
+            AppKeyValue(label: 'Evidence', value: scope.join('  ·  ')),
+        ],
+        if (note.isNotEmpty) ...[
+          const AppDivider(label: 'Note'),
+          Text(note, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ],
+    );
+  }
+
+  /// The approval gate: one bar that says what is selected and what the
+  /// button will do. It is the last thing on the page, because it is the last
+  /// decision.
+  Widget _approvalBar() {
+    final count = _selectedFixes.length;
+    return AppPanel(
+      tone: count == 0 ? AppTone.info : AppTone.warning,
+      filled: count > 0,
+      icon: count == 0 ? Icons.lock_outline : Icons.approval_outlined,
+      title: count == 0
+          ? 'No fixes selected'
+          : 'Review and approve $count fix(es)',
+      subtitle: count == 0
+          ? 'Tick a suggested fix on a device below. Nothing is applied '
+                'without this step.'
+          : 'The exact commands are shown before anything is typed.',
+      actions: [
+        FilledButton.icon(
+          onPressed: _busy || count == 0 ? null : _reviewAndApply,
+          icon: const Icon(Icons.approval, size: 18),
+          label: Text(
+            count == 0
+                ? 'Select suggested fixes first'
+                : 'Review and approve $count fix(es)',
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildDevice(Map dev) {
     final findings = (dev['findings'] as List? ?? []).whereType<Map>().toList();
     final interfaces = (dev['interfaces'] as List? ?? [])
@@ -359,133 +632,217 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     final ipcfg = Map<String, dynamic>.from((dev['ipcfg'] as Map? ?? const {}));
     final ospf = (dev['ospf'] as List? ?? []).join(', ');
     final name = (dev['name'] ?? 'device').toString();
-    return ExpansionTile(
-      initiallyExpanded: findings.any((f) => f['severity'] == 'high'),
-      title: Text('$name (${dev['type'] ?? 'device'})'),
-      subtitle: Text(
-        findings.isEmpty ? 'No findings' : '${findings.length} finding(s)',
-      ),
-      children: [
-        if (interfaces.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Interfaces: ${interfaces.map((i) => '${i['name']} ${i['status']}').join(' · ')}'
-                '${ospf.isEmpty ? '' : '\nOSPF networks: $ospf'}',
-                style: const TextStyle(fontSize: 12),
-              ),
-            ),
+    final high =
+        findings.where((f) => f['severity'] == 'high').length;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppTheme.s8),
+      child: AppPanel(
+        padding: EdgeInsets.zero,
+        dense: true,
+        tone: high > 0 ? AppTone.danger : AppTone.neutral,
+        framed: true,
+        child: Theme(
+          // The panel draws the surfaces; the tile must not paint its own.
+          data: Theme.of(context).copyWith(
+            dividerColor: Colors.transparent,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
           ),
-        if (ipcfg.values.any((value) => value.toString().isNotEmpty))
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'IPv4: ${ipcfg['ip'] ?? 'unreadable'}'
-                '${(ipcfg['mask'] ?? '').toString().isEmpty ? '' : ' / ${ipcfg['mask']}'}'
-                '${(ipcfg['gw'] ?? '').toString().isEmpty ? '' : '  gateway ${ipcfg['gw']}'}',
-                style: const TextStyle(fontSize: 12),
-              ),
+          child: ExpansionTile(
+            initiallyExpanded: high > 0,
+            shape: const RoundedRectangleBorder(),
+            collapsedShape: const RoundedRectangleBorder(),
+            tilePadding: const EdgeInsets.symmetric(
+              horizontal: AppTheme.s12,
+              vertical: AppTheme.s2,
             ),
-          ),
-        if (services.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Services: ${services.map((service) {
-                  final state = (service['state'] ?? 'unknown').toString();
-                  final saved = service['saved_data'] == true ? ', saved data' : '';
-                  final mode = service['verification_mode'] == 'state_only' ? ', state only' : ', rules verified';
-                  return '${service['name'] ?? 'service'} ($state$saved$mode)';
-                }).join(' · ')}',
-                style: const TextStyle(fontSize: 12),
-              ),
+            childrenPadding: const EdgeInsets.fromLTRB(
+              AppTheme.s12,
+              0,
+              AppTheme.s12,
+              AppTheme.s12,
             ),
-          ),
-        for (final service in services)
-          if ((service['evidence'] as List? ?? []).isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '${service['name']}: ${(service['evidence'] as List).join(' | ')}',
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 11, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
-                ),
-              ),
+            leading: AppIconBubble(
+              icon: high > 0 ? Icons.report_gmailerrorred : Icons.devices_other,
+              tone: high > 0 ? AppTone.danger : AppTone.success,
+              size: 30,
             ),
-        for (final probe in probes)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '${probe['command']}: '
-                '${probe['readable'] == true ? 'read' : 'unreadable'}'
-                '${(probe['evidence'] as List? ?? []).isEmpty ? '' : ' · ${(probe['evidence'] as List).take(3).join(' | ')}'}',
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
-              ),
-            ),
-          ),
-        if (findings.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(12),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Clean - no actionable issue found.',
-                style: TextStyle(color: Colors.green),
-              ),
-            ),
-          ),
-        for (final finding in findings) _buildFinding(name, finding),
-        if (_pcFixFields[name] != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Row(
+            title: Row(
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _pcFixFields[name]![0],
-                    decoration: const InputDecoration(
-                      labelText: 'PC IP',
-                      isDense: true,
-                    ),
-                  ),
+                Flexible(
+                  child: Text('$name (${dev['type'] ?? 'device'})'),
                 ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: TextField(
-                    controller: _pcFixFields[name]![1],
-                    decoration: const InputDecoration(
-                      labelText: 'Mask',
-                      isDense: true,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: TextField(
-                    controller: _pcFixFields[name]![2],
-                    decoration: const InputDecoration(
-                      labelText: 'Gateway',
-                      isDense: true,
-                    ),
-                  ),
+                const SizedBox(width: AppTheme.s8),
+                AppTag(
+                  label: '${findings.length} finding(s)',
+                  tone: findings.isEmpty ? AppTone.success : AppTone.warning,
                 ),
               ],
             ),
+            subtitle: Text(
+              findings.isEmpty
+                  ? 'No findings'
+                  : '${findings.where((f) => f['severity'] == 'high').length} '
+                        'high, ${findings.where((f) => f['severity'] == 'medium').length} '
+                        'medium',
+            ),
+            children: [
+              if (interfaces.isNotEmpty)
+                AppKeyValue(
+                  label: 'Interfaces',
+                  value: interfaces
+                      .map((i) => '${i['name']} ${i['status']}')
+                      .join('  ·  '),
+                  mono: true,
+                ),
+              if (ospf.isNotEmpty)
+                AppKeyValue(label: 'OSPF networks', value: ospf, mono: true),
+              if (ipcfg.values.any((value) => value.toString().isNotEmpty))
+                AppKeyValue(
+                  label: 'IPv4',
+                  value:
+                      '${ipcfg['ip'] ?? 'unreadable'}'
+                      '${(ipcfg['mask'] ?? '').toString().isEmpty ? '' : ' / ${ipcfg['mask']}'}'
+                      '${(ipcfg['gw'] ?? '').toString().isEmpty ? '' : '  gateway ${ipcfg['gw']}'}',
+                  mono: true,
+                ),
+              if (services.isNotEmpty) ...[
+                const AppDivider(label: 'Services'),
+                for (final service in services)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppTheme.s4),
+                    child: Row(
+                      children: [
+                        AppTag(
+                          label: (service['state'] ?? 'unknown').toString(),
+                          tone: service['state'] == 'on'
+                              ? AppTone.success
+                              : AppTone.neutral,
+                        ),
+                        const SizedBox(width: AppTheme.s8),
+                        Expanded(
+                          child: Text(
+                            '${service['name'] ?? 'service'}'
+                            '${service['saved_data'] == true ? '  ·  saved data' : ''}'
+                            '${service['verification_mode'] == 'state_only' ? '  ·  state only' : '  ·  rules verified'}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                for (final service in services)
+                  if ((service['evidence'] as List? ?? []).isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(left: AppTheme.s4),
+                      child: Text(
+                        '${service['name']}: ${(service['evidence'] as List).join(' | ')}',
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+              ],
+              if (probes.isNotEmpty) ...[
+                const AppDivider(label: 'CLI probes'),
+                for (final probe in probes)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppTheme.s4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppTag(
+                          label: probe['readable'] == true ? 'read' : 'unreadable',
+                          tone: probe['readable'] == true
+                              ? AppTone.success
+                              : AppTone.warning,
+                        ),
+                        const SizedBox(width: AppTheme.s8),
+                        Expanded(
+                          child: Text(
+                            '${probe['command']}'
+                            '${(probe['evidence'] as List? ?? []).isEmpty ? '' : '  ·  ${(probe['evidence'] as List).take(3).join(' | ')}'}',
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  fontFamily: AppTheme.monoFont,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+              if (findings.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppTheme.s4),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle_outline,
+                        size: 16,
+                        color: AppPalette.success(Theme.of(context).colorScheme),
+                      ),
+                      const SizedBox(width: AppTheme.s8),
+                      Text(
+                        'Clean - no actionable issue found.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppPalette.success(
+                            Theme.of(context).colorScheme,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              for (final finding in findings) _buildFinding(name, finding),
+              if (_pcFixFields[name] != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppTheme.s6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _pcFixFields[name]![0],
+                          decoration: const InputDecoration(
+                            labelText: 'PC IP',
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppTheme.s6),
+                      Expanded(
+                        child: TextField(
+                          controller: _pcFixFields[name]![1],
+                          decoration: const InputDecoration(
+                            labelText: 'Mask',
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppTheme.s6),
+                      Expanded(
+                        child: TextField(
+                          controller: _pcFixFields[name]![2],
+                          decoration: const InputDecoration(
+                            labelText: 'Gateway',
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ),
-      ],
+        ),
+      ),
     );
   }
 
@@ -493,32 +850,104 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     final id = (finding['id'] ?? '').toString();
     final canFix = _hasFix(finding);
     final severity = (finding['severity'] ?? 'info').toString();
-    final color = severity == 'high'
-        ? Colors.red
+    final tone = severity == 'high'
+        ? AppTone.danger
         : severity == 'medium'
-        ? Colors.orange
-        : Colors.blueGrey;
+        ? AppTone.warning
+        : AppTone.neutral;
+    final selected = _selectedFixes.contains(id);
     if (!canFix) {
-      return ListTile(
-        dense: true,
-        leading: Icon(Icons.info_outline, color: color),
-        title: Text(finding['text'].toString()),
-        subtitle: Text('$severity - informational only'),
+      return Padding(
+        padding: const EdgeInsets.only(top: AppTheme.s6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppIconBubble(
+              icon: Icons.info_outline,
+              tone: tone,
+              size: 24,
+            ),
+            const SizedBox(width: AppTheme.s10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(finding['text'].toString()),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$severity - informational only',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       );
     }
-    return CheckboxListTile(
-      dense: true,
-      value: _selectedFixes.contains(id),
-      onChanged: _busy
-          ? null
-          : (value) => setState(() {
-              value == true
-                  ? _selectedFixes.add(id)
-                  : _selectedFixes.remove(id);
-            }),
-      title: Text(finding['text'].toString()),
-      subtitle: Text(
-        '$severity - suggested fix available${finding['fix_pc'] == true ? ' - enter the gateway below' : ''}',
+    return Padding(
+      padding: const EdgeInsets.only(top: AppTheme.s6),
+      child: Material(
+        color: selected
+            ? AppPalette.tone(Theme.of(context).colorScheme, AppTone.accent).fill
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(AppTheme.rMd),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppTheme.rMd),
+          onTap: _busy
+              ? null
+              : () => setState(() {
+                  selected ? _selectedFixes.remove(id) : _selectedFixes.add(id);
+                }),
+          child: Padding(
+            padding: const EdgeInsets.all(AppTheme.s8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Checkbox(
+                  value: selected,
+                  onChanged: _busy
+                      ? null
+                      : (value) => setState(() {
+                          value == true
+                              ? _selectedFixes.add(id)
+                              : _selectedFixes.remove(id);
+                        }),
+                ),
+                const SizedBox(width: AppTheme.s4),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(finding['text'].toString()),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          AppTag(label: severity, tone: tone),
+                          const SizedBox(width: AppTheme.s6),
+                          Flexible(
+                            child: Text(
+                              'suggested fix available'
+                              '${finding['fix_pc'] == true ? ' - enter the gateway below' : ''}',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -533,232 +962,79 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     final error = (reachability['error'] ?? '').toString();
     final passed = reachability['passed'] ?? 0;
     final failed = reachability['failed'] ?? 0;
-    return Card(
-      color: failed is num && failed > 0
-          ? AppPalette.dangerFill(Theme.of(context).colorScheme)
-          : AppPalette.successFill(Theme.of(context).colorScheme),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Live connectivity tests',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            Text(
-              'Attempted ${reachability['attempted'] ?? 0} · '
-              'passed $passed · failed $failed · skipped ${skipped.length}',
-            ),
-            if (error.isNotEmpty)
-              Text(error, style: const TextStyle(color: Colors.red)),
-            for (final result in results)
-              ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  result['ok'] == true ? Icons.check_circle : Icons.error,
-                  color: result['ok'] == true ? Colors.green : Colors.red,
+    final bad = failed is num && failed > 0;
+    return AppPanel(
+      icon: bad ? Icons.wifi_tethering_error : Icons.wifi_tethering,
+      tone: bad ? AppTone.danger : AppTone.success,
+      filled: true,
+      title: 'Live connectivity tests',
+      subtitle:
+          'Attempted ${reachability['attempted'] ?? 0}  ·  '
+          'passed $passed  ·  failed $failed  ·  skipped ${skipped.length}',
+      children: [
+        if (error.isNotEmpty)
+          AppBanner(tone: AppTone.danger, message: error, dense: true),
+        for (final result in results)
+          Padding(
+            padding: const EdgeInsets.only(top: AppTheme.s6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppIconBubble(
+                  icon: result['ok'] == true
+                      ? Icons.check_circle_outline
+                      : Icons.error_outline,
+                  tone: result['ok'] == true
+                      ? AppTone.success
+                      : AppTone.danger,
+                  size: 26,
                 ),
-                title: Text('${result['source']} → ${result['target']}'),
-                subtitle: Text(
-                  '${result['ok'] == true ? 'Reply received' : 'No verified reply'} · '
-                  'attempts ${result['attempts'] ?? '?'}'
-                  '${(result['evidence'] ?? '').toString().isEmpty ? '' : '\n${result['evidence']}'}',
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            for (final item in skipped)
-              Text(
-                'Skipped ${item['source']}: ${item['reason']}',
-                style: TextStyle(fontSize: 12, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
-              ),
-            if (reachability['note'] != null)
-              Text(
-                reachability['note'].toString(),
-                style: TextStyle(fontSize: 11, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final redDots = _report?['red_dots'] ?? 0;
-    final error = (_report?['error'] ?? '').toString();
-    final summary = Map<String, dynamic>.from(
-      (_report?['summary'] as Map? ?? const {}),
-    );
-    final byType = Map<String, dynamic>.from(
-      (summary['by_type'] as Map? ?? const {}),
-    );
-    final severity = Map<String, dynamic>.from(
-      (summary['severity'] as Map? ?? const {}),
-    );
-    final interfaces = Map<String, dynamic>.from(
-      (summary['interfaces'] as Map? ?? const {}),
-    );
-    final services = Map<String, dynamic>.from(
-      (summary['services'] as Map? ?? const {}),
-    );
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Card(
-            color: Color(0xFFE3F2FD),
-            child: Padding(
-              padding: EdgeInsets.all(12),
-              child: Text(
-                'Analyze is read-only. It reads the live Packet Tracer '
-                'devices, interfaces, routing state, PC/server addressing, '
-                'server service panels, and red link indicators. It never '
-                'presses service On/Off or Add/Save. Connectivity is tested '
-                'with real Packet Tracer pings from endpoint command prompts. '
-                'Suggested fixes wait for your explicit approval before '
-                'anything is changed.',
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _project,
-            enabled: !_busy,
-            decoration: const InputDecoration(
-              labelText: 'Packet Tracer project name',
-              hintText: 'office-net',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: _busy ? null : _analyze,
-            icon: Icon(_analyzing ? Icons.hourglass_top : Icons.fact_check),
-            label: Text(
-              _analyzing
-                  ? 'Analyzing and testing...'
-                  : 'Analyze + test network',
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(_message, style: const TextStyle(fontSize: 12)),
-          if (_busy)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: LinearProgressIndicator(),
-            ),
-          if (_planIssues.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Text(
-              'Current plan checks',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            for (final issue in _planIssues)
-              Card(
-                color: issue.severity == 'error'
-                    ? AppPalette.dangerFill(Theme.of(context).colorScheme)
-                    : AppPalette.warningFill(Theme.of(context).colorScheme),
-                child: ListTile(
-                  dense: true,
-                  leading: Icon(
-                    issue.severity == 'error'
-                        ? Icons.error_outline
-                        : Icons.warning_amber,
-                  ),
-                  title: Text(issue.message),
-                  subtitle: Text(issue.severity),
-                ),
-              ),
-          ],
-          if (_report != null) ...[
-            const SizedBox(height: 12),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Analysis results',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    Text('Project: ${_report!['project'] ?? _project.text}'),
-                    Text(
-                      'Red link indicators: $redDots',
-                      style: TextStyle(
-                        color: redDots is num && redDots > 0
-                            ? Colors.red
-                            : Colors.green,
-                      ),
-                    ),
-                    if (summary.isNotEmpty) ...[
-                      const SizedBox(height: 6),
+                const SizedBox(width: AppTheme.s10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        'Scope: ${summary['device_count'] ?? 0} device(s) · '
-                        '${summary['finding_count'] ?? 0} finding(s) · '
-                        'types ${byType.entries.map((e) => '${e.key}=${e.value}').join(', ')}',
-                        style: const TextStyle(fontSize: 12),
+                        '${result['source']} → ${result['target']}',
+                        style: Theme.of(context).textTheme.titleSmall,
                       ),
                       Text(
-                        'Severity: high ${severity['high'] ?? 0}, '
-                        'medium ${severity['medium'] ?? 0}, '
-                        'info ${severity['info'] ?? 0} · '
-                        'interfaces up ${interfaces['up'] ?? 0}, '
-                        'down ${interfaces['down'] ?? 0}, '
-                        'admin-down ${interfaces['administratively_down'] ?? 0}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      if ((services['checked'] ?? 0) != 0)
-                        Text(
-                          'Services checked ${services['checked']}: '
-                          'on ${services['on'] ?? 0}, off ${services['off'] ?? 0}, '
-                          'unknown ${services['unknown'] ?? 0}, saved tables '
-                          '${services['saved_data'] ?? 0}, rules verified '
-                          '${services['rules_verified'] ?? 0}, state only '
-                          '${services['state_only'] ?? 0}',
-                          style: const TextStyle(fontSize: 12),
+                        '${result['ok'] == true ? 'Reply received' : 'No verified reply'}  ·  '
+                        'attempts ${result['attempts'] ?? '?'}'
+                        '${(result['evidence'] ?? '').toString().isEmpty ? '' : '\n${result['evidence']}'}',
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
+                      ),
                     ],
-                    if ((_report!['scope'] as List? ?? []).isNotEmpty)
-                      Text(
-                        'Evidence: ${(_report!['scope'] as List).join(' · ')}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppPalette.mutedText(Theme.of(context).colorScheme),
-                        ),
-                      ),
-                    if (error.isNotEmpty)
-                      Text(error, style: const TextStyle(color: Colors.red)),
-                    if ((_report!['note'] ?? '').toString().isNotEmpty)
-                      Text(_report!['note'].toString()),
-                  ],
+                  ),
                 ),
+              ],
+            ),
+          ),
+        for (final item in skipped)
+          Padding(
+            padding: const EdgeInsets.only(top: AppTheme.s4),
+            child: Text(
+              'Skipped ${item['source']}: ${item['reason']}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
-            if ((_report!['reachability'] as Map? ?? {}).isNotEmpty)
-              _buildReachability(
-                Map<String, dynamic>.from(_report!['reachability'] as Map),
-              ),
-            for (final dev in _devices()) _buildDevice(dev),
-            const SizedBox(height: 8),
-            FilledButton.icon(
-              onPressed: _busy || _selectedFixes.isEmpty
-                  ? null
-                  : _reviewAndApply,
-              icon: const Icon(Icons.approval),
-              label: Text(
-                _selectedFixes.isEmpty
-                    ? 'Select suggested fixes first'
-                    : 'Review and approve ${_selectedFixes.length} fix(es)',
+          ),
+        if (reachability['note'] != null)
+          Padding(
+            padding: const EdgeInsets.only(top: AppTheme.s4),
+            child: Text(
+              reachability['note'].toString(),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
-          ],
-        ],
-      ),
+          ),
+      ],
     );
   }
 }

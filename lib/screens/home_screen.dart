@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/build_record.dart';
 import '../services/memory_service.dart';
+import '../theme/app_kit.dart';
+import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
 
 /// Every network this app has built.
@@ -10,6 +13,11 @@ import '../theme/app_theme.dart';
 /// The list is the app's own memory of its work: what was asked, which target
 /// it was built for, and how it ended. It reads newest first, is searchable,
 /// and opening a row restores the plan exactly as it was compiled.
+///
+/// The list grew a filter and a sort because a real build history stops being
+/// a list you read and becomes a list you search: "what failed last week",
+/// "the branch lab I built in March". Both are guesses about the same data,
+/// so they can never disagree with the rows below them.
 class HomeScreen extends StatefulWidget {
   final void Function(BuildRecord) onOpen;
   final VoidCallback? onNewBuild;
@@ -20,11 +28,27 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+/// How the list is ordered. Named, so the menu and the header cannot drift.
+enum _HistorySort {
+  newest('Newest first'),
+  oldest('Oldest first'),
+  name('By name'),
+  status('By status');
+
+  final String label;
+  const _HistorySort(this.label);
+}
+
 class _HomeScreenState extends State<HomeScreen> {
   final _search = TextEditingController();
   List<BuildRecord> _items = [];
   bool _loading = true;
+  /// Why the list could not be read, verbatim. Null means the read worked -
+  /// which is the only way to tell "no networks yet" from "I could not look".
+  String? _loadError;
   String _query = '';
+  String _statusFilter = 'all';
+  _HistorySort _sort = _HistorySort.newest;
 
   @override
   void initState() {
@@ -39,28 +63,75 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refresh() async {
-    setState(() => _loading = true);
+    if (mounted) setState(() => _loading = true);
     try {
       final mem = context.read<MemoryService>();
-      if (mem.ready) {
+      if (!mem.ready) {
+        _items = [];
+        _loadError =
+            'The local memory database is not open, so the saved networks '
+            'cannot be listed. Planning, the toolkit and .pkt work do not need '
+            'it, so the rest of the app still works.';
+      } else {
         _items = await mem.recentBuilds(limit: 200);
+        _loadError = null;
       }
-    } catch (_) {
+    } catch (e) {
       _items = [];
+      _loadError = e.toString().replaceFirst('Exception: ', '');
     }
     if (mounted) setState(() => _loading = false);
   }
 
   List<BuildRecord> get _visible {
     final q = _query.trim().toLowerCase();
-    if (q.isEmpty) return _items;
     bool matches(BuildRecord item) {
-      final haystack = '${item.projectName} ${item.instruction} '
+      if (_statusFilter != 'all' &&
+          item.status.toLowerCase() != _statusFilter) {
+        return false;
+      }
+      if (q.isEmpty) return true;
+      final haystack =
+          '${item.projectName} ${item.instruction} '
           '${item.target} ${item.status}';
       return haystack.toLowerCase().contains(q);
     }
 
-    return _items.where(matches).toList();
+    final rows = _items.where(matches).toList();
+    switch (_sort) {
+      case _HistorySort.newest:
+        rows.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      case _HistorySort.oldest:
+        rows.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      case _HistorySort.name:
+        rows.sort(
+          (a, b) => a.projectName.toLowerCase().compareTo(
+            b.projectName.toLowerCase(),
+          ),
+        );
+      case _HistorySort.status:
+        rows.sort((a, b) {
+          final byStatus = a.status.compareTo(b.status);
+          return byStatus != 0
+              ? byStatus
+              : b.createdAt.compareTo(a.createdAt);
+        });
+    }
+    return rows;
+  }
+
+  /// Which statuses actually exist in the history, so the filter row offers
+  /// real choices instead of a fixed menu of things that may not be there.
+  List<String> get _statuses {
+    final seen = <String>{};
+    for (final item in _items) {
+      final status = item.status.trim().toLowerCase();
+      if (status.isNotEmpty) seen.add(status);
+    }
+    final order = ['verified', 'corrected', 'planned', 'failed'];
+    final known = order.where(seen.contains).toList();
+    final rest = seen.where((s) => !order.contains(s)).toList()..sort();
+    return [...known, ...rest];
   }
 
   @override
@@ -68,11 +139,36 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
+    // A failed read is not an empty list. Saying "No networks yet" after an
+    // error tells the user their work is gone, which is both untrue and
+    // unrecoverable-looking.
+    if (_loadError != null) {
+      return AppEmptyState(
+        icon: Icons.error_outline,
+        danger: true,
+        title: 'Saved networks could not be read',
+        body: '$_loadError',
+        actions: [
+          FilledButton.icon(
+            onPressed: _refresh,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Try again'),
+          ),
+          if (widget.onNewBuild != null)
+            OutlinedButton.icon(
+              onPressed: widget.onNewBuild,
+              icon: const Icon(Icons.add_circle_outline),
+              label: const Text('Plan a network'),
+            ),
+        ],
+      );
+    }
     if (_items.isEmpty) {
       return AppEmptyState(
         icon: Icons.hub_outlined,
         title: 'No networks yet',
-        body: 'Describe a network in a sentence and this app plans it, '
+        body:
+            'Describe a network in a sentence and this app plans it, '
             'validates it, builds it and remembers the result. It will be '
             'listed here.',
         actions: [
@@ -95,78 +191,74 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        HistoryDashboard(items: _items),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppTheme.s20,
-            AppTheme.s16,
-            AppTheme.s20,
-            AppTheme.s8,
+        AppToolbar(
+          search: AppSearchField(
+            controller: _search,
+            label: 'Search your networks',
+            hint: 'project, instruction or target',
+            onChanged: (value) => setState(() => _query = value),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _search,
-                  onChanged: (value) => setState(() => _query = value),
-                  decoration: InputDecoration(
-                    labelText: 'Search your networks',
-                    hintText: 'project, instruction or target',
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    suffixIcon: _query.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: 'Clear',
-                            icon: const Icon(Icons.close, size: 18),
-                            onPressed: () => setState(() {
-                              _search.clear();
-                              _query = '';
-                            }),
-                          ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppTheme.s12),
-              IconButton(
-                tooltip: 'Refresh',
-                onPressed: _refresh,
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppTheme.s20),
-          child: Text(
-            '${visible.length} of ${_items.length} network(s)',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+          filters: [
+            _StatusFilter(
+              value: _statusFilter,
+              statuses: _statuses,
+              onChanged: (value) => setState(() => _statusFilter = value),
             ),
-          ),
+            PopupMenuButton<_HistorySort>(
+              tooltip: 'Sort',
+              initialValue: _sort,
+              onSelected: (value) => setState(() => _sort = value),
+              itemBuilder: (context) => [
+                for (final option in _HistorySort.values)
+                  PopupMenuItem(value: option, child: Text(option.label)),
+              ],
+              child: _MenuChip(
+                icon: Icons.swap_vert,
+                label: _sort.label,
+              ),
+            ),
+            IconButton(
+              tooltip: 'Refresh',
+              onPressed: _refresh,
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+          count: '${visible.length} of ${_items.length} network(s)',
         ),
-        const SizedBox(height: AppTheme.s8),
         Expanded(
-          child: visible.isEmpty
-              ? const AppEmptyState(
+          child: AppPage(
+            maxWidth: 1000,
+            padding: EdgeInsets.fromLTRB(
+              AppTheme.gutter(context),
+              AppTheme.s16,
+              AppTheme.gutter(context),
+              AppTheme.s24,
+            ),
+            children: [
+              if (_statusFilter == 'all' && _query.trim().isEmpty)
+                HistoryDashboard(items: _items),
+              const SizedBox(height: AppTheme.s8),
+              if (visible.isEmpty)
+                const AppEmptyState(
                   icon: Icons.search_off,
                   title: 'Nothing matches that',
-                  body: 'Try part of the project name, or the words you used '
-                      'when you asked for it.',
+                  body:
+                      'Try part of the project name, the words you used when '
+                      'you asked for it, or clear the filters.',
                 )
-              : RefreshIndicator(
+              else
+                RefreshIndicator(
                   onRefresh: _refresh,
                   child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppTheme.s20,
-                      0,
-                      AppTheme.s20,
-                      AppTheme.s20,
-                    ),
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
                     itemCount: visible.length,
                     itemBuilder: (context, index) =>
                         _row(context, visible[index]),
                   ),
                 ),
+            ],
+          ),
         ),
       ],
     );
@@ -175,44 +267,45 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _row(BuildContext context, BuildRecord record) {
     final theme = Theme.of(context);
     final status = _status(record, theme);
-    return Card(
-      child: InkWell(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppTheme.s8),
+      child: AppPanel(
+        dense: true,
+        padding: EdgeInsets.zero,
         onTap: () => widget.onOpen(record),
         child: Padding(
           padding: const EdgeInsets.all(AppTheme.s14),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(AppTheme.s8),
-                decoration: BoxDecoration(
-                  color: status.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(AppTheme.rSm),
-                ),
-                child: Icon(status.icon, size: 18, color: status.color),
-              ),
+              AppIconBubble(icon: status.icon, tone: status.tone, size: 34),
               const SizedBox(width: AppTheme.s12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    // A Wrap, not a Row: a name, a status pill and a target tag
+                    // do not fit on one line of a 360dp phone at 1.5x text, and
+                    // a clipped tag is worse than a second line.
+                    Wrap(
+                      spacing: AppTheme.s8,
+                      runSpacing: AppTheme.s4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Flexible(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 320),
                           child: Text(
                             record.projectName,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.titleSmall,
                           ),
                         ),
-                        const SizedBox(width: AppTheme.s8),
-                        AppStatusPill(
+                        AppTag(
                           label: status.label,
-                          ok: status.ok,
-                          warn: status.warn,
+                          tone: status.tone,
+                          icon: status.icon,
                         ),
-                        const SizedBox(width: AppTheme.s8),
-                        _Tag(text: record.target),
+                        AppTag(label: record.target, tone: AppTone.neutral),
                       ],
                     ),
                     const SizedBox(height: AppTheme.s6),
@@ -242,21 +335,67 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                         const SizedBox(width: AppTheme.s4),
-                        Text(
-                          _when(record.createdAt),
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                        // The relative stamp is for scanning; the exact minute
+                        // is here, because "that one" needs a real time.
+                        Tooltip(
+                          message: _whenFull(record.createdAt),
+                          child: Text(
+                            _when(record.createdAt),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              letterSpacing: 0.2,
+                            ),
                           ),
                         ),
+                        if ((record.fix ?? '').trim().isNotEmpty) ...[
+                          const SizedBox(width: AppTheme.s10),
+                          Icon(
+                            Icons.build_circle_outlined,
+                            size: 12,
+                            color: AppPalette.warning(theme.colorScheme),
+                          ),
+                          const SizedBox(width: AppTheme.s4),
+                          Flexible(
+                            child: Text(
+                              record.fix!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: AppPalette.warning(theme.colorScheme),
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: AppTheme.s8),
-              Icon(
-                Icons.chevron_right,
-                color: theme.colorScheme.onSurfaceVariant,
+              Column(
+                children: [
+                  Icon(
+                    Icons.chevron_right,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  PopupMenuButton<String>(
+                    tooltip: 'Row actions',
+                    iconSize: 16,
+                    padding: EdgeInsets.zero,
+                    onSelected: (value) => _rowAction(value, record),
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: 'copy-brief',
+                        child: Text('Copy the brief'),
+                      ),
+                      PopupMenuItem(
+                        value: 'copy-json',
+                        child: Text('Copy the plan JSON'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),
@@ -265,46 +404,54 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  ({String label, IconData icon, Color color, bool ok, bool warn}) _status(
+  Future<void> _rowAction(String action, BuildRecord record) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    switch (action) {
+      case 'copy-brief':
+        await Clipboard.setData(ClipboardData(text: record.instruction));
+        messenger?.showSnackBar(
+          const SnackBar(content: Text('Brief copied')),
+        );
+      case 'copy-json':
+        await Clipboard.setData(ClipboardData(text: record.intentJson));
+        messenger?.showSnackBar(
+          const SnackBar(content: Text('Plan JSON copied')),
+        );
+    }
+  }
+
+  ({String label, IconData icon, AppTone tone}) _status(
     BuildRecord record,
     ThemeData theme,
-  ) => switch (record.status) {
-    'verified' => (
-      label: 'verified',
-      icon: Icons.verified_outlined,
-      color: const Color(0xFF2E7D32),
-      ok: true,
-      warn: false,
-    ),
-    'failed' => (
-      label: 'failed',
-      icon: Icons.error_outline,
-      color: theme.colorScheme.error,
-      ok: false,
-      warn: true,
-    ),
-    'corrected' => (
-      label: 'corrected',
-      icon: Icons.build_outlined,
-      color: const Color(0xFFEF6C00),
-      ok: false,
-      warn: false,
-    ),
-    'planned' => (
-      label: 'planned',
-      icon: Icons.schedule,
-      color: theme.colorScheme.primary,
-      ok: false,
-      warn: false,
-    ),
-    _ => (
-      label: record.status,
-      icon: Icons.pending_actions,
-      color: theme.colorScheme.onSurfaceVariant,
-      ok: false,
-      warn: false,
-    ),
-  };
+  ) {
+    return switch (record.status) {
+      'verified' => (
+        label: 'verified',
+        icon: Icons.verified_outlined,
+        tone: AppTone.success,
+      ),
+      'failed' => (
+        label: 'failed',
+        icon: Icons.error_outline,
+        tone: AppTone.danger,
+      ),
+      'corrected' => (
+        label: 'corrected',
+        icon: Icons.build_outlined,
+        tone: AppTone.warning,
+      ),
+      'planned' => (
+        label: 'planned',
+        icon: Icons.schedule,
+        tone: AppTone.accent,
+      ),
+      _ => (
+        label: record.status,
+        icon: Icons.pending_actions,
+        tone: AppTone.neutral,
+      ),
+    };
+  }
 
   /// "3 hours ago" reads faster than a timestamp when scanning a list, and the
   /// exact time is still there in the tooltip.
@@ -315,9 +462,105 @@ class _HomeScreenState extends State<HomeScreen> {
     if (diff.inMinutes < 60) return '${diff.inMinutes} minute(s) ago';
     if (diff.inHours < 24) return '${diff.inHours} hour(s) ago';
     if (diff.inDays < 7) return '${diff.inDays} day(s) ago';
+    return _whenFull(when).split(' ').first;
+  }
+
+  /// The whole truth about when a build happened, to the minute, in local
+  /// time. This is what the tooltip promises, so it has to be a real time and
+  /// not another relative phrase.
+  static String _whenFull(DateTime when) {
     final local = when.toLocal();
-    return '${local.year}-${local.month.toString().padLeft(2, '0')}-'
-        '${local.day.toString().padLeft(2, '0')}';
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${local.year}-${two(local.month)}-${two(local.day)} '
+        '${two(local.hour)}:${two(local.minute)}';
+  }
+}
+
+/// The status filter: a chip that opens the statuses actually present in the
+/// history. A fixed menu would offer "verified" to someone who has never
+/// verified anything.
+class _StatusFilter extends StatelessWidget {
+  final String value;
+  final List<String> statuses;
+  final ValueChanged<String> onChanged;
+
+  const _StatusFilter({
+    required this.value,
+    required this.statuses,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = value != 'all';
+    return PopupMenuButton<String>(
+      tooltip: 'Filter by status',
+      initialValue: value,
+      onSelected: onChanged,
+      itemBuilder: (context) => [
+        const PopupMenuItem(value: 'all', child: Text('All statuses')),
+        for (final status in statuses)
+          PopupMenuItem(value: status, child: Text('Status: $status')),
+      ],
+      child: _MenuChip(
+        icon: Icons.filter_alt_outlined,
+        label: selected ? 'Status: $value' : 'All statuses',
+        active: selected,
+      ),
+    );
+  }
+}
+
+/// A toolbar control that looks like an outlined button but is really a menu
+/// trigger. Written out because a disabled `OutlinedButton` used as a menu
+/// child paints greyed-out, which reads as "this control is unavailable" - the
+/// opposite of what it means.
+class _MenuChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+
+  const _MenuChip({
+    required this.icon,
+    required this.label,
+    this.active = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final fg = active ? scheme.primary : scheme.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.s12,
+        vertical: AppTheme.s8,
+      ),
+      decoration: BoxDecoration(
+        color: active
+            ? scheme.primary.withValues(alpha: 0.10)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(AppTheme.rMd),
+        border: Border.all(
+          color: active
+              ? scheme.primary.withValues(alpha: 0.4)
+              : AppPalette.hairline(scheme),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 17, color: fg),
+          const SizedBox(width: AppTheme.s6),
+          Text(
+            label,
+            style: theme.textTheme.labelLarge?.copyWith(color: fg),
+          ),
+          const SizedBox(width: AppTheme.s4),
+          Icon(Icons.expand_more, size: 16, color: fg),
+        ],
+      ),
+    );
   }
 }
 
@@ -344,99 +587,91 @@ class HistoryDashboard extends StatelessWidget {
       (
         label: 'Builds',
         value: '$total',
+        icon: Icons.inventory_2_outlined,
         color: theme.colorScheme.primary,
       ),
       (
         label: 'Verified rate',
         value: '$rate%',
-        color: const Color(0xFF2E7D32),
+        icon: Icons.verified_outlined,
+        color: AppPalette.success(theme.colorScheme),
       ),
       (
         label: 'Needs attention',
         value: '$failed',
-        color: failed > 0 ? theme.colorScheme.error : theme.colorScheme.outline,
+        icon: Icons.report_gmailerrorred_outlined,
+        color: failed > 0
+            ? theme.colorScheme.error
+            : theme.colorScheme.outline,
       ),
       (
         label: 'Last 7 days',
         value: '$recent',
+        icon: Icons.trending_up,
         color: theme.colorScheme.tertiary,
       ),
     ];
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppTheme.s20,
-        AppTheme.s12,
-        AppTheme.s20,
-        AppTheme.s4,
-      ),
-      child: Row(
-        children: [
-          for (var i = 0; i < cells.length; i++) ...[
-            if (i > 0) const SizedBox(width: AppTheme.s8),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: AppTheme.s10,
-                  horizontal: AppTheme.s10,
-                ),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest
-                      .withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(AppTheme.rSm),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      cells[i].value,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        color: cells[i].color,
-                        fontWeight: FontWeight.w700,
-                      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = AppTheme.s8;
+        final columns = (constraints.maxWidth / 150).floor().clamp(2, 4);
+        final tileWidth =
+            (constraints.maxWidth - gap * (columns - 1)) / columns;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final cell in cells)
+              SizedBox(
+                width: tileWidth,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: AppTheme.s12,
+                    horizontal: AppTheme.s12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppPalette.panelAlt(theme.colorScheme),
+                    borderRadius: BorderRadius.circular(AppTheme.rMd),
+                    border: Border.all(
+                      color: AppPalette.hairline(theme.colorScheme),
                     ),
-                    Text(
-                      cells[i].label,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(cell.icon, size: 14, color: cell.color),
+                          const SizedBox(width: AppTheme.s6),
+                          Expanded(
+                            child: Text(
+                              cell.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                letterSpacing: 0.6,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: AppTheme.s6),
+                      Text(
+                        cell.value,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: cell.color,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _Tag extends StatelessWidget {
-  final String text;
-
-  const _Tag({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTheme.s8,
-        vertical: 2,
-      ),
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.8),
-        ),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        text,
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
+        );
+      },
     );
   }
 }

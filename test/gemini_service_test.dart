@@ -3,17 +3,21 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:net_builder/services/ai_provider.dart';
+import 'package:net_builder/services/gemini_model_catalog.dart';
 import 'package:net_builder/services/gemini_service.dart';
 
 class _FakeClient extends http.BaseClient {
   final String responseBody;
-  _FakeClient(this.responseBody);
+  _FakeClient(this.responseBody, {this.statusCode = 200});
+
+  final int statusCode;
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     return http.StreamedResponse(
       Stream<List<int>>.value(utf8.encode(responseBody)),
-      200,
+      statusCode,
       headers: {'content-type': 'application/json'},
     );
   }
@@ -68,5 +72,44 @@ void main() {
       contains('Should the switch use a management VLAN?'),
     );
     expect(result.confidence, closeTo(0.9, 0.001));
+  });
+
+  test('a 404 points at a model name that exists', () async {
+    // The remediation used to name `gemini-3.8-flash` / `gemini-3.6-flash`,
+    // which the API does not serve either - so following the advice produced
+    // the same 404. Every name offered now has to be one the catalog knows.
+    await expectLater(
+      GeminiService(
+        client: _FakeClient('{"error":{"message":"not found"}}',
+            statusCode: 404),
+      ).generateIntent(
+        apiKey: 'test',
+        model: 'gemini-9.9-flash',
+        instruction: 'make a small lab',
+        contextBlock: '',
+        target: 'gns3',
+        offlineCandidate: const {'projectName': 'fallback'},
+      ),
+      throwsA(
+        isA<Exception>().having((e) => e.toString(), 'message', (message) {
+          expect(message, contains('gemini-9.9-flash'),
+              reason: 'the model the user actually asked for is named');
+          expect(message, contains(AiProviderConfig.defaultGeminiModel));
+          for (final stale in const ['3.8-flash', '3.6-flash']) {
+            expect(message, isNot(contains(stale)),
+                reason: 'no name the API does not serve: $stale');
+          }
+          for (final known in GeminiModelCatalog.fallbackSuggestions) {
+            expect(GeminiModelCatalog.isChatModel(
+              GeminiModelInfo(
+                name: known,
+                methods: const ['generateContent'],
+              ),
+            ), isTrue, reason: '$known is offered, so it has to be a real one');
+          }
+          return true;
+        }),
+      ),
+    );
   });
 }

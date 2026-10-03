@@ -1,4 +1,4 @@
-"""Offline .pkt generator: turn a NetBuilder plan into a Packet Tracer save.
+﻿"""Offline .pkt generator: turn a NetBuilder plan into a Packet Tracer save.
 
 The plan is exactly what the app already sends to the Packet Tracer executor
 (``PacketTracerAdapter.autopilotPlan``): ``create_nodes``, ``create_links``,
@@ -31,8 +31,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
+import shutil
 import time
 import copy
 import uuid
@@ -74,19 +76,112 @@ KIND_PATTERNS = {
 
 CLI_KINDS = ("router", "switch", "multilayer switch")
 
-# Canvas rows per node type.  Packet Tracer's logical workspace is roughly
-# 2000x1200 at 100% zoom; this keeps routers on top, switches in the middle
-# and end devices below them, like the executor's own layout.
-ROW_Y = {
-    "router": 120, "firewall": 120, "wireless-router": 120,
-    "switch": 300,
-    "pc": 480, "laptop": 480, "server": 480, "printer": 480,
-    "wireless": 480, "iot": 480, "tablet": 660, "smartphone": 660,
-    "cloud": 660,
+# Drawing bands per node role, top to bottom: routed core, aggregation,
+# access, servers, then the hosts.  A device's band follows what it is FOR,
+# not just its raw type, so servers get their own row instead of sharing the
+# hosts'.
+CORE_TYPES = ("router", "firewall", "cloud", "modem", "wireless-router")
+AGGREGATION_TYPES = ("multilayer switch", "wlc")
+ACCESS_TYPES = ("switch", "wireless", "accesspoint", "wireless access point")
+SERVICE_TYPES = ("server",)
+TIER_CORE, TIER_AGGREGATION, TIER_ACCESS, TIER_SERVICES, TIER_HOSTS = range(5)
+
+
+def _tier_of(node_type: str) -> int:
+    """Which drawing band a device belongs in, by what it does in the design."""
+    kind = str(node_type or "").strip().lower()
+    if kind in CORE_TYPES:
+        return TIER_CORE
+    if kind in AGGREGATION_TYPES:
+        return TIER_AGGREGATION
+    if kind in ACCESS_TYPES:
+        return TIER_ACCESS
+    if kind in SERVICE_TYPES:
+        return TIER_SERVICES
+    return TIER_HOSTS
+
+
+# Vertical rhythm.  Only the tiers a plan actually uses get a band, so a
+# router/switch/PC lab is drawn compactly instead of leaving empty rows for
+# device kinds it does not have.
+# The drawing algorithm's own version, reported by the engine over /health so
+# an app can tell whether the engine answering on the port is the one it ships.
+# Bump it whenever the placement changes in a way a person would SEE - a stale
+# engine holding the port is why a layout fix can look like it never happened.
+LAYOUT_REVISION = 5
+
+ROW_TOP = 60
+BAND_STEP = 190
+# Second and later rows inside one band (a switch with more hosts than fit on
+# one row) and the pitch that keeps devices readable side by side.
+ROW_STEP = 130
+DEVICE_PITCH = 120
+BLOCK_GAP = 150
+GRID_COLUMNS = 4
+# The part of the workspace a person sees at 100% zoom (about 1600x900 on a
+# full-screen Packet Tracer).  Wider plans scroll, but no row is ever allowed
+# to grow without a wrap.
+CANVAS_WIDTH = 1400
+X_START = 140
+DEFAULT_ROW_Y = ROW_TOP + BAND_STEP
+# How far out each ring of the `radial` drawing sits, as a multiple of the
+# device pitch. A ring has to clear the one inside it, so the step is a little
+# over one pitch rather than exactly one.
+RADIAL_FIRST_RING = 1.4
+RADIAL_RING_STEP = 1.6
+
+# The drawings a plan can ask for.  A person who says "the layout is ugly" or
+# "spread them out" is asking for a DIFFERENT picture, not the same one again,
+# so the layout is an input the plan carries rather than a constant:
+#
+#   tree     the default: each site a tree, hosts blocked under their switch;
+#   wide     same tree, more room: bigger pitch and gaps, more hosts to a row;
+#   compact  the whole lab on one screen: tighter pitch, fewer to a row;
+#   rows     the textbook drawing: one band per device kind, left to right;
+#   grouped  a tree, but the devices named in `side` are lifted out of their
+#            own sub-tree and parked in one column at `sideEdge`, so "move the
+#            servers to the side" has a drawing it can actually mean.
+#   layered  the same hierarchy drawn left to right: ranks become COLUMNS.
+#            The industry "hierarchical" diagram, and the one to reach for when
+#            a lab reads better across than down;
+#   radial   concentric rings by role: the core sits in the middle and the
+#            hosts on the outside, so the shape of the lab is the shape of the
+#            drawing;
+#   circle   every device on one ring, ordered core-first, for an overview;
+#   grid     an evenly spaced box that ignores the topology entirely - the
+#            fastest way to read a lab with forty endpoints in it;
+#   split    one vertical column per kind of device, so "servers on one side,
+#            routers on the other" is a drawing rather than a hope.
+#
+# The five new drawings are deliberately different ALGORITHMS, not different
+# scales of the same one: `tree`, `wide` and `compact` are the same tree at
+# three sizes, which is why offering them side by side read as three near
+# identical pictures.
+LAYOUT_STYLES = ("tree", "wide", "compact", "rows", "grouped", "layered",
+                 "radial", "circle", "grid", "split")
+# Drawings that place every device from the plan's shape alone, without
+# nesting anything under an uplink.
+LAYOUT_FLAT_STYLES = ("radial", "circle", "grid", "split")
+# How many devices a band holds before it wraps in the `rows` style.
+ROWS_PER_ROW = 8
+# What each style changes about the geometry.  `spacing` from the plan scales
+# the pitch and the gaps on top of this, so "a bit more room" is expressible
+# without inventing a new style.
+LAYOUT_STYLE_SHAPES = {
+    "tree": {"spacing": 1.0, "columns": GRID_COLUMNS},
+    "wide": {"spacing": 1.3, "columns": 6},
+    "compact": {"spacing": 0.75, "columns": 4},
+    "rows": {"spacing": 1.0, "columns": GRID_COLUMNS},
+    "grouped": {"spacing": 1.0, "columns": GRID_COLUMNS},
+    "layered": {"spacing": 1.0, "columns": GRID_COLUMNS},
+    "radial": {"spacing": 1.0, "columns": GRID_COLUMNS},
+    "circle": {"spacing": 1.0, "columns": GRID_COLUMNS},
+    "grid": {"spacing": 1.0, "columns": GRID_COLUMNS},
+    "split": {"spacing": 1.0, "columns": GRID_COLUMNS},
 }
-DEFAULT_ROW_Y = 660
-X_START = 240
-X_STEP = 200
+DEFAULT_LAYOUT = {"style": "tree",
+                  "spacing": 1.0,
+                  "columns": GRID_COLUMNS}
 
 _POSITION_RE = re.compile(r"^([a-z]+)((?:[0-9]+(?:/[0-9]+)*)?)$")
 _PORT_ALIASES = {
@@ -208,8 +303,19 @@ def resolve_port(variant: dict, requested: str,
         return None, ""
     ports = variant.get("ports") or []
     claimed = {str(name) for name in taken or () if str(name)}
+    exact_taken = False
     for port in ports:
         if port.get("name") and normalize_port_name(port["name"]) == want:
+            if port["name"] in claimed:
+                # The name matches, but this device already gave that port to
+                # another interface.  Returning it anyway is how R2 ended up
+                # with two cables on GigabitEthernet0/1: the plan's invented
+                # 'g1/0' was remapped onto Gi0/1 first, and the plan's real
+                # 'g0/1' then claimed the same port by name - one interface,
+                # two links, and the second `interface` block overwrote the
+                # first so a whole subnet (and its OSPF network) vanished.
+                exact_taken = True
+                continue
             return port, ""
     # A bare family ("f0", "eth0", "g0") means the first free port of it.
     for port in ports:
@@ -236,8 +342,29 @@ def resolve_port(variant: dict, requested: str,
                 continue
             if port["name"] in claimed:
                 continue
+            if exact_taken:
+                return port, (f"{requested} -> {port['name']} "
+                              f"({requested} is already carrying a cable)")
             return port, f"{requested} -> {port['name']} (slot remap)"
     return None, ""
+
+
+def exact_port(variant: dict, spec: str) -> dict | None:
+    """The port under exactly the name the plan spelled, or None.
+
+    Used to reserve a model's OWN interfaces before any name it does not have
+    is remapped onto a spare: the plan's real interfaces must keep the ports
+    they name, and only the invented ones may take what is left.  Without the
+    reservation a remapped name resolved first can swallow a port a real name
+    needs (see :func:`resolve_port`).
+    """
+    want = normalize_port_name(spec)
+    if not want or _SUBINTERFACE.match(str(spec or "").strip()):
+        return None
+    for port in variant.get("ports") or []:
+        if port.get("name") and normalize_port_name(port["name"]) == want:
+            return port
+    return None
 
 
 def _resolve_cached(variant: dict, spec: str,
@@ -353,11 +480,31 @@ def select_variant(library: dict, node: dict,
             hits += 1 if resolved else 0
         return hits
 
+    def fits(entry):
+        """1 when every requested interface gets its own physical port.
+
+        The plan's cabling is only buildable if the hardware has a port per
+        link.  A candidate that cannot host the whole device list would remap
+        two names onto one port - two cables, one interface, and the second
+        config block overwriting the first - so it must lose to one that can,
+        even when both "cover" the names (resolve_port happily answers with a
+        substitute port, which is what made coverage blind to this).
+        """
+        if not wanted:
+            return 1
+        claimed: dict[str, dict] = {}
+        for spec in wanted:
+            port, _note = _resolve_cached(entry, spec, claimed)
+            if port is None:
+                return 0
+        return 1
+
     def score(entry):
         model = str(entry.get("model") or "").lower()
         hint = 1 if model_hint and (model == model_hint
                                     or model.startswith(model_hint)) else 0
-        return (coverage(entry), hint, -len(entry.get("ports") or []))
+        return (fits(entry), coverage(entry), hint,
+                -len(entry.get("ports") or []))
 
     best = max(candidates, key=score)
     # A rejected template is reported even when another model can take its
@@ -377,9 +524,15 @@ def select_variant(library: dict, node: dict,
         hinted = next((entry for entry in candidates
                        if str(entry.get("model") or "").lower()
                        .startswith(model_hint)), None)
-        miss = [port for port in wanted
-                if hinted is not None
-                and not resolve_port(hinted, port)[0]]
+        # Which of the plan's interfaces the hinted model cannot host - asked
+        # with the same one-port-per-interface allocation the build will use,
+        # so the reason names the interface that really forced the swap.
+        miss: list[str] = []
+        if hinted is not None:
+            claimed: dict[str, dict] = {}
+            for port in wanted:
+                if _resolve_cached(hinted, port, claimed)[0] is None:
+                    miss.append(port)
         reason = (f" (its template has no port for {', '.join(miss)})"
                   if miss else "")
         notes.append(f"{node.get('name')}: used {best.get('model')} "
@@ -446,6 +599,548 @@ def _set_ref_id(block: bytes, ref: int) -> bytes:
     if not match:
         return block
     return block[:match.end()] + b"\n   " + value + block[match.end():]
+
+
+def _by_tier(names: list[str], tier: dict[str, int]) -> dict[int, list[str]]:
+    """Group devices by drawing band, keeping plan order inside a band."""
+    groups: dict[int, list[str]] = {}
+    for name in names:
+        groups.setdefault(tier[name], []).append(name)
+    return groups
+
+
+def layout_options(raw) -> dict:
+    """The drawing a plan asks for, in the vocabulary this module speaks.
+
+    Accepts ``layout: {"style": "wide", "columns": 6, "spacing": 1.3}`` and
+    drops anything it does not understand, so a plan carrying a style this
+    build never heard of still draws (as the default tree) instead of failing.
+    """
+    if not isinstance(raw, dict):
+        return {}
+    out: dict = {}
+    style = str(raw.get("style") or "").strip().lower()
+    if style in LAYOUT_STYLES:
+        out["style"] = style
+    try:
+        columns = int(raw.get("columns") or 0)
+    except (TypeError, ValueError):
+        columns = 0
+    if 1 <= columns <= 12:
+        out["columns"] = columns
+    try:
+        spacing = float(raw.get("spacing") or 0)
+    except (TypeError, ValueError):
+        spacing = 0.0
+    if 0.5 <= spacing <= 2.0:
+        out["spacing"] = round(spacing, 2)
+    side = raw.get("side")
+    if isinstance(side, (list, tuple)):
+        names = [str(item).strip() for item in side]
+        names = [name for name in names if name][:128]
+        if names:
+            out["side"] = names
+    edge = str(raw.get("sideEdge") or raw.get("side_edge") or "").strip().lower()
+    if edge in ("left", "right"):
+        out["sideEdge"] = edge
+    zones = raw.get("zones")
+    if isinstance(zones, (list, tuple)):
+        out["zones"] = [_zone(item) for item in zones if _zone(item)]
+    return out
+
+
+def _zone(raw) -> dict | None:
+    """One group of devices parked at one edge.
+
+    Accepts ``{"side": ["SRV1"], "edge": "left"}`` and drops anything it
+    cannot use, so a plan carrying a zone this build does not understand still
+    draws.
+    """
+    if not isinstance(raw, dict):
+        return None
+    side = raw.get("side") or raw.get("sideNames") or raw.get("names")
+    if not isinstance(side, (list, tuple)):
+        return None
+    names = [str(item).strip() for item in side]
+    names = [name for name in names if name][:128]
+    if not names:
+        return None
+    edge = str(raw.get("edge") or raw.get("sideEdge") or "").strip().lower()
+    return {"side": names, "edge": edge if edge in ("left", "right") else ""}
+
+
+def _resolved_positions(raw) -> dict[str, tuple[int, int]]:
+    """The spot every device was already drawn at, when the plan carries one.
+
+    Accepts ``positions: {"R1": [700, 60]}`` - the coordinates the app showed
+    the user in the preview and the layout gallery - and drops anything it
+    cannot use: a name that is not a pair of whole numbers, and a point that
+    is nowhere near the canvas. A plan that sends nothing usable still draws,
+    because the caller falls back to computing its own.
+    """
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, tuple[int, int]] = {}
+    for name, point in list(raw.items())[:4096]:
+        key = str(name).strip()
+        if not key or not isinstance(point, (list, tuple)) or len(point) < 2:
+            continue
+        try:
+            x = int(round(float(point[0])))
+            y = int(round(float(point[1])))
+        except (TypeError, ValueError):
+            continue
+        if not (-10000 <= x <= 100000 and -10000 <= y <= 100000):
+            continue
+        out[key] = (x, y)
+    return out
+
+
+def layout_settings(raw=None) -> dict:
+    """The options a plan asked for merged over the default drawing, so the
+    report can state exactly which drawing was used."""
+    options = layout_options(raw if raw is not None else {})
+    style = str(options.get("style") or DEFAULT_LAYOUT["style"])
+    shape = LAYOUT_STYLE_SHAPES.get(style, LAYOUT_STYLE_SHAPES["tree"])
+    return {
+        "style": style,
+        "spacing": options.get("spacing", shape["spacing"]),
+        "columns": options.get("columns", shape["columns"]),
+        "side": list(options.get("side") or []),
+        "sideEdge": str(options.get("sideEdge") or "left"),
+        "zones": list(options.get("zones") or []),
+        "positions": _resolved_positions(raw.get("positions") if isinstance(raw, dict) else None),
+    }
+
+
+def layout_positions(nodes: list[dict], links: list[dict] | None = None,
+                     *, style: str = "", columns: int = 0,
+                     spacing: float = 0.0, side: list[str] | None = None,
+                     side_edge: str = "", zones: list | None = None,
+                     positions: dict | None = None
+                     ) -> dict[str, tuple[int, int]]:
+    """A network-diagram spot on the canvas for every device in one plan.
+
+    When ``positions`` carries the drawing the user was already shown, those
+    spots win: the preview is the picture that gets built, so the `.pkt` is
+    parked exactly where the app drew it instead of a second implementation of
+    the same ten algorithms being trusted to agree with the first. Any device
+    the resolved drawing does not name still gets a computed spot, so a partial
+    or stale map degrades to the old behaviour rather than losing a device.
+
+    The plan's link list is read as a topology, the way an engineer draws one:
+    a device's parent is the neighbour one band closer to the core, so access
+    switches hang under the router they uplink to, servers sit under their own
+    switch, and hosts cluster in a compact block under the switch that serves
+    them.  A parent is centred over its children, sibling sub-trees get their
+    own columns of canvas, and a block with more hosts than fit on one row
+    wraps instead of running off the edge.
+
+    A link between two equals (two routers joined by a WAN, two switches
+    trunked together) does not nest them: both stay on their own band's row,
+    side by side, which is exactly how the two sites of a site-to-site lab are
+    drawn.  Devices with no links at all keep their own place, by band.
+
+    ``style``, ``columns`` and ``spacing`` choose the drawing itself (see
+    LAYOUT_STYLES): a person who asks for a different layout must get a
+    visibly different picture, not the same coordinates again.  Positions are
+    returned by name so the caller can place each device as it builds it, and
+    they are deterministic: the same plan and the same style always draw the
+    same picture.
+
+    Five of the drawings do not nest anything (`layered`, `radial`, `circle`,
+    `grid`, `split`): they place every device from the plan's own shape - its
+    links, or its role per device - and ignore the tree the others build.
+    Those are the ones that read differently at a glance rather than the same
+    picture at a different size.
+    """
+    settings = layout_settings({"style": style, "columns": columns,
+                                "spacing": spacing,
+                                "side": list(side or []),
+                                "sideEdge": side_edge,
+                                "zones": list(zones or [])})
+    style = settings["style"]
+    # Geometry is local, so one call with a style cannot change the drawing of
+    # the next plan - the module constants stay the defaults of the default
+    # style.
+    scale = float(settings["spacing"])
+    pitch = DEVICE_PITCH * scale
+    gap = BLOCK_GAP * scale
+    band_step = BAND_STEP * scale
+    row_step = ROW_STEP * scale
+    grid_columns = max(1, min(int(settings["columns"]), 12))
+    tree_aware = style not in ("rows",) + LAYOUT_FLAT_STYLES
+
+    entries: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for node in nodes:
+        name = str(node.get("name") or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        entries.append((name, str(node.get("type") or "").strip().lower()))
+    if not entries:
+        return {}
+    order = {name: index for index, (name, _kind) in enumerate(entries)}
+    tier = {name: _tier_of(kind) for name, kind in entries}
+
+    neighbours: dict[str, list[str]] = {name: [] for name, _kind in entries}
+    for link in links or []:
+        if not isinstance(link, dict):
+            continue
+        a = str(link.get("a") or "").strip()
+        b = str(link.get("b") or "").strip()
+        if a in neighbours and b in neighbours and a != b:
+            neighbours[a].append(b)
+            neighbours[b].append(a)
+
+    children: dict[str, list[str]] = {name: [] for name, _kind in entries}
+    roots: list[str] = []
+    for name, _kind in entries:
+        uphill = [other for other in neighbours[name] if tier[other] < tier[name]]
+        if uphill:
+            # Its uplink, not just any neighbour: the one closest to the core,
+            # ties broken in plan order so the drawing is stable.
+            parent = min(uphill, key=lambda other: (tier[other], order[other]))
+            children[parent].append(name)
+        else:
+            roots.append(name)
+
+    width: dict[str, float] = {}
+
+    def span(name: str) -> float:
+        """Canvas width this device's whole sub-tree needs."""
+        if name in width:
+            return width[name]
+        kids = children[name]
+        branches = [kid for kid in kids if children[kid]]
+        leaves = [kid for kid in kids if not children[kid]]
+        need = float(pitch)
+        if branches:
+            need = max(need, sum(span(kid) for kid in branches)
+                       + gap * (len(branches) - 1))
+        for group in _by_tier(leaves, tier).values():
+            need = max(need, min(len(group), grid_columns) * pitch)
+        width[name] = need
+        return need
+
+    bands = {value: ROW_TOP + index * band_step for index, value in enumerate(
+        sorted({tier[name] for name, _kind in entries}))}
+    spots: dict[str, tuple[float, float]] = {}
+
+    def place(name: str, left: float) -> None:
+        need = span(name)
+        spots[name] = (left + need / 2, float(bands[tier[name]]))
+        # The `rows` style is the textbook drawing: no nesting at all, every
+        # device of a kind on its own row, left to right in plan order.
+        if not tree_aware:
+            return
+        kids = children[name]
+        # Sub-trees sit side by side inside this device's span; leaf children
+        # (hosts, servers) form compact grids centred on the same axis, one
+        # grid per band, so hosts stay visibly under their own switch.
+        branches = [kid for kid in kids if children[kid]]
+        if branches:
+            block = sum(span(kid) for kid in branches) \
+                + gap * (len(branches) - 1)
+            cursor = left + (need - block) / 2
+            for kid in branches:
+                place(kid, cursor)
+                cursor += span(kid) + gap
+        for band, group in _by_tier(
+                [kid for kid in kids if not children[kid]], tier).items():
+            columns = min(len(group), grid_columns)
+            grid = columns * pitch
+            grid_left = left + (need - grid) / 2
+            for index, kid in enumerate(group):
+                row, column = divmod(index, columns)
+                in_row = min(columns, len(group) - row * columns)
+                row_left = grid_left + (grid - in_row * pitch) / 2
+                spots[kid] = (
+                    row_left + column * pitch + pitch / 2,
+                    float(bands[band] + row * row_step),
+                )
+
+    if not tree_aware:
+        # One row per kind, each device beside the last, every band centred on
+        # the canvas, wrapped at ROWS_PER_ROW so a 40-PC band still fits the
+        # visible workspace.
+        for band, group in _by_tier([name for name, _kind in entries],
+                                    tier).items():
+            columns = min(len(group), max(grid_columns, ROWS_PER_ROW))
+            for index, name in enumerate(group):
+                row, column = divmod(index, columns)
+                in_row = min(columns, len(group) - row * columns)
+                row_left = X_START + max(
+                    (CANVAS_WIDTH - 2 * X_START - in_row * pitch) / 2, 0)
+                spots[name] = (row_left + column * pitch + pitch / 2,
+                               float(bands[band] + row * row_step))
+        spots = {name: spots[name] for name, _kind in entries if name in spots}
+
+    total = sum(span(root) for root in roots) \
+        + gap * max(len(roots) - 1, 0)
+    cursor = X_START + max((CANVAS_WIDTH - 2 * X_START - total) / 2, 0)
+    for root in roots:
+        place(root, cursor)
+        cursor += span(root) + gap
+
+    # Whole-pixel spots, and never two devices on the same point.
+    if style in LAYOUT_FLAT_STYLES:
+        spots = _flat_positions(style, entries, tier, children, roots,
+                                pitch, gap, row_step)
+    elif style == "layered":
+        spots = _layered_positions(entries, tier, children, roots, pitch,
+                                   band_step, row_step)
+    elif style == "grouped":
+        spots = _grouped_positions(entries, tier, bands, spots, settings,
+                                   pitch, gap, row_step)
+
+    placed: dict[str, tuple[int, int]] = {}
+    resolved = _resolved_positions(positions)
+    # The drawing the user was shown wins, spot for spot. Collisions are still
+    # broken (the app resolves them the same way) but never against a resolved
+    # point: nudging a device the user agreed to would move the preview.
+    taken: set[tuple[int, int]] = set()
+    for name, (x, y) in spots.items():
+        point = (int(round(x)), int(round(y)))
+        if name in resolved:
+            point = resolved[name]
+            if point in taken:
+                continue
+        else:
+            while point in taken:
+                point = (point[0] + int(pitch), point[1])
+        taken.add(point)
+        placed[name] = point
+    # A device the resolved drawing named but this plan does not have, or one
+    # this plan has and the drawing does not, are both left out rather than
+    # invented: the file is built from the plan, not from the drawing.
+    return placed
+
+
+def _by_role(entries: list[tuple[str, str]], tier: dict) -> list[str]:
+    """Every device name, core first then outward, plan order inside a role."""
+    ordered = sorted(
+        (tier[name], index, name)
+        for index, (name, _kind) in enumerate(entries)
+    )
+    return [name for _role, _index, name in ordered]
+
+
+def _flat_positions(style: str, entries: list[tuple[str, str]], tier: dict,
+                    children: dict, roots: list[str], pitch: float,
+                    gap: float, row_step: float) -> dict[str, tuple[float, float]]:
+    """The drawings that place every device from its role, not its uplink.
+
+    Each of these ignores the tree the other styles build, which is the whole
+    point: the same lab has to be readable in more than one silhouette.
+    """
+    by_role: dict[int, list[str]] = {}
+    for name, _kind in entries:
+        by_role.setdefault(tier[name], []).append(name)
+    roles = sorted(by_role)
+    spots: dict[str, tuple[float, float]] = {}
+
+    if style == "grid":
+        # An evenly spaced box, core first. Reads top-to-bottom like a table of
+        # contents and stays inside the visible canvas no matter how many hosts
+        # a plan has.
+        columns = max(1, min(int(len(entries) ** 0.5 + 0.9999), 12))
+        step = pitch + gap
+        for index, name in enumerate(_by_role(entries, tier)):
+            row, column = divmod(index, columns)
+            spots[name] = (float(X_START + column * step),
+                           float(ROW_TOP + row * step))
+        return spots
+
+    if style == "split":
+        # One vertical column per kind of device, so a lab reads left to right
+        # as core -> access -> services -> endpoints. This is the drawing that
+        # makes "servers on one side, routers on the other" true by default.
+        columns = max(1, min(max(len(group) for group in by_role.values()),
+                             ROWS_PER_ROW))
+        column_width = columns * pitch + gap
+        for index, role in enumerate(roles):
+            group = by_role[role]
+            left = float(X_START + index * column_width)
+            for row, name in enumerate(group):
+                spots[name] = (left + min(len(group), columns) * pitch / 2,
+                               float(ROW_TOP + row * row_step))
+        return spots
+
+    if style == "circle":
+        # One ring for the whole lab, ordered so the core is together and the
+        # hosts follow. An overview, not a place to read a config off.
+        count = len(entries)
+        radius = max(float(pitch) * (count / (2 * math.pi)) + pitch,
+                     float(pitch) * 1.5)
+        centre_x = CANVAS_WIDTH / 2
+        centre_y = ROW_TOP + radius
+        for index, name in enumerate(_by_role(entries, tier)):
+            angle = -math.pi / 2 + 2 * math.pi * index / count
+            spots[name] = (centre_x + radius * math.cos(angle),
+                           centre_y + radius * math.sin(angle))
+        return spots
+
+    if style == "radial":
+        # Concentric rings by role: the core in the middle, the endpoints on
+        # the outside, so the drawing has the shape of the lab.
+        radius = float(pitch) * RADIAL_FIRST_RING
+        centre_x = CANVAS_WIDTH / 2
+        centre_y = ROW_TOP + radius
+        for index, role in enumerate(roles):
+            group = by_role[role]
+            ring = float(pitch) * (RADIAL_FIRST_RING
+                                   + RADIAL_RING_STEP * index)
+            # Each ring is drawn around the same centre, which sits far enough
+            # down the page that the OUTERMOST ring still starts on the canvas.
+            centre_y = ROW_TOP + radius + ring
+            for position, name in enumerate(group):
+                angle = -math.pi / 2 + 2 * math.pi * position / len(group)
+                spots[name] = (centre_x + ring * math.cos(angle),
+                               centre_y + ring * math.sin(angle))
+
+    if style in ("circle", "radial"):
+        return _keep_on_canvas(spots)
+
+    raise ValueError(f"{style} is not a flat drawing")
+
+
+def _keep_on_canvas(spots: dict[str, tuple[float, float]]
+                    ) -> dict[str, tuple[float, float]]:
+    """A drawing centred on the canvas can reach past its left edge.
+
+    The ring layouts put devices all the way round a centre, so with enough
+    roles the leftmost one lands at a negative x - which is off the visible
+    workspace in Packet Tracer. Nudging the whole drawing right is the same
+    picture on the canvas rather than one device lost off the side.
+    """
+    if not spots:
+        return spots
+    min_x = min(x for x, _ in spots.values())
+    if min_x < X_START:
+        shift = X_START - min_x
+        for name, (x, y) in spots.items():
+            spots[name] = (x + shift, y)
+    return spots
+
+
+def _layered_positions(entries: list[tuple[str, str]], tier: dict,
+                       children: dict, roots: list[str], pitch: float,
+                       band_step: float, row_step: float
+                       ) -> dict[str, tuple[float, float]]:
+    """The industry hierarchical drawing, read left to right.
+
+    Ranks come from the links, so a device sits in the column of how far it is
+    from a root; devices inside a rank are ordered by a breadth-first walk so
+    a child stays beside the parent it hangs from and the cables stop
+    crossing. This is `rows` turned on its side, and it follows the topology
+    where `split` follows the role - the two disagree exactly when a lab has
+    more than one layer of the same kind of device.
+    """
+    depth: dict[str, int] = {}
+    # Rank is computed DOWN from the roots, because a leaf cannot know how far
+    # it is from the top: ranking from the leaves gives every leaf rank 0, the
+    # same column as the router it hangs from. Each device takes one column
+    # more than its furthest parent, so a node reached twice by two paths keeps
+    # the deeper of the two.
+    queue: list[str] = []
+    for name in roots:
+        if name not in depth:
+            depth[name] = 0
+            queue.append(name)
+    while queue:
+        name = queue.pop(0)
+        if name not in depth:
+            depth[name] = 0
+        rank = depth[name] + 1
+        for kid in children[name]:
+            if depth.get(kid, -1) < rank:
+                depth[kid] = rank
+                if kid not in queue:
+                    queue.append(kid)
+
+    order: list[str] = []
+    seen: set[str] = set()
+    queue = list(roots)
+    while queue:
+        name = queue.pop(0)
+        if name in seen or name not in depth:
+            continue
+        seen.add(name)
+        order.append(name)
+        queue.extend(children[name])
+    for name, _kind in entries:
+        if name not in seen:
+            order.append(name)
+
+    ranks: dict[int, list[str]] = {}
+    for name in order:
+        ranks.setdefault(depth[name], []).append(name)
+
+    spots: dict[str, tuple[float, float]] = {}
+    for index in sorted(ranks):
+        for row, name in enumerate(ranks[index]):
+            spots[name] = (float(X_START + index * band_step),
+                           float(ROW_TOP + row * row_step))
+    return spots
+
+
+def _grouped_positions(entries: list[tuple[str, str]], tier: dict,
+                       bands: dict, spots: dict, settings: dict, pitch: float,
+                       gap: float, row_step: float
+                       ) -> dict[str, tuple[float, float]]:
+    """Park the named devices in columns at the edges they were sent to.
+
+    A `zones` list is the multi-group form the app sends for "the servers on
+    one side and the routers on the other": one column per zone, in the order
+    the request listed them, each at its own edge. A single `side` list with no
+    zones is the one-group form and behaves exactly as it always did.
+    """
+    zones = [zone for zone in settings.get("zones") or []
+             if isinstance(zone, dict) and zone.get("side")]
+    if not zones and settings.get("side"):
+        zones = [{"side": list(settings["side"]),
+                  "edge": str(settings.get("sideEdge") or "")}]
+
+    parked: list[dict] = []
+    claimed: set[str] = set()
+    for zone in zones:
+        names = [name for name in zone.get("side") or [] if name in spots]
+        names = [name for name in names if name not in claimed]
+        if not names or len(names) == len(spots):
+            continue
+        claimed.update(names)
+        parked.append({"names": names, "edge": str(zone.get("edge") or "")})
+    if not parked:
+        return spots
+
+    left_zones = [zone for zone in parked if zone["edge"] != "right"]
+    right_zones = [zone for zone in parked if zone["edge"] == "right"]
+    shift = gap + pitch
+    rest = [name for name in spots if name not in claimed]
+
+    # The left columns start at the canvas edge and the rest of the lab moves
+    # right to clear them, so nothing is ever placed off-canvas.
+    for index, zone in enumerate(left_zones):
+        zone["x"] = float(X_START + index * shift)
+    if left_zones:
+        for name in rest:
+            spots[name] = (spots[name][0] + shift * len(left_zones),
+                           spots[name][1])
+
+    edge = max((spots[name][0] for name in rest), default=float(X_START))
+    for index, zone in enumerate(right_zones):
+        zone["x"] = float(edge + (index + 1) * shift)
+
+    for zone in parked:
+        row_in_band: dict[int, int] = {}
+        for name in zone["names"]:
+            band = tier[name]
+            row = row_in_band.get(band, 0)
+            row_in_band[band] = row + 1
+            spots[name] = (zone["x"], float(bands[band] + row * row_step))
+    return spots
 
 
 def _set_position(block: bytes, x: int, y: int) -> bytes:
@@ -784,6 +1479,10 @@ def _interface_lines(lines: list[str]) -> list[str]:
     for line in lines:
         match = re.match(r"^interface\s+(\S+)\s*$", line, re.I)
         if match:
+            # A dot1Q sub-interface (router-on-a-stick: `g0/0.10`) rides on
+            # its parent's hardware, so it must not claim a port of its own.
+            if _SUBINTERFACE.match(match.group(1)):
+                continue
             # A virtual interface (an ASA's Vlan1) has no port to claim, so
             # it is config to write, not hardware to find.
             if not _VIRTUAL_INTERFACES.match(match.group(1)):
@@ -810,6 +1509,10 @@ def _interface_lines(lines: list[str]) -> list[str]:
 _VIRTUAL_INTERFACES = re.compile(r"^(vlan|bvi|management|inside|outside|dmz)"
                                  r"[0-9]*$", re.I)
 
+# A dot1Q sub-interface: `<parent-port>.<vlan>` (router-on-a-stick).  The
+# parent is the hardware; the suffix is config on it.
+_SUBINTERFACE = re.compile(r"^(\S+)\.(\d+)$")
+
 
 def _remap_config_interfaces(variant: dict, lines: list[str],
                              resolved: dict | None = None,
@@ -824,6 +1527,20 @@ def _remap_config_interfaces(variant: dict, lines: list[str],
     notes = []
     out = []
     for line in lines:
+        sub = re.match(r"^interface\s+(\S+?)\.(\d+)\s*$", line, re.I)
+        if sub:
+            # Sub-interface: rewrite only the parent to the port this model
+            # really has (`g0/0.10` on a 2811 is `FastEthernet0/0.10`) and
+            # keep the VLAN suffix.  The parent resolution is shared with
+            # the links, so the trunk and the sub-interfaces land on the
+            # same physical port.
+            base = sub.group(1)
+            if not _VIRTUAL_INTERFACES.match(base):
+                port, _note = _resolve_cached(variant, base, resolved)
+                if port:
+                    line = f"interface {port['name']}.{sub.group(2)}"
+            out.append(line)
+            continue
         match = re.match(r"^interface\s+(\S+)\s*$", line, re.I)
         if match:
             requested = match.group(1)
@@ -1227,10 +1944,27 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
     device_blocks: list[bytes] = []
     device_report = []
     variants_used: dict[str, dict] = {}
-    columns: dict[int, int] = {}
+    # Every device's canvas spot, decided once for the whole plan from its own
+    # topology, so each site is drawn as a tree instead of one endless row.
+    # `layout` (see LAYOUT_STYLES) is what a person's "redraw this, spread it
+    # out" turns into - the drawing is an input, so asking for a different one
+    # produces a different file instead of the same coordinates again.
+    layout = layout_settings(plan.get("layout"))
+    positions = layout_positions(nodes, sections["links"],
+                                 positions=layout.get("positions"),
+                                 style=layout["style"],
+                                 columns=layout["columns"],
+                                 spacing=layout["spacing"],
+                                 side=layout["side"],
+                                 side_edge=layout["sideEdge"],
+                                 zones=layout["zones"])
 
     for node in nodes:
         name = str(node["name"])
+        # The device report carries the plan's own kind for every device (the
+        # audit and the "does the file match the plan" check read it back), so
+        # it is normalized exactly as select_variant normalizes it.
+        node_type = str(node.get("type") or "").strip().lower()
         device_report_services: dict = {}
         variant, notes = select_variant(library, node, wanted.get(name, []))
         warnings.extend(notes)
@@ -1242,11 +1976,7 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
                             "missing from the library")
             continue
         variants_used[name] = variant
-        node_type = str(node.get("type") or "").strip().lower()
-        row = ROW_Y.get(node_type, DEFAULT_ROW_Y)
-        column = columns.get(row, 0)
-        columns[row] = column + 1
-        x, y = X_START + column * X_STEP, row
+        x, y = positions.get(name, (X_START, DEFAULT_ROW_Y))
         block = _set_name(block, name)
         ref = _ref_id(f"{project}:{name}", used_refs)
         refs[name] = ref
@@ -1259,6 +1989,16 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
         # interface per device, shared by the config and the links, so a
         # two-port router cannot put its WAN and its LAN on one port.
         resolved_ports: dict[str, dict] = {}
+        # Reserve the ports this model really has BEFORE anything is remapped.
+        # A plan names both the ports its hardware has ('g0/1') and ports it
+        # invented to keep a chain apart ('g1/0' on a machine whose slots stop
+        # at 0/2).  Reserving the real names first means the invented one takes
+        # what is left, instead of stealing the port a real name needs - the
+        # exact-name lookup in resolve_port is what let both land on Gi0/1.
+        for spec in wanted.get(name, []):
+            exact = exact_port(variant, spec)
+            if exact is not None:
+                resolved_ports.setdefault(normalize_port_name(spec), exact)
         if name in sections["configs"]:
             config_lines, dropped = _sanitize_config_lines(
                 sections["configs"][name])
@@ -1298,8 +2038,20 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
         # text opens with every referenced interface down (the serial link
         # shows red).  `no shutdown` and `ip address` therefore land on the
         # port element too.
+        by_name = {normalize_port_name(port.get("name")): port
+                   for port in variant.get("ports") or [] if port.get("name")}
         for ifname, sub in _interface_blocks(config_lines).items():
-            port, _note = _resolve_cached(variant, ifname, resolved_ports)
+            # A dot1Q sub-interface resolves to its parent's port; its own
+            # address must NOT be mirrored onto that physical port (the
+            # parent is a trunk - the address lives in PT's sub-interface
+            # config text, which the saved <LINE> list already carries).
+            if _SUBINTERFACE.match(ifname):
+                continue
+            # The config was already rewritten to the model's own port names
+            # above, so this is a plain lookup - asking the allocator again
+            # would look like a second interface trying to take a port that
+            # is (correctly) already spoken for.
+            port = by_name.get(normalize_port_name(ifname))
             if not port:
                 continue
             used_ports[(name, port["name"])] = True
@@ -1427,6 +2179,27 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
             "cable": str(link.get("cable") or "copper"),
         })
 
+    # ONE INTERFACE, ONE CABLE.  A plan may name the same port twice (the
+    # validator reports that), but the generator must never *create* it: two
+    # <LINK> records on one port is what Packet Tracer refuses to load, and
+    # the second `interface` block in the config silently overwrites the
+    # first, which is how a whole transit subnet and its OSPF network went
+    # missing while the file still looked complete.  Report it rather than
+    # ship it quietly.
+    cable_count: dict[tuple, int] = {}
+    for link in link_report:
+        for side in ("a", "b"):
+            device = str(link.get(side) or "")
+            port = str(link.get(f"{side}If") or "")
+            if device and port:
+                cable_count[(device, port)] = cable_count.get(
+                    (device, port), 0) + 1
+    for (device, port), count in sorted(cable_count.items()):
+        if count > 1:
+            warnings.append(
+                f"{device}: {port} is cabled {count} times - one interface "
+                "cannot carry two cables, so only one of them can work")
+
     if not sections["servers"]:
         pass
     elif not any(entry.get("services") for entry in device_report):
@@ -1472,6 +2245,9 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
         "plannedLinks": len(sections["links"]),
         "templateVersion": library.get("version") or "",
         "templateDirectory": library.get("_directory") or "",
+        # Which drawing was used, so the app can tell the user what changed
+        # instead of asserting that something did.
+        "layout": layout,
     }
 
 
@@ -2120,9 +2896,27 @@ def _validate_physical_workspace(xml: bytes) -> None:
                                  "match its workspace leaf")
 
 
+def _backup_existing(target: str) -> str:
+    """Copy the file about to be replaced aside; return the copy's path.
+
+    The name carries a timestamp so repeated edits keep every generation, and
+    a second in the same second never overwrites the first backup.
+    """
+    stem, ext = os.path.splitext(target)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    candidate = f"{stem}.backup-{stamp}{ext or '.pkt'}"
+    n = 2
+    while os.path.exists(candidate):
+        candidate = f"{stem}.backup-{stamp}-{n}{ext or '.pkt'}"
+        n += 1
+    shutil.copy2(target, candidate)
+    return candidate
+
+
 def generate_pkt_file(plan: dict, out_path: str, *, project: str = "",
                       library: dict | None = None, version: str = "",
-                      replace: bool = False, log=None) -> dict:
+                      replace: bool = False, backup: bool = True,
+                      log=None) -> dict:
     """Build the topology and write it as a .pkt.  Returns the report."""
     say = log or (lambda *_: None)
     target = os.path.abspath(os.path.expanduser(str(out_path or "").strip()))
@@ -2131,6 +2925,14 @@ def generate_pkt_file(plan: dict, out_path: str, *, project: str = "",
     if os.path.exists(target) and not replace:
         raise FileExistsError(f"refusing to overwrite an existing file: "
                               f"{target}")
+    # Editing a project in place must never cost the user the file they had.
+    # The replaced build is copied aside first and its name is reported, so an
+    # in-place edit is reversible without a separate backup habit.
+    backup_path = ""
+    if replace and backup and os.path.exists(target):
+        backup_path = _backup_existing(target)
+        if backup_path:
+            say(f"kept the previous build as {backup_path}")
     parent = os.path.dirname(target)
     if parent and not os.path.isdir(parent):
         raise BuildError(f"output directory does not exist: {parent}")
@@ -2156,10 +2958,19 @@ def generate_pkt_file(plan: dict, out_path: str, *, project: str = "",
         "devices": built["devices"],
         "links": built["links"],
         "warnings": built["warnings"],
+        # The drawing this file was actually written with, so the app can
+        # remember it and the next build keeps it.  Dropping it here is what
+        # made a chosen layout silently revert to the default one: the app
+        # asked for it, the engine honoured it, and then the answer said
+        # nothing about what had been used.
+        "layout": built["layout"],
         "encodeMs": round(elapsed * 1000, 1),
         "authority": "NetBuilder offline generator",
         "binaryAuthority": "NetBuilder pkt_codec (verified container format)",
     }
+    if backup_path:
+        report["backupPath"] = backup_path
+        report["backupName"] = os.path.basename(backup_path)
     say(f"generated {target} ({report['bytes']} bytes, "
         f"{report['deviceCount']} devices, {report['linkCount']} links)")
     return report

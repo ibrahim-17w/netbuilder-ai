@@ -11,6 +11,8 @@ import '../services/diagnostics_service.dart';
 import '../services/network_math.dart';
 import '../services/network_tools.dart';
 import '../services/validator_service.dart';
+import '../theme/app_kit.dart';
+import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_dialogs.dart';
 
@@ -142,12 +144,12 @@ class _NetworkToolkitScreenState extends State<NetworkToolkitScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SizedBox(
-                  height: 46,
+                  height: 50,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppTheme.s12,
-                      vertical: AppTheme.s4,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppTheme.gutter(context),
+                      vertical: AppTheme.s6,
                     ),
                     children: [
                       for (final section in ToolkitSection.values)
@@ -172,24 +174,52 @@ class _NetworkToolkitScreenState extends State<NetworkToolkitScreen> {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(
-                width: 268,
-                child: NavigationRail(
-                  extended: true,
-                  minExtendedWidth: 268,
-                  selectedIndex: _section.index,
-                  onDestinationSelected: (index) =>
-                      setState(() => _section = ToolkitSection.values[index]),
-                  destinations: [
+              // The tool list, with what each tool is for under its name: a
+              // rail of bare labels made the blurb (and so the tool) invisible
+              // until it had already been opened.
+              Container(
+                width: 296,
+                decoration: BoxDecoration(
+                  color: AppPalette.panel(theme.colorScheme),
+                  border: Border(
+                    right: BorderSide(
+                      color: AppPalette.hairline(theme.colorScheme),
+                    ),
+                  ),
+                ),
+                child: ListView(
+                  padding: const EdgeInsets.all(AppTheme.s10),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppTheme.s8,
+                        AppTheme.s4,
+                        AppTheme.s8,
+                        AppTheme.s8,
+                      ),
+                      child: Text(
+                        'TOOLS',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                    ),
                     for (final section in ToolkitSection.values)
-                      NavigationRailDestination(
-                        icon: Icon(section.icon),
-                        label: Text(section.title),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: AppRowTile(
+                          icon: section.icon,
+                          title: section.title,
+                          subtitle: section.blurb,
+                          dense: true,
+                          selected: section == _section,
+                          onTap: () => setState(() => _section = section),
+                        ),
                       ),
                   ],
                 ),
               ),
-              const VerticalDivider(width: 1),
               Expanded(
                 child: ColoredBox(
                   color: theme.scaffoldBackgroundColor,
@@ -235,28 +265,10 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppTheme.s20),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: AppTheme.wideMeasure),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(title, style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: AppTheme.s4),
-              Text(
-                blurb,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: AppTheme.s20),
-              ...children,
-            ],
-          ),
-        ),
-      ),
+    return AppPage(
+      maxWidth: AppTheme.wideMeasure,
+      header: AppPageHeader(title: title, description: blurb),
+      children: children,
     );
   }
 }
@@ -295,6 +307,7 @@ class _Field extends StatelessWidget {
           hintText: hint.isEmpty ? null : hint,
           helperText: helper.isEmpty ? null : helper,
           helperMaxLines: 2,
+          border: const OutlineInputBorder(),
         ),
       ),
     );
@@ -311,49 +324,33 @@ class _Result extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      color: error ? theme.colorScheme.errorContainer.withValues(alpha: 0.35) : null,
-      child: Padding(
-        padding: const EdgeInsets.all(AppTheme.s12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(title, style: theme.textTheme.titleSmall),
-                ),
-                IconButton(
-                  tooltip: 'Copy',
-                  visualDensity: VisualDensity.compact,
-                  iconSize: 18,
-                  icon: const Icon(Icons.copy_all_outlined),
-                  onPressed: () => copyText(context, body, message: 'Copied $title'),
-                ),
-              ],
-            ),
-            if (body.trim().isEmpty)
-              Text(
-                'Nothing to show.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              )
-            else
-              SelectionArea(
-                child: Text(
-                  body,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontFamily: 'monospace',
-                    fontSize: 12.5,
-                    height: 1.5,
-                  ),
-                ),
-              ),
-          ],
+    return AppPanel(
+      tone: error ? AppTone.danger : AppTone.neutral,
+      filled: error,
+      icon: error ? Icons.error_outline : Icons.check_circle_outline,
+      title: title,
+      actions: [
+        IconButton(
+          tooltip: 'Copy',
+          visualDensity: VisualDensity.compact,
+          iconSize: 18,
+          icon: const Icon(Icons.copy_all_outlined),
+          onPressed: () => copyText(context, body, message: 'Copied $title'),
         ),
-      ),
+      ],
+      child: body.trim().isEmpty
+          ? Text(
+              'Nothing to show.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            )
+          : AppCodeBlock(
+              text: body,
+              maxHeight: 320,
+              copyable: false,
+              compact: true,
+            ),
     );
   }
 }
@@ -369,38 +366,29 @@ class _ProbeLog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (entries.isEmpty) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(AppTheme.s12),
-          child: Text(
-            'No results yet - run a check above.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ),
+      return const AppPanel(
+        icon: Icons.checklist_rtl,
+        title: 'Results',
+        subtitle: 'No results yet - run a check above.',
       );
     }
     final all = entries
         .map((e) => '--- ${e.title} ---\n${e.body}')
         .join('\n\n');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Results',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-            ),
-            TextButton.icon(
-              onPressed: () => copyText(context, all, message: 'Copied every result'),
-              icon: const Icon(Icons.copy_all_outlined, size: 18),
-              label: const Text('Copy all'),
-            ),
-            TextButton(onPressed: onClear, child: const Text('Clear')),
-          ],
+    return AppPanel(
+      icon: Icons.checklist_rtl,
+      title: 'Results',
+      subtitle: '${entries.length} probe(s) · newest first',
+      actions: [
+        TextButton.icon(
+          onPressed: () =>
+              copyText(context, all, message: 'Copied every result'),
+          icon: const Icon(Icons.copy_all_outlined, size: 18),
+          label: const Text('Copy all'),
         ),
+        TextButton(onPressed: onClear, child: const Text('Clear')),
+      ],
+      children: [
         for (final entry in entries)
           _Result(title: entry.title, body: entry.body, error: entry.error),
       ],
@@ -480,74 +468,73 @@ class _SubnetToolState extends State<_SubnetTool> {
         if (!ok)
           _Result(
             title: 'Not a valid IPv4 network',
-            body: '"${_cidr.text}" did not parse. Expected something like '
+            body:
+                '"${_cidr.text}" did not parse. Expected something like '
                 '192.168.1.0/24.',
             error: true,
           )
         else ...[
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(AppTheme.s12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    NetworkMath.describe(_cidr.text.trim()),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Divider(height: AppTheme.s20),
-                  AppKeyValue(label: 'Network', value: '${_facts['network']}'),
-                  AppKeyValue(label: 'Prefix', value: '/${_facts['prefix']}'),
-                  AppKeyValue(label: 'Subnet mask', value: '${_facts['mask']}'),
-                  AppKeyValue(
-                    label: 'Wildcard (ACL)',
-                    value: '${_facts['wildcard']}',
-                  ),
-                  AppKeyValue(
-                    label: 'Broadcast',
-                    value: '${_facts['broadcast']}',
-                  ),
-                  AppKeyValue(
-                    label: 'Host range',
-                    value: '${_facts['firstHost']} - ${_facts['lastHost']}',
-                  ),
-                  AppKeyValue(
-                    label: 'Addresses',
-                    value:
-                        '${_facts['totalAddresses']} total, '
-                        '${_facts['usableHosts']} usable',
-                  ),
-                  AppKeyValue(label: 'Scope', value: '${_facts['scope']}'),
-                  AppKeyValue(
-                    label: 'Classful',
-                    value: 'class ${_facts['classfulClass']}'
-                        '${(_facts['classfulMask'] as String).isEmpty ? '' : ' (default mask ${_facts['classfulMask']})'}',
-                  ),
-                  AppKeyValue(label: 'Reverse DNS', value: '${_facts['reverseDns']}'),
-                  AppKeyValue(
-                    label: 'Reverse zone',
-                    value: '${_facts['reverseZone']}',
-                  ),
-                  AppKeyValue(
-                    label: 'Previous block',
-                    value:
-                        '${(_facts['previous'] as String).isEmpty ? 'none' : _facts['previous']}',
-                  ),
-                  AppKeyValue(
-                    label: 'Next block',
-                    value:
-                        '${(_facts['next'] as String).isEmpty ? 'none' : _facts['next']}',
-                  ),
-                ],
+          AppPanel(
+            icon: Icons.lan_outlined,
+            title: NetworkMath.describe(_cidr.text.trim()),
+            children: [
+              Text(
+                NetworkMath.describe(_cidr.text.trim()),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
-            ),
+              const Divider(height: AppTheme.s20),
+              AppKeyValue(label: 'Network', value: '${_facts['network']}'),
+              AppKeyValue(label: 'Prefix', value: '/${_facts['prefix']}'),
+              AppKeyValue(label: 'Subnet mask', value: '${_facts['mask']}'),
+              AppKeyValue(
+                label: 'Wildcard (ACL)',
+                value: '${_facts['wildcard']}',
+              ),
+              AppKeyValue(label: 'Broadcast', value: '${_facts['broadcast']}'),
+              AppKeyValue(
+                label: 'Host range',
+                value: '${_facts['firstHost']} - ${_facts['lastHost']}',
+              ),
+              AppKeyValue(
+                label: 'Addresses',
+                value:
+                    '${_facts['totalAddresses']} total, '
+                    '${_facts['usableHosts']} usable',
+              ),
+              AppKeyValue(label: 'Scope', value: '${_facts['scope']}'),
+              AppKeyValue(
+                label: 'Classful',
+                value:
+                    'class ${_facts['classfulClass']}'
+                    '${(_facts['classfulMask'] as String).isEmpty ? '' : ' (default mask ${_facts['classfulMask']})'}',
+              ),
+              AppKeyValue(
+                label: 'Reverse DNS',
+                value: '${_facts['reverseDns']}',
+              ),
+              AppKeyValue(
+                label: 'Reverse zone',
+                value: '${_facts['reverseZone']}',
+              ),
+              AppKeyValue(
+                label: 'Previous block',
+                value:
+                    '${(_facts['previous'] as String).isEmpty ? 'none' : _facts['previous']}',
+              ),
+              AppKeyValue(
+                label: 'Next block',
+                value:
+                    '${(_facts['next'] as String).isEmpty ? 'none' : _facts['next']}',
+              ),
+            ],
           ),
           const SizedBox(height: AppTheme.s12),
           _Result(
             title: 'Binary',
-            body: 'address  ${_facts['binary']}\n'
+            body:
+                'address  ${_facts['binary']}\n'
                 'mask     ${_facts['binaryMask']}\n'
                 '         ${_networkMarker(_facts['prefix'] as int)}'
                 'network part | host part',
@@ -574,9 +561,11 @@ class _SubnetToolState extends State<_SubnetTool> {
                     spacing: AppTheme.s6,
                     runSpacing: AppTheme.s6,
                     children: [
-                      for (var prefix = (_facts['prefix'] as int) + 1;
-                          prefix <= 32 && prefix <= (_facts['prefix'] as int) + 6;
-                          prefix++)
+                      for (
+                        var prefix = (_facts['prefix'] as int) + 1;
+                        prefix <= 32 && prefix <= (_facts['prefix'] as int) + 6;
+                        prefix++
+                      )
                         ActionChip(
                           label: Text(
                             '/$prefix  x${NetworkMath.splitCount(_cidr.text.trim(), prefix)}',
@@ -604,7 +593,8 @@ class _SubnetToolState extends State<_SubnetTool> {
                             }
                             showArtifactDialog(
                               context,
-                              title: '${NetworkMath.splitCount(_cidr.text.trim(), prefix)} subnets '
+                              title:
+                                  '${NetworkMath.splitCount(_cidr.text.trim(), prefix)} subnets '
                                   'of /$prefix',
                               subtitle: 'From ${_cidr.text.trim()}',
                               text: parts.join('\n'),
@@ -707,80 +697,69 @@ class _VlsmToolState extends State<_VlsmTool> {
               : 'Not a valid block yet.',
           onChanged: (_) => _compute(),
         ),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(AppTheme.s12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
+        AppPanel(
+          icon: Icons.list_alt_outlined,
+          title: 'Requirements',
+          subtitle: 'One row per site or department.',
+          actions: [
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _rows.add((
+                    name: TextEditingController(),
+                    hosts: TextEditingController(text: '24'),
+                  ));
+                });
+                _compute();
+              },
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add site'),
+            ),
+          ],
+          children: [
+            for (var i = 0; i < _rows.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(top: AppTheme.s8),
+                child: Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        'Requirements',
-                        style: Theme.of(context).textTheme.titleSmall,
+                      flex: 3,
+                      child: TextField(
+                        controller: _rows[i].name,
+                        onChanged: (_) => _compute(),
+                        decoration: const InputDecoration(
+                          labelText: 'Site',
+                          isDense: true,
+                        ),
                       ),
                     ),
-                    TextButton.icon(
+                    const SizedBox(width: AppTheme.s8),
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: _rows[i].hosts,
+                        keyboardType: TextInputType.number,
+                        onChanged: (_) => _compute(),
+                        decoration: const InputDecoration(
+                          labelText: 'Hosts',
+                          isDense: true,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Remove',
+                      icon: const Icon(Icons.remove_circle_outline),
                       onPressed: () {
-                        setState(() {
-                          _rows.add((
-                            name: TextEditingController(),
-                            hosts: TextEditingController(text: '24'),
-                          ));
-                        });
+                        final row = _rows.removeAt(i);
+                        row.name.dispose();
+                        row.hosts.dispose();
                         _compute();
                       },
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('Add site'),
                     ),
                   ],
                 ),
-                for (var i = 0; i < _rows.length; i++)
-                  Padding(
-                    padding: const EdgeInsets.only(top: AppTheme.s8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: TextField(
-                            controller: _rows[i].name,
-                            onChanged: (_) => _compute(),
-                            decoration: const InputDecoration(
-                              labelText: 'Site',
-                              isDense: true,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: AppTheme.s8),
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: _rows[i].hosts,
-                            keyboardType: TextInputType.number,
-                            onChanged: (_) => _compute(),
-                            decoration: const InputDecoration(
-                              labelText: 'Hosts',
-                              isDense: true,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: 'Remove',
-                          icon: const Icon(Icons.remove_circle_outline),
-                          onPressed: () {
-                            final row = _rows.removeAt(i);
-                            row.name.dispose();
-                            row.hosts.dispose();
-                            _compute();
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
+              ),
+          ],
         ),
         const SizedBox(height: AppTheme.s12),
         if (_plan.isEmpty)
@@ -863,7 +842,10 @@ class _SummarizeToolState extends State<_SummarizeTool> {
         if (NetworkTools.parseCidr(cidr) == null) cidr,
     ];
     final summary = NetworkMath.summarize(cidrs);
-    final range = NetworkMath.rangeToCidrs(_start.text.trim(), _end.text.trim());
+    final range = NetworkMath.rangeToCidrs(
+      _start.text.trim(),
+      _end.text.trim(),
+    );
     return _Section(
       title: ToolkitSection.summarize.title,
       blurb: ToolkitSection.summarize.blurb,
@@ -885,11 +867,7 @@ class _SummarizeToolState extends State<_SummarizeTool> {
         ),
         if (invalid.isNotEmpty) ...[
           const SizedBox(height: AppTheme.s12),
-          _Result(
-            title: 'Not valid',
-            body: invalid.join('\n'),
-            error: true,
-          ),
+          _Result(title: 'Not valid', body: invalid.join('\n'), error: true),
         ],
         const Divider(height: AppTheme.s32),
         Text(
@@ -924,31 +902,20 @@ class _SummarizeToolState extends State<_SummarizeTool> {
           error: range.isEmpty,
         ),
         const SizedBox(height: AppTheme.s12),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(AppTheme.s12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Do these two overlap?',
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                Text(
-                  'Compared against every pair above, plus the two range endpoints.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: AppTheme.s8),
-                Text(
-                  NetworkMath.overlaps(_start.text.trim(), _end.text.trim())
-                      ? '${_start.text.trim()} and ${_end.text.trim()} '
-                            'share addresses (${NetworkMath.coveringPrefix(_start.text.trim(), _end.text.trim()) ?? '?'}).'
-                      : 'They do not overlap.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ],
+        AppPanel(
+          icon: Icons.compare_arrows,
+          title: 'Do these two overlap?',
+          subtitle:
+              'Compared against every pair above, plus the two range endpoints.',
+          children: [
+            Text(
+              NetworkMath.overlaps(_start.text.trim(), _end.text.trim())
+                  ? '${_start.text.trim()} and ${_end.text.trim()} '
+                        'share addresses (${NetworkMath.coveringPrefix(_start.text.trim(), _end.text.trim()) ?? '?'}).'
+                  : 'They do not overlap.',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
-          ),
+          ],
         ),
       ],
     );
@@ -1002,8 +969,9 @@ class _AddressingToolState extends State<_AddressingTool> {
               '${(entry['ipCidr'] ?? '').toString().split('/').first}, which is '
               'the network or broadcast address of that subnet',
     ];
-    final issues =
-        intent == null ? const [] : ValidatorService.validate(intent);
+    final issues = intent == null
+        ? const []
+        : ValidatorService.validate(intent);
     final manualList = [
       for (final line in _manual.text.split('\n'))
         if (line.trim().isNotEmpty) line.trim(),
@@ -1017,14 +985,16 @@ class _AddressingToolState extends State<_AddressingTool> {
         if (intent == null)
           const _Result(
             title: 'No plan is open',
-            body: 'Open the make/build screen to plan a network, or use the '
+            body:
+                'Open the make/build screen to plan a network, or use the '
                 'manual check below. Every check here also runs on the '
                 'current plan automatically.',
           )
         else ...[
           _Result(
             title: 'Plan under check',
-            body: '${intent.projectName}: ${intent.nodes.length} devices, '
+            body:
+                '${intent.projectName}: ${intent.nodes.length} devices, '
                 '${intent.links.length} links, '
                 '${intent.addressing.length} addressed interfaces, '
                 'routing ${intent.routing}.',
@@ -1050,8 +1020,9 @@ class _AddressingToolState extends State<_AddressingTool> {
                 : 'Overlapping subnets: ${overlaps.length}',
             body: overlaps.isEmpty
                 ? ''
-                : [for (final pair in overlaps) '${pair.$1}  <->  ${pair.$2}']
-                      .join('\n'),
+                : [
+                    for (final pair in overlaps) '${pair.$1}  <->  ${pair.$2}',
+                  ].join('\n'),
             error: overlaps.isNotEmpty,
           ),
           const SizedBox(height: AppTheme.s12),
@@ -1075,10 +1046,7 @@ class _AddressingToolState extends State<_AddressingTool> {
           ),
           const Divider(height: AppTheme.s32),
         ],
-        Text(
-          'Manual check',
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
+        Text('Manual check', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: AppTheme.s8),
         _Field(
           label: 'Subnets, one per line',
@@ -1181,91 +1149,82 @@ class _AclToolState extends State<_AclTool> {
         if (resolved.isEmpty)
           _Result(
             title: 'Could not read that',
-            body: 'Expected 192.168.10.0/24 or a contiguous mask like '
+            body:
+                'Expected 192.168.10.0/24 or a contiguous mask like '
                 '255.255.255.0.',
             error: true,
           )
         else
           _Result(
             title: 'Masks',
-            body: 'network     ${resolved['network']}${resolved['prefix']}\n'
+            body:
+                'network     ${resolved['network']}${resolved['prefix']}\n'
                 'mask        ${resolved['mask']}\n'
                 'wildcard    ${resolved['wildcard']}\n'
                 'binary      ${resolved['binary']}\n'
                 'reverse     $reverseDns',
           ),
         const SizedBox(height: AppTheme.s12),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(AppTheme.s12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+        AppPanel(
+          icon: Icons.shield_outlined,
+          title: 'Build an ACL line',
+          subtitle: 'A ready-to-paste standard ACL entry.',
+          children: [
+            const SizedBox(height: AppTheme.s8),
+            Row(
               children: [
-                Text(
-                  'Build an ACL line',
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: AppTheme.s8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _Field(
-                        label: 'ACL number',
-                        controller: _aclNumber,
-                        onChanged: (_) => setState(() {}),
-                      ),
-                    ),
-                    const SizedBox(width: AppTheme.s8),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _action,
-                        decoration: const InputDecoration(
-                          labelText: 'Action',
-                          isDense: true,
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'permit', child: Text('permit')),
-                          DropdownMenuItem(value: 'deny', child: Text('deny')),
-                        ],
-                        onChanged: (v) =>
-                            setState(() => _action = v ?? 'permit'),
-                      ),
-                    ),
-                    const SizedBox(width: AppTheme.s8),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _protocol,
-                        decoration: const InputDecoration(
-                          labelText: 'Protocol',
-                          isDense: true,
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'ip', child: Text('ip')),
-                          DropdownMenuItem(value: 'tcp', child: Text('tcp')),
-                          DropdownMenuItem(value: 'udp', child: Text('udp')),
-                          DropdownMenuItem(value: 'icmp', child: Text('icmp')),
-                        ],
-                        onChanged: (v) => setState(() => _protocol = v ?? 'ip'),
-                      ),
-                    ),
-                    const SizedBox(width: AppTheme.s8),
-                    Expanded(
-                      child: _Field(
-                        label: 'Port (optional)',
-                        controller: _port,
-                        onChanged: (_) => setState(() {}),
-                      ),
-                    ),
-                  ],
-                ),
-                if (aclLine.isNotEmpty)
-                  _Result(
-                    title: 'Standard/extended ACL entry',
-                    body: aclLine,
+                Expanded(
+                  child: _Field(
+                    label: 'ACL number',
+                    controller: _aclNumber,
+                    onChanged: (_) => setState(() {}),
                   ),
+                ),
+                const SizedBox(width: AppTheme.s8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _action,
+                    decoration: const InputDecoration(
+                      labelText: 'Action',
+                      isDense: true,
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'permit', child: Text('permit')),
+                      DropdownMenuItem(value: 'deny', child: Text('deny')),
+                    ],
+                    onChanged: (v) => setState(() => _action = v ?? 'permit'),
+                  ),
+                ),
+                const SizedBox(width: AppTheme.s8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _protocol,
+                    decoration: const InputDecoration(
+                      labelText: 'Protocol',
+                      isDense: true,
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'ip', child: Text('ip')),
+                      DropdownMenuItem(value: 'tcp', child: Text('tcp')),
+                      DropdownMenuItem(value: 'udp', child: Text('udp')),
+                      DropdownMenuItem(value: 'icmp', child: Text('icmp')),
+                    ],
+                    onChanged: (v) => setState(() => _protocol = v ?? 'ip'),
+                  ),
+                ),
+                const SizedBox(width: AppTheme.s8),
+                Expanded(
+                  child: _Field(
+                    label: 'Port (optional)',
+                    controller: _port,
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
               ],
             ),
-          ),
+            if (aclLine.isNotEmpty)
+              _Result(title: 'Standard/extended ACL entry', body: aclLine),
+          ],
         ),
       ],
     );
@@ -1357,7 +1316,11 @@ class _DiagnosticsToolState extends State<_DiagnosticsTool> {
                   : () => _run('Ping $host', () async {
                       final r = await _service.ping(host);
                       return '${r.summary}\n\n'
-                          'Interpretation: ${r.ok ? 'the address answered ICMP.' : r.transmitted == 0 ? 'no reply was received - the host is down, filtering ICMP, or the name did not resolve.' : 'the host answered but lost packets, which points at the link rather than the device.'}';
+                          'Interpretation: ${r.ok
+                              ? 'the address answered ICMP.'
+                              : r.transmitted == 0
+                              ? 'no reply was received - the host is down, filtering ICMP, or the name did not resolve.'
+                              : 'the host answered but lost packets, which points at the link rather than the device.'}';
                     }),
               icon: const Icon(Icons.network_ping, size: 18),
               label: const Text('Ping (desktop)'),
@@ -1434,10 +1397,7 @@ class _DiagnosticsToolState extends State<_DiagnosticsTool> {
           ),
         ),
         if (_busy) const LinearProgressIndicator(minHeight: 2),
-        _ProbeLog(
-          entries: _log,
-          onClear: () => setState(_log.clear),
-        ),
+        _ProbeLog(entries: _log, onClear: () => setState(_log.clear)),
         const SizedBox(height: AppTheme.s12),
         Text(
           'Every probe runs from this machine to the address you typed. '
@@ -1514,7 +1474,8 @@ class _LocalToolState extends State<_LocalTool> {
                       }
                       return entries
                           .map(
-                            (e) => '${e.address.padRight(16)} '
+                            (e) =>
+                                '${e.address.padRight(16)} '
                                 '${e.mac.padRight(20)} ${e.dynamic_ ? 'dynamic' : 'static'}'
                                 '${e.iface.isEmpty ? '' : '  ${e.iface}'}',
                           )
@@ -1570,34 +1531,25 @@ class _ExporterTool extends StatelessWidget {
         if (plan == null)
           const _Result(
             title: 'No plan is open',
-            body: 'Plan a network first - the exporters render the plan that '
+            body:
+                'Plan a network first - the exporters render the plan that '
                 'is currently open, so what you copy is what was reviewed.',
           )
         else
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(AppTheme.s12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Current plan: ${plan.projectName}',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  Text(
-                    '${plan.nodes.length} devices, ${plan.links.length} links, '
-                    '${plan.addressing.length} interfaces, routing ${plan.routing}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
+          AppPanel(
+            icon: Icons.account_tree_outlined,
+            title: 'Current plan: ${plan.projectName}',
+            subtitle:
+                '${plan.nodes.length} devices, '
+                '${plan.links.length} links, '
+                '${plan.addressing.length} interfaces, routing ${plan.routing}',
           ),
         if (plan != null) ...[
           const SizedBox(height: AppTheme.s12),
           _ExportTile(
             title: 'Cisco IOS configuration',
-            description: 'Hostname, interfaces, routing, security and lines '
+            description:
+                'Hostname, interfaces, routing, security and lines '
                 'for every device.',
             icon: Icons.terminal,
             render: () {
@@ -1632,7 +1584,8 @@ class _ExporterTool extends StatelessWidget {
           ),
           _ExportTile(
             title: 'Plan JSON',
-            description: 'The whole intent, for a ticket, an archive or a diff.',
+            description:
+                'The whole intent, for a ticket, an archive or a diff.',
             icon: Icons.data_object,
             // includeSecrets is off: this text is meant to be pasted into a
             // ticket, and a ticket is not a place for credentials.
@@ -1661,27 +1614,63 @@ class _ExportTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A Card, not a bare row: the exporters are a list of peer panels, and
+    // AppRowTile alone read as loose text. The card keeps them looking like
+    // one family of things you can pick from.
     return Card(
-      child: ListTile(
-        leading: Icon(icon),
-        title: Text(title),
-        subtitle: Text(description),
-        trailing: FilledButton(
-            onPressed: () {
-            String text;
-            try {
-              text = render();
-            } catch (e) {
-              text = 'Could not render this export: $e';
-            }
-            showArtifactDialog(
-              context,
-              title: title,
-              subtitle: description,
-              text: text,
-            );
-          },
-          child: const Text('Generate'),
+      color: AppPalette.panel(Theme.of(context).colorScheme),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppTheme.rLg),
+        side: BorderSide(
+          color: AppPalette.hairline(Theme.of(context).colorScheme),
+        ),
+      ),
+      margin: const EdgeInsets.only(bottom: AppTheme.s10),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTheme.s12,
+          vertical: AppTheme.s8,
+        ),
+        child: Row(
+          children: [
+            AppIconBubble(icon: icon, size: 32),
+            const SizedBox(width: AppTheme.s10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleSmall),
+                  Text(
+                    description,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppTheme.s10),
+            FilledButton.icon(
+              onPressed: () {
+                String text;
+                try {
+                  text = render();
+                } catch (e) {
+                  text = 'Could not render this export: $e';
+                }
+                showArtifactDialog(
+                  context,
+                  title: title,
+                  subtitle: description,
+                  text: text,
+                );
+              },
+              icon: const Icon(Icons.description_outlined, size: 18),
+              label: const Text('Generate'),
+            ),
+          ],
         ),
       ),
     );

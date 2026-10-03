@@ -1,10 +1,15 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:net_builder/models/chat_message.dart';
 import 'package:net_builder/services/ai_provider.dart';
+import 'package:net_builder/services/chat_service.dart';
+import 'package:net_builder/services/context_report.dart';
+import 'package:net_builder/services/generation_control.dart';
 import 'package:net_builder/services/openai_chat_service.dart';
 import 'package:net_builder/services/provider_chat_service.dart';
 import 'package:net_builder/services/settings_service.dart';
@@ -41,6 +46,31 @@ class _FakeEndpoint extends http.BaseClient {
   }
 }
 
+/// A transport the test drives by hand, so "the user pressed stop halfway
+/// through" and "the provider went quiet" are real events here.
+class _HandDrivenClient extends http.BaseClient {
+  _HandDrivenClient(this.pieces);
+  final Stream<List<int>> pieces;
+  String? lastBody;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    if (request is http.Request) lastBody = request.body;
+    return http.StreamedResponse(
+      pieces,
+      200,
+      headers: {'content-type': 'text/event-stream'},
+    );
+  }
+}
+
+/// A transport that accepts the connection and then says nothing at all.
+class _SilentClient extends http.BaseClient {
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) =>
+      Completer<http.StreamedResponse>().future;
+}
+
 AiProviderConfig _cfg({
   String model = 'llama-3.3-70b-versatile',
   String base = 'https://api.groq.com/openai/v1',
@@ -69,6 +99,32 @@ String _chunk(String delta) => 'data: ${jsonEncode({
     },
   ],
 })}\n\n';
+
+/// A 1x1 PNG, written to disk so the attachment path is a real file.
+Future<ChatImage> _shot({String name = 'shot.png'}) async {
+  final dir = await Directory.systemTemp.createTemp('openai-img');
+  final file = File('${dir.path}/$name');
+  await file.writeAsBytes(
+    base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8'
+      'z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    ),
+  );
+  addTearDown(() async {
+    if (dir.existsSync()) await dir.delete(recursive: true);
+  });
+  return ChatImage(path: file.path, name: name, mimeType: 'image/png');
+}
+
+/// Every message in [body] that carries an image, as its decoded content.
+List<List<Map<String, dynamic>>> _imageTurns(String body) {
+  final messages = (jsonDecode(body) as Map)['messages'] as List;
+  return [
+    for (final message in messages)
+      if (message['content'] is List)
+        List<Map<String, dynamic>>.from(message['content'] as List)
+  ].where((parts) => parts.any((p) => p['type'] == 'image_url')).toList();
+}
 
 void main() {
   test('a non-streaming call hits <base>/chat/completions with the model',
@@ -220,9 +276,11 @@ void main() {
       final service = ProviderChatService(
         config: _cfg(),
         openaiKey: 'k',
-        // ~30k tokens: above the fixed per-request reserves, so the
-        // difference is history - and 20 big turns do not all fit.
-        contextTokens: 30000,
+        // 12k tokens against 20 turns of ~900 tokens each: the reserves are
+        // honest (the system prompt is measured, not guessed), so the budget
+        // has to be genuinely smaller than the conversation for anything to
+        // be compacted - which is exactly what this pins.
+        contextTokens: 12000,
       );
       final history = [
         for (var i = 0; i < 10; i++) ...[
@@ -339,6 +397,274 @@ void main() {
       );
       expect(providerCall.body, contains('you are a network engineer'));
       expect(providerCall.body, contains('ORIGINAL request'));
+    });
+  });
+
+  group('images on the OpenAI-compatible path', () {
+    // The Gemini path has sent inlineData for the current turn for a long
+    // time; the OpenAI path dropped the attachments entirely, so a screenshot
+    // worked on one provider and was invisible on the other.
+
+    test('a turn with an image sends image_url parts, on the current turn '
+        'only', () async {
+      final shot = await _shot();
+      final service = ProviderChatService(config: _cfg(), openaiKey: 'k');
+      final messages = await service.openAiRichMessages(
+        history: [
+          ChatMessage(role: 'user', text: 'check PC1'),
+          ChatMessage(role: 'model', text: 'PC1 is fine'),
+        ],
+        text: 'what is wrong here?',
+        systemContext: 'you are a network engineer',
+        attachments: [shot],
+      );
+
+      // History is still plain text: replaying every old screenshot would
+      // multiply the request for no benefit.
+      expect(messages[1]['content'], 'check PC1');
+      expect(messages[2]['content'], isA<String>());
+
+      final parts = messages.last['content'] as List;
+      expect((parts.first as Map)['type'], 'text');
+      expect((parts.first as Map)['text'], 'what is wrong here?');
+      final image = parts.last as Map;
+      expect(image['type'], 'image_url');
+      final url = (image['image_url'] as Map)['url'] as String;
+      expect(url, startsWith('data:image/png;base64,'));
+      expect(url.length, greaterThan('data:image/png;base64,'.length));
+    });
+
+    test('an image-only turn still sends text to sit next to the picture',
+        () async {
+      final shot = await _shot();
+      final service = ProviderChatService(config: _cfg(), openaiKey: 'k');
+      final messages = await service.openAiRichMessages(
+        history: const [],
+        text: '   ',
+        systemContext: 'sys',
+        attachments: [shot],
+      );
+      final parts = messages.last['content'] as List;
+      expect((parts.first as Map)['type'], 'text');
+      expect((parts.first as Map)['text'], '(look at the attached image)');
+    });
+
+    test('a text-only turn keeps the plain string shape', () async {
+      final service = ProviderChatService(config: _cfg(), openaiKey: 'k');
+      final messages = await service.openAiRichMessages(
+        history: const [],
+        text: 'why?',
+        systemContext: 'sys',
+      );
+      expect(messages.last['content'], 'why?');
+    });
+
+    test('the per-turn image cap is the same one Gemini uses', () async {
+      final shots = [
+        for (var i = 0; i < ChatService.maxImagesPerTurn + 2; i++)
+          await _shot(name: 'shot$i.png'),
+      ];
+      final service = ProviderChatService(config: _cfg(), openaiKey: 'k');
+      final messages = await service.openAiRichMessages(
+        history: const [],
+        text: 'look',
+        systemContext: 'sys',
+        attachments: shots,
+      );
+      final parts = messages.last['content'] as List;
+      expect(
+        parts.where((p) => p['type'] == 'image_url').length,
+        ChatService.maxImagesPerTurn,
+      );
+    });
+
+    test('stream() puts the images on the wire', () async {
+      final shot = await _shot();
+      final fake = _FakeEndpoint(
+        pieces: ['${_chunk('I can see the canvas.')}data: [DONE]\n\n'],
+      );
+      final service = ProviderChatService(
+        config: _cfg(),
+        openaiKey: 'sk-test',
+        client: fake,
+      );
+      final pieces = await service
+          .stream(
+            history: const [],
+            text: 'what is wrong here?',
+            systemContext: 'sys',
+            attachments: [shot],
+          )
+          .toList();
+
+      expect(pieces.join(), 'I can see the canvas.');
+      expect(_imageTurns(fake.lastBody!), hasLength(1));
+      expect(fake.lastBody, contains('"stream":true'));
+    });
+
+    test('the request log reports the cost, never the picture', () async {
+      final shot = await _shot();
+      RequestLog.clear();
+      final fake = _FakeEndpoint(
+        pieces: ['${_chunk('I can see the canvas.')}data: [DONE]\n\n'],
+      );
+      final service = ProviderChatService(
+        config: _cfg(),
+        openaiKey: 'sk-test',
+        client: fake,
+      );
+      await service
+          .stream(
+            history: const [],
+            text: 'what is wrong here?',
+            systemContext: 'sys',
+            attachments: [shot],
+          )
+          .toList();
+
+      final report = RequestLog.last!;
+      expect(report.toText(), contains('1 attachment(s)'));
+      final logged = jsonEncode(report.toJson());
+      expect(logged, isNot(contains('base64')));
+      expect(logged, isNot(contains('data:image')));
+    });
+  });
+
+  group('a cancelled turn is not a provider failure', () {
+    test('pressing stop mid-answer raises AbortedException', () async {
+      final control = GenerationControl()..begin();
+      final controller = StreamController<List<int>>();
+      addTearDown(controller.close);
+      final service = OpenAiChatService(
+        config: _cfg(),
+        apiKey: 'sk-test',
+        client: _HandDrivenClient(controller.stream),
+      );
+
+      final collected = <String>[];
+      final run = () async {
+        await for (final piece in service.streamMessages(
+          const [
+            {'role': 'user', 'content': 'hi'},
+          ],
+          abortTrigger: control.abortTrigger,
+        )) {
+          collected.add(piece);
+          if (collected.length == 1) control.cancel();
+        }
+      }();
+
+      controller.add(utf8.encode(_chunk('one')));
+      await pumpEventQueue();
+      controller.add(utf8.encode(_chunk('two')));
+      controller.close();
+
+      await expectLater(run, throwsA(isA<AbortedException>()));
+      expect(collected, ['one'],
+          reason: 'the answer stops where the user stopped it');
+    });
+
+    test('a turn stopped before it starts never reaches the provider',
+        () async {
+      final control = GenerationControl()..begin();
+      control.cancel();
+      final fake = _FakeEndpoint(pieces: [_chunk('never mind')]);
+      final service = OpenAiChatService(
+        config: _cfg(),
+        apiKey: 'sk-test',
+        client: fake,
+      );
+      await expectLater(
+        service
+            .streamMessages(
+              const [
+                {'role': 'user', 'content': 'hi'},
+              ],
+              abortTrigger: control.abortTrigger,
+              // A cancel that happened before this request existed is only
+              // visible synchronously, which is what the chat passes too.
+              abortProbe: () => control.cancelled,
+            )
+            .toList(),
+        throwsA(isA<AbortedException>()),
+      );
+      expect(fake.last, isNull, reason: 'nothing was sent at all');
+    });
+  });
+
+  group('a provider that stops talking is stopped', () {
+    test('headers never arrive', () async {
+      final service = OpenAiChatService(
+        config: _cfg(),
+        apiKey: 'sk-test',
+        client: _SilentClient(),
+      );
+      await expectLater(
+        service
+            .streamMessages(
+              const [
+                {'role': 'user', 'content': 'hi'},
+              ],
+              firstByteTimeout: const Duration(milliseconds: 60),
+            )
+            .toList(),
+        throwsA(predicate((e) => e.toString().contains('timed out'))),
+      );
+    });
+
+    test('the stream goes quiet halfway', () async {
+      final controller = StreamController<List<int>>();
+      addTearDown(controller.close);
+      final service = OpenAiChatService(
+        config: _cfg(),
+        apiKey: 'sk-test',
+        client: _HandDrivenClient(controller.stream),
+      );
+      final run = service
+          .streamMessages(
+            const [
+              {'role': 'user', 'content': 'hi'},
+            ],
+            idleTimeout: const Duration(milliseconds: 80),
+            totalTimeout: const Duration(seconds: 30),
+          )
+          .toList();
+      controller.add(utf8.encode(_chunk('half an answer')));
+      await expectLater(
+        run,
+        throwsA(predicate((e) => e.toString().contains('timed out'))),
+      );
+    });
+
+    test('the stream never ends', () async {
+      final chatter = Stream<List<int>>.periodic(
+        const Duration(milliseconds: 20),
+        (_) => utf8.encode(_chunk('.')),
+      );
+      final service = OpenAiChatService(
+        config: _cfg(),
+        apiKey: 'sk-test',
+        client: _HandDrivenClient(chatter),
+      );
+      await expectLater(
+        service
+            .streamMessages(
+              const [
+                {'role': 'user', 'content': 'hi'},
+              ],
+              idleTimeout: const Duration(seconds: 30),
+              totalTimeout: const Duration(milliseconds: 120),
+            )
+            .toList(),
+        throwsA(predicate((e) => e.toString().contains('timed out'))),
+      );
+    });
+
+    test('the defaults are the ones the chat promises', () {
+      expect(StreamDeadlines.firstByte, const Duration(seconds: 60));
+      expect(StreamDeadlines.idle, const Duration(seconds: 45));
+      expect(StreamDeadlines.total, const Duration(minutes: 5));
+      expect(StreamDeadlines.toolCall, const Duration(seconds: 30));
     });
   });
 }

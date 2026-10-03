@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -6,7 +7,9 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/chat_message.dart';
+import 'ai_provider.dart';
 import 'context_budget.dart';
+import 'generation_control.dart';
 
 /// One parsed assistant turn.
 class ChatReply {
@@ -89,6 +92,8 @@ class ChatService {
     required String systemContext,
     List<ChatImage> attachments = const [],
     int? contextTokens,
+    ContextPlan? plan,
+    bool systemContextIsAssembled = false,
   }) async {
     final key = apiKey.trim();
     if (key.isEmpty) {
@@ -102,16 +107,21 @@ class ChatService {
     // is no turn cap: the old `historyLimit = 20` (plus a 60-message load
     // and a 200-row retention) is exactly why the chat forgot a request
     // made at the start of a session.
-    final plan = ContextBudget.plan(
-      history: history,
-      systemContext: systemContext,
-      pendingText: text,
-      budgetTokens: contextTokens ?? this.contextTokens,
-    );
-    lastPlan = plan;
+    //
+    // A caller that already planned the request (the provider facade, which
+    // owns the runtime window) passes its plan in: planning twice would
+    // budget an already-budgeted history and attach the memory block twice.
+    final effectivePlan = plan ??
+        ContextBudget.plan(
+          history: history,
+          systemContext: systemContext,
+          pendingText: text,
+          budgetTokens: contextTokens ?? this.contextTokens,
+        );
+    lastPlan = effectivePlan;
 
     final contents = <Map<String, dynamic>>[];
-    for (final turn in plan.recentTurns) {
+    for (final turn in effectivePlan.recentTurns) {
       if (turn.actions.isNotEmpty && turn.text.trim().isEmpty) {
         // A turn that was only proposals: keep the prose the user read.
         continue;
@@ -139,25 +149,33 @@ class ChatService {
     }
     contents.add({'role': 'user', 'parts': parts});
 
-    final r = await _client
+    // A momentary 429/5xx is retried: nothing has been sent to the user yet,
+    // so a second try is invisible, and the alternative is answering a blip
+    // with the offline planner instead of the model the user configured.
+    Future<http.Response> post() => _client
         .post(
           Uri.parse(_url(model)),
           headers: _headers(key),
           body: jsonEncode({
-            'contents': contents,
-            'systemInstruction': {
-              'parts': [
-                {
-                  'text': plan.memoryBlock.isEmpty
-                      ? systemContext
-                      : '$systemContext\n\n${plan.memoryBlock}',
-                },
-              ],
-            },
-            'generationConfig': {'responseMimeType': 'application/json'},
-          }),
-        )
+            'contents': contents,          'systemInstruction': {
+            'parts': [
+              {
+                'text':
+                    systemContextIsAssembled || effectivePlan.memoryBlock.isEmpty
+                    ? systemContext
+                    : '$systemContext\n\n${effectivePlan.memoryBlock}',
+              },
+            ],
+          },
+          'generationConfig': {'responseMimeType': 'application/json'},
+        }),
+      )
         .timeout(const Duration(seconds: 90));
+
+    final r = await AiRetry.fetch<http.Response>(
+      send: post,
+      status: (response) => response.statusCode,
+    );
 
     if (r.statusCode != 200) {
       throw Exception(_friendlyError(r.statusCode, r.body, model));
@@ -207,6 +225,14 @@ class ChatService {
   /// Same budget, same memory block and same request as [send] - only the
   /// transport differs (server-sent events), so the chat can show the
   /// answer growing instead of a spinner.
+  ///
+  /// [abortTrigger] completes when the user pressed stop; the request is
+  /// aborted and [AbortedException] is raised, so a cancelled turn is never
+  /// turned into "the provider is down" by the caller. [abortProbe] is the same
+  /// question asked synchronously, for a stop that happened before this request
+  /// was built. The stream is bounded by [StreamDeadlines] - a provider that
+  /// accepts the connection and then says nothing must not leave an empty
+  /// bubble on screen.
   Stream<String> stream({
     required String apiKey,
     required String model,
@@ -215,6 +241,13 @@ class ChatService {
     required String systemContext,
     List<ChatImage> attachments = const [],
     int? contextTokens,
+    ContextPlan? plan,
+    bool systemContextIsAssembled = false,
+    Future<void>? abortTrigger,
+    bool Function()? abortProbe,
+    Duration? firstByteTimeout,
+    Duration? idleTimeout,
+    Duration? totalTimeout,
   }) async* {
     final key = apiKey.trim();
     if (key.isEmpty) {
@@ -222,15 +255,22 @@ class ChatService {
         'No Gemini API key. Add one in Settings - chat needs a model to talk to.',
       );
     }
-    final plan = ContextBudget.plan(
-      history: history,
-      systemContext: systemContext,
-      pendingText: text,
-      budgetTokens: contextTokens ?? this.contextTokens,
+    final signal = AbortSignal(
+      abortTrigger,
+      isAbortedNow: abortProbe,
+      isAbortError: (e) => e is http.RequestAbortedException,
     );
-    lastPlan = plan;
+    signal.throwIfAborted();
+    final effectivePlan = plan ??
+        ContextBudget.plan(
+          history: history,
+          systemContext: systemContext,
+          pendingText: text,
+          budgetTokens: contextTokens ?? this.contextTokens,
+        );
+    lastPlan = effectivePlan;
     final contents = <Map<String, dynamic>>[];
-    for (final turn in plan.recentTurns) {
+    for (final turn in effectivePlan.recentTurns) {
       if (turn.actions.isNotEmpty && turn.text.trim().isEmpty) continue;
       contents.add(turn.toGeminiTurn());
     }
@@ -246,22 +286,51 @@ class ChatService {
     }
     contents.add({'role': 'user', 'parts': parts});
 
-    final request = http.Request('POST', Uri.parse(_streamUrl(model)));
-    request.headers.addAll(_headers(key));
-    request.body = jsonEncode({
-      'contents': contents,
-      'systemInstruction': {
-        'parts': [
-          {
-            'text': plan.memoryBlock.isEmpty
-                ? systemContext
-                : '$systemContext\n\n${plan.memoryBlock}',
-          },
-        ],
-      },
-      'generationConfig': {'responseMimeType': 'application/json'},
-    });
-    final response = await _client.send(request);
+    final started = DateTime.now();
+
+    /// A fresh request per attempt: an http request can only be sent once, so
+    /// a retry needs its own copy.
+    http.AbortableRequest buildRequest() {
+      final request = http.AbortableRequest(
+        'POST',
+        Uri.parse(_streamUrl(model)),
+        abortTrigger: abortTrigger,
+      );
+      request.headers.addAll(_headers(key));
+      request.body = jsonEncode({
+        'contents': contents,
+        'systemInstruction': {
+          'parts': [
+            {
+              'text':
+                  systemContextIsAssembled || effectivePlan.memoryBlock.isEmpty
+                  ? systemContext
+                  : '$systemContext\n\n${effectivePlan.memoryBlock}',
+            },
+          ],
+        },
+        'generationConfig': {'responseMimeType': 'application/json'},
+      });
+      return request;
+    }
+
+    final http.StreamedResponse response;
+    try {
+      // Retried BEFORE the first byte: after that the answer is already
+      // reaching the user and a retry would repeat part of it.
+      response = await AiRetry.fetch<http.StreamedResponse>(
+        send: () => _client
+            .send(buildRequest())
+            .timeout(firstByteTimeout ?? StreamDeadlines.firstByte),
+        status: (r) => r.statusCode,
+        onFailure: (r) => r.stream.drain<void>(),
+      );
+    } on http.RequestAbortedException {
+      throw const AbortedException();
+    } catch (e) {
+      if (signal.isAbortError(e)) throw const AbortedException();
+      rethrow;
+    }
     if (response.statusCode != 200) {
       final body = await response.stream.bytesToString();
       throw Exception(_friendlyError(response.statusCode, body, model));
@@ -269,15 +338,29 @@ class ChatService {
     // A chunk can split a line, so keep the tail and only parse complete
     // lines - otherwise a JSON payload cut in half would be dropped.
     var buffer = '';
-    await for (final piece in response.stream.transform(utf8.decoder)) {
-      buffer += piece;
-      final lines = buffer.split('\n');
-      buffer = lines.removeLast();
-      final delta = sseText('${lines.join('\n')}\n');
-      if (delta.isNotEmpty) yield delta;
+    try {
+      final pieces = StreamDeadlines.guarded(
+        response.stream.transform(utf8.decoder),
+        startedAt: started,
+        idleGap: idleTimeout,
+        budget: totalTimeout,
+      );
+      await for (final piece in pieces) {
+        signal.throwIfAborted();
+        buffer += piece;
+        final lines = buffer.split('\n');
+        buffer = lines.removeLast();
+        final delta = sseText('${lines.join('\n')}\n');
+        if (delta.isNotEmpty) yield delta;
+      }
+      final tail = sseText(buffer);
+      if (tail.isNotEmpty) yield tail;
+    } on http.RequestAbortedException {
+      throw const AbortedException();
+    } on TimeoutException catch (e) {
+      throw Exception(AiErrors.network(e));
     }
-    final tail = sseText(buffer);
-    if (tail.isNotEmpty) yield tail;
+    signal.throwIfAborted();
   }
 
   /// Read the model text out of a generateContent response body.
@@ -328,6 +411,20 @@ class ChatService {
       }
     }
     if (data == null) {
+      // The answer never parsed as JSON. Two salvage paths before giving up:
+      //  * a truncated object still carries a readable "reply" string - keep
+      //    it and say plainly that the rest was cut off;
+      //  * a JSON-looking blob with nothing readable gets a human sentence,
+      //    never raw punctuation on screen.
+      final salvaged = _salvageTruncated(cleaned);
+      if (salvaged != null) return salvaged;
+      if (cleaned.startsWith('{') || cleaned.startsWith('[')) {
+        return ChatReply(
+          text: 'The model\'s answer arrived cut off before it could be read. '
+              'Ask again to retry - or keep going offline, which needs no '
+              'model.',
+        );
+      }
       return ChatReply(text: cleaned);
     }
     final questions = <String>[];
@@ -342,6 +439,94 @@ class ChatService {
       text: (data['reply'] ?? data['text'] ?? '').toString().trim(),
       actions: ChatAction.parseList(data['actions']),
       questions: questions,
+    );
+  }
+
+  /// The readable part of a streaming reply, right now.
+  ///
+  /// Model replies arrive as the JSON object `{"reply": "...", ...}`, so raw
+  /// deltas on screen look like punctuation soup. When [raw] carries a
+  /// `"reply"` string, this returns the string's value so far with escapes
+  /// resolved (it simply stops at the cut when the stream is unfinished).
+  /// Returns null when the text is not that shape - status lines, offline
+  /// answers, plain prose - so callers fall back to showing [raw] as-is.
+  static String? streamPreview(String raw) {
+    final start = RegExp(r'"reply"\s*:\s*"').firstMatch(raw);
+    if (start == null) return null;
+    return _jsonStringValue(raw, start.end);
+  }
+
+  /// Read a JSON string body starting at [from], stopping at its closing
+  /// quote or at the end of the text (a truncated stream has no closing
+  /// quote yet). Escapes are resolved as the model intended them.
+  static String _jsonStringValue(String raw, int from) {
+    final b = StringBuffer();
+    var i = from;
+    while (i < raw.length) {
+      final c = raw[i];
+      if (c == '"') break;
+      if (c == r'\') {
+        if (i + 1 >= raw.length) break;
+        final n = raw[i + 1];
+        switch (n) {
+          case 'n':
+            b.write('\n');
+          case 't':
+            b.write('\t');
+          case 'r':
+            b.write('\r');
+          case 'b':
+            b.write('\b');
+          case 'f':
+            b.write('\f');
+          case 'u':
+            if (i + 6 > raw.length) return b.toString();
+            final code = int.tryParse(raw.substring(i + 2, i + 6), radix: 16);
+            if (code != null) b.write(String.fromCharCode(code));
+            i += 6;
+            continue;
+          default:
+            b.write(n);
+        }
+        i += 2;
+        continue;
+      }
+      b.write(c);
+      i += 1;
+    }
+    return b.toString();
+  }
+
+  /// Keep what a cut-off structured reply still says: the readable reply
+  /// text plus any action list that arrived complete, and an explicit note
+  /// about what could not be recovered.
+  static ChatReply? _salvageTruncated(String raw) {
+    final start = RegExp(r'"reply"\s*:\s*"').firstMatch(raw);
+    if (start == null) return null;
+    final text = _jsonStringValue(raw, start.end).trimRight();
+    if (text.trim().isEmpty) return null;
+    final actions = <ChatAction>[];
+    final listMatch =
+        RegExp(r'"actions"\s*:\s*(\[[^\][]*\])').firstMatch(raw);
+    if (listMatch != null) {
+      try {
+        final decoded = jsonDecode(listMatch.group(1)!);
+        if (decoded is List) actions.addAll(ChatAction.parseList(decoded));
+      } catch (_) {
+        // A half-arrived action list is dropped, not guessed at.
+      }
+    }
+    final note = StringBuffer(
+      "The model's answer was cut off before it finished",
+    );
+    if (raw.contains('"actions"') && actions.isEmpty) {
+      note.write(' and its action list could not be recovered');
+    } else if (actions.isNotEmpty) {
+      note.write('; the actions it did list were kept');
+    }
+    return ChatReply(
+      text: '$text\n\n($note. Ask again if you want the rest.)',
+      actions: actions,
     );
   }
 
@@ -434,6 +619,16 @@ class ChatService {
     sb.writeln();
     sb.writeln('## How to answer (this is what makes you useful)');
     sb.writeln(
+      '- NETWORKING ONLY. This app plans, builds and explains networks '
+      '(Packet Tracer, GNS3, real hardware) and nothing else. If a request '
+      'is not about networks, decline it in ONE short line saying what you '
+      'do instead ("I only do networking - planning, building, explaining '
+      'networks. Tell me what network you need."). Never answer coding '
+      'requests, homework, translations or general-knowledge questions '
+      'here; for network automation asks, answer with device CLI/config '
+      'instead of scripts.',
+    );
+    sb.writeln(
       '- USE THE CONVERSATION. Everything above is the source of truth. '
       'When the user says "it", "that", "the first thing" or "as I '
       'asked", they mean an earlier request in this conversation - go '
@@ -448,6 +643,33 @@ class ChatService {
       '- GIVE GUIDANCE, NOT FILLER. 2-5 concrete steps, the exact '
       'commands/addresses/model names where they apply, and what to check '
       'afterwards. Say what you would do, and why.',
+    );
+    sb.writeln(
+      '- ADVICE GETS A RECOMMENDATION. When the user asks what to buy or '
+      'use, how many they need, which of two options is better, or to '
+      'review a design ("which router should I use in this case?", "how '
+      'many access points for 50 users?", "fiber or copper?", "review my '
+      'design"), answer as an advisor: lead with what YOU would do, then '
+      '2-4 options, each with "choose this when ..." and its trade-off. '
+      'Ground it in the user\'s own numbers and in the plan on the table '
+      '(name its real devices when one exists), give ONE concrete next '
+      'step, and ask at most 2 questions - only ones whose answer would '
+      'change the recommendation.',
+    );
+    sb.writeln(
+      '- ADVICE NEVER CHANGES THE PLAN. A design or purchase question must '
+      'not add devices, rewrite the plan, or propose paste_cli/config_pcs '
+      'for gear that does not exist in it. When the advice implies a plan, '
+      'write the plan-able sentence (say "build it: 1 router, 1 switch, '
+      '2 access points and 10 PCs") instead of performing it.',
+    );
+    sb.writeln(
+      '- NO INVENTED PRICES OR STOCK. Recommend classes of gear (home '
+      'all-in-one, business firewall, L2/L3 switch, ceiling AP) and name '
+      'models/vendors as examples only; say when the answer depends on '
+      'budget, skill or what the ISP hands over. If a plan is on the table, '
+      'give the lab (Packet Tracer/GNS3) equivalent first, then the '
+      'real-world answer, so one reply serves both.',
     );
     sb.writeln(
       '- ASK WHEN IT MATTERS. If the request is ambiguous in a way that '
@@ -487,6 +709,19 @@ class ChatService {
     sb.writeln(
       '- {"kind":"open_project","project":"<name>"} - bring a project up for '
       'review.',
+    );
+    sb.writeln(
+      '- {"kind":"check_plan"} - run the app\'s own validator on the '
+      'current plan (read-only) and show the findings.',
+    );
+    sb.writeln(
+      '- {"kind":"pkt_generate"} - compile the plan that stands right now '
+      'into a real .pkt file, offline (no Packet Tracer, no clicks). This '
+      'is how the app BUILDS files: whenever the user asks to build, '
+      'compile, generate or write the lab file / the .pkt, propose this as '
+      'the first action and say that approving the card builds it. Never '
+      'claim a file was built in prose - only the app reports that, after '
+      'the card runs.',
     );
     sb.writeln();
     sb.writeln('## Output format');
@@ -563,7 +798,9 @@ class ChatService {
     final short = body.length > 500 ? '${body.substring(0, 500)}...' : body;
     if (code == 404) {
       return 'HTTP 404: model "$model" is not available for this key. '
-          'Pick gemini-3.8-flash in Settings. Server: $short';
+          'Pick ${AiProviderConfig.defaultGeminiModel} in Settings '
+          '(${AiProviderConfig.geminiSuggestions.take(2).join(' / ')} are '
+          'current names). Server: $short';
     }
     if (code == 400 && short.contains('API key not valid')) {
       return 'HTTP 400: API key not valid. Create one at '

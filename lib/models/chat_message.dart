@@ -64,11 +64,17 @@ class ChatAction {
     'config_pcs',
     'run_control',
     'open_project',
+    // Read-only: runs the app's own validator on the current plan.
+    'check_plan',
     // Offline capture work: no Packet Tracer, no window, no clicks.
     'pkt_scan',
     'pkt_fix',
     'pkt_undo',
     'pkt_generate',
+    // Rewriting the file this conversation already produced, with a backup.
+    'pkt_edit',
+    // Show the drawing this plan would be built with, before Packet Tracer.
+    'layout_preview',
     'ledger',
   };
 
@@ -88,6 +94,12 @@ class ChatAction {
   ///
   /// Dropping is the safe direction: an unknown kind is a model invention,
   /// and silently ignoring it is better than inventing an executor for it.
+  ///
+  /// Two shapes are accepted: the model's own flat form ({"kind":"pkt_fix",
+  /// "path":...}) and the nested form this class writes to the store
+  /// ({"kind":"pkt_fix","payload":{...}}). Re-reading a saved action through
+  /// the flat parser produced a payload of one key called "payload", so a
+  /// repair card reopened after a restart lost the commands it was about to run.
   static List<ChatAction> parseList(dynamic raw) {
     if (raw is! List) return const [];
     final out = <ChatAction>[];
@@ -96,8 +108,12 @@ class ChatAction {
       final kind = (entry['kind'] ?? '').toString().trim();
       if (!supported.contains(kind)) continue;
       final payload = <String, dynamic>{};
+      final nested = entry['payload'];
+      if (nested is Map) {
+        nested.forEach((k, v) => payload[k.toString()] = v);
+      }
       entry.forEach((k, v) {
-        if (k == 'kind' || k == 'summary') return;
+        if (k == 'kind' || k == 'summary' || k == 'payload') return;
         payload[k.toString()] = v;
       });
       out.add(
@@ -130,13 +146,41 @@ class ChatAction {
             'the autopilot';
       case 'open_project':
         return 'Open project ${payload['project'] ?? ''}';
+      case 'pkt_scan':
+        return 'Re-read ${payload['name'] ?? payload['path'] ?? 'the capture'} '
+            '(read-only)';
+      case 'pkt_fix':
+        return 'Apply the proposed repair to '
+            '${payload['device'] ?? payload['path'] ?? 'the capture'}';
+      case 'pkt_undo':
+        return 'Undo the last repair';
+      case 'pkt_generate':
+        return 'Build the .pkt from the current plan';
+      case 'pkt_edit':
+        return 'Edit ${payload['name'] ?? payload['path'] ?? 'the file'} in '
+            'place (a backup is kept)';
+      case 'layout_preview':
+        return 'Preview the drawing this plan would be built with';
+      case 'ledger':
+        return 'Show the repair ledger';
+      case 'check_plan':
+        return 'Check the plan for errors (read-only)';
     }
     return kind;
   }
 
   /// True when approving this changes something outside the app's memory.
+  ///
+  /// The offline repair actions rewrite a saved capture, so they are as
+  /// consequential as typing CLI on a device and must carry the same warning.
+  /// Building a fresh .pkt does not: it writes a new file and touches no device.
   bool get touchesPacketTracer =>
-      kind == 'paste_cli' || kind == 'config_pcs' || kind == 'run_control';
+      kind == 'paste_cli' ||
+      kind == 'config_pcs' ||
+      kind == 'run_control' ||
+      kind == 'pkt_fix' ||
+      kind == 'pkt_undo' ||
+      kind == 'pkt_edit';
 }
 
 /// One turn of the conversation, including any attachments and proposals.
@@ -149,6 +193,13 @@ class ChatMessage {
   final List<String> executed;
   final String createdAt;
 
+  /// Where this answer came from: "via Google Gemini (gemini-2.5-flash)", or
+  /// "from the built-in planner - no API key". Stored with the turn so a
+  /// reopened conversation still says which model answered it, instead of the
+  /// user having to remember whether a key was set that day. Empty on user
+  /// turns and on turns saved before this field existed.
+  final String source;
+
   const ChatMessage({
     this.id,
     required this.role,
@@ -157,6 +208,7 @@ class ChatMessage {
     this.actions = const [],
     this.executed = const [],
     this.createdAt = '',
+    this.source = '',
   });
 
   bool get isUser => role == 'user';
@@ -170,6 +222,7 @@ class ChatMessage {
     'actionsJson': jsonEncode(actions.map((a) => a.toMap()).toList()),
     'executedJson': jsonEncode(executed),
     'createdAt': createdAt,
+    'source': source,
   };
 
   factory ChatMessage.fromMap(Map<String, dynamic> m) {
@@ -202,6 +255,7 @@ class ChatMessage {
       actions: actions,
       executed: executed,
       createdAt: (m['createdAt'] ?? '').toString(),
+      source: (m['source'] ?? '').toString(),
     );
   }
 
@@ -210,6 +264,7 @@ class ChatMessage {
     List<ChatImage>? images,
     List<ChatAction>? actions,
     List<String>? executed,
+    String? source,
   }) => ChatMessage(
     id: id,
     role: role,
@@ -218,6 +273,7 @@ class ChatMessage {
     actions: actions ?? this.actions,
     executed: executed ?? this.executed,
     createdAt: createdAt,
+    source: source ?? this.source,
   );
 
   /// The turn as the Gemini API expects it, newest last.

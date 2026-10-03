@@ -1,5 +1,8 @@
 import 'dart:convert';
 import '../../models/network_intent.dart';
+import '../layout_engine.dart';
+import '../layout_intent.dart';
+import '../network_tools.dart';
 import 'cisco_adapter.dart';
 
 /// Packet Tracer has NO public API. This adapter produces:
@@ -71,6 +74,14 @@ class PacketTracerAdapter {
     return out;
   }
 
+  /// The first pool address of a /24: x.x.x.50 keeps the low addresses for
+  /// statically addressed gear (routers, servers).
+  static String _poolStart(String gatewayIp) {
+    final o = gatewayIp.split('.');
+    if (o.length != 4) return gatewayIp;
+    return '${o[0]}.${o[1]}.${o[2]}.50';
+  }
+
   static String? _dnsServerIp(NetworkIntent intent) {
     for (final node in intent.nodes) {
       if (node.type != 'server' || !node.services.contains('dns')) continue;
@@ -122,6 +133,34 @@ class PacketTracerAdapter {
           final explicit = explicitRules('dhcp');
           if (explicit.containsKey('pools')) {
             out['dhcp'] = explicit;
+            break;
+          }
+          // Inter-VLAN plans: one pool per VLAN, derived from the router's
+          // dot1Q sub-interface addresses in the plan's addressing (the
+          // single source of truth), so a lease's gateway always matches
+          // the interface that actually serves that VLAN.
+          final subIfaces = intent.addressing.where(
+            (a) =>
+                intent.nodes.any(
+                  (n) => n.name == a.node && n.type == 'router',
+                ) &&
+                a.iface.contains('.'),
+          ).toList();
+          if (subIfaces.isNotEmpty) {
+            out['dhcp'] = {
+              'pools': [
+                for (final a in subIfaces)
+                  {
+                    'poolName': 'VLAN${a.iface.split('.').last}',
+                    'gateway': a.ipCidr.split('/').first,
+                    'dnsServer':
+                        node.services.contains('dns') ? srvIp : a.ipCidr.split('/').first,
+                    'startIp': _poolStart(a.ipCidr.split('/').first),
+                    'mask': '255.255.255.0',
+                    'maxUsers': '100',
+                  },
+              ],
+            };
             break;
           }
           final secDhcp = intent.security;
@@ -262,6 +301,12 @@ class PacketTracerAdapter {
           );
           final serverType = isRadius ? 'RADIUS' : 'TACACS';
           final clients = <Map<String, String>>[];
+          // The shared key both ends must agree on. Kept apart from the
+          // account password below: the key is what the listed client router
+          // has to send, the account is what a user logs in with.
+          final clientKey = (secAaa.aaaPassword ?? '').trim().isNotEmpty
+              ? secAaa.aaaPassword!.trim()
+              : 'cisco';
           if (secAaa.requested &&
               secAaa.aaa &&
               secAaa.aaaRouter != null) {
@@ -274,12 +319,7 @@ class PacketTracerAdapter {
             if (routerIp.isNotEmpty) {
               clients.add({
                 'hostIp': routerIp.first,
-                // Same key on both ends: the router side writes it from the
-                // same field, defaulting to 'cisco' when none was supplied.
-                'key': (secAaa.aaaPassword != null &&
-                        secAaa.aaaPassword!.isNotEmpty)
-                    ? secAaa.aaaPassword!
-                    : 'cisco',
+                'key': clientKey,
                 'serverType': serverType,
                 'description': secAaa.aaaRouter!,
               });
@@ -294,21 +334,26 @@ class PacketTracerAdapter {
           if (clients.isEmpty && gw != '0.0.0.0') {
             clients.add({
               'hostIp': gw,
-              'key': 'cisco',
+              'key': clientKey,
               'serverType': serverType,
               'description': 'router on this LAN',
             });
           }
+          // The account and the shared key are different secrets and belong in
+          // different tabs: the account (name + its own password) is what the
+          // server authenticates against, the key is what the listed client
+          // router has to send.  Reading the account password as the key
+          // produced a client entry the router could never satisfy.
+          final accountUser = (secAaa.aaaUsername ?? '').trim();
+          final accountPass = (secAaa.aaaAccountPassword ?? '').trim();
+          final hasAccount = accountUser.isNotEmpty && accountPass.isNotEmpty;
           out['aaa'] = {
             'users': secAaa.requested && secAaa.aaa
-                ? secAaa.aaaUsername != null && secAaa.aaaPassword != null
+                ? (hasAccount
                       ? [
-                          {
-                            'username': secAaa.aaaUsername,
-                            'password': secAaa.aaaPassword,
-                          },
+                          {'username': accountUser, 'password': accountPass},
                         ]
-                      : <Map<String, String>>[]
+                      : <Map<String, String>>[])
                 : [
                     // Two accounts, so there is something to log in with and
                     // something to prove the server distinguishes them.
@@ -324,6 +369,17 @@ class PacketTracerAdapter {
           out[role] = {
             'on': true,
             'verification': explicit.isEmpty ? 'state_only' : 'rules',
+            ...explicit,
+          };
+        case 'radiuseap':
+          // WPA-Enterprise: the AAA server accepts EAP from the AP. The
+          // builder writes the EAP_METHODS list; the AP side asks for the
+          // same server IP in its Security tab.
+          final explicit = explicitRules('radiusEap');
+          out['radiusEap'] = {
+            'enabled': true,
+            'methods': explicit['methods'] ??
+                const ['PEAP', 'TLS', 'TTLS', 'FAST', 'LEAP'],
             ...explicit,
           };
         case 'cme':
@@ -352,9 +408,27 @@ class PacketTracerAdapter {
     return out;
   }
 
-  static Map<String, dynamic> autopilotPlan(NetworkIntent intent) => {
-    'project': intent.projectName,
-    'requirement': 'PT window open, maximized, focused, uninterrupted',
+  /// [layout] is the drawing the plan asks for (`{'style': 'wide'}` and
+  /// optionally `columns`/`spacing`); the engine reads it out of the plan and
+  /// places every device accordingly, so asking for a different drawing really
+  /// produces a different file.
+  ///
+  /// When [layout] is omitted the drawing is read from the plan's own notes
+  /// (a chosen layout is stamped `layout: <style>`), so a style picked in the
+  /// layout gallery reaches the engine on EVERY build path - the builder
+  /// screen and the action hub included, not only the chat turn that set it.
+  /// With neither, the engine uses its default (site trees).
+  static Map<String, dynamic> autopilotPlan(
+    NetworkIntent intent, {
+    Map<String, dynamic>? layout,
+  }) {
+    final effective = (layout != null && layout.isNotEmpty)
+        ? layout
+        : intentLayoutFromNotes(intent);
+    return {
+      'project': intent.projectName,
+      if (effective.isNotEmpty) 'layout': resolveLayoutForEngine(intent, effective),
+      'requirement': 'PT window open, maximized, focused, uninterrupted',
     'steps': [
       {
         'action': 'create_nodes',
@@ -362,7 +436,13 @@ class PacketTracerAdapter {
       },
       {
         'action': 'create_links',
-        'links': [for (final l in intent.links) l.toJson()],
+        // `wiredLinks`, not `links`: a copper link between two routers (or two
+        // switches, or two hosts) needs a CROSSOVER cable, and Packet Tracer
+        // holds the link down with a straight-through - red cable, both ports
+        // down, every packet across it dropped. The plan used to leave the
+        // cable kind unset for those pairs, so the default straight-through
+        // went in and the whole transit network was dead in simulation.
+        'links': [for (final l in intent.wiredLinks) l.toJson()],
       },
       {
         'action': 'paste_cli',
@@ -402,8 +482,164 @@ class PacketTracerAdapter {
       },
       if (intent.security.requested)
         {'action': 'verify_security', 'checks': securityChecks(intent)},
-    ],
+      ],
+    };
+  }
+
+/// The drawing a plan's own notes ask for, as an engine payload.
+///
+/// A chosen layout is stamped into the plan as `layout: <style>`; reading it
+/// here is what makes that choice reach the engine on every build path. An
+/// unknown or absent note returns an empty map, so the engine keeps its
+/// default rather than being handed a style it does not know.
+static Map<String, dynamic> intentLayoutFromNotes(NetworkIntent intent) {
+    for (final note in intent.notes) {
+      final style = LayoutRequest.styleFromNote(note);
+      if (style.isEmpty) continue;
+      final zones = LayoutRequest.zonesFromNote(note);
+      if (zones.isNotEmpty) {
+        return <String, dynamic>{
+          'style': style,
+          'zones': <Map<String, dynamic>>[
+            for (final zone in zones)
+              <String, dynamic>{
+                if (zone.kinds.isNotEmpty) 'sideKinds': zone.kinds,
+                if (zone.names.isNotEmpty) 'sideNames': zone.names,
+                if (zone.edge.isNotEmpty) 'sideEdge': zone.edge,
+              },
+          ],
+        };
+      }
+      final kinds = LayoutRequest.sideKindsFromNote(note);
+      final names = LayoutRequest.sideNamesFromNote(note);
+      return <String, dynamic>{
+        'style': style,
+        if (kinds.isNotEmpty) 'sideKinds': kinds,
+        if (names.isNotEmpty) 'sideNames': names,
+        if (kinds.isNotEmpty || names.isNotEmpty)
+          'sideEdge': LayoutRequest.sideEdgeFromNote(note),
+      };
+    }
+    return const {};
+  }
+
+/// Turn a drawing request into the payload the engine actually places with.
+///
+/// The request speaks in kinds ("the servers"); the engine speaks in device
+/// names. This is the only place that holds both the plan and the payload, so
+/// it is the only place that can do the translation - and doing it here means
+/// every build path (chat redraw, gallery pick, builder screen, action hub)
+/// parks the same devices, with no chance of one of them quietly drawing the
+/// default instead.
+////// A `grouped` request that names devices the plan does not have keeps its
+/// style but carries no side list: the engine then draws it exactly as a tree,
+/// which is honest rather than arbitrary.
+///
+/// The resolved payload also carries the spot every device was drawn at, so
+/// the `.pkt` is parked on the coordinates the user was shown. Sending only
+/// the style meant the sidecar recomputed the whole drawing from that string
+/// alone: a second, independent implementation of the same ten algorithms,
+/// which happened to agree until one side was edited and the preview quietly
+/// stopped being the picture that got built. Resolving once here makes the
+/// preview the single source of truth - the sidecar places what it is told,
+/// and only falls back to computing its own when a caller sends a bare style.
+static Map<String, dynamic> resolveLayoutForEngine(
+  NetworkIntent intent,
+  Map<String, dynamic> layout,
+) {
+  final out = _resolvedLayoutSettings(intent, layout);
+  final spots = resolvedCanvasPositions(intent, out);
+  if (spots.isNotEmpty) out['positions'] = spots;
+  return out;
+}
+
+/// The drawing's resolved spot for every device, as the engine payload wants
+/// it: `{"R1": [700, 60]}`, one whole-pixel `[x, y]` per device.
+///
+/// Exposed on its own so the parity test can compare what the preview draws
+/// against what the build is handed, without reaching through the payload.
+static Map<String, List<int>> resolvedCanvasPositions(
+  NetworkIntent intent,
+  Map<String, dynamic> layout,
+) {
+  final zones = <LayoutZone>[];
+  final raw = layout['zones'];
+  if (raw is List) {
+    for (final zone in raw) {
+      if (zone is! Map) continue;
+      final names = _stringsIn(zone['side']);
+      if (names.isEmpty) continue;
+      zones.add(LayoutZone(names, edge: '${zone['sideEdge'] ?? ''}'));
+    }
+  }
+  final snapshot = computeLayoutSnapshot(
+    intent,
+    style: '${layout['style'] ?? 'tree'}',
+    side: zones.isEmpty ? _stringsIn(layout['side']) : const <String>[],
+    sideEdge: '${layout['sideEdge'] ?? 'left'}',
+    zones: zones,
+  );
+  return <String, List<int>>{
+    for (final spot in snapshot.spots)
+      spot.name: <int>[spot.x.toInt(), spot.y.toInt()],
   };
+}
+
+/// The payload the engine places with, from a drawing request - kinds
+/// translated to device names - without the resolved spots, which
+/// [resolveLayoutForEngine] adds on top.
+static Map<String, dynamic> _resolvedLayoutSettings(
+  NetworkIntent intent,
+  Map<String, dynamic> layout,
+) {
+  final out = Map<String, dynamic>.from(layout);
+  if ('${out['style'] ?? ''}' != 'grouped') {
+    out.remove('sideKinds');
+    out.remove('sideNames');
+    out.remove('zones');
+    return out;
+  }
+    final zones = <Map<String, dynamic>>[];
+    final raw = out['zones'];
+    if (raw is List) {
+      for (final zone in raw) {
+        if (zone is! Map) continue;
+        final names = resolveSideNames(
+          intent,
+          kinds: _stringsIn(zone['sideKinds']),
+          names: _stringsIn(zone['sideNames']),
+        );
+        if (names.isEmpty) continue;
+        zones.add(<String, dynamic>{
+          'side': names,
+          'edge': '${zone['sideEdge'] ?? ''}',
+        });
+      }
+    }
+    out.remove('sideKinds');
+    out.remove('sideNames');
+    if (zones.isNotEmpty) {
+      out['zones'] = zones;
+      out.remove('side');
+    } else {
+      final names = resolveSideNames(
+        intent,
+        kinds: _stringsIn(layout['sideKinds']),
+        names: _stringsIn(layout['sideNames']),
+      );
+      if (names.isEmpty) {
+        out.remove('side');
+      } else {
+        out['side'] = names;
+      }
+      out['sideEdge'] = '${out['sideEdge'] ?? 'left'}';
+    }
+    return out;
+  }
+
+  static List<String> _stringsIn(Object? raw) => raw is List
+      ? raw.map((e) => '$e').toList()
+      : const <String>[];
 
   /// Live checks are deliberately expressed as read-only CLI commands.  The
   /// sidecar runs them after configuration and reports evidence, rather than
@@ -472,14 +708,21 @@ class PacketTracerAdapter {
         });
       }
       if (s.ipsecVpn) {
+        // ADVISORY, deliberately: the crypto block is generated into the
+        // config but Packet Tracer's ISR images elide `crypto isakmp` / `crypto
+        // ipsec` / `crypto map` until the Security Technology package is
+        // licensed, which the executor reports as an unsupported feature. A
+        // check that can never pass is not evidence, it is a false failure -
+        // so the tunnel's state is still probed and reported, and it no longer
+        // withholds the run's verification.
+        final target = _tunnelTrafficTarget(intent, n.name);
         checks.add({
           'device': n.name,
           'command': 'show crypto isakmp sa',
           'expected': 'qm_idle',
           'kind': 'ike',
-          'trafficTarget': n.name == 'HQ_Router'
-              ? '192.168.2.10'
-              : '192.168.1.102',
+          'trafficTarget': ?target,
+          'advisory': true,
           'label': '${n.name} IPSec IKE state',
         });
         checks.add({
@@ -487,14 +730,52 @@ class PacketTracerAdapter {
           'command': 'show crypto ipsec sa',
           'expected': 'pkts encaps',
           'kind': 'ipsec',
-          'trafficTarget': n.name == 'HQ_Router'
-              ? '192.168.2.10'
-              : '192.168.1.102',
+          'trafficTarget': ?target,
+          'advisory': true,
           'label': '${n.name} IPSec traffic counters',
         });
       }
     }
     return checks;
+  }
+
+  /// A host to ping at the FAR end of the tunnel before the crypto probes:
+  /// the first addressed endpoint that is not on this router's own LAN.
+  ///
+  /// The old value was two addresses lifted from the security-lab profile
+  /// (192.168.2.10 / 192.168.1.102), which exist in no other plan - every
+  /// other tunnel pinged a host that was not there and generated no traffic,
+  /// so the very probes that follow had nothing to observe.
+  static String? _tunnelTrafficTarget(NetworkIntent intent, String router) {
+    final mine = <String>{};
+    for (final a in intent.addressing) {
+      if (a.node != router) continue;
+      var wan = false;
+      for (final l in intent.links) {
+        final onThis = (l.a == router && l.aIf == a.iface) ||
+            (l.b == router && l.bIf == a.iface);
+        if (!onThis) continue;
+        bool isRouter(String name) =>
+            intent.nodes.any((x) => x.name == name && x.type == 'router');
+        if (isRouter(l.a) && isRouter(l.b)) {
+          wan = true;
+          break;
+        }
+      }
+      if (!wan) mine.add(NetworkTools.subnet(a.ipCidr)?.network ?? a.ipCidr);
+    }
+    for (final a in intent.addressing) {
+      if (a.node == router) continue;
+      final network = NetworkTools.subnet(a.ipCidr)?.network ?? a.ipCidr;
+      if (mine.contains(network)) continue;
+      final owner = intent.nodes.where((n) => n.name == a.node).firstOrNull;
+      if (owner == null) continue;
+      if (const ['router', 'switch', 'firewall'].contains(owner.type)) {
+        continue;
+      }
+      return a.ipCidr.split('/').first;
+    }
+    return null;
   }
 
   static String exportPlanJson(NetworkIntent intent) =>

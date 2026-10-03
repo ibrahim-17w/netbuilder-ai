@@ -546,4 +546,137 @@ class NetworkMath {
       'previous': previousSubnet(cidr) ?? '',
     };
   }
+
+  // --- IPv6 (dual-stack where it fits the existing design) -----------------
+  //
+  // Address facts only, computed on the same deterministic helpers pattern
+  // as the IPv4 side; the v4-only VLSM planner and summarizer stay
+  // untouched. Parsing follows RFC 4291 (one '::', up to 8 groups),
+  // printing follows RFC 5952 (lowercase, longest zero run compressed).
+
+  /// Parse an IPv6 address (with optional '%zone') into 128 bits, or null.
+  static BigInt? ipv6ToBig(String raw) {
+    var s = raw.trim().toLowerCase();
+    final zone = s.indexOf('%');
+    if (zone != -1) s = s.substring(0, zone);
+    if (s.isEmpty) return null;
+
+    final String headPart;
+    final String tailPart;
+    if (s.contains('::')) {
+      final idx = s.indexOf('::');
+      if (s.indexOf('::', idx + 1) != -1) return null;
+      headPart = s.substring(0, idx);
+      tailPart = s.substring(idx + 2);
+    } else {
+      headPart = s;
+      tailPart = '';
+    }
+
+    List<int>? groups(String part) {
+      if (part.isEmpty) return <int>[];
+      final out = <int>[];
+      for (final g in part.split(':')) {
+        if (g.isEmpty) return null;
+        final v = int.tryParse(g, radix: 16);
+        if (v == null || v < 0 || v > 0xFFFF) return null;
+        out.add(v);
+      }
+      return out;
+    }
+
+    final head = groups(headPart);
+    final tail = groups(tailPart);
+    if (head == null || tail == null) return null;
+    final compressed = s.contains('::');
+    final filled = head.length + tail.length;
+    if (compressed ? filled > 7 : filled != 8) return null;
+
+    final all = <int>[
+      ...head,
+      if (compressed) ...List<int>.filled(8 - filled, 0),
+      ...tail,
+    ];
+    var value = BigInt.zero;
+    for (final g in all) {
+      value = (value << 16) | BigInt.from(g);
+    }
+    return value;
+  }
+
+  /// RFC 5952-style text form of a 128-bit address.
+  static String ipv6Compress(BigInt value) {
+    final words = <int>[];
+    final mask = BigInt.from(0xFFFF);
+    for (var i = 7; i >= 0; i--) {
+      words.add(((value >> (16 * i)) & mask).toInt());
+    }
+    var bestStart = -1;
+    var bestLen = 0;
+    var runStart = -1;
+    var runLen = 0;
+    for (var i = 0; i < 8; i++) {
+      if (words[i] == 0) {
+        if (runStart == -1) runStart = i;
+        runLen++;
+        if (runLen > bestLen) {
+          bestLen = runLen;
+          bestStart = runStart;
+        }
+      } else {
+        runStart = -1;
+        runLen = 0;
+      }
+    }
+    String hex(List<int> ws) => ws.map((w) => w.toRadixString(16)).join(':');
+    if (bestLen < 2) return hex(words);
+    final head = hex(words.take(bestStart).toList());
+    final tail = hex(words.skip(bestStart + bestLen).toList());
+    return '$head::$tail';
+  }
+
+  /// Everything worth stating about one IPv6 CIDR: network, first and last
+  /// address (compressed) and the address count as an exact number when it
+  /// fits and 2^N otherwise.
+  static (
+    String network,
+    String first,
+    String last,
+    String countText,
+  )?
+      ipv6Facts(String cidr) {
+    final parts = cidr.trim().split('/');
+    if (parts.length != 2) return null;
+    final addr = ipv6ToBig(parts[0]);
+    final prefix = int.tryParse(parts[1].trim());
+    if (addr == null || prefix == null || prefix < 0 || prefix > 128) {
+      return null;
+    }
+    final hostBits = 128 - prefix;
+    final network = hostBits == 128
+        ? BigInt.zero
+        : (addr >> hostBits) << hostBits;
+    final last = hostBits == 128
+        ? (BigInt.one << 128) - BigInt.one
+        : network | ((BigInt.one << hostBits) - BigInt.one);
+    final count = BigInt.one << hostBits;
+    final countText = hostBits <= 64
+        ? _groupThousands(count.toString())
+        : '2^$hostBits';
+    return (
+      '${ipv6Compress(network)}/$prefix',
+      ipv6Compress(network),
+      ipv6Compress(last),
+      countText,
+    );
+  }
+
+  static String _groupThousands(String digits) {
+    final b = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) b.write(',');
+      b.write(digits[i]);
+    }
+    return b.toString();
+  }
 }

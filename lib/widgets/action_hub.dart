@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../services/capability_registry.dart';
 import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
 import 'whats_new.dart';
+
+/// [Intent] wrapper for one arrow-key step, because an enum alone is not an
+/// [Intent] and cannot be dispatched.
+class _HubMoveIntent extends Intent {
+  const _HubMoveIntent(this.step) : super();
+
+  final int step;
+}
 
 /// Every feature in the app, as buttons, searchable, from anywhere.
 ///
@@ -24,7 +33,10 @@ Future<void> showActionHub(BuildContext context, ActionContext host) {
         insetPadding: const EdgeInsets.all(AppTheme.s24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 860, maxHeight: 720),
-          child: ActionHubPanel(host: host, onClose: () => Navigator.of(dialogContext).pop()),
+          child: ActionHubPanel(
+            host: host,
+            onClose: () => Navigator.of(dialogContext).pop(),
+          ),
         ),
       ),
     );
@@ -62,6 +74,11 @@ class _ActionHubPanelState extends State<ActionHubPanel> {
   final _focus = FocusNode();
   String _query = '';
 
+  /// Which result the keyboard is on. Enter runs THIS one, visibly - a query
+  /// that happens to match something you did not mean used to run the first
+  /// result, which for a device-touching action is the worst possible default.
+  int _cursor = 0;
+
   @override
   void initState() {
     super.initState();
@@ -98,12 +115,25 @@ class _ActionHubPanelState extends State<ActionHubPanel> {
   }
 
   Future<void> _runFirst() async {
-    final matches = [
-      for (final action in CapabilityRegistry.search(_query))
-        if (_enabled(action)) action,
-    ];
+    final matches = _runnable();
     if (matches.isEmpty) return;
-    await _run(matches.first);
+    final index = _cursor.clamp(0, matches.length - 1);
+    await _run(matches[index]);
+  }
+
+  /// The results the keyboard can walk, in the order they are drawn.
+  List<AppAction> _runnable() => [
+    for (final action in CapabilityRegistry.search(_query))
+      if (_enabled(action)) action,
+  ];
+
+  void _moveCursor(int delta) {
+    final count = _runnable().length;
+    if (count == 0) return;
+    setState(() {
+      _cursor = (_cursor + delta) % count;
+      if (_cursor < 0) _cursor += count;
+    });
   }
 
   @override
@@ -111,134 +141,168 @@ class _ActionHubPanelState extends State<ActionHubPanel> {
     final theme = Theme.of(context);
     final matches = CapabilityRegistry.search(_query);
     final searching = _query.trim().isNotEmpty;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppTheme.s16,
-            AppTheme.s16,
-            AppTheme.s8,
-            AppTheme.s8,
+    final runnable = _runnable();
+    final selected = runnable.isEmpty
+        ? null
+        : runnable[_cursor.clamp(0, runnable.length - 1)];
+    return Shortcuts(
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.arrowDown): _HubMoveIntent(1),
+        SingleActivator(LogicalKeyboardKey.arrowUp): _HubMoveIntent(-1),
+      },
+      child: Actions(
+        actions: {
+          _HubMoveIntent: CallbackAction<_HubMoveIntent>(
+            onInvoke: (intent) => _moveCursor(intent.step),
           ),
-          child: Row(
+        },
+        child: Focus(
+          // The list is walked with the arrows even though the text field has
+          // focus, so this has to be an ancestor of the field too.
+          autofocus: true,
+          skipTraversal: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _search,
-                  focusNode: _focus,
-                  autofocus: true,
-                  textInputAction: TextInputAction.go,
-                  onChanged: (value) => setState(() => _query = value),
-                  onSubmitted: (_) => _runFirst(),
-                  decoration: InputDecoration(
-                    labelText: 'Find a feature',
-                    hintText: 'subnet, vlsm, terraform, ledger, diagnose',
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    suffixIcon: searching
-                        ? IconButton(
-                            tooltip: 'Clear',
-                            icon: const Icon(Icons.close, size: 18),
-                            onPressed: () => setState(() {
-                              _search.clear();
-                              _query = '';
-                            }),
-                          )
-                        : null,
-                  ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.s16,
+                  AppTheme.s16,
+                  AppTheme.s8,
+                  AppTheme.s8,
                 ),
-              ),
-              IconButton(
-                tooltip: 'Close',
-                icon: const Icon(Icons.close),
-                onPressed: widget.onClose,
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppTheme.s16),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  searching
-                      ? '${matches.length} feature(s) match "$_query"'
-                      : '${CapabilityRegistry.all.length} features, grouped. '
-                            'Enter runs the top match.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-              if (widget.host.intent != null)
-                AppStatusPill(
-                  label: 'Plan open',
-                  detail: widget.host.project,
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppTheme.s8),
-        const Divider(height: 1),
-        Expanded(
-          child: matches.isEmpty
-              ? AppEmptyState(
-                  icon: Icons.search_off,
-                  title: 'Nothing matches that',
-                  body: 'Try a plainer word: "subnet", "pkt", "gns3", '
-                      '"export", "diagnose", "theme".',
-                )
-              : ListView(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: AppTheme.s8,
-                    horizontal: AppTheme.s8,
-                  ),
+                child: Row(
                   children: [
-                    if (!searching && _settingsOrNull(context) != null)
-                      ChangelogCard(settings: _settingsOrNull(context)!),
-                    for (final group in CapabilityRegistry.groupOrder)
-                      if (matches.any((a) => a.group == group))
-                        _group(context, group, [
-                          for (final action in matches)
-                            if (action.group == group) action,
-                        ]),
+                    Expanded(
+                      child: TextField(
+                        controller: _search,
+                        focusNode: _focus,
+                        autofocus: true,
+                        textInputAction: TextInputAction.go,
+                        onChanged: (value) => setState(() {
+                          _query = value;
+                          _cursor = 0;
+                        }),
+                        onSubmitted: (_) => _runFirst(),
+                        decoration: InputDecoration(
+                          labelText: 'Find a feature',
+                          hintText: 'subnet, vlsm, terraform, ledger, diagnose',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          suffixIcon: searching
+                              ? IconButton(
+                                  tooltip: 'Clear',
+                                  icon: const Icon(Icons.close, size: 18),
+                                  onPressed: () => setState(() {
+                                    _search.clear();
+                                    _query = '';
+                                  }),
+                                )
+                              : null,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Close',
+                      icon: const Icon(Icons.close),
+                      onPressed: widget.onClose,
+                    ),
                   ],
                 ),
-        ),
-        const Divider(height: 1),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppTheme.s16,
-            AppTheme.s8,
-            AppTheme.s16,
-            AppTheme.s12,
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.keyboard_outlined,
-                size: 14,
-                color: theme.colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(width: AppTheme.s6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppTheme.s16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        searching
+                            ? '${matches.length} feature(s) match "$_query"'
+                            : '${CapabilityRegistry.all.length} features, grouped. '
+                                  'Up/Down to choose, Enter to run the highlighted '
+                                  'one.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    if (widget.host.intent != null)
+                      AppStatusPill(
+                        label: 'Plan open',
+                        detail: widget.host.project,
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppTheme.s8),
+              const Divider(height: 1),
               Expanded(
-                child: Text(
-                  'Ctrl+K opens this anywhere. Esc closes it. '
-                  'Closest to your goal: open the Network toolkit.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                child: matches.isEmpty
+                    ? AppEmptyState(
+                        icon: Icons.search_off,
+                        title: 'Nothing matches that',
+                        body:
+                            'Try a plainer word: "subnet", "pkt", "gns3", '
+                            '"export", "diagnose", "theme".',
+                      )
+                    : ListView(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppTheme.s8,
+                          horizontal: AppTheme.s8,
+                        ),
+                        children: [
+                          if (!searching && _settingsOrNull(context) != null)
+                            ChangelogCard(settings: _settingsOrNull(context)!),
+                          for (final group in CapabilityRegistry.groupOrder)
+                            if (matches.any((a) => a.group == group))
+                              _group(context, group, [
+                                for (final action in matches)
+                                  if (action.group == group) action,
+                              ], selected),
+                        ],
+                      ),
+              ),
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.s16,
+                  AppTheme.s8,
+                  AppTheme.s16,
+                  AppTheme.s12,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.keyboard_outlined,
+                      size: 14,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: AppTheme.s6),
+                    Expanded(
+                      child: Text(
+                        'Ctrl+K opens this anywhere. Esc closes it. '
+                        'Up/Down moves the highlight; Enter runs only what is '
+                        'highlighted.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 
-  Widget _group(BuildContext context, String group, List<AppAction> actions) {
+  Widget _group(
+    BuildContext context,
+    String group,
+    List<AppAction> actions,
+    AppAction? selected,
+  ) {
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -259,97 +323,109 @@ class _ActionHubPanelState extends State<ActionHubPanel> {
             ),
           ),
         ),
-        for (final action in actions) _actionTile(context, action),
+        for (final action in actions)
+          _actionTile(context, action, selected: identical(action, selected)),
       ],
     );
   }
 
-  Widget _actionTile(BuildContext context, AppAction action) {
+  Widget _actionTile(
+    BuildContext context,
+    AppAction action, {
+    bool selected = false,
+  }) {
     final theme = Theme.of(context);
     final enabled = _enabled(action);
     return Padding(
       padding: const EdgeInsets.only(bottom: AppTheme.s6),
-      child: Material(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: enabled ? 0.25 : 0.12,
-        ),
-        borderRadius: BorderRadius.circular(AppTheme.rMd),
-        child: InkWell(
+      child: Semantics(
+        selected: selected,
+        button: true,
+        child: Material(
+          color: selected
+              ? theme.colorScheme.primaryContainer
+              : theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: enabled ? 0.25 : 0.12,
+                ),
           borderRadius: BorderRadius.circular(AppTheme.rMd),
-          onTap: enabled ? () => _run(action) : null,
-          child: Padding(
-            padding: const EdgeInsets.all(AppTheme.s12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(AppTheme.s8),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(
-                      alpha: enabled ? 0.12 : 0.06,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppTheme.rMd),
+            onTap: enabled ? () => _run(action) : null,
+            child: Padding(
+              padding: const EdgeInsets.all(AppTheme.s12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(AppTheme.s8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(
+                        alpha: enabled ? 0.12 : 0.06,
+                      ),
+                      borderRadius: BorderRadius.circular(AppTheme.rSm),
                     ),
-                    borderRadius: BorderRadius.circular(AppTheme.rSm),
+                    child: Icon(
+                      action.icon,
+                      size: 18,
+                      color: enabled
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant.withValues(
+                              alpha: 0.5,
+                            ),
+                    ),
                   ),
-                  child: Icon(
-                    action.icon,
-                    size: 18,
-                    color: enabled
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurfaceVariant.withValues(
-                            alpha: 0.5,
+                  const SizedBox(width: AppTheme.s12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          action.label,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: enabled
+                                ? null
+                                : theme.colorScheme.onSurfaceVariant.withValues(
+                                    alpha: 0.7,
+                                  ),
                           ),
-                  ),
-                ),
-                const SizedBox(width: AppTheme.s12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        action.label,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: enabled
-                              ? null
-                              : theme.colorScheme.onSurfaceVariant
-                                    .withValues(alpha: 0.7),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        action.description,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                        const SizedBox(height: 2),
+                        Text(
+                          action.description,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
-                      if (!enabled || action.touchesDevices) ...[
-                        const SizedBox(height: AppTheme.s6),
-                        Wrap(
-                          spacing: AppTheme.s6,
-                          runSpacing: AppTheme.s4,
-                          children: [
-                            if (!enabled)
-                              const _Tag(
-                                label: 'Open a plan first',
-                                icon: Icons.lock_outline,
-                              ),
-                            if (action.touchesDevices)
-                              const _Tag(
-                                label: 'Changes something outside the app',
-                                icon: Icons.warning_amber_rounded,
-                              ),
-                          ],
-                        ),
+                        if (!enabled || action.touchesDevices) ...[
+                          const SizedBox(height: AppTheme.s6),
+                          Wrap(
+                            spacing: AppTheme.s6,
+                            runSpacing: AppTheme.s4,
+                            children: [
+                              if (!enabled)
+                                const _Tag(
+                                  label: 'Open a plan first',
+                                  icon: Icons.lock_outline,
+                                ),
+                              if (action.touchesDevices)
+                                const _Tag(
+                                  label: 'Changes something outside the app',
+                                  icon: Icons.warning_amber_rounded,
+                                ),
+                            ],
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                Icon(
-                  enabled ? Icons.chevron_right : Icons.block,
-                  size: 18,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ],
+                  Icon(
+                    enabled ? Icons.chevron_right : Icons.block,
+                    size: 18,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

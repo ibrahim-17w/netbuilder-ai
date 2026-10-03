@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Project secrets (AAA keys, VPN pre-shared keys, wireless PSKs) live in
@@ -11,23 +12,42 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class SecretVault {
   static const _prefix = 'project_secret_';
 
-  static const FlutterSecureStorage _storage = FlutterSecureStorage(
+  /// Every secret slot a project has. One list for the writer, the reader and
+  /// the purger, so a slot cannot be written but never read back.
+  static const _slots = [
+    'aaaPassword',
+    'aaaAccountPassword',
+    'vpnPreSharedKey',
+  ];
+
+  static const FlutterSecureStorage _defaultStorage = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
 
-  /// Write every secret the intent carries for [project].  An empty value
-  /// clears the slot, so re-saving a project after removing a password
-  /// cannot leave a stale key behind.
+  /// Swapped for an in-memory stand-in in tests; the app uses
+  /// [_defaultStorage].
+  @visibleForTesting
+  static FlutterSecureStorage storage = _defaultStorage;
+
+  /// Write the project's COMPLETE secret set: every slot in [_slots] is either
+  /// written or removed, whatever [secrets] contains.
+  ///
+  /// Writing only the entries it was given left a removed password in the
+  /// keychain forever - the user deleted it from the brief, the intent no
+  /// longer carried it, and nothing in the app could overwrite it because
+  /// there was no longer a value to write.  Treating the argument as the whole
+  /// truth is what makes a re-save a re-save.  An empty value clears the slot.
   static Future<void> store(
     String project,
     Map<String, String> secrets,
   ) async {
     final key = _projectKey(project);
-    for (final entry in secrets.entries) {
-      if (entry.value.isEmpty) {
-        await _storage.delete(key: '${key}_${entry.key}');
+    for (final slot in _slots) {
+      final value = secrets[slot] ?? '';
+      if (value.isEmpty) {
+        await storage.delete(key: '${key}_$slot');
       } else {
-        await _storage.write(key: '${key}_${entry.key}', value: entry.value);
+        await storage.write(key: '${key}_$slot', value: value);
       }
     }
   }
@@ -37,17 +57,19 @@ class SecretVault {
   /// to blank".
   static Future<Map<String, String>> load(String project) async {
     final out = <String, String>{};
-    for (final name in const ['aaaPassword', 'vpnPreSharedKey']) {
-      final value = await _storage.read(key: '${_projectKey(project)}_$name');
-      if (value != null && value.isNotEmpty) out[name] = value;
+    final key = _projectKey(project);
+    for (final slot in _slots) {
+      final value = await storage.read(key: '${key}_$slot');
+      if (value != null && value.isNotEmpty) out[slot] = value;
     }
     return out;
   }
 
   /// Remove all secrets for a project (used when a build record is deleted).
   static Future<void> purge(String project) async {
-    for (final name in const ['aaaPassword', 'vpnPreSharedKey']) {
-      await _storage.delete(key: '${_projectKey(project)}_$name');
+    final key = _projectKey(project);
+    for (final slot in _slots) {
+      await storage.delete(key: '${key}_$slot');
     }
   }
 
@@ -57,8 +79,10 @@ class SecretVault {
     final security = intentJson['security'];
     if (security is! Map) return const {};
     final out = <String, String>{};
-    final aaa = security['aaaPassword'];
-    if (aaa is String && aaa.isNotEmpty) out['aaaPassword'] = aaa;
+    for (final slot in _slots.where((s) => s != 'vpnPreSharedKey')) {
+      final value = security[slot];
+      if (value is String && value.isNotEmpty) out[slot] = value;
+    }
     final psk = security['vpnPreSharedKey'];
     if (psk is String && psk.isNotEmpty) out['vpnPreSharedKey'] = psk;
     return out;

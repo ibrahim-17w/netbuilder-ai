@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../models/network_intent.dart';
+import '../theme/app_kit.dart';
+import '../theme/app_palette.dart';
+import '../theme/app_theme.dart';
 import '../widgets/topology_canvas.dart';
 
 /// Full-screen plan diagram: drag to rearrange, tap a node for details.
@@ -42,14 +45,32 @@ class _TopologyPreviewScreenState extends State<TopologyPreviewScreen> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Row(
+          AppToolbar(
+            // The strip flexes the leading itself; the hint ellipsizes inside
+            // it so the counts always stay visible.
+            leading: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  '${intent.nodes.length} devices, ${intent.links.length} '
-                  'cables - drag boxes to rearrange, tap for details',
-                  style: Theme.of(context).textTheme.bodySmall,
+                AppTag(
+                  label: '${intent.nodes.length} devices',
+                  tone: AppTone.accent,
+                  icon: Icons.devices_other_outlined,
+                ),
+                AppTag(
+                  label: '${intent.links.length} cables',
+                  tone: AppTone.info,
+                  icon: Icons.cable_outlined,
+                ),
+                const SizedBox(width: AppTheme.s8),
+                Flexible(
+                  child: Text(
+                    'drag to rearrange, tap for details',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ),
               ],
             ),

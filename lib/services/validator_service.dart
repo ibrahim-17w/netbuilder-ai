@@ -2,14 +2,32 @@ import '../models/network_intent.dart';
 
 /// Pure-Dart pre-deploy validator. No plugins, fully unit-testable.
 class ValidationIssue {
-  final String severity; // error, warning
+  final String severity; // error, warning, info
   final String message;
-  const ValidationIssue(this.severity, this.message);
+
+  /// Whether this finding WITHHOLDS the build.
+  ///
+  /// An error does, and so does a warning - unless the warning is one the app
+  /// already acts on by itself. A cable the engine remaps to a free port, a
+  /// restriction Packet Tracer cannot enforce, plain advice: none of those
+  /// needs a decision from the user, and making them withhold the build meant
+  /// "2 routers with a serial link" - a perfectly ordinary brief - could never
+  /// be built by anything the user typed, and "fix the plan" answered with a
+  /// hardware note no reply can change. The finding is still REPORTED (it is
+  /// in the plan check and in the card), it just no longer refuses the build.
+  final bool? blocking;
+
+  const ValidationIssue(this.severity, this.message, {this.blocking});
+
+  bool get blocks => blocking ?? severity != 'info';
 }
 
 class ValidatorService {
+  /// Cisco interface names: `g0/1`, `Serial0/0/0`, and now dot1Q
+  /// sub-interfaces (`g0/1.10`) - the router-on-a-stick rows are real
+  /// addressing, not typos.
   static final _interfacePattern = RegExp(
-    r'^[A-Za-z][A-Za-z0-9-]*\d+(?:/\d+){0,2}$',
+    r'^[A-Za-z][A-Za-z0-9-]*\d+(?:/\d+){0,2}(?:\.\d+)?$',
   );
   static final _serviceNames = <String>{
     'dhcp',
@@ -26,6 +44,8 @@ class ValidatorService {
     'prp',
     'snmp',
     'vm',
+    'cme',
+    'radiuseap',
   };
 
   static List<int>? _ipv4(String raw) {
@@ -76,6 +96,7 @@ class ValidatorService {
           const ValidationIssue(
             'warning',
             'Avoid using VLAN 1 for user traffic.',
+            blocking: false,
           ),
         );
       }
@@ -140,10 +161,17 @@ class ValidatorService {
         );
       }
       if (nets.containsKey(ip)) {
+        // Both sides are named the same way. The old message printed the
+        // second node bare and the first as "node iface", so a self-collision
+        // - one router holding the same address on two of its own interfaces -
+        // read as "Duplicate IP 192.168.10.1 on R1 and R1 g0/0": the interface
+        // that needed the change was the one thing the line did not name.
         issues.add(
           ValidationIssue(
             'error',
-            'Duplicate IP $ip on ${a.node} and ${nets[ip]}.',
+            'Duplicate IP $ip is assigned to both ${nets[ip]} and '
+            '${a.node} ${a.iface}; give one of them the next free host '
+            'address on its own LAN.',
           ),
         );
       } else {
@@ -237,6 +265,80 @@ class ValidatorService {
       }
     }
 
+    // A device the plan never cables is not part of the network: it ships as
+    // an island on the canvas, and any advice that mentions it ("trunk the
+    // switches") then describes a link the file does not contain. Report it
+    // at the same severity a build would carry into the .pkt.
+    final linked = <String>{};
+    for (final l in intent.links) {
+      linked.add(l.a.toLowerCase());
+      linked.add(l.b.toLowerCase());
+    }
+    // A device that JOINS instead of being cabled - an IoT device, a tablet,
+    // a phone, the access point itself - is not standing alone: it associates,
+    // and association is not a link in the file. Counting those as islands
+    // made an IoT lab a blocking error ("no links are defined, so all 4
+    // devices would ship standing alone") for a network whose whole design is
+    // that they are not cabled.
+    bool joinsInsteadOfCabling(NetNode n) {
+      final kind = deviceKindOf(n.type);
+      if (kind == null) return false;
+      if (kind.wireless) return true;
+      // A kind with no port name is placed without a cable BY DESIGN - the
+      // device table's own rule is "empty means the executor must not invent
+      // a cable for it" (the WLC's Packet Tracer port menu has no stable name
+      // across builds). That is not a stranded island, and blocking the build
+      // on it asked the user to supply a cable the plan itself refused to
+      // invent.
+      return kind.port.isEmpty;
+    }
+
+    final islands = intent.nodes
+        .where((n) => !linked.contains(n.name.toLowerCase()))
+        .where((n) => !joinsInsteadOfCabling(n))
+        .map((n) => n.name)
+        .toList();
+    // Uncabled by design is still uncabled: say it once, as advice, instead
+    // of either blocking the build or pretending the device is wired.
+    final placedNotWired = intent.nodes
+        .where((n) => !linked.contains(n.name.toLowerCase()))
+        .where((n) => joinsInsteadOfCabling(n))
+        .where((n) => !(deviceKindOf(n.type)?.wireless ?? false))
+        .map((n) => n.name)
+        .toList();
+    if (placedNotWired.isNotEmpty) {
+      issues.add(
+        ValidationIssue(
+          'info',
+          '${placedNotWired.join(', ')} '
+          '${placedNotWired.length == 1 ? 'is' : 'are'} placed but not cabled '
+          'by the plan: Packet Tracer names this device type\'s port '
+          'differently across builds, so the cable is left to the canvas '
+          '(the live run discovers the port on the device).',
+          blocking: false,
+        ),
+      );
+    }
+
+    if (islands.isNotEmpty) {
+      final everything = islands.length == intent.nodes.length;
+      issues.add(
+        ValidationIssue(
+          everything ? 'error' : 'warning',
+          everything
+              ? 'No links are defined, so all ${intent.nodes.length} '
+                    'device(s) (${islands.take(3).join(', ')}...) would ship '
+                    'standing alone; cable the plan before building it.'
+              : '${islands.join(', ')} '
+                    '${islands.length == 1 ? 'has' : 'have'} no link in the '
+                    'plan, so '
+                    '${islands.length == 1 ? 'it' : 'they'} would ship standing '
+                    'alone on the canvas; cable '
+                    '${islands.length == 1 ? 'it' : 'them'} or say so.',
+        ),
+      );
+    }
+
     // Packet Tracer hardware gap. A default PT ISR unit ships without a
     // serial HWIC, so a requested serial WAN cannot use the exact interface:
     // the build remaps the cable to a spare routed port. Report that
@@ -265,9 +367,45 @@ class ValidatorService {
             'Remedy: open the router Physical tab, power it off, drag '
             'an HWIC-2T into an empty HWIC slot, power it back on, then '
             're-run - $iface exists after that and no remap is needed.',
+            // The build DOES the remap, so this cannot be a decision only the
+            // user can make: with it blocking, every serial WAN brief was
+            // unbuildable and "fix the plan" answered with a hardware note.
+            blocking: false,
           ),
         );
       }
+    }
+
+    // PORT CAPACITY: a switch cannot hold more cables than it has ports. 30
+    // PCs plus a server plus a router uplink on a 24-port 2960 planned ports
+    // f0/25..f0/32, which the device does not have - and nothing in the build
+    // path objects, so the .pkt was quietly written with dangling cables.
+    final usedPorts = <String, Set<String>>{};
+    for (final l in intent.links) {
+      for (final endpoint in [MapEntry(l.a, l.aIf), MapEntry(l.b, l.bIf)]) {
+        if (!RegExp(r'^f[a-z]*0?/\d+$').hasMatch(endpoint.value.toLowerCase())) {
+          continue;
+        }
+        (usedPorts[endpoint.key] ??= <String>{}).add(endpoint.value.toLowerCase());
+      }
+    }
+    for (final node in intent.nodes) {
+      if (node.type != 'switch') continue;
+      final used = usedPorts[node.name] ?? const <String>{};
+      if (used.isEmpty) continue;
+      final capacity = NetworkIntent.switchPortCapacity(node.model);
+      if (used.length <= capacity) continue;
+      final over = used.length - capacity;
+      issues.add(
+        ValidationIssue(
+          'error',
+          '${node.name} is cabled to ${used.length} devices but a Packet '
+          'Tracer ${node.model ?? '2960'} has only $capacity ports; '
+          '$over cable(s) land on interfaces the switch does not have. '
+          'Remedy: add another switch, or use a model with more ports '
+          '(a 3560 has 24 FastEthernet plus 4 GigabitEthernet).',
+        ),
+      );
     }
 
     // Services are only executable on Server-PT nodes. Unknown roles are
@@ -287,13 +425,15 @@ class ValidatorService {
             ValidationIssue(
               'warning',
               '${node.name} requests unsupported Packet Tracer service "$service"; it will be staged for review.',
+              blocking: false,
             ),
           );
         }
       }
       for (final entry in node.serviceRules.entries) {
         final role = entry.key.trim().toLowerCase();
-        if (!node.services.map((s) => s.toLowerCase()).contains(role)) {
+        if (!node.services.map((s) => s.toLowerCase()).contains(role) &&
+            !_roleIsIntrinsicTo(role, node.type)) {
           issues.add(
             ValidationIssue(
               'warning',
@@ -349,6 +489,7 @@ class ValidatorService {
           const ValidationIssue(
             'warning',
             'VLAN 1 is default; prefer dedicated VLANs.',
+            blocking: false,
           ),
         );
       }
@@ -377,10 +518,57 @@ class ValidatorService {
           'license boot module c2900 technology-package securityk9, then '
           'reload, then re-run - the same commands are already in the config '
           'view for pasting by hand.',
+          // A Packet Tracer licensing gap the plan cannot act on: the config
+          // is generated either way, so it is a note, not a refusal.
+          blocking: false,
         ),
       );
     }
     final officeHours = security.officeHours?.trim() ?? '';
+    if (security.hsrp &&
+        !intent.nodes.where((n) => n.type == 'router').any(
+          (n) => intent.addressing.any(
+            (a) =>
+                a.node == n.name &&
+                !intent.links.any((l) => _isTransitEndpoint(l, a.node, a.iface)),
+          ),
+        )) {
+      issues.add(
+        const ValidationIssue(
+          'warning',
+          'HSRP is requested but no router has a LAN interface; the standby '
+          'groups were not applied.',
+        ),
+      );
+    }
+    if (security.etherChannel &&
+        intent.nodes.where((n) => n.type == 'switch').length < 2) {
+      issues.add(
+        const ValidationIssue(
+          'error',
+          'EtherChannel needs at least two switches to bundle between.',
+        ),
+      );
+    }
+    if (security.interVlanRouting && intent.vlans.isEmpty) {
+      issues.add(
+        const ValidationIssue(
+          'warning',
+          'Inter-VLAN routing was requested but the plan defines no VLANs; '
+          'no dot1Q sub-interfaces were created.',
+        ),
+      );
+    }
+    if (security.interVlanRouting &&
+        intent.vlans.isNotEmpty &&
+        !intent.nodes.any((n) => n.type == 'router')) {
+      issues.add(
+        const ValidationIssue(
+          'error',
+          'Inter-VLAN routing needs a router; the plan has none.',
+        ),
+      );
+    }
     if (officeHours.isNotEmpty) {
       issues.add(
         ValidationIssue(
@@ -389,6 +577,7 @@ class ValidatorService {
           'restriction ($officeHours) cannot be enforced on the device; the '
           'plain manager-only ACL is applied instead and the time window is '
           'reported as unsupported.',
+          blocking: false,
         ),
       );
     }
@@ -415,11 +604,27 @@ class ValidatorService {
             ),
           );
         }
-        if (security.aaaUsername == null || security.aaaPassword == null) {
+        // What AAA actually needs to work is an ACCOUNT on the server, not a
+        // shared key: the key is a documented lab default the adapters fill
+        // in, while an empty account list means nothing can log in at all.
+        // Checking the key instead reported a missing credential on plans that
+        // had a working login, and missed a configured one.
+        final server = intent.nodes
+            .where((n) => n.name == security.aaaServer)
+            .firstOrNull;
+        final users =
+            (server?.serviceRules['aaa'] as Map?)?['users'];
+        final hasAccount =
+            (users is List && users.isNotEmpty) ||
+            ((security.aaaUsername ?? '').isNotEmpty &&
+                (security.aaaAccountPassword ?? '').isNotEmpty);
+        if (!hasAccount) {
           issues.add(
             const ValidationIssue(
               'warning',
-              'TACACS+ credentials are missing; the base network can build, but AAA login cannot be verified yet.',
+              'The AAA server holds no account, so no login can be verified. '
+              'Add one - for example "AAA client name admin password 123" - '
+              'and it is written into the server\'s Services tab.',
             ),
           );
         }
@@ -429,6 +634,7 @@ class ValidatorService {
           const ValidationIssue(
             'warning',
             'The manager-only VTY rule has no office hours; confirm the time window before relying on it.',
+            blocking: false,
           ),
         );
       }
@@ -453,19 +659,31 @@ class ValidatorService {
             ),
           );
         }
-        final serial = intent.links.any(
-          (l) =>
-              l.aIf.toLowerCase().startsWith('s') ||
-              l.bIf.toLowerCase().startsWith('s'),
-        );
-        if (!serial) {
+        // What a tunnel needs is a ROUTED link between its two peers - that
+        // is the link the crypto map rides on, and the message below has
+        // always said "serial or routed peer link". The test only ever looked
+        // for a serial port, so every ordinary Ethernet WAN ("2 routers, 2
+        // switches and 8 pcs each, site-to-site ipsec vpn") was reported as
+        // missing one it plainly had. A serial link is a special case of a
+        // routed one, and it is the case that needs the module note.
+        NetLink? peerLink;
+        for (final l in intent.links) {
+          final a = intent.nodes.where((n) => n.name == l.a).firstOrNull;
+          final b = intent.nodes.where((n) => n.name == l.b).firstOrNull;
+          if (a?.type == 'router' && b?.type == 'router') {
+            peerLink = l;
+            break;
+          }
+        }
+        if (peerLink == null) {
           issues.add(
             const ValidationIssue(
               'error',
-              'IPSec WAN requirements need a serial or routed peer link.',
+              'IPSec is requested but no router-to-router link exists for the '
+              'tunnel to run over.',
             ),
           );
-        } else if (target == 'packet-tracer') {
+        } else if (peerLink.isSerial && target == 'packet-tracer') {
             issues.add(
               const ValidationIssue(
                 'info',
@@ -522,13 +740,20 @@ class ValidatorService {
           const ValidationIssue(
             'warning',
             'Packet Tracer BGP support is limited; verify commands.',
+            blocking: false,
           ),
         );
       }
       if (intent.nodes.length > 20) {
+        // INFO, not a warning: nothing about a 35-device lab is baked into the
+        // file as a defect - it is a heads-up about how long the autopilot
+        // takes. Carrying it at warning severity withheld the Build card for
+        // an entirely correct plan ("the plan still has 1 finding that would
+        // be baked into the .pkt"), and no phrasing from the user could clear
+        // it, because there was nothing to clear.
         issues.add(
           const ValidationIssue(
-            'warning',
+            'info',
             'Large topologies are slow in Packet Tracer autopilot.',
           ),
         );
@@ -540,4 +765,25 @@ class ValidatorService {
 
   static bool hasErrors(List<ValidationIssue> issues) =>
       issues.any((i) => i.severity == 'error');
+
+  /// A rule a device's own TYPE carries, without asking for a "service".
+  ///
+  /// An access point or wireless router holds its SSID and its WPA key on the
+  /// `wireless` rule: there is no Services tab to tick for it and no other
+  /// place the setting could live. Reporting it as "rules for a service it did
+  /// not request; the rules will be ignored" told the user something was
+  /// wrong with the only thing that device exists to do.
+  static bool _roleIsIntrinsicTo(String role, String type) =>
+      role == 'wireless' &&
+      (type == 'wireless' || type == 'wireless-router' || type == 'ap');
+
+  /// True when this node+interface pair is an endpoint of a
+  /// router-to-router link (the deterministic "transit" definition both
+  /// the planner and the adapters share).
+  static bool _isTransitEndpoint(NetLink l, String node, String iface) {
+    final spec = l.a == node ? l.aIf : (l.b == node ? l.bIf : null);
+    return spec != null &&
+        spec.toLowerCase() == iface.toLowerCase() &&
+        l.isSerial; // serial links are the plan's transit links
+  }
 }

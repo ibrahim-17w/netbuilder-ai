@@ -1,0 +1,9 @@
+[run]
+omit =
+    test_*.py
+    conftest.py
+    _tmp_pytest/*
+    _tmp_pytest_run/*
+
+[report]
+skip_covered = True

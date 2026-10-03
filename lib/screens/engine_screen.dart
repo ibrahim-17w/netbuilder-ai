@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 import '../services/engine_status.dart';
 import '../services/settings_service.dart';
+import '../theme/app_kit.dart';
+import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
 
 /// Everything about the local .pkt engine, in one place.
@@ -76,7 +78,6 @@ class _EngineScreenState extends State<EngineScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Local engine'),
@@ -90,278 +91,442 @@ class _EngineScreenState extends State<EngineScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppTheme.s16),
+      body: AppPage(
+        maxWidth: 1000,
         children: [
-          _statusCard(theme),
-          const SizedBox(height: AppTheme.s12),
-          _actionsCard(theme),
-          const SizedBox(height: AppTheme.s12),
-          _addressCard(theme),
-          const SizedBox(height: AppTheme.s12),
-          _offlineCard(theme),
-          const SizedBox(height: AppTheme.s12),
-          _logCard(theme),
+          _statusHero(),
+          _actionsPanel(),
+          _addressPanel(),
+          _capabilityPanel(),
+          _logPanel(),
         ],
       ),
     );
   }
 
-  Widget _statusCard(ThemeData theme) {
-    final phase = _engine.phase;
-    final colour = switch (phase) {
-      EngineState.up => theme.colorScheme.primary,
-      EngineState.down => theme.colorScheme.error,
-      _ => theme.colorScheme.onSurfaceVariant,
-    };
-    final label = switch (phase) {
-      EngineState.up => 'Running',
-      EngineState.down => 'Not running',
-      EngineState.checking => 'Checking...',
-      EngineState.starting => 'Starting...',
-      EngineState.unknown => 'Unknown',
-    };
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppTheme.s16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  switch (phase) {
-                    EngineState.up => Icons.check_circle_outline,
-                    EngineState.down => Icons.cloud_off_outlined,
-                    _ => Icons.hourglass_empty,
-                  },
-                  color: colour,
-                ),
-                const SizedBox(width: AppTheme.s8),
-                Text(label,
-                    style: theme.textTheme.titleMedium?.copyWith(color: colour)),
-                const Spacer(),
-                if (_busy)
-                  const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-              ],
+  // -------------------------------------------------------------------------
+  // Status
+  // -------------------------------------------------------------------------
+
+  _EnginePhase _phase() => switch (_engine.phase) {
+    EngineState.up => _EnginePhase(
+      tone: AppTone.success,
+      label: 'Running',
+      icon: Icons.check_circle_outline,
+    ),
+    EngineState.down => _EnginePhase(
+      tone: AppTone.danger,
+      label: 'Not running',
+      icon: Icons.cloud_off_outlined,
+    ),
+    EngineState.checking => _EnginePhase(
+      tone: AppTone.info,
+      label: 'Checking...',
+      icon: Icons.hourglass_empty,
+    ),
+    EngineState.starting => _EnginePhase(
+      tone: AppTone.accent,
+      label: 'Starting...',
+      icon: Icons.hourglass_top,
+    ),
+    EngineState.unknown => _EnginePhase(
+      tone: AppTone.neutral,
+      label: 'Unknown',
+      icon: Icons.help_outline,
+    ),
+  };
+
+  Widget _statusHero() {
+    final phase = _phase();
+    final theme = Theme.of(context);
+    return AppPanel(
+      tone: phase.tone,
+      filled: true,
+      leading: AppIconBubble(icon: phase.icon, tone: phase.tone, size: 40),
+      title: phase.label,
+      subtitle: _engine.summary,
+      trailing: _busy
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : AppTag(
+              label: _engine.base,
+              tone: AppTone.neutral,
+              icon: Icons.dns_outlined,
+              mono: true,
             ),
-            const SizedBox(height: AppTheme.s8),
-            Text(_engine.summary, style: theme.textTheme.bodyMedium),
-            const SizedBox(height: AppTheme.s12),
-            _fact(theme, 'Address', _engine.base),
-            if (_engine.version.isNotEmpty)
-              _fact(theme, 'Engine version', _engine.version),
-            _fact(
-              theme,
+      children: [
+        const SizedBox(height: AppTheme.s4),
+        Wrap(
+          spacing: AppTheme.s8,
+          runSpacing: AppTheme.s8,
+          children: [
+            _factChip(
+              'Engine version',
+              _engine.version.isEmpty ? 'unknown' : _engine.version,
+              Icons.info_outline,
+            ),
+            _factChip(
               'Drives Packet Tracer',
               _engine.isUp
                   ? (_engine.hasRpa ? 'Yes' : 'No - RPA packages missing')
-                  : '-',
+                  : 'Not yet',
+              Icons.mouse_outlined,
+              tone: _engine.isUp && !_engine.hasRpa
+                  ? AppTone.warning
+                  : AppTone.neutral,
             ),
-            _fact(
-              theme,
+            _factChip(
               'Reads the CLI by OCR',
-              _engine.isUp ? (_engine.hasOcr ? 'Yes' : 'No') : '-',
+              _engine.isUp ? (_engine.hasOcr ? 'Yes' : 'No') : 'Not yet',
+              Icons.text_fields_outlined,
+              tone: _engine.isUp && !_engine.hasOcr
+                  ? AppTone.warning
+                  : AppTone.neutral,
             ),
-            _fact(
-              theme,
+            _factChip(
               'Started by this app',
-              _engine.logPath == null ? 'Not yet' : 'Yes',
+              _engine.logPath == null ? 'No' : 'Yes',
+              Icons.play_circle_outline,
             ),
           ],
         ),
+        if (_engine.isUp) ...[
+          const SizedBox(height: AppTheme.s10),
+          Text(
+            'The engine is a helper, not a dependency: every other screen '
+            'keeps working when it is down.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _factChip(
+    String label,
+    String value,
+    IconData icon, {
+    AppTone tone = AppTone.neutral,
+  }) {
+    final theme = Theme.of(context);
+    final colors = AppPalette.tone(theme.colorScheme, tone);
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.s10,
+        vertical: AppTheme.s8,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(AppTheme.rMd),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: colors.fg),
+          const SizedBox(width: AppTheme.s6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              Text(
+                value,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _fact(ThemeData theme, String label, String value) => Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 170,
-              child: Text(
-                label,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
+  // -------------------------------------------------------------------------
+  // Actions
+  // -------------------------------------------------------------------------
+
+  Widget _actionsPanel() {
+    // A phone has no engine process to start, so the buttons that start one
+    // are not shown there: an offer that cannot work is worse than no offer.
+    // "Copy a report" stays - it is how the phone tells someone what its
+    // address is set to.
+    final local = _engine.canStartLocally;
+    return AppPanel(
+      icon: Icons.tune,
+      title: 'Controls',
+      subtitle: local
+          ? 'Start, restart or stop the helper that drives Packet Tracer.'
+          : 'The engine runs on a PC, not on this device.',
+      children: [
+        if (!local)
+          const AppBanner(
+            tone: AppTone.info,
+            message:
+                'On the PC, start the app (or run python '
+                'sidecar/pt_autopilot.py in the project folder), find that '
+                'PC\'s address with ipconfig on Windows or `ifconfig` / '
+                '`ip addr` on Linux and macOS, then enter it below as '
+                'http://<pc-address>:5005 and press Test. On the Android '
+                'emulator the host PC is 10.0.2.2.',
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppTheme.s12),
+            child: Wrap(
+              spacing: AppTheme.s8,
+              runSpacing: AppTheme.s8,
+              children: [
+                FilledButton.icon(
+                  onPressed: _busy
+                      ? null
+                      : () => _run(() => _engine.ensure(force: true)),
+                  icon: const Icon(Icons.play_arrow, size: 18),
+                  label: const Text('Start the engine'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : () => _run(() => _engine.restart()),
+                  icon: const Icon(Icons.restart_alt, size: 18),
+                  label: const Text('Restart'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : () => _run(() => _engine.stop()),
+                  icon: const Icon(Icons.stop, size: 18),
+                  label: const Text('Stop'),
+                ),
+              ],
             ),
-            Expanded(
-              child: SelectableText(value, style: theme.textTheme.bodySmall),
+          ),
+        Row(
+          children: [
+            TextButton.icon(
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.maybeOf(context);
+                final report = await _engine.diagnose();
+                await Clipboard.setData(ClipboardData(text: report));
+                messenger?.showSnackBar(
+                  const SnackBar(content: Text('Engine report copied')),
+                );
+              },
+              icon: const Icon(Icons.copy_all_outlined, size: 18),
+              label: const Text('Copy a report'),
             ),
           ],
         ),
-      );
+      ],
+    );
+  }
 
-  Widget _actionsCard(ThemeData theme) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(AppTheme.s12),
-          child: Wrap(
-            spacing: AppTheme.s8,
-            runSpacing: AppTheme.s8,
-            children: [
-              FilledButton.icon(
-                onPressed: _busy ? null : () => _run(() => _engine.ensure(force: true)),
-                icon: const Icon(Icons.play_arrow),
-                label: const Text('Start the engine'),
-              ),
-              OutlinedButton.icon(
-                onPressed: _busy ? null : () => _run(() => _engine.restart()),
-                icon: const Icon(Icons.restart_alt),
-                label: const Text('Restart'),
-              ),
-              OutlinedButton.icon(
-                onPressed: _busy ? null : () => _run(() => _engine.stop()),
-                icon: const Icon(Icons.stop),
-                label: const Text('Stop'),
-              ),
-              TextButton.icon(
-                onPressed: () async {
-                  final messenger = ScaffoldMessenger.maybeOf(context);
-                  final report = await _engine.diagnose();
-                  await Clipboard.setData(ClipboardData(text: report));
-                  messenger?.showSnackBar(
-                    const SnackBar(content: Text('Engine report copied')),
-                  );
-                },
-                icon: const Icon(Icons.copy_all_outlined),
-                label: const Text('Copy a report'),
-              ),
-            ],
-          ),
-        ),
-      );
+  // -------------------------------------------------------------------------
+  // Address
+  // -------------------------------------------------------------------------
 
-  Widget _addressCard(ThemeData theme) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(AppTheme.s12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Address', style: theme.textTheme.titleSmall),
-              const SizedBox(height: 4),
-              Text(
-                'On this PC that is 127.0.0.1. On a phone the engine runs on '
-                'your PC, so this must be that PC\'s address (for the Android '
-                'emulator, 10.0.2.2).',
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: AppTheme.s8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _address,
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
-                      onSubmitted: (_) => _applyAddress(),
-                    ),
-                  ),
-                  const SizedBox(width: AppTheme.s8),
-                  FilledButton(
-                    onPressed: _busy ? null : _applyAddress,
-                    child: const Text('Use this'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      );
-
-  Widget _offlineCard(ThemeData theme) => Card(
-        color: theme.colorScheme.surfaceContainerHighest,
-        child: Padding(
-          padding: const EdgeInsets.all(AppTheme.s12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.offline_bolt_outlined, size: 18),
-                  const SizedBox(width: AppTheme.s6),
-                  Text('What needs what',
-                      style: theme.textTheme.titleSmall),
-                ],
-              ),
-              const SizedBox(height: AppTheme.s6),
-              _tier(theme, 'With no engine at all',
-                  'Planning a network from plain English, IPv4/IPv6 subnet and '
-                  'VLSM math, live DNS/ping/port diagnostics, the topology '
-                  'preview, and every toolkit calculator.'),
-              _tier(theme, 'With the engine (no Packet Tracer needed)',
-                  'Generating a .pkt file from a plan, and opening, auditing, '
-                  'diffing or grading an existing .pkt.'),
-              _tier(theme, 'With the engine and Packet Tracer open',
-                  'Building the network in the app itself - clicking, typing '
-                  'config, reading the CLI back and pinging to prove it works.'),
-            ],
-          ),
-        ),
-      );
-
-  Widget _tier(ThemeData theme, String title, String body) => Padding(
-        padding: const EdgeInsets.only(top: AppTheme.s8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style: theme.textTheme.labelLarge
-                    ?.copyWith(color: theme.colorScheme.primary)),
-            Text(body, style: theme.textTheme.bodySmall),
-          ],
-        ),
-      );
-
-  Widget _logCard(ThemeData theme) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(AppTheme.s12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text('Engine log', style: theme.textTheme.titleSmall),
-                  const SizedBox(width: AppTheme.s8),
-                  Expanded(
-                    child: Text(
-                      _engine.logPath ?? '(none yet)',
-                      style: theme.textTheme.bodySmall,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Reload the log',
-                    icon: const Icon(Icons.refresh, size: 18),
-                    onPressed: _loadLog,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppTheme.s6),
-              Container(
-                width: double.infinity,
-                constraints: const BoxConstraints(maxHeight: 260),
-                padding: const EdgeInsets.all(AppTheme.s8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(AppTheme.rSm),
+  Widget _addressPanel() {
+    final theme = Theme.of(context);
+    return AppPanel(
+      icon: Icons.dns_outlined,
+      title: 'Address',
+      subtitle: 'Where this app looks for the engine.',
+      children: [
+        AppField(
+          label: 'Engine base URL',
+          help:
+              'On this PC that is 127.0.0.1. On a phone the engine runs on '
+              'your PC, so this must be that PC\'s address (for the Android '
+              'emulator, 10.0.2.2).',
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final field = TextField(
+                controller: _address,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  hintText: 'http://127.0.0.1:5005',
+                  prefixIcon: Icon(Icons.link, size: 18),
                 ),
-                child: SingleChildScrollView(
-                  child: SelectableText(
-                    _log.isEmpty ? 'Nothing logged yet.' : _log,
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
-                  ),
-                ),
-              ),
-            ],
+                onSubmitted: (_) => _applyAddress(),
+              );
+              final button = FilledButton(
+                onPressed: _busy ? null : _applyAddress,
+                child: const Text('Use this'),
+              );
+              if (constraints.maxWidth < 420) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    field,
+                    const SizedBox(height: AppTheme.s8),
+                    button,
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: field),
+                  const SizedBox(width: AppTheme.s8),
+                  button,
+                ],
+              );
+            },
           ),
         ),
-      );
+        if (_engine.isUp)
+          Text(
+            'Currently answering at ${_engine.base}.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+      ],
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // What needs what
+  // -------------------------------------------------------------------------
+
+  Widget _capabilityPanel() {
+    return AppPanel(
+      icon: Icons.layers_outlined,
+      title: 'What needs what',
+      subtitle: 'The engine is optional: most of the app never needs it.',
+      children: const [
+        _Tier(
+          icon: Icons.offline_bolt_outlined,
+          tone: AppTone.success,
+          title: 'With no engine at all',
+          body:
+              'Planning a network from plain English, IPv4/IPv6 subnet and '
+              'VLSM math, live DNS/ping/port diagnostics, the topology '
+              'preview, and every toolkit calculator.',
+        ),
+        _Tier(
+          icon: Icons.description_outlined,
+          tone: AppTone.info,
+          title: 'With the engine (no Packet Tracer needed)',
+          body:
+              'Generating a .pkt file from a plan, and opening, auditing, '
+              'diffing or grading an existing .pkt.',
+        ),
+        _Tier(
+          icon: Icons.smart_toy_outlined,
+          tone: AppTone.accent,
+          title: 'With the engine and Packet Tracer open',
+          body:
+              'Building the network in the app itself - clicking, typing '
+              'config, reading the CLI back and pinging to prove it works.',
+        ),
+      ],
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Log
+  // -------------------------------------------------------------------------
+
+  Widget _logPanel() {
+    final theme = Theme.of(context);
+    return AppPanel(
+      icon: Icons.terminal_outlined,
+      title: 'Engine log',
+      subtitle:
+          _engine.logPath ?? 'Nothing has been started from this app yet.',
+      actions: [
+        IconButton(
+          tooltip: 'Reload the log',
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.refresh, size: 18),
+          onPressed: _loadLog,
+        ),
+      ],
+      children: [
+        AppCodeBlock(
+          text: _log,
+          title: 'Log tail (80 lines)',
+          maxHeight: 260,
+          emptyText: 'Nothing logged yet.',
+          copyable: false,
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: AppTheme.s10),
+          child: Text(
+            'A failed start writes its reason here - read the last few lines '
+            'first.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EnginePhase {
+  final AppTone tone;
+  final String label;
+  final IconData icon;
+
+  const _EnginePhase({
+    required this.tone,
+    required this.label,
+    required this.icon,
+  });
+}
+
+/// One rung of the "what needs what" ladder: a coloured bullet, a bold rung
+/// name and the features it unlocks.
+class _Tier extends StatelessWidget {
+  final IconData icon;
+  final AppTone tone;
+  final String title;
+  final String body;
+
+  const _Tier({
+    required this.icon,
+    required this.tone,
+    required this.title,
+    required this.body,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppTheme.s14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppIconBubble(icon: icon, tone: tone, size: 30),
+          const SizedBox(width: AppTheme.s10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.textTheme.titleSmall),
+                const SizedBox(height: 2),
+                Text(
+                  body,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

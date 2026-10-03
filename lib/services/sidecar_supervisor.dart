@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'settings_service.dart';
+
 /// The outcome of trying to bring the local engine up.
 ///
 /// It carries the *reason* rather than a bare bool: "python is the Windows
@@ -72,6 +74,25 @@ class SidecarSupervisor {
   static bool get weStartedIt => _process != null;
   static String? get logPath => _logPath;
   static String? _logPath;
+
+  /// Whether this platform can run the engine at all.
+  ///
+  /// The engine is Python that drives a Packet Tracer window. A phone has no
+  /// Python process to start and no Packet Tracer to drive, so looking for one
+  /// there produced the worst possible answer - "install Python 3" - instead
+  /// of the true one: the engine lives on the PC, point the app at it.
+  ///
+  /// One source of truth for that fact ([SettingsService.canHostEngine]), so a
+  /// phone cannot be a phone in one place and a desktop in another.
+  static bool get canRunLocally => SettingsService.canHostEngine;
+
+  /// The one sentence a phone user needs, used by every caller so the wording
+  /// cannot drift.
+  static const String phoneEngineMessage =
+      'This device runs no engine of its own. The .pkt engine is a PC '
+      'program: start it on the PC (python pt_autopilot.py) and set this app\'s '
+      'engine address to that PC - for example http://192.168.1.20:5005. On the '
+      'Android emulator the host is 10.0.2.2.';
 
   /// The bundled/derived interpreter candidates, most specific first.
   /// Pure and side-effect free so it can be tested without a process.
@@ -287,6 +308,18 @@ class SidecarSupervisor {
     List<String>? roots,
     String? logPath,
   }) {
+    // A phone cannot host the engine. Saying so immediately is both the truth
+    // and the only useful answer - the alternative was searching a filesystem
+    // for Python that cannot exist there.
+    if (!canRunLocally) {
+      return Future.value(
+        lastResult = const SidecarLaunchResult(
+          ok: false,
+          method: 'phone',
+          message: phoneEngineMessage,
+        ),
+      );
+    }
     if (!force && _process != null) {
       return Future.value(lastResult ??
           const SidecarLaunchResult(
@@ -497,10 +530,101 @@ class SidecarSupervisor {
     return File(bundled).existsSync() ? bundled : null;
   }
 
+  /// The engine executable this build ships, or null when there is none (a
+  /// dev run against a checkout, or a phone).
+  static String? bundledEngineFile({List<String>? roots}) {
+    for (final root in roots ?? searchRoots()) {
+      final exe = p.join(root, 'sidecar', 'pt_autopilot.exe');
+      if (File(exe).existsSync()) return exe;
+    }
+    return null;
+  }
+
+  /// When a file was written, in milliseconds - the same scale the engine
+  /// reports about itself, so the two numbers can be compared directly.
+  static int? fileBuiltAt(String? path) {
+    if (path == null || path.trim().isEmpty) return null;
+    try {
+      final file = File(path);
+      if (!file.existsSync()) return null;
+      return file.statSync().modified.millisecondsSinceEpoch;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The pid of whatever is LISTENING on a loopback port.
+  ///
+  /// The app talks to `127.0.0.1:5005` without caring who started the process
+  /// behind it - and that is exactly how an engine from an older build keeps
+  /// answering after the app has been updated, serving the old behaviour and
+  /// making a fix look like it never happened. This is how the app finds the
+  /// stray process it has to replace. Null when nothing is listening (or the
+  /// platform will not say).
+  static Future<int?> pidListeningOnPort(int port) async {
+    try {
+      if (Platform.isWindows) {
+        final r = await Process.run('netstat.exe', ['-ano'], runInShell: false)
+            .timeout(const Duration(seconds: 5));
+        if (r.exitCode != 0) return null;
+        return listeningPid('${r.stdout}', port);
+      }
+      final r = await Process.run('lsof', ['-ti', 'tcp:$port'],
+          runInShell: false).timeout(const Duration(seconds: 5));
+      if (r.exitCode != 0) return null;
+      return int.tryParse('${r.stdout}'.trim().split(RegExp(r'\s+')).first);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The pid from one line of `netstat -ano` output for [port].
+  ///
+  /// Pure, so the parsing - the part that silently returns the wrong process -
+  /// is tested against real netstat text instead of being trusted.
+  static int? listeningPid(String output, int port) {
+    final suffix = ':$port';
+    for (final line in output.split(RegExp(r'\r?\n'))) {
+      final fields = line
+          .trim()
+          .split(RegExp(r'\s+'))
+          .where((f) => f.isNotEmpty)
+          .toList();
+      // PROTO  LOCAL  FOREIGN  STATE  PID
+      if (fields.length < 5) continue;
+      if (!fields[1].endsWith(suffix)) continue;
+      if (!fields[3].toUpperCase().contains('LISTEN')) continue;
+      final pid = int.tryParse(fields.last);
+      if (pid != null && pid > 0) return pid;
+    }
+    return null;
+  }
+
+  /// Stop a process the app did NOT start.
+  ///
+  /// [stop] deliberately refuses that - a hand-started engine is not ours to
+  /// kill - but an engine older than the one this build ships is a different
+  /// case: it is holding the port the app must use, and it will keep answering
+  /// with the behaviour the user just updated away from.
+  static Future<bool> stopStrayEngine(int pid) async {
+    if (pid <= 0) return false;
+    try {
+      final log = _logPath;
+      if (log != null) {
+        _appendLog(log, '\n[replacing the stale engine, pid $pid]\n');
+      }
+      return Process.killPid(pid, ProcessSignal.sigkill);
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Where to look for `sidecar/`: a packaged build puts it beside the exe,
   /// a development run has it one level up from `app/`. Public because the
   /// diagnostics card reports where the app actually looked.
   static List<String> searchRoots() {
+    // Nothing to find on a phone, and walking its filesystem is pure cost.
+    if (!canRunLocally) return const [];
     final roots = <String>[];
     var cursor = p.dirname(Platform.resolvedExecutable);
     for (var depth = 0; depth < 7; depth++) {

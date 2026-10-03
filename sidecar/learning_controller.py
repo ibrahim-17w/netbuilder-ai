@@ -86,11 +86,47 @@ def _safe_json(value):
 class StrategyStore:
     """Thread-safe JSON store with atomic writes and confidence updates."""
 
+    # A write budget: `record()` is called once per step, and each call used to
+    # re-serialize the whole file.  Writes are now coalesced within a short
+    # window so a burst of steps costs one disk write, while a read-after-write
+    # still sees the change (the in-memory row is always current).  `flush()`
+    # is called at run boundaries so nothing is left unpersisted.
+    WRITE_COALESCE_S = 1.5
+
     def __init__(self, path: str):
         self.path = path
         self._lock = threading.RLock()
         self._data = {"schema": SCHEMA, "strategies": {}}
+        self._dirty = False
+        self._last_write = 0.0
         self._load()
+
+    def _write_locked(self, force: bool = False):
+        """Persist, coalescing bursts unless `force` is set."""
+        now = time.time()
+        self._dirty = True
+        if not force and (now - self._last_write) < self.WRITE_COALESCE_S:
+            return
+        self._flush_locked()
+
+    def _flush_locked(self):
+        directory = os.path.dirname(os.path.abspath(self.path))
+        os.makedirs(directory, exist_ok=True)
+        temp = self.path + ".tmp"
+        with open(temp, "w", encoding="utf-8") as stream:
+            json.dump(self._data, stream, indent=2, sort_keys=True)
+        os.replace(temp, self.path)
+        self._dirty = False
+        self._last_write = time.time()
+
+    def flush(self):
+        """Force any coalesced changes to disk (called at run boundaries)."""
+        with self._lock:
+            if self._dirty:
+                try:
+                    self._flush_locked()
+                except Exception:
+                    pass
 
     def _load(self):
         try:
@@ -125,7 +161,7 @@ class StrategyStore:
         except Exception:
             pass
         self._prune()
-        self._write_locked()
+        self._write_locked(force=True)
 
     @classmethod
     def _migrate_v1(cls, rows: dict) -> dict:
@@ -223,14 +259,6 @@ class StrategyStore:
         )
         row["last_seen_epoch"] = time.time()
 
-    def _write_locked(self):
-        directory = os.path.dirname(os.path.abspath(self.path))
-        os.makedirs(directory, exist_ok=True)
-        temp = self.path + ".tmp"
-        with open(temp, "w", encoding="utf-8") as stream:
-            json.dump(self._data, stream, indent=2, sort_keys=True)
-        os.replace(temp, self.path)
-
     @staticmethod
     def _static_key(kind: str, scope: str, context, candidate) -> str:
         """Identity-only key: transferable across projects and renaming."""
@@ -308,7 +336,12 @@ class StrategyStore:
             row.pop("ptVersion", None)
             if persist and kind in SAFE_KINDS:
                 self._prune()
-                self._write_locked()
+                # A verified replacement (or a fresh success) is worth an
+                # immediate write; an ordinary counter bump can wait for the
+                # coalescing window or the next flush().
+                learnt = (outcome == "success"
+                          or bool(row.get("replacement_verified")))
+                self._write_locked(force=learnt)
             return deepcopy(row)
 
     def affinity(self, row, project: str = "") -> float:

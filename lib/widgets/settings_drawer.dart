@@ -156,6 +156,9 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
     });
     String result;
     try {
+      // Deliberately NOT the shared client: this button exists to test an
+      // address that has not been saved yet, so it is handed the field's own
+      // value for this one call.
       final ok = await AutopilotService(base: address).healthy;
       result = ok
           ? 'Reachable: $address answered.'
@@ -271,21 +274,17 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
     );
   }
 
-  AutopilotService _autopilot(SettingsService s) =>
-      AutopilotService(base: s.engineBase);
-
   /// Pause the autopilot at a safe boundary, or resume it.
   Future<void> _togglePause() async {
-    final s = context.read<SettingsService>();
     setState(() {
       _runBusy = true;
       _runStatus = 'Talking to the engine...';
     });
     String result;
     try {
-      final svc = _autopilot(s);
+      final svc = AutopilotService.of(context);
       if (!await svc.healthy) {
-        result = AutopilotService.startHint;
+        result = svc.hint;
       } else {
         final res = await svc.pauseToggle();
         result = (res['state'] ?? '').toString() == 'paused'
@@ -305,16 +304,15 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
 
   /// Emergency stop.
   Future<void> _stopRun() async {
-    final s = context.read<SettingsService>();
     setState(() {
       _runBusy = true;
       _runStatus = 'Stopping...';
     });
     String result;
     try {
-      final svc = _autopilot(s);
+      final svc = AutopilotService.of(context);
       if (!await svc.healthy) {
-        result = AutopilotService.startHint;
+        result = svc.hint;
       } else {
         await svc.stop();
         result = 'Emergency stop requested.';
@@ -331,14 +329,14 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
 
   /// The audit ledger, shown where the rest of the records live.
   Future<void> _showLedger() async {
-    final s = context.read<SettingsService>();
+    final engine = AutopilotService.of(context);
     setState(() {
       _runBusy = true;
       _runStatus = 'Reading the ledger...';
     });
     String body;
     try {
-      final report = await _autopilot(s).pktLedger();
+      final report = await engine.pktLedger();
       final lines = <String>[
         'Entries: ${report['count'] ?? 0}',
         'Applied changes: ${report['applied'] ?? 0}',
@@ -544,6 +542,10 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
               initialValue: s.providerName,
+              // Expanded, because the widest item ('OpenAI-compatible (free
+              // models OK)') plus a large system font is wider than this
+              // drawer, and an overflowing dropdown hides more than it shows.
+              isExpanded: true,
               items: const [
                 DropdownMenuItem(
                   value: 'gemini',
@@ -751,6 +753,7 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
             const SizedBox(height: 6),
             DropdownButtonFormField<int>(
               initialValue: s.contextBudget,
+              isExpanded: true,
               items:
                   (<int>{
                         32768,
@@ -776,6 +779,61 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
+            ),
+            const SizedBox(height: 10),
+            // The budget above is a ceiling; this is what the runtime really
+            // allocates. Detection is right when the runtime runs on this
+            // machine, and the override exists because a runtime can accept a
+            // bigger number than it honours: Ollama's OpenAI-compatible
+            // endpoint ignores a per-request num_ctx, so its window is what
+            // OLLAMA_CONTEXT_LENGTH (or the Modelfile) says, not what is
+            // requested here.
+            DropdownButtonFormField<int>(
+              initialValue: s.runtimeWindow,
+              isExpanded: true,
+              items:
+                  (<int>{
+                        0,
+                        2048,
+                        4096,
+                        8192,
+                        16384,
+                        32768,
+                        131072,
+                        262144,
+                        s.runtimeWindow,
+                      }.toList()
+                      ..sort())
+                  .map(
+                    (w) => DropdownMenuItem<int>(
+                      value: w,
+                      child: Text(
+                        w == 0 ? 'Detect automatically' : '${w ~/ 1024}k tokens',
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) => s.setRuntimeWindow(v ?? s.runtimeWindow),
+              decoration: const InputDecoration(
+                labelText: 'Runtime window',
+                helperText:
+                    'The context the runtime gives one request. Detection '
+                    'reads the local runtime; set it by hand for a remote one.',
+                helperMaxLines: 3,
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: s.contextDebug,
+              title: const Text('Log every request context'),
+              subtitle: const Text(
+                'Prints each request\'s token breakdown to the debug console '
+                'and keeps the last 20 for the context inspector.',
+                style: TextStyle(fontSize: 12),
+              ),
+              onChanged: (v) => s.setContextDebug(v),
             ),
 
             const Divider(height: 24),
@@ -804,8 +862,14 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
                     onPressed: () async {
                       await s.setEngineBase(_engine.text);
                       if (!mounted) return;
-                      setState(() => _engine.text = s.engineBase);
-                      _toast('Engine set to ${s.engineBase}');
+                      final error = s.engineBaseError;
+                      setState(() {
+                        if (error.isEmpty) _engine.text = s.engineBase;
+                      });
+                      // A rejected address leaves the field as typed and says
+                      // why, instead of snapping back to the old value with no
+                      // explanation.
+                      _toast(error.isEmpty ? 'Engine set to ${s.engineBase}' : error);
                     },
                     child: const Text('Save engine'),
                   ),
@@ -870,55 +934,12 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
             ),
 
             const Divider(height: 24),
-            Text('Privacy', style: theme.textTheme.titleSmall),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: s.privateMode,
-              title: const Text('Private mode'),
-              subtitle: const Text(
-                'Never call the model; plan and audit offline only.',
-                style: TextStyle(fontSize: 12),
-              ),
-              onChanged: (v) => s.setPrivateMode(v),
-            ),
-
-            const Divider(height: 24),
             // ---- EVERYTHING ELSE ---------------------------------
-            // The hub is the app's index: every capability, searchable. On a
-            // phone this drawer is the main way around, so the way in has to
-            // be here, not only in the app bar of a wide window.
-            Text('Everything else', style: theme.textTheme.titleSmall),
-            const SizedBox(height: 6),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.grid_view_rounded),
-              title: const Text('All features'),
-              subtitle: const Text(
-                'Search every capability: subnet maths, VLSM, diagnostics, '
-                'exports, the ledger, .pkt tools',
-                style: TextStyle(fontSize: 12),
-              ),
-              onTap: () {
-                Navigator.of(context).pop();
-                widget.onOpenHub?.call();
-              },
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.calculate_outlined),
-              title: const Text('Network toolkit'),
-              subtitle: const Text(
-                'Subnet calculator, VLSM, summarization, ACL masks, live '
-                'diagnostics and the config exporters',
-                style: TextStyle(fontSize: 12),
-              ),
-              onTap: () {
-                Navigator.of(context).pop();
-                widget.onOpenToolkit?.call();
-              },
-            ),
-
-            const Divider(height: 24),
+            // Private mode, the feature index and the toolkit are NOT
+            // repeated here: each has one home (Settings, the rail's
+            // "All features"/app-bar hub, and the rail's calculator). This
+            // drawer is the control center for what is in flight - chats,
+            // run controls, context - plus the way in on a phone.
             Text('Appearance', style: theme.textTheme.titleSmall),
             const SizedBox(height: 6),
             SegmentedButton<String>(

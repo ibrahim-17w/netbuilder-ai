@@ -215,6 +215,65 @@ def firewall_library(tmp_path_factory):
     return pkt_builder.load_library(str(out))
 
 
+def _router_size_save() -> bytes:
+    """The sample save plus two routers with different port counts.
+
+    The reported plan cables its middle router three ways - two WAN hops and
+    a LAN - and the app's own interface layout names 'g1/0' for the second
+    hop, which no real model has.  A two-port router cannot host three
+    interfaces, so the builder has to either choose hardware that can or put
+    two cables on one port (a file Packet Tracer refuses, and a config whose
+    second `interface` block overwrites the first).
+    """
+    extra = (
+        _device("1841", "Router", "Lab-R-two", 601,
+                ("eCopperFastEthernet",) * 2,
+                config=("interface FastEthernet0/0",
+                        "interface FastEthernet0/1"))
+        + _device("2911", "Router", "Lab-R-three", 602,
+                  ("eCopperGigabitEthernet",) * 3,
+                  config=("interface GigabitEthernet0/0",
+                          "interface GigabitEthernet0/1",
+                          "interface GigabitEthernet0/2"))
+    ).encode()
+    return _sample_save().replace(b"</DEVICES>", extra + b"</DEVICES>")
+
+
+@pytest.fixture(scope="module")
+def router_size_library(tmp_path_factory):
+    """A library with a 2-port and a 3-port router to choose between."""
+    source = tmp_path_factory.mktemp("size-saves") / "size.pkt"
+    source.write_bytes(pkt_codec.encrypt_pkt(_router_size_save()))
+    out = tmp_path_factory.mktemp("size-templates")
+    tb.extract_templates([str(source)], str(out))
+    return pkt_builder.load_library(str(out))
+
+
+def cable_ports(built: dict) -> dict:
+    """(device, port) -> how many cables the built file puts on it."""
+    counts: dict[tuple, int] = {}
+    for link in built["links"]:
+        for side in ("a", "b"):
+            key = (link[side], link[f"{side}If"])
+            counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def device_spots(xml: bytes) -> dict[str, tuple[int, int]]:
+    """Every device's logical canvas spot, read back from the built XML."""
+    spots = {}
+    for block in re.findall(rb"<DEVICE(?:\s[^>]*)?>(.*?)</DEVICE>", xml, re.S):
+        name = re.search(rb'<NAME translate="true">([^<]*)</NAME>', block)
+        logical = re.search(rb"<LOGICAL>.*?</LOGICAL>", block, re.S)
+        if not name or not logical:
+            continue
+        x = re.search(rb"<X>(-?\d+)</X>", logical.group(0))
+        y = re.search(rb"<Y>(-?\d+)</Y>", logical.group(0))
+        if x and y:
+            spots[name.group(1).decode()] = (int(x.group(1)), int(y.group(1)))
+    return spots
+
+
 PLAN = {
     "project": "lab",
     "steps": [
@@ -515,6 +574,46 @@ class TestPortNames:
             and "slot remap" in note  # ethernet0 really is a remap to Fa0/0
         assert pkt_builder.resolve_port(router, "Vlan1") == (None, "")
 
+    def test_a_claimed_port_is_never_handed_to_a_second_name(self, library):
+        """The allocator must refuse a port another interface already owns.
+
+        The exact-name lookup used to return its port no matter what, which
+        is how 'g1/0' (remapped onto Gi0/1) and the plan's real 'g0/1' both
+        landed on GigabitEthernet0/1."""
+        router = next(e for e in library["devices"] if e["model"] == "2811")
+        port, _note = pkt_builder.resolve_port(router, "f0/0")
+        assert port["name"] == "FastEthernet0/0"
+        port, note = pkt_builder.resolve_port(
+            router, "f0/0", taken={"FastEthernet0/0"})
+        assert port["name"] == "FastEthernet0/1"
+        assert "already carrying a cable" in note
+        # The family is exhausted: no port is better than a second cable.
+        port, note = pkt_builder.resolve_port(
+            router, "f0/0",
+            taken={"FastEthernet0/0", "FastEthernet0/1"})
+        assert port is None and note == ""
+        # ...but a name the model does not have still finds a free one.
+        port, note = pkt_builder.resolve_port(
+            router, "g1/0", taken={"FastEthernet0/0"})
+        assert port["name"] == "FastEthernet0/1"
+
+    def test_the_model_is_right_sized_to_the_cabling(self,
+                                                    router_size_library):
+        """Hardware has to have a port per cable the plan asks for."""
+        two, notes = pkt_builder.select_variant(
+            router_size_library,
+            {"name": "R2", "type": "router", "model": "1841"},
+            ["g0/0", "g0/1"])
+        assert two["model"] == "1841" and not notes
+        three, notes = pkt_builder.select_variant(
+            router_size_library,
+            {"name": "R2", "type": "router", "model": "1841"},
+            ["g0/0", "g1/0", "g0/1"])
+        assert three["model"] == "2911"
+        note = " ".join(notes)
+        assert "instead of 1841" in note
+        assert "no port for" in note and "g0/1" in note
+
     def test_select_variant(self, library):
         best, notes = pkt_builder.select_variant(
             library, {"name": "R1", "type": "router", "model": "2811"},
@@ -587,6 +686,82 @@ class TestConfig:
         lines = ["interface f0/0", "interface range f0/1 - f0/3", "no shut"]
         names = pkt_builder._interface_lines(lines)
         assert names == ["f0/0", "f0/1", "f0/3"]
+
+    def test_subinterface_never_claims_a_port(self):
+        """A dot1Q sub-interface (router-on-a-stick) rides on its parent's
+        hardware: it must not be counted as a port the template has to have."""
+        lines = ["interface g0/0.10", " encapsulation dot1Q 10",
+                 "interface f0/1"]
+        assert pkt_builder._interface_lines(lines) == ["f0/1"]
+
+    def test_subinterface_remap_keeps_vlan_suffix(self):
+        """`g0/0.10` on a 2811 becomes `FastEthernet0/0.10`: the parent is
+        remapped to a real port, the VLAN suffix survives, and the parent
+        resolution is shared with the links (one port, not two)."""
+        variant = {"key": "2811", "ports": [
+            {"index": 0, "name": "FastEthernet0/0",
+             "family": "fastethernet"},
+            {"index": 1, "name": "FastEthernet0/1",
+             "family": "fastethernet"},
+        ]}
+        lines = ["hostname R1",
+                 "interface g0/0.10",
+                 " encapsulation dot1Q 10",
+                 " ip address 192.168.10.1 255.255.255.0",
+                 "exit",
+                 "interface g0/0.20",
+                 " encapsulation dot1Q 20",
+                 "exit"]
+        remapped, notes = pkt_builder._remap_config_interfaces(
+            variant, lines, {})
+        assert remapped[1] == "interface FastEthernet0/0.10"
+        assert remapped[5] == "interface FastEthernet0/0.20"
+        assert " encapsulation dot1Q 10" in remapped
+        assert notes == []
+
+    def test_subinterface_address_not_mirrored_onto_parent_port(self,
+                                                                library):
+        """The trunk parent carries no IP of its own; mirroring the VLAN 10
+        address onto the physical port would break every other VLAN."""
+        plan = {"steps": [
+            {"action": "create_nodes", "nodes": [
+                {"name": "R1", "type": "router", "model": "2811"}]},
+            {"action": "paste_cli", "configs": {
+                "R1": ("hostname R1\n"
+                       "interface g0/0.10\n encapsulation dot1Q 10\n"
+                       " ip address 192.168.10.1 255.255.255.0\n no shut\n"
+                       "exit\nend\n")}}]}
+        built = pkt_builder.build_pkt(plan, library)
+        assert b"<LINE>interface FastEthernet0/0.10</LINE>" in built["xml"]
+        assert b"<LINE>encapsulation dot1Q 10</LINE>" in built["xml"]
+        # The physical port element stays clean.
+        port = next(p for p in re.findall(
+            rb"<PORT>.*?</PORT>", built["xml"], re.S)
+            if b"eCopperFastEthernet" in p)
+        assert b"<IP>192.168.10.1</IP>" not in port
+
+    def test_router_protocol_and_trunk_lines_survive(self, library):
+        """EIGRP, BGP, trunk and HSRP lines are real config in Packet
+        Tracer: they must land in the saved config text, not be filtered."""
+        plan = {"steps": [
+            {"action": "create_nodes", "nodes": [
+                {"name": "R1", "type": "router", "model": "2811"}]},
+            {"action": "paste_cli", "configs": {
+                "R1": ("hostname R1\n"
+                       "router eigrp 10\n no auto-summary\n"
+                       " network 192.168.1.0 0.0.0.255\nexit\n"
+                       "router bgp 65001\n neighbor 10.0.0.2 remote-as 65001\n"
+                       " network 192.168.1.0 mask 255.255.255.0\nexit\n"
+                       "interface f0/1\n switchport mode trunk\n"
+                       " switchport trunk allowed vlan 10,20\n"
+                       " standby 1 ip 192.168.1.254\n standby 1 priority 110\n"
+                       "exit\nend\n")}}]}
+        built = pkt_builder.build_pkt(plan, library)
+        xml = built["xml"]
+        assert b"<LINE>router eigrp 10</LINE>" in xml
+        assert b"<LINE>neighbor 10.0.0.2 remote-as 65001</LINE>" in xml
+        assert b"<LINE>switchport trunk allowed vlan 10,20</LINE>" in xml
+        assert b"<LINE>standby 1 priority 110</LINE>" in xml
 
     def test_clock_rate_found_per_interface(self):
         lines = ["interface s0/2/0", "clock rate 64000", "interface f0/0",
@@ -762,10 +937,406 @@ class TestBuild:
         ref_ids = __import__("re").findall(
             rb"<SAVE_REF_ID>save-ref-id:(\d+)</SAVE_REF_ID>", xml)
         assert len(ref_ids) == 5 and len(set(ref_ids)) == 5
-        # layout rows
-        assert b"<X>240</X>" in xml and b"<Y>120</Y>" in xml  # first router
-        assert b"<Y>300</Y>" in xml  # switch row
-        assert b"<Y>480</Y>" in xml  # pc row
+        # Layout: the plan's own topology decides the picture - the WAN pair
+        # on the core row, the switch under the router it uplinks to, the
+        # hosts under that switch.  The assertion is the rule, not one magic
+        # coordinate pair from the single-row-per-kind layout it replaced.
+        placed = device_spots(xml)
+        assert set(placed) == {"R1", "R2", "SW1", "PC1", "PC2"}
+        for name, (x, y) in placed.items():
+            assert x > 0 and y > 0, f"{name} is off canvas"
+        # the two routers share the core row, R2 to the right of R1
+        assert placed["R1"][1] == placed["R2"][1] == pkt_builder.ROW_TOP
+        assert placed["R2"][0] > placed["R1"][0]
+        # the switch hangs below its uplink, the hosts below their switch
+        assert placed["SW1"][1] > placed["R1"][1]
+        assert placed["PC1"][1] == placed["PC2"][1]
+        assert placed["PC1"][1] > placed["SW1"][1]
+        # centred under what they attach to, not stacked on it
+        assert abs(placed["SW1"][0] - placed["R1"][0]) <= pkt_builder.DEVICE_PITCH
+        assert abs((placed["PC1"][0] + placed["PC2"][0]) / 2
+                   - placed["SW1"][0]) <= pkt_builder.DEVICE_PITCH
+        # no two devices stacked on the same spot
+        assert len(set(placed.values())) == len(placed)
+
+    def test_company_plan_is_drawn_as_site_trees_not_one_row(self):
+        """The reported bug: 29 end devices on one 5,840-pixel line, 200px
+        apart, every link fanning back to a single point, so nothing could be
+        read ("it puts all of them on top of each other at the end").  A
+        two-site plan must come out as two readable trees: each site's hosts
+        in a compact block under their own switch, and each switch under the
+        router it uplinks to."""
+        nodes = ([{"name": f"R{i}", "type": "router", "model": "2911"}
+                  for i in (1, 2, 3)]
+                 + [{"name": f"SW{i}", "type": "switch", "model": "2960"}
+                    for i in (1, 2, 3)]
+                 + [{"name": f"SRV{i}", "type": "server"} for i in (1, 2, 3, 4)]
+                 + [{"name": f"PC{i}", "type": "pc"} for i in range(1, 26)])
+        links = [{"a": "R1", "b": "R2"}, {"a": "R2", "b": "R3"},
+                 {"a": "R1", "b": "SW1"}, {"a": "R2", "b": "SW2"},
+                 {"a": "R3", "b": "SW3"}]
+        links += [{"a": "SW1", "b": f"SRV{i}"} for i in (1, 2, 3, 4)]
+        links += [{"a": "SW1", "b": f"PC{i}"} for i in range(1, 10)]
+        links += [{"a": "SW2", "b": f"PC{i}"} for i in range(10, 18)]
+        links += [{"a": "SW3", "b": f"PC{i}"} for i in range(18, 26)]
+
+        spots = pkt_builder.layout_positions(nodes, links)
+        assert set(spots) == {node["name"] for node in nodes}
+        assert len(set(spots.values())) == len(spots)
+        # deterministic: the same plan always draws the same picture
+        assert pkt_builder.layout_positions(nodes, links) == spots
+        # the WAN peers share the core row, each switch one band below its own
+        # router and centred on it
+        assert {spots[f"R{i}"][1] for i in (1, 2, 3)} == {pkt_builder.ROW_TOP}
+        for index, switch in enumerate(("SW1", "SW2", "SW3"), start=1):
+            router = spots[f"R{index}"]
+            assert spots[switch][1] > router[1]
+            assert abs(spots[switch][0] - router[0]) <= pkt_builder.DEVICE_PITCH
+        # servers keep a band of their own, above the hosts
+        assert spots["SRV1"][1] < spots["PC1"][1]
+        # hosts cluster under their own switch: never more than GRID_COLUMNS to
+        # a row inside one block, and never more than two columns off its axis
+        parent = {link["b"]: link["a"] for link in links
+                  if link["b"].startswith(("PC", "SRV"))}
+        per_row: dict[tuple, int] = {}
+        for host, switch in parent.items():
+            x, y = spots[host]
+            assert y > spots[switch][1], f"{host} is not below {switch}"
+            assert abs(x - spots[switch][0]) \
+                <= (pkt_builder.GRID_COLUMNS / 2) * pkt_builder.DEVICE_PITCH
+            per_row[(switch, y)] = per_row.get((switch, y), 0) + 1
+        assert max(per_row.values()) <= pkt_builder.GRID_COLUMNS
+        # and the whole lab fits a couple of screens instead of one long line
+        assert max(x for x, _ in spots.values()) < 3 * pkt_builder.CANVAS_WIDTH
+
+    def test_layout_without_links_still_places_every_device(self):
+        """A plan whose links never made it (an isolated lab, or a hand-made
+        node list) still draws: devices keep their own band, side by side."""
+        nodes = [{"name": "R1", "type": "router"},
+                 {"name": "SW1", "type": "switch"},
+                 {"name": "PC1", "type": "pc"},
+                 {"name": "PC2", "type": "pc"}]
+        spots = pkt_builder.layout_positions(nodes)
+        assert set(spots) == {"R1", "SW1", "PC1", "PC2"}
+        assert len(set(spots.values())) == 4
+        assert spots["R1"][1] < spots["SW1"][1] < spots["PC1"][1]
+        assert spots["PC1"][1] == spots["PC2"][1]
+        assert spots["PC2"][0] > spots["PC1"][0]
+
+    def _grouped_fixture(self):
+        nodes = [{"name": f"PC{i}", "type": "pc"} for i in range(1, 8)]
+        nodes += [{"name": f"SRV{i}", "type": "server"} for i in range(1, 5)]
+        nodes += [{"name": "SW1", "type": "switch"}]
+        links = [{"a": "SW1", "b": f"PC{i}"} for i in range(1, 8)]
+        links += [{"a": "SW1", "b": f"SRV{i}"} for i in range(1, 5)]
+        return nodes, links
+
+    def test_grouped_parks_the_named_devices_in_one_column(self):
+        """"Move the servers to the side" has to mean something.  The servers
+        leave their own sub-tree and line up in a column at the edge asked for,
+        which is the whole reason the style exists."""
+        nodes, links = self._grouped_fixture()
+        servers = [f"SRV{i}" for i in range(1, 5)]
+        tree = pkt_builder.layout_positions(nodes, links, style="tree")
+        left = pkt_builder.layout_positions(nodes, links, style="grouped",
+                                            side=servers, side_edge="left")
+        right = pkt_builder.layout_positions(nodes, links, style="grouped",
+                                             side=servers, side_edge="right")
+
+        # Every device is still placed, and no two share a point.
+        assert set(left) == {n["name"] for n in nodes}
+        assert len(set(left.values())) == len(nodes)
+
+        # One column, stacked, on the edge that was asked for.
+        assert len({left[s][0] for s in servers}) == 1
+        assert len({left[s][1] for s in servers}) == len(servers)
+        assert all(left[s][0] < left["PC1"][0] for s in servers)
+        assert all(right[s][0] > right["PC7"][0] for s in servers)
+
+        # It is a real change, not a relabelling of the same picture.
+        assert tree["SRV1"] != left["SRV1"]
+
+    def test_grouped_never_draws_off_the_canvas(self):
+        """Parking on the left shifts the rest of the drawing right rather than
+        parking the column at a negative x."""
+        nodes, links = self._grouped_fixture()
+        spots = pkt_builder.layout_positions(
+            nodes, links, style="grouped",
+            side=[f"SRV{i}" for i in range(1, 5)], side_edge="left")
+        assert all(x >= 0 for x, _ in spots.values())
+
+    def test_grouped_without_devices_is_exactly_the_tree(self):
+        """With nothing named there is nothing to park, so the picture must be
+        the tree - not a differently-named identical drawing."""
+        nodes, links = self._grouped_fixture()
+        assert pkt_builder.layout_positions(nodes, links, style="grouped") == \
+            pkt_builder.layout_positions(nodes, links, style="tree")
+        assert pkt_builder.layout_positions(
+            nodes, links, style="grouped", side=["NOPE"]) == \
+            pkt_builder.layout_positions(nodes, links, style="tree")
+
+    def test_layout_options_drops_what_it_cannot_use(self):
+        """A plan carrying a side list this build cannot honour still draws."""
+        assert pkt_builder.layout_options(
+            {"style": "grouped", "sideEdge": "up"}).get("sideEdge") is None
+        assert pkt_builder.layout_options(
+            {"style": "sideways"}).get("style") is None
+        assert len(pkt_builder.layout_options(
+            {"style": "grouped", "side": ["x"] * 400})["side"]) <= 128
+        settings = pkt_builder.layout_settings(
+            {"style": "grouped", "side": ["SRV1"], "sideEdge": "right"})
+        assert settings["side"] == ["SRV1"]
+        assert settings["sideEdge"] == "right"
+
+    def _rich_fixture(self):
+        """A lab with every tier in it, so a drawing that only ever draws one
+        shape of thing cannot pass by accident."""
+        nodes = [{"name": "R1", "type": "router"},
+                 {"name": "R2", "type": "router"},
+                 {"name": "FW1", "type": "firewall"},
+                 {"name": "SW1", "type": "switch"},
+                 {"name": "SW2", "type": "switch"}]
+        nodes += [{"name": f"PC{i}", "type": "pc"} for i in range(1, 4)]
+        nodes += [{"name": f"SRV{i}", "type": "server"} for i in range(1, 3)]
+        links = [{"a": "FW1", "b": "R1"},
+                 {"a": "R1", "aIf": "g0/1", "b": "R2", "bIf": "g0/0",
+                  "cable": "serial"},
+                 {"a": "R1", "aIf": "g0/2", "b": "SW1", "bIf": "g0/1"},
+                 {"a": "R2", "aIf": "g0/2", "b": "SW2", "bIf": "g0/1"},
+                 {"a": "SW1", "aIf": "f0/1", "b": "PC1", "bIf": "f0"},
+                 {"a": "SW1", "aIf": "f0/2", "b": "PC2", "bIf": "f0"},
+                 {"a": "SW2", "aIf": "f0/3", "b": "PC3", "bIf": "f0"},
+                 {"a": "SW1", "aIf": "f0/3", "b": "SRV1", "bIf": "f0"},
+                 {"a": "SW2", "aIf": "f0/4", "b": "SRV2", "bIf": "f0"}]
+        return nodes, links
+
+    def test_every_drawing_places_every_device_on_canvas(self):
+        """All ten drawings, on a lab with every tier in it."""
+        nodes, links = self._rich_fixture()
+        names = {n["name"] for n in nodes}
+        for style in pkt_builder.LAYOUT_STYLES:
+            spots = pkt_builder.layout_positions(nodes, links, style=style)
+            assert set(spots) == names, style
+            assert len(set(spots.values())) == len(nodes), style
+            assert all(x >= 0 for x, _ in spots.values()), style
+            assert all(y >= 0 for _, y in spots.values()), style
+
+    def test_no_two_drawings_are_the_same_picture(self):
+        """The complaint that started this: `tree`, `wide` and `compact` are one
+        algorithm at three sizes, so the gallery offered near-identical
+        pictures. Nine drawings, nine pictures - and `grouped`, which is the
+        tree until devices are parked, makes a tenth."""
+        nodes, links = self._rich_fixture()
+        prints = {}
+        for style in pkt_builder.LAYOUT_STYLES:
+            side = ["SRV1", "SRV2"] if style == "grouped" else None
+            spots = pkt_builder.layout_positions(
+                nodes, links, style=style, side=side or [])
+            prints[style] = tuple(sorted(spots.items()))
+        assert len(set(prints.values())) == len(pkt_builder.LAYOUT_STYLES), \
+            {style for style in pkt_builder.LAYOUT_STYLES
+             if prints[style] == prints["tree"]}
+
+    def test_layered_ranks_follow_the_links_not_the_kind(self):
+        """`layered` puts a device in the column of how far it is from a root.
+        The routers and the firewall are all roots (a link between equals does
+        not nest one under the other), so they share the first column, the
+        switches sit in the next, and the endpoints beyond them."""
+        nodes, links = self._rich_fixture()
+        layered = pkt_builder.layout_positions(nodes, links, style="layered")
+        xs = {name: layered[name][0] for name in layered}
+        # Roots share a column; equals are stacked, not side by side.
+        assert xs["FW1"] == xs["R1"] == xs["R2"]
+        assert len({layered[n][1] for n in ("FW1", "R1", "R2")}) == 3
+        # Each hop away from a root moves one column right.
+        assert xs["SW1"] == xs["SW2"] > xs["R1"]
+        assert xs["PC1"] > xs["SW1"]
+        # And that is what makes it differ from `split`, which sorts by KIND.
+        split = pkt_builder.layout_positions(nodes, links, style="split")
+        assert split["FW1"][0] == split["R1"][0] != xs["FW1"]
+
+    def test_radial_puts_the_core_in_the_middle_and_hosts_outside(self):
+        nodes, links = self._rich_fixture()
+        spots = pkt_builder.layout_positions(nodes, links, style="radial")
+        centre_x = pkt_builder.CANVAS_WIDTH / 2
+        def distance(name):
+            return abs(spots[name][0] - centre_x) + abs(
+                spots[name][1] - max(
+                    s[1] for s in spots.values()) / 2)
+        # Hosts sit further out than the routers do.
+        assert distance("PC1") > distance("R1")
+
+    def test_split_gives_each_kind_its_own_column(self):
+        nodes, links = self._rich_fixture()
+        spots = pkt_builder.layout_positions(nodes, links, style="split")
+        # Core, access, services and endpoints are four different columns.
+        assert spots["R1"][0] == spots["R2"][0] == spots["FW1"][0]
+        assert spots["SW1"][0] == spots["SW2"][0]
+        assert spots["SRV1"][0] == spots["SRV2"][0]
+        assert spots["PC1"][0] == spots["PC2"][0] == spots["PC3"][0]
+        assert spots["R1"][0] < spots["SW1"][0] < spots["SRV1"][0] \
+            < spots["PC1"][0]
+
+    def test_grid_is_an_evenly_spaced_box(self):
+        nodes, links = self._rich_fixture()
+        spots = pkt_builder.layout_positions(nodes, links, style="grid")
+        columns = int(len(nodes) ** 0.5 + 0.9999)
+        first_row = [spots[n["name"]] for n in nodes[:columns]]
+        assert len({y for _x, y in first_row}) == 1
+        assert len({x for x, _ in first_row}) == columns
+
+    def test_circle_puts_every_device_on_one_ring(self):
+        import math
+        nodes, links = self._rich_fixture()
+        spots = pkt_builder.layout_positions(nodes, links, style="circle")
+        centre_x = sum(x for x, _ in spots.values()) / len(spots)
+        centre_y = sum(y for _, y in spots.values()) / len(spots)
+        radii = [math.hypot(x - centre_x, y - centre_y)
+                 for x, y in spots.values()]
+        # Every device the same distance from the middle.
+        assert max(radii) - min(radii) < max(radii) * 0.05
+
+    def test_zones_send_groups_to_different_edges(self):
+        """"Put the servers on one side and the routers on the other"."""
+        nodes, links = self._rich_fixture()
+        zones = [{"side": ["SRV1", "SRV2"], "edge": "left"},
+                 {"side": ["R1", "R2"], "edge": "right"}]
+        spots = pkt_builder.layout_positions(nodes, links, style="grouped",
+                                            zones=zones)
+        assert len({spots[s][0] for s in ("SRV1", "SRV2")}) == 1
+        assert len({spots[r][0] for r in ("R1", "R2")}) == 1
+        assert spots["SRV1"][0] < spots["SW1"][0] < spots["R1"][0]
+        assert all(x >= 0 for x, _ in spots.values())
+
+    def test_two_zones_differ_from_one_zone(self):
+        nodes, links = self._rich_fixture()
+        one = pkt_builder.layout_positions(
+            nodes, links, style="grouped", side=["SRV1", "SRV2"],
+            side_edge="left")
+        two = pkt_builder.layout_positions(
+            nodes, links, style="grouped",
+            zones=[{"side": ["SRV1", "SRV2"], "edge": "left"},
+                   {"side": ["R1", "R2"], "edge": "right"}])
+        assert one != two
+
+    def test_a_zone_naming_nothing_is_ignored(self):
+        nodes, links = self._rich_fixture()
+        plain = pkt_builder.layout_positions(nodes, links, style="grouped")
+        assert pkt_builder.layout_positions(
+            nodes, links, style="grouped",
+            zones=[{"side": ["NOPE"]}]) == plain
+        assert pkt_builder.layout_positions(
+            nodes, links, style="grouped",
+            zones=[{"edge": "left"}]) == plain
+
+    def test_two_zones_on_the_same_edge_do_not_pile_up(self):
+        nodes, links = self._rich_fixture()
+        spots = pkt_builder.layout_positions(
+            nodes, links, style="grouped",
+            zones=[{"side": ["SRV1"], "edge": "left"},
+                   {"side": ["PC1"], "edge": "left"}])
+        assert spots["SRV1"][0] != spots["PC1"][0]
+        assert len(set(spots.values())) == len(nodes)
+
+    def test_unknown_style_falls_back_to_the_tree(self):
+        nodes, links = self._rich_fixture()
+        assert pkt_builder.layout_positions(
+            nodes, links, style="sideways") == pkt_builder.layout_positions(
+                nodes, links, style="tree")
+
+    def test_the_report_states_the_drawing_that_was_used(self, library,
+                                                         tmp_path):
+        """The app remembers the drawing from this, so it has to be in here.
+        A report that said nothing about the layout made the NEXT build fall
+        back to the default drawing - the file was right and the app's memory
+        of it was not."""
+        plan = {"steps": [
+            {"action": "create_nodes", "nodes": [
+                {"name": "SW1", "type": "switch"},
+                {"name": "PC1", "type": "pc"},
+                {"name": "SRV1", "type": "server"}]},
+            {"action": "create_links", "links": [
+                {"a": "SW1", "aIf": "f0/1", "b": "PC1", "bIf": "f0"},
+                {"a": "SW1", "aIf": "f0/2", "b": "SRV1", "bIf": "f0"}]},
+            {"action": "paste_cli", "configs": {}}],
+            "layout": {"style": "grouped", "side": ["SRV1"],
+                       "sideEdge": "right"}}
+        built = pkt_builder.generate_pkt_file(
+            plan, str(tmp_path / "grouped-report.pkt"), library=library,
+            replace=True)
+        assert built["layout"]["style"] == "grouped"
+        assert built["layout"]["sideEdge"] == "right"
+        assert built["layout"]["side"] == ["SRV1"]
+
+        # The reported drawing is the drawing that was written to the file.
+        spots = device_spots(pkt_codec.decrypt_pkt(
+            (tmp_path / "grouped-report.pkt").read_bytes()))
+        assert spots["SRV1"][0] > spots["PC1"][0]
+
+    def test_zones_in_a_plan_reach_the_built_file(self, library, tmp_path):
+        """The whole path a chat request takes: two zones in the plan's own
+        layout, compiled, and read back out of the saved file. `layout_options`
+        parsing a zone is not enough - the zones also have to be handed to the
+        function that places devices, and forgetting that silently draws the
+        tree while the report still says `grouped`."""
+        nodes, links = self._grouped_fixture()
+        steps = [{"action": "create_nodes", "nodes": nodes},
+                 {"action": "create_links", "links": links},
+                 {"action": "paste_cli", "configs": {}}]
+        plan = {"steps": steps,
+                "layout": {"style": "grouped",
+                           "zones": [{"side": ["SRV1", "SRV2"], "edge": "left"},
+                                     {"side": ["SW1"], "edge": "right"}]}}
+        out = tmp_path / "zones.pkt"
+        built = pkt_builder.generate_pkt_file(plan, str(out),
+                                              library=library, replace=True)
+
+        assert [z["edge"] for z in built["layout"]["zones"]] == ["left", "right"]
+        spots = device_spots(pkt_codec.decrypt_pkt(out.read_bytes()))
+        assert len(spots) == len(nodes)
+        assert len(set(spots.values())) == len(nodes)
+        # The servers really are in their own left column and the switch in
+        # its own right one.
+        assert spots["SRV1"][0] == spots["SRV2"][0]
+        assert spots["SRV1"][0] < spots["PC1"][0] < spots["SW1"][0]
+
+    def test_grouped_layout_reaches_the_built_file(self, library):
+        """"Move the servers to the side" has to reach the saved coordinates,
+        not only the preview: the file is what the user opens in Packet
+        Tracer, so a drawing that only existed on screen would be a lie."""
+        plan = {"steps": [
+            {"action": "create_nodes", "nodes": [
+                {"name": "R1", "type": "router", "model": "2811"},
+                {"name": "SW1", "type": "switch"}] +
+            [{"name": f"PC{i}", "type": "pc"} for i in range(1, 5)] +
+            [{"name": f"SRV{i}", "type": "server"} for i in range(1, 4)]},
+            {"action": "create_links", "links": (
+            [{"a": "R1", "aIf": "g0/1", "b": "SW1", "bIf": "g0/1"}] +
+            [{"a": "SW1", "aIf": f"f0/{i}", "b": f"PC{i}", "bIf": "f0"}
+             for i in range(1, 5)] +
+            [{"a": "SW1", "aIf": f"f0/{i + 4}", "b": f"SRV{i}", "bIf": "f0"}
+             for i in range(1, 4)])},
+            {"action": "paste_cli", "configs": {}}],
+            "layout": {"style": "grouped",
+                       "side": ["SRV1", "SRV2", "SRV3"],
+                       "sideEdge": "left"}}
+
+        built = pkt_builder.build_pkt(plan, library)
+
+        # The report states the drawing it actually used.
+        assert built["layout"]["style"] == "grouped"
+        assert built["layout"]["sideEdge"] == "left"
+
+        # Read every device's spot back out of the compiled file.
+        spots = device_spots(built["xml"])
+
+        servers = [spots[f"SRV{i}"] for i in range(1, 4)]
+        hosts = [spots[f"PC{i}"] for i in range(1, 5)]
+        assert len(spots) == 9, sorted(spots)
+        assert len({x for x, _ in servers}) == 1, servers
+        assert len({y for _, y in servers}) == 3, servers
+        assert all(x < min(hx for hx, _ in hosts) for x, _ in servers), servers
+        assert all(x >= 0 for x, _ in spots.values())
 
     def test_config_embedded_and_exec_dropped(self, library):
         built = pkt_builder.build_pkt(PLAN, library)
@@ -815,6 +1386,57 @@ class TestBuild:
         # with the second interface's address.
         assert b"<IP>192.168.1.1</IP>" in built["xml"]
         assert b"<IP>192.168.2.1</IP>" in built["xml"]
+
+    def test_a_router_cabled_three_ways_never_shares_one_port(
+            self, router_size_library):
+        """The reported failure, end to end.
+
+        'R2 GigabitEthernet0/1' carried both the branch transit link and the
+        SW2 LAN link, so the transit subnet's config block was overwritten by
+        the LAN's: 10.0.0.4/30 did not exist in the file at all, R3's OSPF
+        network was never advertised, and every packet the user simulated at
+        the branch was dropped.  R2 names three interfaces, so the builder must
+        find it hardware with three ports and give each its own."""
+        plan = {"steps": [
+            {"action": "create_nodes", "nodes": [
+                {"name": "R1", "type": "router", "model": "1841"},
+                {"name": "R2", "type": "router", "model": "1841"},
+                {"name": "R3", "type": "router", "model": "1841"},
+                {"name": "SW1", "type": "switch", "model": "2960"},
+                {"name": "SW2", "type": "switch", "model": "2960"},
+                {"name": "SW3", "type": "switch", "model": "2960"}]},
+            {"action": "create_links", "links": [
+                {"a": "R1", "aIf": "g0/0", "b": "R2", "bIf": "g0/0"},
+                # the plan's invented second WAN interface
+                {"a": "R2", "aIf": "g1/0", "b": "R3", "bIf": "g0/0"},
+                {"a": "R1", "aIf": "g0/1", "b": "SW1", "bIf": "f0/1"},
+                {"a": "R2", "aIf": "g0/1", "b": "SW2", "bIf": "f0/1"},
+                {"a": "R3", "aIf": "g0/1", "b": "SW3", "bIf": "f0/1"}]}]}
+        built = pkt_builder.build_pkt(plan, router_size_library)
+        assert len(built["links"]) == 5
+        counts = cable_ports(built)
+        assert max(counts.values()) == 1, counts
+        r2 = next(d for d in built["devices"] if d["name"] == "R2")
+        assert r2["model"] == "2911"
+        assert sorted(r2["ports"]) == ["g0/0", "g0/1", "g1/0"]
+        assert len(set(r2["ports"].values())) == 3
+        assert not [w for w in built["warnings"] if "cabled" in w]
+
+    def test_two_cables_on_one_port_are_reported_never_shipped_silently(
+            self, library):
+        """A plan that names one port twice must say so: the second cable is
+        the one Packet Tracer cannot use."""
+        plan = {"steps": [
+            {"action": "create_nodes", "nodes": [
+                {"name": "R1", "type": "router", "model": "2811"},
+                {"name": "SW1", "type": "switch", "model": "2960"},
+                {"name": "SW2", "type": "switch", "model": "2960"}]},
+            {"action": "create_links", "links": [
+                {"a": "R1", "aIf": "f0/0", "b": "SW1", "bIf": "f0/1"},
+                {"a": "R1", "aIf": "f0/0", "b": "SW2", "bIf": "f0/1"}]}]}
+        built = pkt_builder.build_pkt(plan, library)
+        reported = " ".join(built["warnings"])
+        assert "R1: FastEthernet0/0 is cabled 2 times" in reported
 
     def test_startup_config_mirrors_the_plan(self, tmp_path):
         """A generated device has never run `write memory`, so its startup
@@ -1076,6 +1698,41 @@ class TestGenerateFile:
         report = pkt_builder.generate_pkt_file(PLAN, str(target),
                                                library=library, replace=True)
         assert report["bytes"] > 100
+
+    def test_editing_in_place_keeps_the_previous_build(self, library, tmp_path):
+        """An in-place edit must never cost the user the file they had.
+
+        "Edit it" writes over the .pkt this conversation already produced, so
+        the generation being replaced is copied aside first and its name comes
+        back in the report for the app to tell the user about.
+        """
+        target = tmp_path / "lab.pkt"
+        first = pkt_builder.generate_pkt_file(PLAN, str(target),
+                                              library=library, replace=True)
+        original_bytes = target.read_bytes()
+
+        second = pkt_builder.generate_pkt_file(PLAN, str(target),
+                                              library=library, replace=True)
+        assert second["sha256"] == first["sha256"], "same plan, same bytes"
+
+        backup = second.get("backupPath")
+        assert backup, "an in-place edit must report the backup it kept"
+        assert os.path.exists(backup)
+        with open(backup, "rb") as stream:
+            assert stream.read() == original_bytes
+        assert ".backup-" in os.path.basename(backup)
+
+        # Repeated edits keep every generation rather than overwriting one
+        # backup with the next.
+        third = pkt_builder.generate_pkt_file(PLAN, str(target),
+                                              library=library, replace=True)
+        assert third["backupPath"] != backup
+
+        # A caller that already made its own backup asks us not to make another.
+        fourth = pkt_builder.generate_pkt_file(PLAN, str(target),
+                                               library=library, replace=True,
+                                               backup=False)
+        assert "backupPath" not in fourth
 
     def test_generation_is_deterministic(self, library, tmp_path):
         a = tmp_path / "a.pkt"

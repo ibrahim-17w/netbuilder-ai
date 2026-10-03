@@ -67,6 +67,184 @@ class AiProviderConfig {
   }
 }
 
+/// What the app can honestly say about the model backend right now.
+///
+/// The chat used to say it in every answer ("The AI model is unavailable
+/// (HTTP 503: {}), so I am answering offline"), which is noise on a working
+/// conversation and useless on a broken one - by the time you read it, you are
+/// already reading the offline answer. The state belongs ABOVE the transcript
+/// (one live sign) and UNDER the answer it produced (one small source line),
+/// so it is visible when it matters and never repeated per message.
+enum AiAvailability {
+  /// A key is set and the last call worked (or nothing failed yet).
+  ready,
+
+  /// A key is set but the provider refused the last request.
+  failing,
+
+  /// No key set: the app answers from its own planner.
+  keyless,
+
+  /// Private mode: the app never calls a model, with or without a key.
+  private,
+}
+
+/// Where an answer came from, and whether the API model is in play.
+class AiStatus {
+  final AiAvailability availability;
+
+  /// "Google Gemini" or "OpenAI-compatible" - the configured backend.
+  final String providerLabel;
+  final String model;
+
+  /// Why it is not ready, in one line ('' when there is nothing to explain).
+  final String detail;
+
+  const AiStatus({
+    required this.availability,
+    this.providerLabel = '',
+    this.model = '',
+    this.detail = '',
+  });
+
+  /// The truth from what the app actually knows: is a key set, is private mode
+  /// on, and did the last call fail. Nothing here is inferred from hope.
+  static AiStatus describe({
+    required String providerLabel,
+    required String model,
+    required bool hasKey,
+    required bool privateMode,
+    String lastError = '',
+  }) {
+    if (privateMode) {
+      return AiStatus(
+        availability: AiAvailability.private,
+        providerLabel: providerLabel,
+        model: model,
+        detail: 'private mode is on, so no model is called at all',
+      );
+    }
+    if (!hasKey) {
+      return AiStatus(
+        availability: AiAvailability.keyless,
+        providerLabel: providerLabel,
+        model: model,
+        detail: 'no API key is set, so the built-in planner answers',
+      );
+    }
+    if (lastError.trim().isNotEmpty) {
+      return AiStatus(
+        availability: AiAvailability.failing,
+        providerLabel: providerLabel,
+        model: model,
+        detail: lastError.trim(),
+      );
+    }
+    return AiStatus(
+      availability: AiAvailability.ready,
+      providerLabel: providerLabel,
+      model: model,
+    );
+  }
+
+  /// Is the API-key model the thing answering? (Private mode and a missing key
+  /// both mean "no", and the app must not pretend otherwise.)
+  bool get apiInUse =>
+      availability == AiAvailability.ready ||
+      availability == AiAvailability.failing;
+
+  /// The sign above the transcript. Short: it sits next to the engine light.
+  String get short {
+    switch (availability) {
+      case AiAvailability.ready:
+        return providerLabel.isEmpty ? 'AI on' : 'AI: $providerLabel';
+      case AiAvailability.failing:
+        return 'AI: not answering';
+      case AiAvailability.keyless:
+        return 'AI: off — no key';
+      case AiAvailability.private:
+        return 'AI: private mode';
+    }
+  }
+
+  /// The one line shown under an answer, saying where THAT answer came from.
+  String get source {
+    switch (availability) {
+      case AiAvailability.ready:
+        return 'via ${providerLabel.isEmpty ? 'the API model' : providerLabel}'
+            '${model.isEmpty ? '' : ' ($model)'}';
+      case AiAvailability.failing:
+        return 'from the built-in planner — the API model did not answer';
+      case AiAvailability.keyless:
+        return 'from the built-in planner — no API key';
+      case AiAvailability.private:
+        return 'from the built-in planner — private mode';
+    }
+  }
+
+  /// What a build or an edit says about itself: those are the app's own work,
+  /// with no model involved, and saying so is more useful than staying quiet.
+  static const String plannerSource =
+      'from the built-in planner — no model was called';
+}
+
+/// Bounded retry for provider failures that are usually momentary.
+///
+/// Before this existed, a single 503/429 ended the whole turn in the offline
+/// fallback - the user read "The AI model is unavailable (HTTP 503: {}), so I
+/// am answering offline" for a blip a second try would have cleared, and the
+/// plan they got back was the offline planner's reading of their brief rather
+/// than the answer they asked for.
+///
+/// Only the FIRST byte is retried: once an answer is streaming, a retry would
+/// duplicate part of it, so callers only wrap the initial request.
+class AiRetry {
+  const AiRetry._();
+
+  /// The first try plus two retries.
+  static const int maxAttempts = 3;
+
+  /// Worth another try: rate limits and server-side trouble. Every 4xx that is
+  /// not a 429 (bad key, unknown model, malformed request) is the caller's to
+  /// fix, and retrying it would only delay the real message.
+  static bool isTransient(int status) => status == 429 || status >= 500;
+
+  /// Backoff: 700ms, then 1.4s. Long enough for a blip to clear, short enough
+  /// that a chat turn is not left hanging.
+  static Future<void> backoff(int attempt) =>
+      Future<void>.delayed(Duration(milliseconds: 700 * attempt));
+
+  /// Send with a bounded retry.
+  ///
+  /// [send] is called once per attempt, so it must build a FRESH request and
+  /// timeout each time (an http request can only be sent once). [onFailure]
+  /// releases the body of a failed response so the connection is not left
+  /// dangling. [wait] is injectable so tests never wait in real time.
+  static Future<Response> fetch<Response>({
+    required Future<Response> Function() send,
+    required int Function(Response) status,
+    Future<void> Function(Response)? onFailure,
+    Future<void> Function(int attempt)? wait,
+    int maxAttempts = maxAttempts,
+  }) async {
+    for (var attempt = 1; ; attempt++) {
+      final response = await send();
+      final code = status(response);
+      if (code == 200 || !isTransient(code) || attempt >= maxAttempts) {
+        return response;
+      }
+      if (onFailure != null) {
+        try {
+          await onFailure(response);
+        } catch (_) {
+          // A body that cannot be drained must not stop the retry.
+        }
+      }
+      await (wait ?? backoff)(attempt);
+    }
+  }
+}
+
 /// One place that turns an HTTP failure into something a person can act on.
 /// Each case is distinct because the fix is different in each case.
 class AiErrors {

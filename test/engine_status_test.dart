@@ -172,6 +172,111 @@ void main() {
     });
   });
 
+  group('the configured address decides what the app may start', () {
+    /// A status wired so any launch is visible.
+    EngineStatus statusWithLauncher({
+      required Future<Map<String, dynamic>> Function(String, Duration) probe,
+      required void Function() onLaunch,
+    }) {
+      return EngineStatus(
+        healthProbe: probe,
+        launcher: () async {
+          onLaunch();
+          return const SidecarLaunchResult(ok: true, message: 'started');
+        },
+        startWait: const Duration(milliseconds: 100),
+      );
+    }
+
+    test('a remote engine is never launched as a local process', () async {
+      var launched = 0;
+      final probed = <String>[];
+      final status = statusWithLauncher(
+        probe: (base, timeout) async {
+          probed.add(base);
+          throw Exception('refused');
+        },
+        onLaunch: () => launched++,
+      )..setBase('http://192.168.1.20:5005');
+
+      expect(status.isLocalEngine, isFalse);
+      expect(await status.ensure(force: true), isFalse);
+      expect(launched, 0,
+          reason: 'the engine on another machine is that machine\'s process, '
+              'not one this app may create here');
+      expect(status.phase, EngineState.down);
+      expect(status.summary, contains('192.168.1.20:5005'),
+          reason: 'the message has to name the address the user configured');
+      expect(probed, ['http://192.168.1.20:5005'],
+          reason: 'the probe must go to the configured address');
+    });
+
+    test('a remote engine is not restarted either', () async {
+      var launched = 0;
+      final status = statusWithLauncher(
+        probe: (base, timeout) async => throw Exception('refused'),
+        onLaunch: () => launched++,
+      )..setBase('http://192.168.1.20:5005');
+
+      expect(await status.restart(), isFalse);
+      expect(launched, 0);
+      expect(status.summary, contains('192.168.1.20:5005'));
+    });
+
+    test('a remote engine is not stopped either', () async {
+      final status = statusWithLauncher(
+        probe: (base, timeout) async => <String, dynamic>{'ok': true},
+        onLaunch: () {},
+      )..setBase('http://192.168.1.20:5005');
+
+      await status.stop();
+      expect(status.summary, contains('192.168.1.20:5005'),
+          reason: 'stopping here would kill a local process the app never '
+              'started and the user never pointed at');
+    });
+
+    test('pointing the app back at loopback restores the ability to start',
+        () async {
+      var launched = 0;
+      final status = statusWithLauncher(
+        probe: (base, timeout) async => throw Exception('refused'),
+        onLaunch: () => launched++,
+      )..setBase('http://192.168.1.20:5005');
+      expect(await status.ensure(force: true), isFalse);
+      expect(launched, 0);
+
+      status.setBase('127.0.0.1:5005');
+      expect(status.isLocalEngine, isTrue);
+      expect(status.base, 'http://127.0.0.1:5005',
+          reason: 'a bare host must resolve to the same address the app calls');
+      await status.ensure(force: true);
+      expect(launched, 1);
+    });
+
+    test('the emulator host alias is remote, not local', () {
+      // 10.0.2.2 is this machine from inside the Android emulator's network,
+      // but there is still no process here to start.
+      final status = statusWithLauncher(
+        probe: (base, timeout) async => throw Exception('refused'),
+        onLaunch: () {},
+      )..setBase('http://10.0.2.2:5005');
+      expect(status.isLocalEngine, isFalse);
+    });
+
+    test('a saved address is normalized before it is probed', () async {
+      final probed = <String>[];
+      final status = EngineStatus(
+        healthProbe: (base, timeout) async {
+          probed.add(base);
+          return <String, dynamic>{'ok': true};
+        },
+      )..setBase('  192.168.1.20/  ');
+
+      await status.probe();
+      expect(probed, ['http://192.168.1.20:5005']);
+    });
+  });
+
   group('interpreter discovery', () {
     test('the Windows Store placeholder is not a Python', () {
       expect(

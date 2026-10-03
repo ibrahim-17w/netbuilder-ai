@@ -12,6 +12,8 @@ import tempfile
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
+
 sys.path.insert(0, "sidecar")
 import pt_autopilot as pt  # noqa: E402
 
@@ -879,7 +881,10 @@ def test_security_evidence_rejects_stale_and_invalid_output():
 
 
 def test_link_evidence_requires_a_real_dark_corridor():
-    from PIL import Image, ImageDraw
+    # CI installs only pytest: fabricating the fixture image needs Pillow,
+    # so skip honestly instead of erroring when it is absent.
+    Image = pytest.importorskip("PIL.Image")
+    ImageDraw = pytest.importorskip("PIL.ImageDraw")
 
     original_mem = pt.DEV_MEM
     original_slot = pt.JOB.slot_of

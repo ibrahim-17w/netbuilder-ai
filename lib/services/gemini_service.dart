@@ -3,10 +3,14 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/network_intent.dart';
+import 'ai_provider.dart';
+import 'gemini_model_catalog.dart';
 
 /// Minimal Gemini REST client (BYOK). No SDK download needed beyond `http`.
 /// Docs: https://ai.google.dev/gemini-api/docs
-/// Sep 2026: 2.x models retired. Use gemini-3.8-flash / gemini-3.6-flash.
+/// The model names this file used to recommend (`gemini-3.8-flash` /
+/// `gemini-3.6-flash`) are not served by the API, so a 404 told the user to
+/// pick a name that 404s too. The names come from the catalog instead.
 /// Gemini 3 disallows temperature/top_p/top_k -> do not send them.
 class GeminiService {
   final http.Client _client;
@@ -291,7 +295,10 @@ questions. The app will validate this plan before anything is executed.
     final short = _short(body);
     if (code == 404 && model.isNotEmpty) {
       return 'HTTP 404: model "$model" not available for this key. '
-          'Pick gemini-3.8-flash (or gemini-3.6-flash) in Settings. Server: $short';
+          'Pick ${AiProviderConfig.defaultGeminiModel} in Settings ('
+          '${GeminiModelCatalog.fallbackSuggestions.take(3).join(' / ')} are '
+          'current names); Settings also lists what this key can actually call. '
+          'Server: $short';
     }
     if (code == 400 && short.contains('API key not valid')) {
       return 'HTTP 400: API key not valid. Create a new one at aistudio.google.com -> Get API key. Server: $short';

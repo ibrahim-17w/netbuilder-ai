@@ -39,6 +39,9 @@ class CiscoAdapter {
           sb.writeln(' name VLAN$v');
           sb.writeln('exit');
         }
+        _renderSwitchVlanPorts(sb, intent, n);
+        _renderSpanningTree(sb, intent, n);
+        _renderEtherChannel(sb, intent, n);
       }
       if (n.type == 'router' && intent.routing == 'ospf') {
         sb.writeln('router ospf 1');
@@ -47,6 +50,52 @@ class CiscoAdapter {
           sb.writeln(
             ' network ${_netBase(a.ipCidr)} ${_wildcard(_prefix(a.ipCidr))} area 0',
           );
+        }
+        sb.writeln('exit');
+      }
+      if (n.type == 'router' && intent.routing == 'eigrp') {
+        // One process, one autonomous-system number: every router in the
+        // plan speaks the same AS so the neighbours actually form.
+        sb.writeln('router eigrp 10');
+        sb.writeln(' no auto-summary');
+        final nets = <String>{};
+        for (final a in addrs) {
+          // EIGRP speaks classful-ish network statements with a wildcard;
+          // dedupe so two interfaces on one subnet never repeat a line.
+          nets.add(' network ${_netBase(a.ipCidr)} ${_wildcard(_prefix(a.ipCidr))}');
+        }
+        for (final net in nets) {
+          sb.writeln(net);
+        }
+        sb.writeln('exit');
+      }
+      if (n.type == 'router' && intent.routing == 'bgp') {
+        // iBGP between the plan's routers, AS 65001, one neighbour per
+        // transit peer; the LANs are advertised into the table.
+        sb.writeln('router bgp 65001');
+        sb.writeln(' bgp log-neighbor-changes');
+        final peers = <String>{};
+        for (final l in intent.links) {
+          final peer = l.a == n.name
+              ? l.b
+              : (l.b == n.name ? l.a : null);
+          if (peer == null ||
+              !intent.nodes.any((x) => x.name == peer && x.type == 'router')) {
+            continue;
+          }
+          final peerIp = _linkLocalIp(intent, l, peer);
+          if (peerIp != null) peers.add(' neighbor $peerIp remote-as 65001');
+        }
+        final nets = <String>{};
+        for (final a in addrs) {
+          if (_onTransitLink(intent, n.name, a.iface)) continue;
+          nets.add(' network ${_netBase(a.ipCidr)} mask ${_mask(_prefix(a.ipCidr))}');
+        }
+        for (final p in peers) {
+          sb.writeln(p);
+        }
+        for (final net in nets) {
+          sb.writeln(net);
         }
         sb.writeln('exit');
       }
@@ -71,6 +120,9 @@ class CiscoAdapter {
           sb.writeln('exit');
         }
       }
+      if (n.type == 'router' && intent.security.interVlanRouting) {
+        _renderInterVlan(sb, intent, n);
+      }
       if (n.type == 'router') {
         _renderStaticRoutes(sb, intent, n);
         // A firewall on the WAN edge is the LAN's default way out: without
@@ -88,6 +140,9 @@ class CiscoAdapter {
       // routers the AAA/ACL/VPN half - so the call stays outside the
       // router guard above.
       _renderSecurity(sb, intent, n);
+      if (n.type == 'router') {
+        _renderHsrp(sb, intent, n);
+      }
       sb.writeln('end');
       sb.writeln('write memory');
       out[n.name] = sb.toString();
@@ -182,6 +237,201 @@ class CiscoAdapter {
     }
   }
 
+  /// The router's address on the far end of one link, or null when the
+  /// link or address is not usable.
+  static String? _linkLocalIp(NetworkIntent intent, NetLink l, String peer) {
+    final iface = l.a == peer ? l.aIf : (l.b == peer ? l.bIf : null);
+    if (iface == null) return null;
+    for (final a in intent.addressing) {
+      if (a.node == peer && _normIface(a.iface) == _normIface(iface)) {
+        final ip = a.ipCidr.split('/').first;
+        return ip == '0.0.0.0' ? null : ip;
+      }
+    }
+    return null;
+  }
+
+  /// VLAN access/trunk wiring for every switch of a multi-VLAN plan.
+  ///
+  /// The uplink to the router (or between switches) becomes a trunk carrying
+  /// every requested VLAN; the ports where PCs sit become access ports in
+  /// the VLAN the addressing implies (the plan numbers PCs' hosts from .10
+  /// upward in the LAN subnet - a second VLAN shows up as its own subnet).
+  static void _renderSwitchVlanPorts(
+    StringBuffer sb,
+    NetworkIntent intent,
+    NetNode device,
+  ) {
+    if (intent.vlans.isEmpty) return;
+    final nativeVlan = intent.vlans.first;
+    // Every link this switch has, with the interface it uses.
+    for (final l in intent.links) {
+      final String? myIf;
+      final other = l.a == device.name ? l.b : (l.b == device.name ? l.a : null);
+      if (other == null) {
+        myIf = null;
+      } else {
+        myIf = l.a == device.name ? l.aIf : l.bIf;
+      }
+      if (myIf == null) continue;
+      final otherNode = intent.nodes.firstWhere(
+        (n) => n.name == other,
+        orElse: () => const NetNode(name: '', type: ''),
+      );
+      final toRouterOrSwitch =
+          otherNode.type == 'router' || otherNode.type == 'switch';
+      final isMultiVlan = intent.vlans.length > 1;
+      if (toRouterOrSwitch && isMultiVlan) {
+        // Trunk: carries every VLAN to the router-on-a-stick or the peer
+        // switch, with VLAN 1 native so unused traffic keeps a home.
+        sb.writeln('interface $myIf');
+        sb.writeln(' switchport mode trunk');
+        sb.writeln(' switchport trunk allowed vlan ${intent.vlans.join(",")}');
+        sb.writeln(' switchport trunk native vlan $nativeVlan');
+        sb.writeln('exit');
+      } else if (!toRouterOrSwitch) {
+        // Access port for the end device hanging off this switch.
+        sb.writeln('interface $myIf');
+        sb.writeln(' switchport mode access');
+        if (intent.vlans.length > 1) {
+          // Round-robin the end devices over the requested VLANs so each
+          // one is populated and testable.
+          final idx = intent.links.indexOf(l);
+          sb.writeln(' switchport access vlan ${intent.vlans[idx % intent.vlans.length]}');
+        }
+        sb.writeln('exit');
+      }
+    }
+  }
+
+  /// Rapid PVST+ with this switch pinned as primary root for the requested
+  /// VLANs (the deterministic tie-break: the first switch wins).
+  static void _renderSpanningTree(
+    StringBuffer sb,
+    NetworkIntent intent,
+    NetNode device,
+  ) {
+    if (!intent.security.spanningTree) return;
+    final switches = intent.nodes.where((n) => n.type == 'switch').toList();
+    if (switches.isEmpty || switches.first.name != device.name) return;
+    sb.writeln('spanning-tree mode rapid-pvst');
+    if (intent.vlans.isEmpty) {
+      sb.writeln('spanning-tree vlan 1 root primary');
+    } else {
+      for (final v in intent.vlans) {
+        sb.writeln('spanning-tree vlan $v root primary');
+      }
+    }
+  }
+
+  /// LACP/PAgP bundle between the first two switches: both sides name the
+  /// same channel-group on the interfaces that face each other, so PT
+  /// forms one Po1 instead of individual links.
+  static void _renderEtherChannel(
+    StringBuffer sb,
+    NetworkIntent intent,
+    NetNode device,
+  ) {
+    if (!intent.security.etherChannel) return;
+    final switches = intent.nodes.where((n) => n.type == 'switch').toList();
+    if (switches.length < 2) return;
+    // The bundle's endpoints are the first two switches. Both sides name
+    // the same channel-group; LACP wants active/passive across the pair,
+    // PAgP desirable/auto, so the neighbours actually form.
+    final String peer;
+    final bool initiator;
+    if (device.name == switches.first.name) {
+      peer = switches[1].name;
+      initiator = true;
+    } else if (device.name == switches[1].name) {
+      peer = switches.first.name;
+      initiator = false;
+    } else {
+      return; // a third switch is not part of this bundle
+    }
+    final isPagp = intent.security.etherChannelProtocol == 'pagp';
+    final mode = isPagp
+        ? (initiator ? 'desirable' : 'auto')
+        : (initiator ? 'active' : 'passive');
+    for (final l in intent.links) {
+      final isPeerLink = (l.a == device.name && l.b == peer) ||
+          (l.a == peer && l.b == device.name);
+      if (!isPeerLink) continue;
+      final myIf = l.a == device.name ? l.aIf : l.bIf;
+      sb.writeln('interface $myIf');
+      sb.writeln(' channel-group 1 mode $mode');
+      sb.writeln('exit');
+    }
+  }
+
+  /// Router-on-a-stick: one dot1Q sub-interface per VLAN.
+  ///
+  /// The plan's addressing rows are the single source of truth - the parser
+  /// already wrote `<uplink>.<vlan>` rows (node = this router, iface =
+  /// `g0/0.10`), so this block only renders them into IOS, and the PCs'
+  /// gateways (endpointIpConfig) point at exactly these addresses.
+  static void _renderInterVlan(
+    StringBuffer sb,
+    NetworkIntent intent,
+    NetNode device,
+  ) {
+    if (intent.vlans.isEmpty) return;
+    // The physical uplink: the parent of the sub-interface rows.
+    var trunk = '';
+    for (final a in intent.addressing.where((a) => a.node == device.name)) {
+      final dot = a.iface.indexOf('.');
+      if (dot <= 0) continue;
+      final parent = a.iface.substring(0, dot);
+      final vlan = int.tryParse(a.iface.substring(dot + 1));
+      if (vlan == null || !intent.vlans.contains(vlan)) continue;
+      if (trunk.isEmpty) trunk = parent;
+      sb.writeln('interface ${a.iface}');
+      sb.writeln(' encapsulation dot1Q $vlan');
+      final ip = a.ipCidr.split('/').first;
+      final prefix = int.tryParse(a.ipCidr.split('/').last) ?? 24;
+      if (ip != '0.0.0.0') {
+        sb.writeln(' ip address $ip ${_mask(prefix)}');
+      }
+      sb.writeln(' no shutdown');
+      sb.writeln('exit');
+    }
+    if (trunk.isEmpty) return;
+    sb.writeln('interface $trunk');
+    sb.writeln(' no shutdown');
+    sb.writeln('exit');
+  }
+
+
+
+  /// HSRP on the router's LAN interfaces: the first router is active
+  /// (.254 virtual IP unless the plan pinned one), the second standby.
+  static void _renderHsrp(
+    StringBuffer sb,
+    NetworkIntent intent,
+    NetNode device,
+  ) {
+    if (!intent.security.hsrp) return;
+    final routers = intent.nodes.where((n) => n.type == 'router').toList();
+    final priority = routers.isEmpty || routers.first.name == device.name
+        ? '  priority 110'
+        : '  priority 100';
+    final preempt = routers.isEmpty || routers.first.name == device.name
+        ? '  preempt'
+        : null;
+    for (final a in intent.addressing.where((a) => a.node == device.name)) {
+      if (_onTransitLink(intent, device.name, a.iface)) continue;
+      final octets = a.ipCidr.split('/').first.split('.');
+      if (octets.length != 4) continue;
+      final vip = intent.security.hsrpVirtualIp ??
+          '${octets[0]}.${octets[1]}.${octets[2]}.254';
+      sb.writeln('interface ${a.iface}');
+      sb.writeln(' standby 1 ip $vip');
+      sb.writeln(priority);
+      if (preempt != null) sb.writeln(preempt);
+      sb.writeln('exit');
+    }
+  }
+
   static void _renderSecurity(
     StringBuffer sb,
     NetworkIntent intent,
@@ -211,6 +461,20 @@ class CiscoAdapter {
         sb.writeln('ip dhcp snooping vlan 1');
         sb.writeln('interface ${s.dhcpTrustedInterface ?? 'f0/1'}');
         sb.writeln(' ip dhcp snooping trust');
+        sb.writeln('exit');
+      }
+      if (s.ssh) {
+        // PT switches accept the same SSH block as the routers.
+        sb.writeln('ip domain-name ${device.name.toLowerCase()}.lab.local');
+        sb.writeln('crypto key generate rsa');
+        sb.writeln(' 1024');
+        final localUser = (s.aaaUsername ?? '').trim().isEmpty
+            ? 'admin'
+            : s.aaaUsername!.trim();
+        sb.writeln('username $localUser secret 0 ${_localAccountSecret(s)}');
+        sb.writeln('line vty 0 4');
+        sb.writeln(' transport input ssh');
+        sb.writeln(' login local');
         sb.writeln('exit');
       }
       return;
@@ -247,6 +511,15 @@ class CiscoAdapter {
             ? s.aaaPassword!
             : 'cisco';
         sb.writeln('aaa new-model');
+        // The account the brief supplied, as a LOCAL account on the same
+        // device. The AAA lines below end in "local", so this is the
+        // credential that actually authenticates a login when the server is
+        // unreachable - and it is written with the ACCOUNT password, the one
+        // the server holds, not with the shared key.
+        final accountUser = (s.aaaUsername ?? '').trim();
+        if (accountUser.isNotEmpty) {
+          sb.writeln('username $accountUser secret 0 ${_localAccountSecret(s)}');
+        }
         if (isRadius) {
           sb.writeln('radius-server host $aaaIp key $key');
           sb.writeln('aaa authentication login default group radius local');
@@ -276,6 +549,30 @@ class CiscoAdapter {
         sb.writeln(' access-class VTY_MANAGER_ONLY in');
         sb.writeln('exit');
       }
+    }
+    if (s.ssh) {
+      // SSH in Packet Tracer: hostname + domain generate the RSA key,
+      // and the VTY lines accept SSH only. Deliberately OUTSIDE the AAA
+      // guard: SSH without a TACACS+/RADIUS server is still a complete,
+      // testable feature (login local).
+      sb.writeln('ip domain-name ${device.name.toLowerCase()}.lab.local');
+      sb.writeln('crypto key generate rsa');
+      sb.writeln(' 1024');
+      // The local account is the AAA ACCOUNT the brief supplied, with the
+      // password that account holds on the server - not the shared key,
+      // which is a different secret for a different purpose.
+      final localUser = (s.aaaUsername ?? '').trim().isEmpty
+          ? 'admin'
+          : s.aaaUsername!.trim();
+      final localSecret = _localAccountSecret(s);
+      sb.writeln('username $localUser secret 0 $localSecret');
+      sb.writeln('line vty 0 4');
+      sb.writeln(' transport input ssh');
+      sb.writeln(' login local');
+      sb.writeln('exit');
+    }
+    if (s.enableSecret != null) {
+      sb.writeln('enable secret 0 ${s.enableSecret}');
     }
 
     if (s.extendedAcl && s.protectedServerIp != null) {
@@ -343,9 +640,16 @@ class CiscoAdapter {
         s.vpnRemoteNetwork != null) {
       final local = _networkAndWildcard(s.vpnLocalNetwork!);
       final remote = _networkAndWildcard(s.vpnRemoteNetwork!);
-      final peer = device.name == 'HQ_Router' ? s.vpnPeerB : s.vpnPeerA;
-      final sideLocal = device.name == 'HQ_Router' ? local : remote;
-      final sideRemote = device.name == 'HQ_Router' ? remote : local;
+      // WHICH end of the tunnel this device is, read from the plan instead of
+      // from one hard-coded name. `device.name == 'HQ_Router'` was the only
+      // test, so in every other plan ("2 routers, 2 switches and 8 pcs each,
+      // site-to-site ipsec vpn") BOTH routers took the A side: each one then
+      // protected the same local subnet and pointed its crypto map at the
+      // same peer, and the tunnel could never come up between them.
+      final localEnd = _ownsNetwork(intent, device.name, s.vpnLocalNetwork!);
+      final peer = localEnd ? s.vpnPeerB : s.vpnPeerA;
+      final sideLocal = localEnd ? local : remote;
+      final sideRemote = localEnd ? remote : local;
       // Packet Tracer ships the IPsec feature set, but an ISR image only
       // accepts the crypto commands once the Security Technology package is
       // licensed.  These are `!` comments, so the live executor never types
@@ -378,12 +682,21 @@ class CiscoAdapter {
       );
       sb.writeln('exit');
       if (s.vpnPreSharedKey != null && s.vpnPreSharedKey!.isNotEmpty) {
+        // The crypto map rides on the device's OWN WAN port, not on a
+        // hard-coded s0/0/0: a plan whose WAN is GigabitEthernet (the
+        // generic two-site shape) applied the map to an interface it does
+        // not have, and the tunnel was never mapped at all.
+        final wanIface = intent.addressing
+            .where((a) => a.node == device.name)
+            .where((a) => _onTransitLink(intent, device.name, a.iface))
+            .map((a) => a.iface)
+            .firstOrNull;
         sb.writeln('crypto map SITE_VPN 10 ipsec-isakmp');
         sb.writeln(' set peer $peer');
         sb.writeln(' set transform-set SITE_VPN_SET');
         sb.writeln(' match address SITE_VPN_TRAFFIC');
         sb.writeln('exit');
-        sb.writeln('interface s0/0/0');
+        sb.writeln('interface ${wanIface ?? 's0/0/0'}');
         sb.writeln(' crypto map SITE_VPN');
         sb.writeln('exit');
       }
@@ -391,6 +704,18 @@ class CiscoAdapter {
         'ip route ${sideRemote.$1} ${_maskFromWildcard(sideRemote.$2)} $peer',
       );
     }
+  }
+
+  /// True when [node] has an addressed interface inside [cidr] - how each end
+  /// of a tunnel recognises which side of it, and therefore which peer and
+  /// which protected subnet are its own.
+  static bool _ownsNetwork(NetworkIntent intent, String node, String cidr) {
+    final wanted = _netBase(cidr);
+    for (final a in intent.addressing) {
+      if (a.node != node) continue;
+      if (_netBase(a.ipCidr) == wanted) return true;
+    }
+    return false;
   }
 
   /// The firewall on this device's WAN edge and its address, or null.
@@ -645,6 +970,22 @@ class CiscoAdapter {
       sb.writeln('exit');
     }
     return {gateway: sb.toString()};
+  }
+
+  /// The secret for a device's own local `username ... secret` line.
+  ///
+  /// The account password the brief gave for the AAA account is the right
+  /// value here, because that is the password the account server holds and a
+  /// local account that does not match it can never be used.  The shared key
+  /// is a different secret (see [SecurityIntent.aaaPassword]) and is only
+  /// reached as a fallback for a brief that supplied just a key.  With neither,
+  /// the documented lab default stands rather than an invented value.
+  static String _localAccountSecret(SecurityIntent s) {
+    final account = s.aaaAccountPassword;
+    if (account != null && account.isNotEmpty) return account;
+    final key = s.aaaPassword;
+    if (key != null && key.isNotEmpty) return key;
+    return 'cisco';
   }
 
   /// Deterministic fake MAC for an ephone binding (PT accepts any

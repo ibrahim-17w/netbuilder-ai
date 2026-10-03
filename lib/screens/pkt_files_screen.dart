@@ -7,7 +7,9 @@ import 'package:path/path.dart' as p;
 
 import '../models/network_intent.dart';
 import '../services/autopilot_service.dart';
+import '../theme/app_kit.dart';
 import '../theme/app_palette.dart';
+import '../theme/app_theme.dart';
 
 /// Safe Packet Tracer file workflow.
 ///
@@ -37,6 +39,7 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
   Map<String, dynamic>? _report;
   Map<String, dynamic>? _analysis;
   Map<String, dynamic>? _lastOperation;
+
   /// Last saved artifact plus its planned-vs-recorded comparison.
   Map<String, dynamic>? _artifact;
   bool _busy = false;
@@ -98,6 +101,7 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
   }
 
   Future<void> _read() async {
+    final engine = AutopilotService.of(context);
     final path = _path.text.trim();
     if (path.isEmpty) {
       setState(() => _message = 'Enter the full path to a .pkt file first.');
@@ -108,7 +112,7 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
       _message = 'Reading the .pkt file without changing it...';
     });
     try {
-      final report = await AutopilotService().pktRead(
+      final report = await engine.pktRead(
         path,
         project: _project.text.trim().isEmpty
             ? 'default'
@@ -130,6 +134,7 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
   }
 
   Future<void> _open() async {
+    final engine = AutopilotService.of(context);
     final path = _path.text.trim();
     if (path.isEmpty) {
       setState(() => _message = 'Enter the full path to a .pkt file first.');
@@ -141,7 +146,7 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
           'Opening in Packet Tracer and creating a recoverable backup...';
     });
     try {
-      await AutopilotService().pktOpen(path);
+      await engine.pktOpen(path);
       final result = await _waitForPktOperation();
       if (!mounted) return;
       final ok = result['ok'] == true;
@@ -162,6 +167,7 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
   }
 
   Future<void> _openAndAnalyze() async {
+    final svc = AutopilotService.of(context);
     final path = _path.text.trim();
     final project = _project.text.trim().isEmpty
         ? 'default'
@@ -177,7 +183,6 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
           'Reading the file, opening Packet Tracer, then starting a read-only analysis...';
     });
     try {
-      final svc = AutopilotService();
       final report = await svc.pktRead(path, project: project);
       if (mounted) setState(() => _report = report);
       await svc.pktOpen(path);
@@ -223,6 +228,7 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
   }
 
   Future<void> _saveAs() async {
+    final engine = AutopilotService.of(context);
     final output = _output.text.trim();
     if (output.isEmpty) {
       setState(
@@ -235,7 +241,7 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
       _message = 'Saving the current Packet Tracer topology as a new .pkt...';
     });
     try {
-      await AutopilotService().pktSaveAs(
+      await engine.pktSaveAs(
         output,
         manifest:
             widget.intent?.toPlannerJson() ??
@@ -266,20 +272,22 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
   /// Save the live topology with its companion manifest and comparison, then
   /// reopen it. This is what a green build run does automatically.
   Future<void> _saveVerified() async {
+    final engine = AutopilotService.of(context);
     setState(() {
       _busy = true;
-      _message = 'Saving the live topology as a verified .pkt '
+      _message =
+          'Saving the live topology as a verified .pkt '
           'artifact...';
     });
     try {
-      await AutopilotService().pktSaveVerified(
+      await engine.pktSaveVerified(
         project: _project.text.trim().isEmpty
             ? 'default'
             : _project.text.trim(),
         reopen: true,
       );
       final result = await _waitForPktOperation();
-      final report = await AutopilotService().pktReport();
+      final report = await engine.pktReport();
       if (!mounted) return;
       final ok = result['ok'] == true;
       final comparison = (report?['comparison'] as Map?) ?? const {};
@@ -311,6 +319,7 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
   }
 
   Future<void> _verify() async {
+    final engine = AutopilotService.of(context);
     final path = _path.text.trim();
     if (path.isEmpty) {
       setState(() => _message = 'Enter the saved .pkt path first.');
@@ -321,7 +330,7 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
       _message = 'Reopening the saved file for Packet Tracer verification...';
     });
     try {
-      await AutopilotService().pktVerify(path);
+      await engine.pktVerify(path);
       final result = await _waitForPktOperation();
       if (!mounted) return;
       final ok = result['ok'] == true;
@@ -341,8 +350,9 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
   }
 
   Future<void> _readSilently() async {
+    final engine = AutopilotService.of(context);
     try {
-      final report = await AutopilotService().pktRead(
+      final report = await engine.pktRead(
         _path.text.trim(),
         project: _project.text.trim().isEmpty
             ? 'default'
@@ -356,9 +366,10 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
   }
 
   Future<Map<String, dynamic>> _waitForPktOperation() async {
+    final engine = AutopilotService.of(context);
     for (var i = 0; i < 160; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 400));
-      final status = await AutopilotService().pktStatus();
+      final status = await engine.pktStatus();
       if (status['operation'] == null) {
         return Map<String, dynamic>.from(
           (status['last'] as Map?) ?? <String, dynamic>{'ok': false},
@@ -375,7 +386,7 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
 
   Future<void> _stop() async {
     try {
-      await AutopilotService().stop();
+      await AutopilotService.of(context).stop();
       if (mounted) setState(() => _message = 'Stop requested.');
     } catch (e) {
       if (mounted) setState(() => _message = _cleanError(e));
@@ -389,30 +400,76 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
   Widget _artifactCard() {
     final artifact = _artifact!;
     final comparison = (artifact['comparison'] as Map?) ?? const {};
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: SelectableText(
-          'Verified artifact:\n'
-          '  file: ${artifact['path'] ?? 'unknown'}\n'
-          '  bytes: ${artifact['bytes'] ?? '?'}'
-          '${artifact['sha256'] == null ? '' : '  sha256: ${artifact['sha256']}'}\n'
-          '  manifest: ${artifact['manifest'] ?? 'none'}\n'
-          '  reopened: ${artifact['reopened'] == true ? 'yes' : 'no'}\n'
-          '  planned: ${comparison['plannedDevices'] ?? '?'} devices, '
-          '${comparison['plannedLinks'] ?? '?'} links\n'
-          '  recorded: ${comparison['devicesOnCanvas'] ?? '?'} devices, '
-          '${comparison['linksRecorded'] ?? '?'} links '
-          '(${comparison['linksFailed'] ?? 0} failed)\n'
-          '  missing: '
-          '${(comparison['devicesMissing'] as List?)?.join(', ') ?? 'none'}\n'
-          '  CLI blocks: ${comparison['cliBlocks'] ?? 0}  '
-          'configs verified: ${comparison['configsVerified'] ?? 0}  '
-          'pings: ${comparison['pingsOk'] ?? 0} ok / '
-          '${comparison['pingsFailed'] ?? 0} failed',
-          style: const TextStyle(fontSize: 12),
+    return AppPanel(
+      tone: AppTone.success,
+      icon: Icons.verified_outlined,
+      title: 'Verified artifact',
+      subtitle: artifact['path']?.toString() ?? 'unknown path',
+      children: [
+        Wrap(
+          spacing: AppTheme.s8,
+          runSpacing: AppTheme.s8,
+          children: [
+            AppTag(
+              label: '${artifact['bytes'] ?? '?'} bytes',
+              tone: AppTone.neutral,
+              icon: Icons.save_outlined,
+              mono: true,
+            ),
+            AppTag(
+              label: artifact['reopened'] == true ? 'Reopened' : 'Not reopened',
+              tone: artifact['reopened'] == true
+                  ? AppTone.success
+                  : AppTone.warning,
+              icon: Icons.restart_alt,
+            ),
+            AppTag(
+              label:
+                  'Planned ${comparison['plannedDevices'] ?? '?'} devices, '
+                  '${comparison['plannedLinks'] ?? '?'} links',
+              tone: AppTone.info,
+              icon: Icons.account_tree_outlined,
+            ),
+            AppTag(
+              label:
+                  'Recorded ${comparison['devicesOnCanvas'] ?? '?'} devices, '
+                  '${comparison['linksRecorded'] ?? '?'} links',
+              tone: AppTone.info,
+              icon: Icons.device_hub_outlined,
+            ),
+            AppTag(
+              label:
+                  'Pings ${comparison['pingsOk'] ?? 0} ok / '
+                  '${comparison['pingsFailed'] ?? 0} failed',
+              tone: (comparison['pingsFailed'] ?? 0) > 0
+                  ? AppTone.danger
+                  : AppTone.success,
+              icon: Icons.network_ping,
+            ),
+          ],
         ),
-      ),
+        if ((comparison['devicesMissing'] as List?)?.isNotEmpty == true ||
+            (comparison['linksFailed'] ?? 0) > 0)
+          AppBanner(
+            dense: true,
+            tone: AppTone.warning,
+            icon: Icons.report_problem_outlined,
+            message:
+                'Missing: ${(comparison['devicesMissing'] as List?)?.join(', ') ?? 'none'}'
+                '${(comparison['linksFailed'] ?? 0) > 0 ? ' · ${comparison['linksFailed']} link(s) failed to record' : ''}',
+          ),
+        AppCodeBlock(
+          text: artifact['sha256'] == null
+              ? 'No sha256 recorded.'
+              : 'sha256 ${artifact['sha256']}\n'
+                    'manifest ${artifact['manifest'] ?? 'none'}\n'
+                    'CLI blocks ${comparison['cliBlocks'] ?? 0} · '
+                    'configs verified ${comparison['configsVerified'] ?? 0}',
+          title: 'Proof',
+          maxHeight: 160,
+          compact: true,
+        ),
+      ],
     );
   }
 
@@ -427,37 +484,36 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
       'modified': report['modified'],
       'sha256': report['sha256'],
     });
-    return Card(
-      color: AppPalette.accentFill(Theme.of(context).colorScheme),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'File report',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            SelectableText(pkt, style: const TextStyle(fontSize: 12)),
-            const SizedBox(height: 6),
-            Text(
-              manifest == null
-                  ? 'No NetBuilder companion manifest found.'
-                  : 'Companion manifest found: generated intent is available.',
-            ),
-            Text(
-              live == null
-                  ? 'Live topology contents: not verified yet.'
-                  : 'Live inventory is available for this project.',
-            ),
-            if (report['backup'] != null)
-              SelectableText(
-                'Backup: ${report['backup']}',
-                style: const TextStyle(fontSize: 12),
-              ),
-          ],
+    return AppPanel(
+      icon: Icons.description_outlined,
+      title: 'File report',
+      subtitle: manifest == null
+          ? 'No NetBuilder companion manifest found.'
+          : 'Companion manifest found: the generated intent is available.',
+      children: [
+        AppBanner(
+          dense: true,
+          tone: live == null ? AppTone.neutral : AppTone.success,
+          icon: live == null ? Icons.help_outline : Icons.inventory_2_outlined,
+          message: live == null
+              ? 'Live topology contents: not verified yet.'
+              : 'Live inventory is available for this project.',
         ),
-      ),
+        AppCodeBlock(
+          text: pkt,
+          title: 'Metadata',
+          maxHeight: 200,
+          compact: true,
+        ),
+        if (report['backup'] != null)
+          Padding(
+            padding: const EdgeInsets.only(top: AppTheme.s8),
+            child: Text(
+              'Backup: ${report['backup']}',
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+      ],
     );
   }
 
@@ -468,174 +524,219 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
         .whereType<Map>()
         .toList();
     final error = (analysis['error'] ?? '').toString();
-    return Card(
-      color: error.isEmpty ? AppPalette.successFill(Theme.of(context).colorScheme) : AppPalette.dangerFill(Theme.of(context).colorScheme),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Topology analysis',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            if (error.isNotEmpty)
-              Text(error, style: const TextStyle(color: Colors.red)),
-            Text('Devices inspected: ${devices.length}'),
-            Text('Red link indicators: ${analysis['red_dots'] ?? 0}'),
-            if ((analysis['note'] ?? '').toString().isNotEmpty)
-              Text(analysis['note'].toString()),
-            if (devices.isNotEmpty)
-              for (final device in devices)
-                ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    '${device['name'] ?? 'device'} (${device['type'] ?? 'unknown'})',
-                  ),
-                  subtitle: Text(
-                    '${((device['findings'] as List?) ?? const []).length} finding(s)',
-                  ),
-                ),
-            const Text(
-              'This report is read-only. Suggested fixes still require approval in Analyze.',
-              style: TextStyle(fontSize: 12),
-            ),
-          ],
+    final reds = (analysis['red_dots'] ?? 0) as num;
+    return AppPanel(
+      tone: error.isEmpty
+          ? (reds > 0 ? AppTone.warning : AppTone.success)
+          : AppTone.danger,
+      filled: true,
+      icon: Icons.analytics_outlined,
+      title: 'Topology analysis',
+      subtitle:
+          '${devices.length} device(s) inspected, '
+          '$reds red link indicator(s)',
+      children: [
+        if (error.isNotEmpty)
+          AppBanner(dense: true, tone: AppTone.danger, message: error),
+        if ((analysis['note'] ?? '').toString().isNotEmpty)
+          Text(analysis['note'].toString()),
+        for (final device in devices)
+          AppRowTile(
+            dense: true,
+            icon: Icons.router_outlined,
+            title:
+                '${device['name'] ?? 'device'} '
+                '(${device['type'] ?? 'unknown'})',
+            subtitle:
+                '${((device['findings'] as List?) ?? const []).length} finding(s)',
+          ),
+        const AppBanner(
+          dense: true,
+          tone: AppTone.info,
+          icon: Icons.lock_outline,
+          message:
+              'This report is read-only. Suggested fixes still require '
+              'approval in Analyze.',
         ),
-      ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Card(
-            color: Color(0xFFE8F5E9),
-            child: Padding(
-              padding: EdgeInsets.all(12),
-              child: Text(
-                'Choose a .pkt file with the file picker. Read checks its metadata '
-                'and companion manifest without rewriting it. Open + analyze makes '
-                'a backup, loads it in Packet Tracer, and runs a read-only audit. '
-                'No fixes are applied automatically.',
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _project,
-            enabled: !_busy,
-            decoration: const InputDecoration(
-              labelText: 'Project name for live analysis',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _path,
-            enabled: !_busy,
-            decoration: const InputDecoration(
-              labelText: 'Existing .pkt path',
-              hintText: r'C:\Labs\office.pkt',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: _busy ? null : _pickPkt,
-              icon: const Icon(Icons.folder_open),
-              label: const Text('Choose .pkt file'),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              FilledButton.icon(
-                onPressed: _busy ? null : _read,
-                icon: const Icon(Icons.description),
-                label: const Text('Inspect .pkt'),
-              ),
-              FilledButton.icon(
-                onPressed: _busy ? null : _open,
-                icon: const Icon(Icons.folder_open),
-                label: const Text('Open + backup'),
-              ),
-              FilledButton.icon(
-                onPressed: _busy ? null : _openAndAnalyze,
-                icon: const Icon(Icons.analytics),
-                label: const Text('Open + analyze'),
-              ),
-              OutlinedButton.icon(
-                onPressed: _busy ? null : _verify,
-                icon: const Icon(Icons.verified),
-                label: const Text('Reopen verify'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _output,
-            enabled: !_busy,
-            decoration: const InputDecoration(
-              labelText: 'New output .pkt path',
-              hintText: r'C:\Labs\office-generated.pkt',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: _busy ? null : _saveAs,
-            icon: const Icon(Icons.save_as),
-            label: const Text('Save current topology as new .pkt'),
-          ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: _busy ? null : _saveVerified,
-            icon: const Icon(Icons.inventory_2),
-            label: const Text('Save verified artifact (.pkt + report)'),
-          ),
-          const SizedBox(height: 8),
-          if (_artifact != null) _artifactCard(),
-          if (_busy) const LinearProgressIndicator(),
-          Text(_message, style: const TextStyle(fontSize: 12)),
-          const SizedBox(height: 8),
-          _infoCard(),
-          _analysisCard(),
-          if (_lastOperation != null)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: SelectableText(
-                  'Last operation:\n${const JsonEncoder.withIndent('  ').convert(_lastOperation)}',
-                  style: const TextStyle(fontSize: 12),
-                ),
-              ),
-            ),
-          const SizedBox(height: 8),
+    return AppPage(
+      maxWidth: 980,
+      header: AppPageHeader(
+        eyebrow: 'Inspect',
+        title: 'Packet Tracer files',
+        description:
+            'Inspect, open, verify, back up and report on .pkt saves. The '
+            'sidecar owns every backup; nothing rewrites a file in place '
+            'without a recoverable copy.',
+        actions: [
           OutlinedButton.icon(
-            onPressed: _busy ? null : _stop,
-            icon: const Icon(Icons.stop_circle),
-            label: const Text('Stop Packet Tracer file activity'),
-          ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: widget.onAnalyze == null || _busy
-                ? null
-                : () => widget.onAnalyze!(_project.text.trim()),
-            icon: const Icon(Icons.fact_check),
-            label: const Text('Analyze loaded topology'),
+            onPressed: _busy ? null : _pickPkt,
+            icon: const Icon(Icons.folder_open, size: 18),
+            label: const Text('Choose .pkt file'),
           ),
         ],
       ),
+      children: [
+        const AppBanner(
+          tone: AppTone.success,
+          icon: Icons.verified_outlined,
+          message:
+              'Read checks a file\'s metadata and companion manifest without '
+              'rewriting it. Open + analyze makes a backup, loads it in Packet '
+              'Tracer, and runs a read-only audit. No fixes are applied '
+              'automatically.',
+        ),
+        AppField(
+          label: 'Project name for live analysis',
+          help: 'Used to label live inventory and audit runs.',
+          child: TextField(
+            controller: _project,
+            enabled: !_busy,
+            decoration: const InputDecoration(
+              isDense: true,
+              hintText: 'office-network',
+              prefixIcon: Icon(Icons.folder_open_outlined, size: 18),
+            ),
+          ),
+        ),
+        AppField(
+          label: 'Existing .pkt path',
+          help: 'Type a path directly, or use Choose .pkt file above.',
+          child: TextField(
+            controller: _path,
+            enabled: !_busy,
+            decoration: const InputDecoration(
+              isDense: true,
+              hintText: r'C:\Labs\office.pkt',
+              prefixIcon: Icon(Icons.description_outlined, size: 18),
+            ),
+          ),
+        ),
+        AppPanel(
+          icon: Icons.play_circle_outline,
+          title: 'Inspect or open',
+          subtitle: 'Every button here touches the engine and takes a backup.',
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  onPressed: _busy ? null : _read,
+                  icon: const Icon(Icons.description, size: 18),
+                  label: const Text('Inspect .pkt'),
+                ),
+                FilledButton.icon(
+                  onPressed: _busy ? null : _open,
+                  icon: const Icon(Icons.folder_open, size: 18),
+                  label: const Text('Open + backup'),
+                ),
+                FilledButton.icon(
+                  onPressed: _busy ? null : _openAndAnalyze,
+                  icon: const Icon(Icons.analytics_outlined, size: 18),
+                  label: const Text('Open + analyze'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.tertiary,
+                    foregroundColor: Theme.of(context).colorScheme.onTertiary,
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _verify,
+                  icon: const Icon(Icons.verified, size: 18),
+                  label: const Text('Reopen verify'),
+                ),
+              ],
+            ),
+          ],
+        ),
+        AppField(
+          label: 'New output .pkt path',
+          help: 'Where a save writes. Leave it empty to let the app choose.',
+          child: TextField(
+            controller: _output,
+            enabled: !_busy,
+            decoration: const InputDecoration(
+              isDense: true,
+              hintText: r'C:\Labs\office-generated.pkt',
+              prefixIcon: Icon(Icons.save_outlined, size: 18),
+            ),
+          ),
+        ),
+        AppPanel(
+          icon: Icons.save_outlined,
+          title: 'Save',
+          subtitle: 'Saving never overwrites: the sidecar keeps the old copy.',
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  onPressed: _busy ? null : _saveAs,
+                  icon: const Icon(Icons.save_as, size: 18),
+                  label: const Text('Save current topology as new .pkt'),
+                ),
+                FilledButton.icon(
+                  onPressed: _busy ? null : _saveVerified,
+                  icon: const Icon(Icons.inventory_2, size: 18),
+                  label: const Text('Save verified artifact (.pkt + report)'),
+                ),
+              ],
+            ),
+          ],
+        ),
+        if (_artifact != null) _artifactCard(),
+        if (_busy) const LinearProgressIndicator(),
+        AppLiveText(
+          text: _message,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        _infoCard(),
+        _analysisCard(),
+        if (_lastOperation != null)
+          AppPanel(
+            icon: Icons.history_outlined,
+            title: 'Last operation',
+            children: [
+              AppCodeBlock(
+                text: const JsonEncoder.withIndent(
+                  '  ',
+                ).convert(_lastOperation),
+                maxHeight: 220,
+              ),
+            ],
+          ),
+        AppPanel(
+          icon: Icons.fact_check_outlined,
+          title: 'Next step',
+          subtitle: 'Hand the loaded topology to the read-only Analyze screen.',
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _stop,
+                  icon: const Icon(Icons.stop_circle, size: 18),
+                  label: const Text('Stop Packet Tracer file activity'),
+                ),
+                FilledButton.icon(
+                  onPressed: widget.onAnalyze == null || _busy
+                      ? null
+                      : () => widget.onAnalyze!(_project.text.trim()),
+                  icon: const Icon(Icons.fact_check, size: 18),
+                  label: const Text('Analyze loaded topology'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

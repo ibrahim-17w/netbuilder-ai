@@ -43,4 +43,60 @@ void main() {
     expect(control.isCurrent(token), isFalse);
     expect(control.id, greaterThan(afterFirst - 1));
   });
+
+  group('a stop that already happened is visible at once', () {
+    test('the future alone is not enough, so the probe is what the transports '
+        'use', () async {
+      final control = GenerationControl()..begin();
+      control.cancel();
+
+      // Built AFTER the cancel: the trigger is already complete, and a
+      // completed future is only observable in a later microtask.
+      final withoutProbe = AbortSignal(control.abortTrigger);
+      expect(withoutProbe.isAborted, isFalse);
+      await Future<void>.delayed(Duration.zero);
+      expect(withoutProbe.isAborted, isTrue,
+          reason: 'which is why a request built after the stop used to go out '
+              'anyway');
+
+      final withProbe = AbortSignal(
+        control.abortTrigger,
+        isAbortedNow: () => control.cancelled,
+      );
+      expect(withProbe.isAborted, isTrue,
+          reason: 'read synchronously, the stop is honoured immediately');
+      expect(
+        () => withProbe.throwIfAborted(),
+        throwsA(isA<AbortedException>()),
+      );
+    });
+
+    test('a turn that was replaced counts as stopped', () {
+      final control = GenerationControl();
+      final first = control.begin();
+      final second = control.begin();
+      final signal = AbortSignal(
+        control.abortTrigger,
+        isAbortedNow: () => !control.isCurrent(first),
+      );
+      expect(signal.isAborted, isTrue);
+      expect(
+        AbortSignal(
+          control.abortTrigger,
+          isAbortedNow: () => !control.isCurrent(second),
+        ).isAborted,
+        isFalse,
+        reason: 'the turn the user is waiting on is not stopped',
+      );
+    });
+
+    test('a trigger that fails is not a cancellation', () async {
+      final failing = Future<void>.error(Exception('the trigger broke'));
+      final signal = AbortSignal(failing);
+      await pumpEventQueue();
+      expect(signal.isAborted, isFalse,
+          reason: 'a broken signal must not be reported as the user stopping');
+      expect(signal.isAbortError(Exception('a real failure')), isFalse);
+    });
+  });
 }

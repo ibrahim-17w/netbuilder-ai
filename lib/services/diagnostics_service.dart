@@ -116,13 +116,18 @@ class PingSummary {
   final int avgMs;
   final int maxMs;
 
+  /// Why no ping ran at all - an unusable target, most often. Empty when the
+  /// ping did run, and never mixed into the reply counts.
+  final String error;
+
   const PingSummary({
     required this.target,
-    required this.transmitted,
-    required this.received,
+    this.transmitted = 0,
+    this.received = 0,
     this.minMs = 0,
     this.avgMs = 0,
     this.maxMs = 0,
+    this.error = '',
   });
 
   int get lost => transmitted - received;
@@ -132,11 +137,14 @@ class PingSummary {
 
   bool get ok => received > 0;
 
-  String get summary => transmitted == 0
-      ? 'no reply from $target'
-      : '$received/$transmitted replies from $target'
-            '${ok ? ' - $minMs/$avgMs/$maxMs ms min/avg/max' : ''}'
-            '${lost > 0 ? ' - ${lossPercent.toStringAsFixed(0)}% loss' : ''}';
+  String get summary {
+    if (error.isNotEmpty) return 'no ping was run: $error';
+    return transmitted == 0
+        ? 'no reply from $target'
+        : '$received/$transmitted replies from $target'
+              '${ok ? ' - $minMs/$avgMs/$maxMs ms min/avg/max' : ''}'
+              '${lost > 0 ? ' - ${lossPercent.toStringAsFixed(0)}% loss' : ''}';
+  }
 
   /// Understands the Windows, macOS and Linux ping formats, because the app
   /// ships on all three and the same button has to work on each.
@@ -284,12 +292,48 @@ class DiagnosticsService {
     }
   }
 
+  /// A target as the probes accept it: letters, digits, `.`, `-`, `_`, `:`.
+  /// That is exactly a host name, an IPv4 literal or an IPv6 literal.
+  ///
+  /// Everything a command processor reads as syntax is outside the set on
+  /// purpose - `& ; | > < ( ) $ \` " ' * ? ! %`, a newline, a control
+  /// character, and the spaces that let a second word become a second command.
+  /// 253 characters is the DNS name limit, so a length check is also a way of
+  /// refusing a value that is not a host at all.
+  static final RegExp _hostPattern = RegExp(r'^[A-Za-z0-9._:-]{1,253}$');
+
+  /// The trimmed, validated target, or null when the value must not be used.
+  ///
+  /// This runs before anything is started, so an unusable target is reported
+  /// as a bad target rather than being quoted, escaped or handed to a shell.
+  /// Escaping is not a second line of defence here: a value that had to be
+  /// escaped is a value that was one quoting mistake away from running.
+  static String? normalizeHost(String raw) {
+    final host = raw.trim();
+    if (host.isEmpty) return null;
+    if (host.startsWith('-')) return null;
+    return _hostPattern.hasMatch(host) ? host : null;
+  }
+
+  /// What to tell the user about a target that was refused, in their words.
+  static String _unusableHost(String raw) {
+    final host = raw.trim();
+    if (host.isEmpty) return 'no host name given';
+    if (host.startsWith('-')) {
+      return "'$host' looks like a command-line option, not a host";
+    }
+    return "'$host' is not a host name: it contains spaces, punctuation or "
+        'control characters';
+  }
+
   /// Resolve a name (or an address, which resolves to itself). This is the
   /// first question of every "can I reach it" conversation, and it is the one
   /// that proves whether DNS - not routing - is the thing that is broken.
   Future<DnsLookup> lookup(String host) async {
-    final name = host.trim();
-    if (name.isEmpty) return const DnsLookup(host: '', error: 'no name given');
+    final name = normalizeHost(host);
+    if (name == null) {
+      return DnsLookup(host: host.trim(), error: _unusableHost(host));
+    }
     final watch = Stopwatch()..start();
     try {
       final result = await InternetAddress.lookup(name).timeout(timeout);
@@ -315,7 +359,13 @@ class DiagnosticsService {
   /// The reverse lookup: an address back to a name, which is what a PTR
   /// record is for.
   Future<DnsLookup> reverseLookup(String address) async {
-    final host = address.split('/').first.trim();
+    final host = normalizeHost(address.split('/').first);
+    if (host == null) {
+      return DnsLookup(
+        host: address.split('/').first.trim(),
+        error: _unusableHost(address),
+      );
+    }
     final watch = Stopwatch()..start();
     try {
       final resolved = await InternetAddress(host).reverse().timeout(timeout);
@@ -334,8 +384,19 @@ class DiagnosticsService {
   /// Is one TCP port answering? A refused connection and a filtered one are
   /// different faults, so the error text is kept rather than flattened.
   Future<PortProbe> checkPort(String host, int port, {String service = ''}) async {
-    final target = host.trim();
+    final name = service.isEmpty ? (commonPorts[port] ?? '') : service;
+    final target = normalizeHost(host);
     final watch = Stopwatch()..start();
+    if (target == null) {
+      watch.stop();
+      return PortProbe(
+        host: host.trim(),
+        port: port,
+        open: false,
+        service: name,
+        error: _unusableHost(host),
+      );
+    }
     Socket? socket;
     try {
       socket = await Socket.connect(target, port, timeout: timeout);
@@ -345,7 +406,7 @@ class DiagnosticsService {
         port: port,
         open: true,
         elapsedMs: watch.elapsedMilliseconds,
-        service: service.isEmpty ? (commonPorts[port] ?? '') : service,
+        service: name,
       );
     } catch (e) {
       watch.stop();
@@ -354,7 +415,7 @@ class DiagnosticsService {
         port: port,
         open: false,
         elapsedMs: watch.elapsedMilliseconds,
-        service: service.isEmpty ? (commonPorts[port] ?? '') : service,
+        service: name,
         error: _reason(e),
       );
     } finally {
@@ -425,13 +486,27 @@ class DiagnosticsService {
   /// ICMP reachability using the operating system's own ping. Unsupported on
   /// a phone, which is reported as an error rather than as "down".
   Future<PingSummary> ping(String host, {int count = 4}) async {
-    final result = await _shell(_pingCommand(host.trim(), count));
-    return PingSummary.parse(host.trim(), result.output);
+    final target = normalizeHost(host);
+    if (target == null) {
+      return PingSummary(
+        target: host.trim(),
+        error: _unusableHost(host),
+      );
+    }
+    final (executable, arguments) = _pingCommand(target, count);
+    final result = await _shell(executable, arguments);
+    return PingSummary.parse(target, result.output);
   }
 
   /// The path a packet takes, hop by hop.
-  Future<ShellResult> traceroute(String host, {int maxHops = 15}) =>
-      _shell(_traceCommand(host.trim(), maxHops));
+  Future<ShellResult> traceroute(String host, {int maxHops = 15}) async {
+    final target = normalizeHost(host);
+    if (target == null) {
+      return ShellResult(command: host.trim(), error: _unusableHost(host));
+    }
+    final (executable, arguments) = _traceCommand(target, maxHops);
+    return _shell(executable, arguments);
+  }
 
   /// This machine's own interfaces - name, MAC and every address on them.
   /// Pure Dart, so it works on a phone too, and it is the fastest way to
@@ -464,17 +539,24 @@ class DiagnosticsService {
   /// on the local segment, which is what a duplicate-address hunt starts
   /// from.
   Future<List<ArpEntry>> arpTable() async {
-    final result = await _shell(_arpCommand());
+    final (executable, arguments) = _arpCommand();
+    final result = await _shell(executable, arguments);
     return parseArp(result.output);
   }
 
   /// The route table as the operating system prints it. Deliberately not
   /// parsed into a model: every OS shapes it differently, and a wrong parse
   /// is worse than the real text.
-  Future<ShellResult> routeTable() => _shell(_routeCommand());
+  Future<ShellResult> routeTable() async {
+    final (executable, arguments) = _routeCommand();
+    return _shell(executable, arguments);
+  }
 
   /// The connections this machine currently has open.
-  Future<ShellResult> activeConnections() => _shell(_netstatCommand());
+  Future<ShellResult> activeConnections() async {
+    final (executable, arguments) = _netstatCommand();
+    return _shell(executable, arguments);
+  }
 
   static List<ArpEntry> parseArp(String raw) {
     final out = <ArpEntry>[];
@@ -518,7 +600,14 @@ class DiagnosticsService {
 
   /// Start a program and collect it, with a hard timeout so a probe can never
   /// hang the screen that asked for it.
-  Future<ShellResult> _shell(String command) async {
+  ///
+  /// The program is started directly with its argument list, never through
+  /// `cmd /c` or `/bin/sh -c`, so a target cannot be read as shell syntax even
+  /// if [normalizeHost] were to let something through. `runInShell: false` is
+  /// stated rather than left to the default, because that default is the one
+  /// thing a reader must not have to look up.
+  Future<ShellResult> _shell(String executable, List<String> arguments) async {
+    final command = [executable, ...arguments].join(' ');
     if (!canRunShellTools) {
       return ShellResult(
         command: command,
@@ -526,7 +615,11 @@ class DiagnosticsService {
       );
     }
     try {
-      final result = await _run(command).timeout(timeout * 4);
+      final result = await Process.run(
+        executable,
+        arguments,
+        runInShell: false,
+      ).timeout(timeout * 4);
       final stdout = result.stdout.toString();
       final stderr = result.stderr.toString();
       return ShellResult(
@@ -540,30 +633,26 @@ class DiagnosticsService {
     }
   }
 
-  static Future<ProcessResult> _run(String command) {
-    if (Platform.isWindows) {
-      return Process.run('cmd', ['/c', command]);
-    }
-    return Process.run('/bin/sh', ['-c', command]);
-  }
+  /// Each command is an executable plus its arguments, so the only variable
+  /// part is one argument and never part of a command line.
+  static (String, List<String>) _pingCommand(String host, int count) =>
+      Platform.isWindows
+          ? ('ping', ['-n', '$count', host])
+          : ('ping', ['-c', '$count', host]);
 
-  static String _pingCommand(String host, int count) => Platform.isWindows
-      ? 'ping -n $count $host'
-      : 'ping -c $count $host';
+  static (String, List<String>) _traceCommand(String host, int maxHops) =>
+      Platform.isWindows
+          ? ('tracert', ['-h', '$maxHops', '-w', '1000', host])
+          : ('traceroute', ['-m', '$maxHops', host]);
 
-  static String _traceCommand(String host, int maxHops) => Platform.isWindows
-      ? 'tracert -h $maxHops -w 1000 $host'
-      : 'traceroute -m $maxHops $host';
+  static (String, List<String>) _arpCommand() =>
+      Platform.isWindows ? ('arp', ['-a']) : ('arp', ['-an']);
 
-  static String _arpCommand() => Platform.isWindows ? 'arp -a' : 'arp -an';
+  static (String, List<String>) _routeCommand() =>
+      Platform.isWindows ? ('route', ['print', '-4']) : ('netstat', ['-rn']);
 
-  static String _routeCommand() => Platform.isWindows
-      ? 'route print -4'
-      : 'netstat -rn';
-
-  static String _netstatCommand() => Platform.isWindows
-      ? 'netstat -ano'
-      : 'netstat -an';
+  static (String, List<String>) _netstatCommand() =>
+      Platform.isWindows ? ('netstat', ['-ano']) : ('netstat', ['-an']);
 
   /// The failure in the user's words: a timeout, a refused connection and an
   /// unknown host are three different problems with three different fixes.

@@ -14,7 +14,8 @@ void main() {
 
     expect(find.byType(BottomNavigationBar), findsNothing);
     expect(find.byType(FloatingActionButton), findsNothing);
-    expect(find.textContaining('Network Engineer'), findsOneWidget);
+    // The top bar names the screen you are on (see chat_landing_test).
+    expect(find.text('Chat'), findsWidgets);
     expect(find.byType(TextField), findsWidgets);
   });
 

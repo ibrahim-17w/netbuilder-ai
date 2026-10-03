@@ -6,7 +6,7 @@ import '../services/settings_service.dart';
 /// and reusable as the tour's "what's new" page. One entry per version -
 /// keep it to the things a user would actually notice.
 const List<({String version, String date, List<String> changes})>
-    kChangelogEntries = [
+kChangelogEntries = [
   (
     version: '2.1',
     date: 'September 2026',
@@ -110,11 +110,16 @@ class FirstRunTour extends StatelessWidget {
                         SingleChildScrollView(
                           child: Column(
                             children: [
-                              Icon(p.icon, size: 44,
-                                  color: Theme.of(context).colorScheme.primary),
+                              Icon(
+                                p.icon,
+                                size: 44,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
                               const SizedBox(height: 14),
-                              Text(p.title,
-                                  style: Theme.of(context).textTheme.titleLarge),
+                              Text(
+                                p.title,
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
                               const SizedBox(height: 8),
                               Text(
                                 p.body,
@@ -155,7 +160,18 @@ class FirstRunTour extends StatelessWidget {
                           FilledButton(
                             onPressed: () async {
                               if (controller.index < pages.length - 1) {
-                                controller.animateTo(controller.index + 1);
+                                // Someone who asked the system not to animate
+                                // gets the same next page, without the slide.
+                                if (MediaQuery.disableAnimationsOf(
+                                  buttonContext,
+                                )) {
+                                  controller.animateTo(
+                                    controller.index + 1,
+                                    duration: Duration.zero,
+                                  );
+                                } else {
+                                  controller.animateTo(controller.index + 1);
+                                }
                                 return;
                               }
                               await settings.markTourDone();
@@ -217,8 +233,11 @@ class ChangelogCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.auto_awesome, size: 18,
-                    color: theme.colorScheme.primary),
+                Icon(
+                  Icons.auto_awesome,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'New in ${latest.version} (${latest.date})',
@@ -228,8 +247,7 @@ class ChangelogCard extends StatelessWidget {
                 IconButton(
                   tooltip: 'Dismiss',
                   icon: const Icon(Icons.close, size: 18),
-                  onPressed: () =>
-                      settings.markChangelogSeen(latest.version),
+                  onPressed: () => settings.markChangelogSeen(latest.version),
                 ),
               ],
             ),

@@ -359,6 +359,39 @@ LabAdmin2026.
       }
     });
 
+    test('EIGRP renders one process with classful network statements', () {
+      final intent = NetworkIntent.parseSimple(
+        'eigrp',
+        '2 routers 2 switches 4 pcs, run eigrp',
+      );
+      expect(intent.routing, 'eigrp');
+      final cfg = CiscoAdapter.render(intent)['R1']!;
+      expect(cfg, contains('router eigrp 10'));
+      expect(cfg, contains(' no auto-summary'));
+      // R1 announces its own connected networks (its LAN and the transit
+      // link); R2 announces the far LAN, EIGRP exchanges the rest.
+      expect(cfg, contains(' network 192.168.1.0 0.0.0.255'));
+      expect(cfg, contains(' network 10.0.0.0 0.0.0.3'));
+      expect(CiscoAdapter.render(intent)['R2']!,
+          contains(' network 192.168.2.0 0.0.0.255'));
+      // The protocol replaces the static routes, not stacks on them.
+      expect(cfg, isNot(contains('ip route ')));
+    });
+
+    test('BGP renders iBGP neighbours between the plan routers', () {
+      final intent = NetworkIntent.parseSimple(
+        'bgp',
+        '2 routers 2 switches 4 pcs, use bgp',
+      );
+      expect(intent.routing, 'bgp');
+      final cfg = CiscoAdapter.render(intent)['R1']!;
+      expect(cfg, contains('router bgp 65001'));
+      expect(cfg, contains(' remote-as 65001'));
+      // LANs are advertised; the transit subnet is not.
+      expect(cfg, contains(' network 192.168.1.0 mask 255.255.255.0'));
+      expect(cfg, isNot(contains(' network 10.0.0.')));
+    });
+
     test('"each with ..." describes every site, not just the first', () {
       final intent = NetworkIntent.parseSimple(
         'sites',
@@ -375,6 +408,72 @@ LabAdmin2026.
       final cfg = CiscoAdapter.render(intent);
       expect(cfg['R1']!, contains('ip route 192.168.2.0 255.255.255.0'));
       expect(cfg['R2']!, contains('ip route 192.168.1.0 255.255.255.0'));
+    });
+
+    test('SSH, HSRP, spanning-tree and EtherChannel wording is parsed', () {
+      final intent = NetworkIntent.parseSimple(
+        'hardened',
+        '2 routers 2 switches 4 pcs. Use SSH for remote access, HSRP with '
+            'virtual ip 192.168.1.254, spanning-tree rapid-pvst with the '
+            'first switch as root bridge, and an etherchannel between the '
+            'switches using lacp. Enable secret Cl4ss2026.',
+      );
+      final s = intent.security;
+      expect(s.ssh, isTrue);
+      expect(s.telnet, isFalse, reason: 'SSH replaces Telnet on the VTY lines');
+      expect(s.hsrp, isTrue);
+      expect(s.hsrpVirtualIp, '192.168.1.254');
+      expect(s.spanningTree, isTrue);
+      expect(s.etherChannel, isTrue);
+      expect(s.etherChannelProtocol, 'lacp');
+      expect(s.enableSecret, 'Cl4ss2026');
+      final cfgs = CiscoAdapter.render(intent);
+      expect(cfgs['R1']!, contains('transport input ssh'));
+      expect(cfgs['R1']!, contains('crypto key generate rsa'));
+      expect(cfgs['R1']!, contains('enable secret 0 Cl4ss2026'));
+      expect(cfgs['SW1']!, contains('transport input ssh'));
+      expect(cfgs['SW1']!, contains('spanning-tree vlan 1 root primary'));
+      expect(cfgs['SW1']!, contains('channel-group 1 mode active'));
+      expect(cfgs['SW2']!, contains('channel-group 1 mode passive'));
+      // HSRP groups on the LAN interfaces (transit links excluded).
+      expect(cfgs['R1']!, contains('standby 1 ip 192.168.1.254'));
+      expect(cfgs['R1']!, isNot(contains('standby 1 ip 10.0.0.')));
+    });
+
+    test('VLANs create trunks, access ports and inter-VLAN routing', () {
+      final intent = NetworkIntent.parseSimple(
+        'vlans',
+        '1 router 1 switch 4 pcs with vlan 10 and vlan 20, inter-vlan routing',
+      );
+      expect(intent.vlans, containsAll([10, 20]));
+      expect(intent.security.interVlanRouting, isTrue);
+      final routerCfg = CiscoAdapter.render(intent)['R1']!;
+      // Router-on-a-stick: one dot1Q sub-interface per VLAN. The first
+      // switch uplink rides g0/1 (g0/0 is the transit port in the layout).
+      expect(routerCfg, contains('interface g0/1.10'));
+      expect(routerCfg, contains(' encapsulation dot1Q 10'));
+      expect(routerCfg, contains('interface g0/1.20'));
+      expect(routerCfg, contains(' encapsulation dot1Q 20'));
+      // The sub-interface addresses are plan data: PCs in VLAN 10 point
+      // their gateway at the VLAN 10 sub-interface.
+      final pcAddrs = intent.addressing
+          .where((a) => a.node.startsWith('PC'))
+          .map((a) => a.ipCidr)
+          .toSet();
+      expect(pcAddrs.any((c) => c.startsWith('192.168.10.')), isTrue,
+          reason: 'a PC sits in VLAN 10');
+      expect(pcAddrs.any((c) => c.startsWith('192.168.20.')), isTrue,
+          reason: 'a PC sits in VLAN 20');
+      final switchCfg = CiscoAdapter.render(intent)['SW1']!;
+      // The uplink is a trunk carrying both VLANs.
+      expect(switchCfg, contains(' switchport mode trunk'));
+      expect(switchCfg, contains(' switchport trunk allowed vlan 10,20'));
+      // The validator agrees the plan is buildable.
+      final issues = ValidatorService.validate(intent);
+      expect(
+        issues.where((i) => i.severity == 'error').map((i) => i.message),
+        isEmpty,
+      );
     });
 
     test('a brief that says it once keeps one site', () {

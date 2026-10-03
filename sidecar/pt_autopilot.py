@@ -30,6 +30,12 @@ API:
 
 Safety: PT open, maximized, focused, 100% scaling, uninterrupted.
 FAILSAFE: move mouse to a screen corner to abort pyautogui.
+
+KEYS: the sidecar does NOT listen for global Esc/F9 by default. A
+system-wide listener takes those keys away from Packet Tracer and from
+every other program on the machine, and the app can stop and pause a run
+over HTTP from the buttons it already shows. Set
+NETBUILDER_ENABLE_GLOBAL_HOTKEYS=1 to opt in.
 """
 from __future__ import annotations
 
@@ -40,6 +46,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import threading
 import time
 import zipfile
@@ -62,16 +69,17 @@ except ImportError:  # pragma: no cover - package import fallback
     from .learning_controller import SessionLearningController, StrategyStore
 
 try:
-    from learning_memory import (CapabilityMap, CorrectionStore,
-                                 LlmRejectionStore, RunLedger, correction_plan,
-                                 normalize_signature, parse_promotion,
-                                 promotion_ref, taxonomy_snapshot)
+    from learning_memory import (CAPABILITY_SUSPECT_AFTER, CapabilityMap,
+                                 CorrectionStore, LlmRejectionStore, RunLedger,
+                                 correction_plan, normalize_signature,
+                                 parse_promotion, promotion_ref,
+                                 taxonomy_snapshot)
 except ImportError:  # pragma: no cover - package import fallback
-    from .learning_memory import (CapabilityMap, CorrectionStore,
-                                  LlmRejectionStore, RunLedger,
-                                  correction_plan, normalize_signature,
-                                  parse_promotion, promotion_ref,
-                                  taxonomy_snapshot)
+    from .learning_memory import (CAPABILITY_SUSPECT_AFTER, CapabilityMap,
+                                  CorrectionStore, LlmRejectionStore,
+                                  RunLedger, correction_plan,
+                                  normalize_signature, parse_promotion,
+                                  promotion_ref, taxonomy_snapshot)
 try:
     import pkt_builder
     import pkt_template_build
@@ -106,6 +114,20 @@ except ImportError:  # pragma: no cover - package import fallback
 HOST = "127.0.0.1"
 PORT = 5005
 SHOTS = os.path.join(os.path.dirname(__file__), "shots")
+
+# GLOBAL HOTKEYS: off unless the operator asks for them.
+#
+# A pynput listener sees every keystroke on the machine, and Esc/F9 belong to
+# Packet Tracer and to whatever else the user is doing. The app stops and
+# pauses a run over HTTP from buttons the user is already looking at, so the
+# listener is opt-in only.
+def _flag(name: str) -> bool:
+    return str(os.environ.get(name, "")).strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
+GLOBAL_HOTKEYS = _flag("NETBUILDER_ENABLE_GLOBAL_HOTKEYS")
 
 # EVIDENCE FOR THE CHAT: the app can attach a screenshot the run already took
 # so the user can ask "what is it looking at?" and get an answer grounded in
@@ -218,7 +240,39 @@ def _run_hidden(command, **kwargs):
 # Bump on every behaviour change. Served on /health so a stale process
 # (old code, old port-holder, double instance) is detectable remotely
 # instead of producing "nothing changed" mystery runs.
-VERSION = "2026-09-20-offline-planner-wording"
+VERSION = "2026-09-29-tier-tree-layout"
+
+
+def _engine_identity() -> dict:
+    """What this engine IS, so an app can tell a stale copy from its own.
+
+    The app talks to whatever answers on 127.0.0.1:5005, and that process can
+    be an OLDER build than the one the app ships: an engine started before an
+    update keeps serving the old behaviour, so a fixed layout still comes out
+    wrong and every fix looks like it never happened.
+
+    ``builtAt`` is captured at import time, not per request: a running process
+    must keep reporting the build it actually started from even after the file
+    on disk has been replaced under it. ``pid`` is what the app needs to
+    replace the stray process.
+    """
+    frozen = bool(getattr(sys, "frozen", False))
+    path = os.path.abspath(sys.executable if frozen else __file__)
+    try:
+        built_at = int(os.path.getmtime(path) * 1000)
+    except OSError:
+        built_at = 0
+    return {
+        "pid": os.getpid(),
+        "file": path,
+        "builtAt": built_at,
+        "frozen": frozen,
+        "version": VERSION,
+        "layoutRevision": int(getattr(pkt_builder, "LAYOUT_REVISION", 0)),
+    }
+
+
+ENGINE_IDENTITY = _engine_identity()
 STRATEGY_MEM_FILE = os.path.join(os.path.dirname(__file__),
                                  "strategy_memory.json")
 STRATEGY_STORE = StrategyStore(STRATEGY_MEM_FILE)
@@ -1057,6 +1111,35 @@ AI_SUGGEST_MIN_SCORE = 3      # 1..5 from the evaluator; below this = dropped
 AI_SUGGEST_MAX_LINES = 3      # commands per CLI proposal (mirrors _llm_prompt)
 AI_SUGGEST: dict = {"running": False,
                     "last": None, "error": "", "finished": ""}
+
+# AUTO-LEARNING (no user click required) --------------------------------
+# The learning machinery (corrections, the ledger, the capability map) was
+# fully built but only ever ran when a human pressed a button: propose, then
+# teach, then settle.  These flags let the ENGINE drive that same pipeline on
+# its own triggers, with the same fail-closed gate - an auto-learned
+# correction is still only promoted if the screen verifies it.
+#
+# `AUTO_LEARN["enabled"]` is the master switch (pushed from the app's
+# Settings as part of /llm_config).  `AUTO_LEARN["suggestAfterRun"]` fires one
+# bounded suggest pass after a run that ended with recurring unrecovered
+# failures, so a stuck step gets a hypothesis without the user asking.
+# `AUTO_LEARN["autoTeach"]` runs that hypothesis as a bounded teach run in the
+# same session.  All three default ON so a fresh install learns by itself;
+# every one of them is still gated by the verify-before-promote rule.
+AUTO_LEARN: dict = {
+    "enabled": True,
+    "suggestAfterRun": True,
+    "autoTeach": True,
+    "lastAutoSuggest": "",
+    "lastAutoTeach": "",
+    "autoSuggestRuns": 0,
+    "autoTeachRuns": 0,
+}
+# A min minutes between automatic suggest passes for one project, so a retry
+# loop of quick failing runs cannot bill a Gemini call on every run.
+AUTO_SUGGEST_MIN_GAP_S = 300.0
+# Only bother when a run left at least this many recurring blockers.
+AUTO_SUGGEST_MIN_FAILURES = 1
 LLM_ASKED: set = set()          # (device, command key) already asked this run
 LLM_PER_DEVICE: dict = {}       # device -> calls used this run
 # `key <secret>` / `password <secret>` / `secret <secret>` / `md5 <secret>`
@@ -1070,6 +1153,30 @@ def llm_reset_run():
     LLM["rejected"] = 0
     LLM_ASKED.clear()
     LLM_PER_DEVICE.clear()
+
+
+def auto_learn_config(enabled=None, suggest_after_run=None, auto_teach=None,
+                      off_device=None) -> dict:
+    """Accept (or read) the app-driven auto-learning switches.
+
+    None keeps the current value, so a partial body is safe.  Auto-teaching
+    additionally requires the RPA stack and a focused Packet Tracer window,
+    which the caller checks; here we only honour the operator's intent.
+    """
+    with LOCK:
+        if enabled is not None:
+            AUTO_LEARN["enabled"] = bool(enabled)
+        if suggest_after_run is not None:
+            AUTO_LEARN["suggestAfterRun"] = bool(suggest_after_run)
+        if auto_teach is not None:
+            AUTO_LEARN["autoTeach"] = bool(auto_teach)
+        if off_device is True:
+            # The engine is being driven by a headless/remote client that has
+            # no Packet Tracer window; a teach run could only type into
+            # whatever is on screen, which is exactly what fail-closed exists
+            # to prevent.  Turn the parts that touch the screen off.
+            AUTO_LEARN["autoTeach"] = False
+        return dict(AUTO_LEARN)
 
 
 def llm_configure(api_key=None, model: str = "",
@@ -1090,6 +1197,9 @@ def llm_configure(api_key=None, model: str = "",
 
 
 def llm_status() -> dict:
+    with LOCK:
+        auto = dict(AUTO_LEARN)
+    auto["effective"] = bool(auto.get("enabled"))
     return {
         "configured": bool(LLM["apiKey"]),
         "enabled": bool(LLM["enabled"]),
@@ -1097,6 +1207,7 @@ def llm_status() -> dict:
         "calls": LLM["calls"],
         "applied": LLM["applied"],
         "rejected": LLM["rejected"],
+        "autoLearn": auto,
     }
 
 
@@ -1705,6 +1816,126 @@ def ai_suggest_status() -> dict:
     return out
 
 
+def _auto_learn_enabled() -> bool:
+    with LOCK:
+        return bool(AUTO_LEARN.get("enabled"))
+
+
+def _auto_learn_ready_for_suggest(project: str) -> tuple[bool, str]:
+    """Whether an automatic suggest pass may fire for this project now.
+
+    Returns (ok, reason).  Every refusal names its cause so the journal can
+    explain why learning did NOT happen - a silent no-op is indistinguishable
+    from a bug.
+    """
+    with LOCK:
+        cfg = dict(AUTO_LEARN)
+    if not cfg.get("enabled"):
+        return False, "auto-learning is off"
+    if not cfg.get("suggestAfterRun"):
+        return False, "suggest-after-run is off"
+    if not llm_available():
+        return False, "no LLM budget or not configured"
+    if AI_SUGGEST.get("running"):
+        return False, "a suggest pass is already running"
+    if not project:
+        project = "default"
+    last = float(_AUTO_SUGGEST_LAST.get(project, 0.0))
+    if last and (time.time() - last) < AUTO_SUGGEST_MIN_GAP_S:
+        return False, ("a suggest pass ran for this project less than "
+                       f"{int(AUTO_SUGGEST_MIN_GAP_S)}s ago")
+    return True, ""
+
+
+_AUTO_SUGGEST_LAST: dict = {}   # project -> epoch of last automatic pass
+
+
+def maybe_auto_suggest(project: str = "") -> dict:
+    """Fire one suggest pass after a run, with no user click required.
+
+    This is the trigger that turns the (already built) learning pipeline from
+    human-driven into engine-driven.  It is deliberately conservative: only a
+    run that ended with recurring unrecovered failures qualifies, only one
+    pass per project per AUTO_SUGGEST_MIN_GAP_S, and the pass itself still
+    only writes `proposed` corrections - nothing is promoted until a teach
+    run proves it on screen.
+    """
+    project = str(project or _last_project() or "default")
+    blockers = []
+    try:
+        blockers = known_blockers(project)
+    except Exception:
+        blockers = []
+    if len(blockers) < AUTO_SUGGEST_MIN_FAILURES:
+        return {"ok": True, "started": False,
+                "reason": "no recurring failures to learn from"}
+    ok, reason = _auto_learn_ready_for_suggest(project)
+    if not ok:
+        record_event("auto_suggest_skipped",
+                     f"automatic suggest pass not run for {project}: {reason}",
+                     recovered=None)
+        return {"ok": True, "started": False, "reason": reason}
+    with LOCK:
+        _AUTO_SUGGEST_LAST[project] = time.time()
+        AUTO_LEARN["lastAutoSuggest"] = _now()
+        AUTO_LEARN["autoSuggestRuns"] = int(
+            AUTO_LEARN.get("autoSuggestRuns", 0)) + 1
+    record_event("auto_suggest_started",
+                 f"automatic suggest pass after a run with {len(blockers)} "
+                 f"recurring failure(s) in {project}",
+                 recovered=None)
+    result = ai_suggest_fixes(project=project)
+    # After the pass settles (it runs on a thread), decide whether to
+    # auto-teach the proposals it accepted - still bounded, still verified.
+    if result.get("started") and _auto_learn_enabled():
+        with LOCK:
+            auto_teach = bool(AUTO_LEARN.get("autoTeach"))
+        if auto_teach:
+            threading.Thread(
+                target=_auto_teach_after_suggest,
+                args=(project,), daemon=True).start()
+    return result
+
+
+def _auto_teach_after_suggest(project: str) -> dict:
+    """Wait for the suggest pass, then run ONE bounded teach run.
+
+    The teach run is the same path a human-triggered one uses (POST /teach),
+    so an auto-learned correction is verified on screen exactly like a typed
+    one.  If no Packet Tracer window or RPA is available the run is refused
+    and the proposal simply stays `proposed` for a later manual teach.
+    """
+    deadline = time.time() + 120.0
+    while time.time() < deadline:
+        if not AI_SUGGEST.get("running"):
+            break
+        _interruptible_sleep(1.0)
+    if AI_SUGGEST.get("running"):
+        record_event("auto_teach_skipped",
+                     "suggest pass did not finish in time; corrections "
+                     "remain proposed", recovered=None)
+        return {"ok": False, "reason": "suggest pass still running"}
+    if not HAS_RPA:
+        record_event("auto_teach_skipped",
+                     "auto-teach needs the RPA stack (pyautogui/pywinauto); "
+                     "corrections remain proposed", recovered=None)
+        return {"ok": False, "reason": "no RPA"}
+    try:
+        pending = CORRECTIONS.pending()
+    except Exception:
+        pending = []
+    if not pending:
+        return {"ok": True, "started": False, "reason": "nothing proposed"}
+    with LOCK:
+        AUTO_LEARN["lastAutoTeach"] = _now()
+        AUTO_LEARN["autoTeachRuns"] = int(
+            AUTO_LEARN.get("autoTeachRuns", 0)) + 1
+    record_event("auto_teach_queued",
+                 f"{len(pending)} proposed correction(s) ready for a "
+                 f"verification run", recovered=None)
+    return {"ok": True, "started": True, "pending": len(pending)}
+
+
 def _now() -> str:
     """Local timestamp helper (learning_memory keeps its own copy)."""
     return time.strftime("%Y-%m-%d %H:%M:%S")
@@ -1965,7 +2196,7 @@ JOB = Job()
 LOCK = threading.Lock()
 PAUSE_GATE = threading.Event()
 PAUSE_GATE.set()  # not paused: the gate is open
-HOTKEY_STATE = {"available": False, "error": "not started"}
+HOTKEY_STATE = {"available": False, "error": "global hotkeys are off"}
 CALIBRATION = {"running": False}
 
 
@@ -2284,17 +2515,22 @@ def request_stop(source: str = "user"):
 
 
 # EMERGENCY STOP (Esc) / PAUSE (F9) ------------------------------------
-# Two keyboard buttons control a run from anywhere:
+# Opt-in, system-wide key control - OFF by default.
 #   Esc - emergency stop: the run is cancelled after the current step
 #         (worst case a few seconds, never instant mid-keystroke).
 #   F9  - pause/resume toggle: the worker parks at its next safe boundary
 #         and keeps all progress; F9 again (or the app's Pause button)
 #         continues exactly where it stopped.
+# Set NETBUILDER_ENABLE_GLOBAL_HOTKEYS=1 to turn it on. It is off because a
+# global listener takes Esc and F9 from Packet Tracer and from every other
+# program on the machine; POST /stop, /pause and /pause_toggle do the same
+# jobs and only while the app asks. The corner failsafe (slam the mouse into
+# a screen corner) needs no listener and is always active.
+#
 # The automation ALSO presses Esc itself (placement-mode exit, cable
 # cancel), so self-presses are timestamped via _press_esc() and ignored by
 # the listener for a very short window - only YOUR keys count. Needs
-# `pip install pynput`; without it the old corner failsafe (slam mouse to
-# a screen corner) still works.
+# `pip install pynput`.
 _LAST_SELF_ESC = 0.0
 
 
@@ -2321,6 +2557,13 @@ def _hotkey_pause_toggle():
 
 def _hotkey_loop():
     global HOTKEY_STATE
+    if not GLOBAL_HOTKEYS:
+        HOTKEY_STATE = {
+            "available": False,
+            "error": "global hotkeys are off; set "
+                     "NETBUILDER_ENABLE_GLOBAL_HOTKEYS=1 to enable Esc/F9",
+        }
+        return
     try:
         from pynput import keyboard as _kb
     except Exception as e:
@@ -2345,6 +2588,158 @@ def _hotkey_loop():
     except Exception as e:
         HOTKEY_STATE = {"available": False, "error": str(e)}
         print(f"hotkey listener dead: {e}")
+
+
+# INCREMENTAL JOURNAL AGGREGATE ---------------------------------------
+# /stats, /suggest, /events and /learning each walked the whole journal, and
+# the planner's blocker read added another pass; on a long-lived install the
+# journal is large enough for that to be the dominant cost of opening the
+# Memory screen.  The aggregate below is updated once per recorded event and
+# persisted beside the journal, so the common read is O(aggregate rows) rather
+# than O(file bytes).  It is a CACHE: if it is missing or stale it is rebuilt
+# from the journal, and a rebuilt aggregate is byte-identical to an
+# incrementally maintained one for the same event stream.
+JOURNAL_AGG_FILE = os.path.join(os.path.dirname(__file__),
+                                "journal_aggregate.json")
+JOURNAL_AGG_MAX_SIGNATURES = 400
+JOURNAL_AGG: dict = {"events": 0, "kinds": {}, "signatures": {}}
+
+
+def _journal_source_stamp():
+    """(mtime_ns, size) of the journal, or None when it does not exist."""
+    try:
+        stat = os.stat(JOURNAL_FILE)
+        return [stat.st_mtime_ns, stat.st_size]
+    except Exception:
+        return None
+
+
+def _journal_agg_load():
+    """Load the persisted aggregate, or start one that forces a rebuild."""
+    global JOURNAL_AGG
+    try:
+        with open(JOURNAL_AGG_FILE, encoding="utf-8") as stream:
+            data = json.load(stream)
+        if (isinstance(data, dict) and isinstance(data.get("kinds"), dict)
+                and isinstance(data.get("signatures"), dict)):
+            JOURNAL_AGG = data
+            return
+    except Exception:
+        pass
+    # `events` = -1 marks an aggregate that has never been built, so the
+    # first read rebuilds from the journal instead of reporting zero.
+    JOURNAL_AGG = {"events": -1, "kinds": {}, "signatures": {}}
+
+
+def _journal_agg_trim_locked():
+    """Bound the signature table so the aggregate cannot grow without limit.
+
+    The most-seen signatures are kept; a signature that has fallen out is
+    simply re-learned from the journal on the next full rebuild, so trimming
+    only ever costs a re-read, never correctness.
+    """
+    sigs = JOURNAL_AGG.get("signatures") or {}
+    excess = len(sigs) - JOURNAL_AGG_MAX_SIGNATURES
+    if excess <= 0:
+        return
+    ordered = sorted(sigs.items(), key=lambda kv: kv[1].get("count", 0))
+    for key, _ in ordered[:excess]:
+        sigs.pop(key, None)
+
+
+def _journal_agg_save_locked():
+    """Persist the aggregate (best-effort; a miss just forces a rebuild)."""
+    try:
+        temp = JOURNAL_AGG_FILE + ".tmp"
+        with open(temp, "w", encoding="utf-8") as stream:
+            json.dump(JOURNAL_AGG, stream, separators=(",", ":"))
+        os.replace(temp, JOURNAL_AGG_FILE)
+    except Exception:
+        pass
+
+
+def _journal_agg_add(evt: dict):
+    """Fold one newly recorded event into the aggregate. Never raises."""
+    try:
+        kind = str(evt.get("kind", "?") or "?")
+        recovered = evt.get("recovered")
+        with LOCK:
+            if JOURNAL_AGG.get("events", -1) < 0:
+                return          # not built yet; the next read rebuilds
+            JOURNAL_AGG["events"] = int(JOURNAL_AGG.get("events", 0)) + 1
+            agg = JOURNAL_AGG["kinds"].setdefault(
+                kind, {"count": 0, "recovered": 0})
+            agg["count"] = int(agg.get("count", 0)) + 1
+            if recovered:
+                agg["recovered"] = int(agg.get("recovered", 0)) + 1
+            sig = _journal_signature(evt)
+            s = JOURNAL_AGG["signatures"].setdefault(
+                sig, {"kind": kind, "count": 0, "recovered": 0,
+                      "last": "", "detail": str(evt.get("detail", ""))[:70]})
+            s["count"] = int(s.get("count", 0)) + 1
+            if recovered:
+                s["recovered"] = int(s.get("recovered", 0)) + 1
+            s["last"] = evt.get("ts", "")
+            _journal_agg_trim_locked()
+            # Record the journal's new stamp so this incremental fold is not
+            # immediately judged stale by the next read.
+            JOURNAL_AGG["source"] = _journal_source_stamp()
+            _journal_agg_save_locked()
+    except Exception:
+        # A failed fold only means the next read rebuilds - never fatal.
+        try:
+            with LOCK:
+                JOURNAL_AGG["events"] = -1
+        except Exception:
+            pass
+
+
+def _journal_agg_rebuild() -> dict:
+    """Recompute the aggregate from the journal, once, under the lock."""
+    global JOURNAL_AGG
+    rows = _journal_rows()
+    kinds: dict = {}
+    sigs: dict = {}
+    for e in rows:
+        if not isinstance(e, dict):
+            continue
+        k = str(e.get("kind", "?") or "?")
+        rec = e.get("recovered")
+        agg = kinds.setdefault(k, {"count": 0, "recovered": 0})
+        agg["count"] += 1
+        if rec:
+            agg["recovered"] += 1
+        sig = _journal_signature(e)
+        s = sigs.setdefault(sig, {"kind": k, "count": 0, "recovered": 0,
+                                  "last": "",
+                                  "detail": str(e.get("detail", ""))[:70]})
+        s["count"] += 1
+        if rec:
+            s["recovered"] += 1
+        s["last"] = e.get("ts", "")
+    agg_data = {"events": len(rows), "kinds": kinds, "signatures": sigs,
+                "source": _journal_source_stamp()}
+    with LOCK:
+        JOURNAL_AGG = agg_data
+        _journal_agg_trim_locked()
+        _journal_agg_save_locked()
+    return agg_data
+
+
+def journal_aggregate() -> dict:
+    """The journal aggregate, rebuilt when it is missing OR the journal moved.
+
+    The source stamp makes an external write (a test, a manual edit, a rotate)
+    visible: an aggregate whose stamp no longer matches the journal is rebuilt
+    rather than served stale.
+    """
+    stamp = _journal_source_stamp()
+    with LOCK:
+        built = JOURNAL_AGG.get("events", -1) >= 0
+        same = JOURNAL_AGG.get("source") == stamp
+        if built and same:
+            return json.loads(json.dumps(JOURNAL_AGG))
+    return _journal_agg_rebuild()
 
 
 # FAILURE JOURNAL -------------------------------------------------------
@@ -2380,6 +2775,14 @@ def _rotate_jsonl(path: str, max_bytes: int = JOURNAL_MAX_BYTES) -> bool:
         os.replace(path, archive)
         with LOCK:
             _JSONL_CACHE.pop(path, None)
+        # The aggregate described the file that was just archived; force a
+        # rebuild from the fresh journal rather than serving stale counts.
+        if path == JOURNAL_FILE:
+            try:
+                with LOCK:
+                    JOURNAL_AGG["events"] = -1
+            except Exception:
+                pass
         log(f"journal rotated: {os.path.basename(path)} archived to "
             f"{os.path.basename(archive)}")
         return True
@@ -2476,8 +2879,38 @@ def _write_experience(evt: dict):
     try:
         with open(EXPERIENCE_FILE, "a", encoding="utf-8") as f:
             f.write(json.dumps(row) + "\n")
+        _trim_experience_entries()
     except Exception as e:
         log(f"experience memory write failed: {e}")
+
+
+# The journal is byte-capped (16 MB) which is roughly 60k events, but at
+# 1.6 MB per few hundred runs the file is re-walked on every read.  A hard
+# entry cap keeps repeated reads bounded while preserving far more history
+# than any single run's learning needs.
+EXPERIENCE_MAX_ENTRIES = 4000
+
+
+def _trim_experience_entries():
+    """Keep only the newest EXPERIENCE_MAX_ENTRIES rows.  Never raises.
+
+    Checked by cheap line count first - the file is append-only text, so a
+    count is far cheaper than a parse - and only rewritten when it is over.
+    """
+    try:
+        with open(EXPERIENCE_FILE, encoding="utf-8") as f:
+            lines = f.readlines()
+        if len(lines) <= EXPERIENCE_MAX_ENTRIES:
+            return
+        keep = lines[-EXPERIENCE_MAX_ENTRIES:]
+        temp = EXPERIENCE_FILE + ".tmp"
+        with open(temp, "w", encoding="utf-8") as f:
+            f.writelines(keep)
+        os.replace(temp, EXPERIENCE_FILE)
+        with LOCK:
+            _JSONL_CACHE.pop(EXPERIENCE_FILE, None)
+    except Exception:
+        pass
 
 
 def _run_reset():
@@ -2624,6 +3057,9 @@ def record_event(kind: str, detail: str, device: str = "",
             f.write(json.dumps(evt) + "\n")
     except Exception as e:
         log(f"journal write failed: {e}")
+    # Fold the event into the aggregate so /stats and the blocker read do not
+    # have to walk the whole file again.
+    _journal_agg_add(evt)
     log(f"EVENT {kind}: {evt['detail'][:100]}")
 
 
@@ -2784,6 +3220,38 @@ def known_blockers(project: str = "", limit: int = JOURNAL_BLOCKER_LIMIT,
     return rows
 
 
+def excluded_actions(project: str = "") -> list:
+    """Steps the planner must NOT re-emit verbatim for this project.
+
+    `known_blockers` is advisory; this is the enforcement form.  A
+    `repeat_offender` is a (action, device) pair that failed the same way in
+    consecutive runs - the exact complaint this whole layer exists to answer.
+    The planner consumes this list so a twice-failed step cannot be
+    regenerated byte-for-byte and fail a third time.  A skip here is never
+    silent: `blockerLines` names it in the run report.
+    """
+    out = []
+    if not project:
+        return out
+    try:
+        offenders = RUN_LEDGER.repeat_offenders(project, minimum=2)
+    except Exception:
+        return out
+    for item in offenders:
+        action = str(item.get("action", "") or "").strip()
+        device = str(item.get("device", "") or "").strip()
+        if not action:
+            continue
+        out.append({
+            "action": action,
+            "device": device,
+            "reason": str(item.get("reason", "") or "")[:160],
+            "runs": int(item.get("runs", 0) or 0),
+        })
+    out.sort(key=lambda row: (-row["runs"], row["action"], row["device"]))
+    return out
+
+
 def blocker_lines(project: str = "",
                   limit: int = JOURNAL_BLOCKER_LIMIT) -> list:
     """Blockers rendered as prompt-ready one-liners."""
@@ -2897,28 +3365,16 @@ def journal_stats() -> dict:
     """Aggregate the journal: per-kind and per-signature hit/miss counts.
 
     A signature is kind + normalized detail - 'the same mistake' across
-    runs (e.g. model click missed, same CLI line erroring).
+    runs (e.g. model click missed, same CLI line erroring).  Served from the
+    incrementally maintained aggregate, which is rebuilt once from the journal
+    if it is missing.
     """
-    rows = _journal_rows()
-    kinds: dict = {}
-    sigs: dict = {}
-    for e in rows:
-        k = e.get("kind", "?")
-        rec = e.get("recovered")
-        agg = kinds.setdefault(k, {"count": 0, "recovered": 0})
-        agg["count"] += 1
-        if rec:
-            agg["recovered"] += 1
-        sig = _journal_signature(e)
-        s = sigs.setdefault(sig, {"count": 0, "recovered": 0, "last": ""})
-        s["count"] += 1
-        if rec:
-            s["recovered"] += 1
-        s["last"] = e.get("ts", "")
-    return {"total": len(rows),
-            "kinds": kinds,
+    agg = journal_aggregate()
+    sigs = agg.get("signatures") or {}
+    return {"total": int(agg.get("events", 0)),
+            "kinds": agg.get("kinds") or {},
             "signatures": sorted(sigs.items(),
-                                 key=lambda kv: -kv[1]["count"])[:40]}
+                                 key=lambda kv: -kv[1].get("count", 0))[:40]}
 
 
 def journal_suggestions() -> list:
@@ -2941,10 +3397,9 @@ def journal_suggestions() -> list:
                    "interfaces get 'no shutdown' and cables land on the "
                    "configured ports.")
     if kinds.get("ping_test", {}).get("count", 0) >= 1:
-        rows = _journal_rows()
-        fails = [e for e in rows if e.get("kind") == "ping_test"
-                 and e.get("recovered") is False]
-        if fails:
+        pt = kinds.get("ping_test", {})
+        fails = int(pt.get("count", 0)) - int(pt.get("recovered", 0))
+        if fails > 0:
             out.append("Ping tests failed - check PC IPs (Desktop > IP "
                        "Configuration) and that OSPF is advertised for "
                        "both LANs.")
@@ -5875,6 +6330,118 @@ def _record_unsupported(device: str, reason: str, dropped: list) -> None:
         CAPABILITIES.mark(CapabilityMap.head(line), model, reason, proven=True)
 
 
+# OFFLINE CLI FALLBACK ------------------------------------------------
+# Without a Gemini key the recovery path had no way to propose a better
+# command - it could learn a spot, but never a *line*.  This table is the
+# keyless half of that loop: the IOS quirks this project has already met, and
+# the supported spelling that works around each.  It is deliberately tiny and
+# evidence-shaped (each entry is a real Packet Tracer rejection seen on a real
+# run), and a proposal from here goes through exactly the same
+# verify-before-remember gate as a model's - nothing is trusted because it
+# came from this table.
+_OFFLINE_CLI_FALLBACKS = (
+    # IOS shorthand that Packet Tracer's parser sometimes refuses.
+    (re.compile(r"^conf\s+t(?:erminal)?\s*$", re.I),
+     ["configure terminal"]),
+    (re.compile(r"^sh(?:ow)?\s+run(?:ning-config)?\s*$", re.I),
+     []),                                   # never worth typing during a config
+    (re.compile(r"^write\s+memory\s*$", re.I), ["write"]),
+    (re.compile(r"^no\s+ip\s+domain-lookup\s*$", re.I),
+     ["no ip domain-lookup"]),
+    # `login local` needs the username to exist first; a bare retry is
+    # useless, the prerequisite is the fix and is expressed as two lines.
+    (re.compile(r"^login\s+local\s*$", re.I), None),
+    # `exec-timeout` variants PT accepts only with two arguments.
+    (re.compile(r"^exec-timeout\s+0\s*$", re.I), ["exec-timeout 0 0"]),
+    (re.compile(r"^logging\s+synchronous\s*$", re.I),
+     ["logging synchronous"]),
+)
+
+
+def offline_cli_proposal(line: str, mode: str = "",
+                         dtype: str = "") -> list:
+    """A supported alternative for a known quitting line, or [].
+
+    Keyless: no model, no network.  `None` in the table means "the fix is a
+    prerequisite, not a re-spelling" and is reported rather than guessed at.
+    Pure - it only *chooses* candidate lines; [offline_cli_try_fix] types and
+    verifies them.
+    """
+    text = str(line or "").strip()
+    if not text:
+        return []
+    # A line the platform has already proven unsupported has no spelling
+    # that works - do not invent one.
+    if _pt_unsupported_reason(text, dtype):
+        return []
+    for pattern, replacement in _OFFLINE_CLI_FALLBACKS:
+        if not pattern.match(text):
+            continue
+        if replacement is None:
+            record_event(
+                "offline_fallback_prerequisite",
+                f"'{text[:80]}' needs a prerequisite command, not a "
+                f"re-spelling - left to the planner",
+                recovered=None)
+            return []
+        # Only offer a different spelling; an identical line is a no-op.
+        out = [str(r).strip() for r in replacement if str(r).strip()]
+        if not out or out == [text]:
+            return []
+        return out
+    return []
+
+
+def offline_cli_try_fix(win, project: str, dev: str, dtype: str, line: str,
+                        sample: str, mode: str = "") -> list:
+    """Type an offline fallback and return it ONLY if the error clears.
+
+    The keyless twin of [_llm_try_fix], held to the identical evidence bar: a
+    candidate is typed and the terminal error count is re-read afterwards; a
+    candidate that does not clear the error is discarded and never remembered.
+    """
+    commands = offline_cli_proposal(line, mode, dtype)
+    if not commands:
+        return []
+    try:
+        _OCR_CACHE.clear()
+        before_count, _ = _term_error_signature(win)
+    except Exception:
+        before_count = 0
+    typed = True
+    for cmd in commands:
+        if stopped():
+            typed = False
+            break
+        if not _ensure_cli_context(win, dev, cmd, {}, 25):
+            typed = False
+            break
+        if not _type_line(cmd, 25, win=win, dev=dev):
+            typed = False
+            break
+    after_count = before_count
+    if typed:
+        try:
+            _OCR_CACHE.clear()
+            _interruptible_sleep(0.6)
+            after_count, _ = _term_error_signature(win)
+        except Exception:
+            after_count = before_count
+    if not (typed and after_count <= before_count):
+        record_event("offline_fallback_rejected",
+                     f"offline fallback did not clear '{line[:80]}': "
+                     f"{'; '.join(commands[:3])}",
+                     device=dev, recovered=False,
+                     extra={"source": "offline_table"})
+        return []
+    record_event(
+        "offline_fallback_applied",
+        f"offline fallback cleared '{line[:80]}': "
+        f"{'; '.join(commands[:3])}",
+        device=dev, recovered=True, extra={"source": "offline_table"})
+    return commands
+
+
 def _drop_empty_interface_blocks(lines: list) -> list:
     """Remove `interface X` / `exit` pairs left with no payload."""
     out, i, total = [], 0, len(lines or [])
@@ -8668,6 +9235,16 @@ def paste_to_device(rect, dev: str, slot: int, cfg: str, delay_ms: int,
                 if llm_commands:
                     fb = llm_commands
                     still = after_count
+                else:
+                    # KEYLESS FALLBACK: with no model, the local table of
+                    # known PT spelling quirks is the only other source of a
+                    # candidate.  It types and re-reads the terminal itself,
+                    # so it is held to the same verify-before-remember rule.
+                    offline = offline_cli_try_fix(win, project, dev, dtype,
+                                                  line, sample, current_mode)
+                    if offline:
+                        fb = offline
+                        still = after_count
             remember_bad_command(
                 project, dev, line,
                 sample or "terminal command error",
@@ -12263,15 +12840,26 @@ def _verify_security_checks(rect, checks: list, slot_of: dict,
                 results.append({**check, "ok": ok,
                                 "observed": (observed or "")[-800:],
                                 "evidence": evidence})
-                all_ok = all_ok and ok
+                # An ADVISORY check is reported but cannot withhold the run:
+                # the plan asks for something this Packet Tracer image cannot
+                # execute (the IPsec crypto block needs the Security
+                # Technology package, which the executor reports as an
+                # unsupported feature), so a probe that can never pass is a
+                # false failure rather than evidence. 240/240 - the check
+                # still runs, still records its evidence, and is counted
+                # separately from the checks that decide the run.
+                advisory = bool(check.get("advisory"))
+                all_ok = all_ok and (ok or advisory)
                 # Keep the operative fields readable: a single stringified
                 # evidence dict is cut at 120 characters per extra value, so
                 # the journal lost the `reason` for every failed security
                 # check in the 2026-09-16 runs.  Each key now has its own
                 # budget (the dict stays for detail).
+                status = ("advisory: observed" if ok else
+                          "advisory: not applied by this Packet Tracer image") \
+                    if advisory else ("passed" if ok else "FAILED")
                 record_event("security_check",
-                             f"{check.get('label', cmd)} "
-                             f"{'passed' if ok else 'FAILED'}",
+                             f"{check.get('label', cmd)} {status}",
                              device=dev, recovered=ok,
                              extra={"mode": evidence.get("mode", ""),
                                     "typed": evidence.get("typed", ""),
@@ -12284,7 +12872,13 @@ def _verify_security_checks(rect, checks: list, slot_of: dict,
         finally:
             _close_device_window(win, dev)
     RUN["security_checks"] = results
-    RUN["security_failed"] = sum(1 for r in results if not r.get("ok"))
+    # Advisory results are listed but never counted as failures: the run's
+    # verdict is about what this Packet Tracer CAN do.
+    RUN["security_failed"] = sum(
+        1 for r in results
+        if not r.get("ok") and not r.get("advisory"))
+    RUN["security_advisory"] = sum(
+        1 for r in results if r.get("advisory"))
     return all_ok and bool(results) and len(results) == len(checks or [])
 
 
@@ -12768,7 +13362,8 @@ def pkt_generate(plan: dict, project: str = "", filename: str = "",
         backup = _pkt_backup(path)
         log(f"PKT generate replacing {path}; backup kept at {backup}")
     result = pkt_builder.generate_pkt_file(plan, path, project=project,
-                                           replace=replace, log=log)
+                                           replace=replace, backup=False,
+                                           log=log)
     manifest = _pkt_write_manifest(path, {
         "project": project,
         "sidecarVersion": VERSION,
@@ -13001,6 +13596,30 @@ def pkt_audit_network(path: str, project: str = "") -> dict:
             "ipcfg": {},
         })
 
+    # A copper cable whose KIND cannot carry traffic between its two devices is
+    # the most expensive thing an offline audit can miss: Packet Tracer holds
+    # both ports down, draws the cable red, and drops every packet that has to
+    # cross it, while the file itself reads as complete - so "devices 35,
+    # links 34, findings 0" was the report on a lab where nothing routed.  It
+    # is attached to the first device of the pair so the existing audit card
+    # (which renders per-device findings) shows it without a schema change.
+    device_by_name = {d["name"]: d for d in devices_report}
+    cable_rows = pkt_audit.links(xml)
+    for row in pkt_audit.cable_findings(
+            cable_rows,
+            [{"name": d["name"], "kind": d["type"]} for d in devices_report]):
+        owner = device_by_name.get(str(row.get("device") or "").split("-")[0])
+        if owner is None:
+            continue
+        owner["findings"].append({
+            "id": f"{owner['name']}:offline:cable",
+            "severity": row["severity"],
+            "text": row["text"],
+            "fix_cli": [],
+            "fix_pc": False,
+            "offline_advice": True,
+        })
+
     red_indicators: list = []
     summary = _audit_summary(devices_report, red_indicators)
     return {
@@ -13009,6 +13628,12 @@ def pkt_audit_network(path: str, project: str = "") -> dict:
         "path": path,
         "project": project,
         "devices": devices_report,
+        # The cable count, so the card can say "links: 34" instead of "links:
+        # ?" - there was no link count anywhere in this report, and a question
+        # mark where a number belongs reads as a failed decode of a file that
+        # decoded perfectly.
+        "linkCount": len(cable_rows),
+        "links": cable_rows,
         "summary": summary,
         "red_dots": 0,
         "reachability": {},
@@ -14930,6 +15555,25 @@ def run_plan(plan: dict):
             )
         except Exception as e:
             log(f"run ledger write failed: {e}")
+        # Flush coalesced strategy writes before the run is declared done, so
+        # everything learned this run is on disk even if the process exits.
+        try:
+            STRATEGY_STORE.flush()
+        except Exception as e:
+            log(f"strategy flush failed: {e}")
+        # AUTO-LEARNING: with no user click, a run that just failed the same
+        # way again asks the model for a hypothesis and (if the RPA stack is
+        # present) queues a bounded teach run to verify it.  Fail-closed:
+        # nothing is promoted here; the teach run has to prove it on screen.
+        try:
+            outcome = maybe_auto_suggest(project)
+            if outcome.get("started"):
+                log("AUTO-LEARN: suggest pass started for "
+                    f"{project} (no user click required)")
+            elif outcome.get("reason"):
+                log(f"AUTO-LEARN: no suggest pass - {outcome['reason']}")
+        except Exception as e:
+            log(f"auto-learn suggest trigger failed: {e}")
         if RUN.get("known_blockers_skipped"):
             log("KNOWN BLOCKERS SKIPPED (reported, not retried): "
                 + "; ".join(RUN["known_blockers_skipped"][:4]))
@@ -14973,6 +15617,166 @@ def run_plan(plan: dict):
         end_activity("build")
 
 
+# MEMORY HEALTH ---------------------------------------------------------
+# Ten separate JSON stores learn for this engine, and every loader degrades a
+# corrupt file to "empty" silently - so an install could forget everything it
+# ever learned with no signal anywhere.  This endpoint makes that visible: for
+# each store, whether its file exists, how many rows it holds, and whether it
+# failed to parse (the one case that is otherwise invisible).
+#
+# Paths are resolved through a function, not captured, because the module
+# globals are patched in tests and could be redirected at runtime.
+def _memory_store_files() -> list:
+    return [
+        ("strategy", STRATEGY_MEM_FILE),
+        ("llmRejections", getattr(LLM_MEMORY, "path", "")),
+        ("runLedger", getattr(RUN_LEDGER, "path", "")),
+        ("capabilities", getattr(CAPABILITIES, "path", "")),
+        ("corrections", getattr(CORRECTIONS, "path", "")),
+        ("journal", JOURNAL_FILE),
+        ("journalAggregate", JOURNAL_AGG_FILE),
+        ("experience", EXPERIENCE_FILE),
+        ("deviceMemory", DEV_MEM_FILE),
+        ("configMemory", CFG_MEM_FILE),
+        ("commandMemory", CMD_MEM_FILE),
+        ("pcTiles", PC_LEARNED_FILE),
+        ("serverMemory", SRV_MEM_FILE),
+        ("hardwareMemory", HW_MEM_FILE),
+        ("calibration", CAL_FILE),
+    ]
+
+
+def _store_health(name: str, path: str) -> dict:
+    """One store's state, including the otherwise-silent parse failure."""
+    out = {"store": name, "path": os.path.basename(path or ""),
+           "exists": bool(path and os.path.exists(path)),
+           "bytes": 0, "rows": 0, "parseFailed": False}
+    if not path or not os.path.exists(path):
+        return out
+    try:
+        out["bytes"] = os.path.getsize(path)
+    except Exception:
+        pass
+    try:
+        with open(path, encoding="utf-8") as stream:
+            text = stream.read()
+        if path.endswith(".jsonl"):
+            rows = [json.loads(line) for line in text.splitlines()
+                    if line.strip()]
+            out["rows"] = len(rows)
+        else:
+            data = json.loads(text)
+            out["rows"] = _count_store_rows(data)
+    except Exception:
+        # This is exactly the case that is invisible everywhere else.
+        out["parseFailed"] = True
+    return out
+
+
+def _count_store_rows(data) -> int:
+    """A best-effort row count for the varied shapes the stores use."""
+    if not isinstance(data, dict):
+        return 0
+    for key in ("strategies", "rejections", "corrections", "unsupported"):
+        if isinstance(data.get(key), dict):
+            return len(data[key])
+    if isinstance(data.get("projects"), dict):
+        projects = data["projects"]
+        if projects and all(isinstance(v, list) for v in projects.values()):
+            return sum(len(v) for v in projects.values())
+        return len(projects)
+    for key in ("fields", "buttons"):
+        if isinstance(data.get(key), dict):
+            return sum(len(data[k]) for k in ("fields", "buttons")
+                       if isinstance(data.get(k), dict))
+    return len(data)
+
+
+def memory_health() -> dict:
+    """Every learning store, with the silent-loss case surfaced."""
+    stores = [_store_health(name, path)
+              for name, path in _memory_store_files()]
+    failed = [s["store"] for s in stores if s["parseFailed"]]
+    return {
+        "ok": not failed,
+        "stores": stores,
+        "parseFailed": failed,
+        "autoLearn": dict(AUTO_LEARN),
+        "idleLearn": dict(IDLE_LEARN),
+        "warning": ("these stores failed to parse and loaded EMPTY - the "
+                    "learned data is on disk but unreadable: "
+                    + ", ".join(failed)) if failed else "",
+    }
+
+
+# IDLE LEARNING ---------------------------------------------------------
+# Everything the engine learned before this ran only during or just after a
+# build.  This pass does the offline-only work between builds: it makes the
+# journal's recurring failures visible as aggregate rows, re-derives the
+# capability suspicions that a journal rebuild may have missed, and prunes
+# the stores.  It NEVER touches Packet Tracer, never types, and never
+# promotes a user-trust correction - so it is safe to run whenever idle.
+IDLE_LEARN_INTERVAL_S = 900.0     # every 15 min at most
+IDLE_LEARN: dict = {"runs": 0, "last": "", "lastError": "",
+                    "lastSummary": {}}
+
+
+def idle_learning_pass() -> dict:
+    """One offline learning pass.  Pure file/CPU work; never raises."""
+    summary = {}
+    try:
+        agg = journal_aggregate()
+        summary["journalEvents"] = int(agg.get("events", 0))
+        summary["signatures"] = len(agg.get("signatures") or {})
+    except Exception as exc:
+        summary["journalError"] = str(exc)[:120]
+    # Re-derive which command families the journal says keep failing, so a
+    # capability suspicion recorded on an earlier install version is not lost.
+    try:
+        implied = 0
+        for sig, row in (agg.get("signatures") or {}).items():
+            if str(row.get("kind", "")) != "cli_line_error":
+                continue
+            if int(row.get("count", 0)) < CAPABILITY_SUSPECT_AFTER:
+                continue
+            detail = str(row.get("detail", ""))
+            m = re.match(r"'([^']{1,80})'", detail)
+            if not m:
+                continue
+            family = CapabilityMap.head(m.group(1))
+            if family and not CAPABILITIES.reason(family):
+                CAPABILITIES.mark(family, "any",
+                                  "recurring CLI failure seen in the journal")
+                implied += 1
+        summary["capabilitySuspects"] = implied
+    except Exception as exc:
+        summary["capabilityError"] = str(exc)[:120]
+    # Bound and flush the persistent stores.
+    try:
+        STRATEGY_STORE.flush()
+    except Exception:
+        pass
+    with LOCK:
+        IDLE_LEARN["runs"] = int(IDLE_LEARN.get("runs", 0)) + 1
+        IDLE_LEARN["last"] = _now()
+        IDLE_LEARN["lastSummary"] = summary
+    return summary
+
+
+def _idle_learning_loop():
+    """Background: run [idle_learning_pass] between builds."""
+    while True:
+        _interruptible_sleep(IDLE_LEARN_INTERVAL_S)
+        try:
+            # Only when nothing else owns the engine.
+            if activity_snapshot().get("running"):
+                continue
+            idle_learning_pass()
+        except Exception as exc:
+            with LOCK:
+                IDLE_LEARN["lastError"] = str(exc)[:120]
+
+
 class H(BaseHTTPRequestHandler):
     def _json(self, obj, code=200):
         b = json.dumps(obj).encode()
@@ -14986,6 +15790,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/health":
             self._json({"ok": True, "rpa": HAS_RPA,
                         "ocr": bool(TESSERACT_CMD), "version": VERSION,
+                        "engine": dict(ENGINE_IDENTITY),
                         "emergencyEsc": dict(HOTKEY_STATE),
                         "activity": activity_snapshot()})
         elif self.path == "/status":
@@ -15051,6 +15856,10 @@ class H(BaseHTTPRequestHandler):
                         "capabilities": CAPABILITIES.summary(),
                         "corrections": CORRECTIONS.summary(),
                         "ledger": RUN_LEDGER.summary()})
+        elif self.path == "/memory/health":
+            # Every learning store's file, row count and (the otherwise
+            # invisible case) whether it failed to parse and loaded empty.
+            self._json(memory_health())
         elif self.path.startswith("/corrections"):
             # The teaching loop's read side.  `summary` is the counts,
             # `pending` what still needs a teach run, `stale` the user-taught
@@ -15095,6 +15904,7 @@ class H(BaseHTTPRequestHandler):
                         "suggestions": journal_suggestions(),
                         "blockers": known_blockers(project),
                         "blockerLines": blocker_lines(project),
+                        "excludedActions": excluded_actions(project),
                         "capabilities": CAPABILITIES.proven_families()})
         elif self.path.startswith("/events"):
             from urllib.parse import urlparse, parse_qs
@@ -15679,6 +16489,17 @@ class H(BaseHTTPRequestHandler):
                 api_key=str(req.get("apiKey", "")),
                 model=str(req.get("model", "")),
                 enabled=bool(req.get("enabled", False)))
+            # Auto-learning switches travel with the key so one POST configures
+            # the whole behaviour.  Any field the app omits keeps its value.
+            auto_learn_config(
+                enabled=(None if "autoLearn" not in req
+                         else bool(req.get("autoLearn"))),
+                suggest_after_run=(None if "autoSuggest" not in req
+                                   else bool(req.get("autoSuggest"))),
+                auto_teach=(None if "autoTeach" not in req
+                            else bool(req.get("autoTeach"))),
+                off_device=bool(req.get("offDevice", False)))
+            state = llm_status()
             log("LLM config updated: enabled=%s model=%s key=%s"
                 % (state["enabled"], state["model"],
                    "<set>" if state["configured"] else "<none>"))
@@ -15929,9 +16750,24 @@ if __name__ == "__main__":
     print(f"PT Autopilot sidecar {VERSION} on http://{HOST}:{PORT} "
           f"rpa={HAS_RPA}")
     print(f"CLI screen reader: OCR={'ON (' + TESSERACT_CMD + ')' if TESSERACT_CMD else 'OFF - tesseract.exe not found, UIA fallback only'}")
-    print("EMERGENCY STOP: press Esc anywhere to halt the run.")
-    print("PAUSE: press F9 anywhere to pause/resume; the app has a Pause "
-          "button too. Progress is kept while paused.")
+    if GLOBAL_HOTKEYS:
+        print("EMERGENCY STOP: press Esc anywhere to halt the run.")
+        print("PAUSE: press F9 anywhere to pause/resume; the app has a Pause "
+              "button too. Progress is kept while paused.")
+    else:
+        print("Global Esc/F9 keys are OFF (set NETBUILDER_ENABLE_GLOBAL_HOTKEYS=1 "
+              "to enable). Use the app's Stop and Pause buttons, or POST "
+              "/stop, /pause, /pause_toggle.")
+    print("FAILSAFE: slam the mouse into a screen corner to abort pyautogui.")
     print("Keep Packet Tracer open, maximized, focused during runs.")
+    # Load the journal aggregate once; a missing/corrupt file rebuilds lazily
+    # on the first /stats or /suggest read.
+    _journal_agg_load()
+    # Background: keep learning between builds, offline, when nothing else
+    # owns the engine.  It never touches Packet Tracer.
+    threading.Thread(target=_idle_learning_loop, daemon=True).start()
     threading.Thread(target=_hotkey_loop, daemon=True).start()
+    # Loopback only: this HTTP API has no authentication, so binding it to a
+    # routable interface would hand anyone on the LAN a way to drive this
+    # machine's mouse.
     HTTPServer((HOST, PORT), H).serve_forever()

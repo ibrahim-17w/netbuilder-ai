@@ -9,6 +9,7 @@ import '../models/build_record.dart';
 import '../models/network_intent.dart';
 import '../screens/engine_screen.dart';
 import '../screens/network_toolkit_screen.dart';
+import '../screens/layout_gallery_screen.dart';
 import '../screens/topology_preview_screen.dart';
 import '../widgets/app_dialogs.dart';
 import 'adapters/cisco_adapter.dart';
@@ -17,12 +18,16 @@ import 'adapters/packet_tracer_adapter.dart';
 import 'adapters/terraform_adapter.dart';
 import 'autopilot_service.dart';
 import 'engine_status.dart';
+import 'export_support.dart';
+import 'layout_engine.dart';
+import 'layout_intent.dart';
 import 'memory_service.dart';
 import 'network_math.dart';
 import 'network_tools.dart';
 import 'planner_suggestions_service.dart';
 import 'privacy_search_service.dart';
 import 'settings_service.dart';
+import 'sidecar_supervisor.dart';
 import 'validator_service.dart';
 
 /// What an action is allowed to do: navigate the shell, open a screen, ask
@@ -44,10 +49,18 @@ class ActionContext {
   /// The project/chat name the app is on.
   final String project;
 
+  /// The app's one engine client, so an action talks to the address the user
+  /// configured rather than building a client of its own.
+  final AutopilotService? autopilot;
+
   final void Function(AppDestination destination) go;
   final void Function(Widget screen) push;
   final void Function({required String project, String prefill}) openChat;
   final VoidCallback openDrawer;
+
+  /// Persist a chosen drawing style back onto the open plan. Null when the
+  /// host cannot do it (a test, a preview) - the caller then just previews.
+  final void Function(String style)? applyLayout;
 
   const ActionContext({
     required this.context,
@@ -59,9 +72,69 @@ class ActionContext {
     this.intent,
     this.record,
     this.project = 'default',
+    this.autopilot,
+    this.applyLayout,
   });
 
   bool get hasPlan => intent != null;
+
+  /// The drawing style the open plan already has, read from its notes (a
+  /// build stamps "layout: <style>"). Falls back to the default.
+  String get layoutStyle {
+    for (final note in intent?.notes ?? const <String>[]) {
+      final style = LayoutRequest.styleFromNote(note);
+      if (style.isNotEmpty) return style;
+    }
+    return 'tree';
+  }
+
+  /// The devices the open plan parks to one side, resolved to real names, so
+  /// the gallery's grouped tile draws the picture the build would actually
+  /// produce instead of a grouped tree with nothing in it.
+  List<String> get layoutSide {
+    final plan = intent;
+    if (plan == null) return const <String>[];
+    for (final note in plan.notes) {
+      if (LayoutRequest.styleFromNote(note) != 'grouped') continue;
+      return resolveSideNames(
+        plan,
+        kinds: LayoutRequest.sideKindsFromNote(note),
+        names: LayoutRequest.sideNamesFromNote(note),
+      );
+    }
+    return const <String>[];
+  }
+
+  /// Every group the open plan sends to an edge, so the gallery shows the same
+  /// arrangement the next build will use.
+  List<LayoutZone> get layoutZones {
+    final plan = intent;
+    if (plan == null) return const <LayoutZone>[];
+    for (final note in plan.notes) {
+      if (LayoutRequest.styleFromNote(note) != 'grouped') continue;
+      final recorded = LayoutRequest.zonesFromNote(note);
+      if (recorded.isEmpty) continue;
+      return <LayoutZone>[
+        for (final zone in recorded)
+          LayoutZone(
+            resolveSideNames(
+              plan,
+              kinds: zone.kinds,
+              names: zone.names,
+            ),
+            edge: zone.edge,
+          ),
+      ].where((z) => z.side.isNotEmpty).toList();
+    }
+    final single = layoutSide;
+    return single.isEmpty
+        ? const <LayoutZone>[]
+        : <LayoutZone>[LayoutZone(single, edge: 'left')];
+  }
+
+  /// The engine client, never null: the one the shell passed in, else the
+  /// app-scoped one, else a client bound to the settings in reach.
+  AutopilotService get engine => autopilot ?? AutopilotService.of(context);
 
   MemoryService? get memory {
     try {
@@ -193,13 +266,19 @@ class CapabilityRegistry {
 
   /// A read-only call to the sidecar (or a local service) rendered as a
   /// result dialog. The failure text is shown verbatim.
+  ///
+  /// The probe receives the app's engine client rather than making one, so it
+  /// is called against whatever address the user configured.
   static AppAction _probe({
     required String id,
     required String label,
     required String description,
     required IconData icon,
     required String group,
-    required Future<({String title, String text})> Function() probe,
+    required Future<({String title, String text})> Function(
+      AutopilotService engine,
+    )
+    probe,
     List<String> keywords = const [],
     bool needsPlan = false,
     bool touchesDevices = false,
@@ -216,7 +295,7 @@ class CapabilityRegistry {
       final result = await runWithFeedback<({String title, String text})>(
         context.context,
         busyLabel: '$label...',
-        action: probe,
+        action: () => probe(context.engine),
       );
       if (result == null || !context.context.mounted) return;
       await showArtifactDialog(
@@ -286,6 +365,19 @@ class CapabilityRegistry {
       ? 'no plan is open'
       : '${intent.nodes.length} devices, ${intent.links.length} links';
 
+  /// The file summary plus the target's support notes, so an export says
+  /// what is automatic and what stays manual before it is used anywhere.
+  static String _withSupportNotes(
+    String base,
+    NetworkIntent? intent,
+    String target,
+  ) {
+    if (intent == null) return base;
+    final notes = ExportSupport.notesFor(intent, target).take(4).toList();
+    if (notes.isEmpty) return base;
+    return '$base\n\nSupport notes:\n${notes.map((n) => '• $n').join('\n')}';
+  }
+
   // --- the capabilities ---------------------------------------------------
 
   static final List<AppAction> _all = [
@@ -332,6 +424,30 @@ class CapabilityRegistry {
       run: (context) => Future.sync(() => context.push(
             TopologyPreviewScreen(intent: context.intent!),
           )),
+    ),
+    AppAction(
+      id: 'plan.layouts',
+      label: 'Choose a layout',
+      description:
+          'See every drawing the engine can make - site trees, wide, compact, '
+          'straight rows - side by side, and pick one before building. The '
+          'build uses exactly the drawing you choose.',
+      icon: Icons.grid_view_outlined,
+      group: planGroup,
+      needsPlan: true,
+      keywords: ['layout', 'arrange', 'draw', 'style', 'compare', 'preview',
+                 'tree', 'rows', 'compact', 'wide'],
+      run: (context) async {
+        final chosen = await LayoutGalleryScreen.show(
+          context.context,
+          intent: context.intent!,
+          currentStyle: context.layoutStyle,
+          side: context.layoutSide,
+          zones: context.layoutZones,
+        );
+        if (chosen == null) return;
+        context.applyLayout?.call(chosen);
+      },
     ),
     _go(
       id: 'plan.history',
@@ -559,7 +675,7 @@ class CapabilityRegistry {
         final report = await runWithFeedback<Map<String, dynamic>>(
           context.context,
           busyLabel: 'Auditing $path...',
-          action: () => AutopilotService().pktAudit(
+          action: () => context.engine.pktAudit(
             path,
             project: context.project,
           ),
@@ -595,13 +711,13 @@ class CapabilityRegistry {
         final intent = context.intent;
         final baseCtx = context.context;
         if (intent == null || !baseCtx.mounted) return;
-        final svc = AutopilotService();
+        final svc = context.engine;
         if (!await svc.healthy) {
           if (!baseCtx.mounted) return;
           await showArtifactDialog(
             baseCtx,
             title: 'Sidecar not running',
-            text: AutopilotService.startHint,
+            text: svc.hint,
           );
           return;
         }
@@ -664,13 +780,13 @@ class CapabilityRegistry {
         final intent = context.intent;
         final baseCtx = context.context;
         if (intent == null || !baseCtx.mounted) return;
-        final svc = AutopilotService();
+        final svc = context.engine;
         if (!await svc.healthy) {
           if (!baseCtx.mounted) return;
           await showArtifactDialog(
             baseCtx,
             title: 'Sidecar not running',
-            text: AutopilotService.startHint,
+            text: svc.hint,
           );
           return;
         }
@@ -725,7 +841,7 @@ class CapabilityRegistry {
           context.context,
           busyLabel: 'Reading the failure journal...',
           action: () =>
-              AutopilotService().blockerLines(project: context.project),
+              context.engine.blockerLines(project: context.project),
         );
         if (lines == null || !context.context.mounted) return;
         await showLinesDialog(
@@ -753,7 +869,7 @@ class CapabilityRegistry {
         final lines = await runWithFeedback<List<String>>(
           context.context,
           busyLabel: 'Reading proven limits...',
-          action: () => AutopilotService().provenUnsupported(),
+          action: () => context.engine.provenUnsupported(),
         );
         if (lines == null || !context.context.mounted) return;
         await showLinesDialog(
@@ -811,7 +927,7 @@ class CapabilityRegistry {
         final report = await runWithFeedback<Map<String, dynamic>>(
           context.context,
           busyLabel: 'Compiling ${intent.projectName}.pkt...',
-          action: () => AutopilotService().pktGenerate(
+          action: () => context.engine.pktGenerate(
             plan,
             project: intent.projectName,
             replace: true,
@@ -850,7 +966,7 @@ class CapabilityRegistry {
         final result = await runWithFeedback<String>(
           context.context,
           busyLabel: 'Saving the live topology...',
-          action: () => AutopilotService().pktSaveVerified(
+          action: () => context.engine.pktSaveVerified(
             project: context.project,
             outDir: context.settings?.outputDir ?? '',
             force: true,
@@ -877,7 +993,7 @@ class CapabilityRegistry {
         final result = await runWithFeedback<String>(
           context.context,
           busyLabel: 'Opening $path...',
-          action: () => AutopilotService().pktOpen(path),
+          action: () => context.engine.pktOpen(path),
           successLabel: 'Opened',
         );
         if (result == null || !context.context.mounted) return;
@@ -898,7 +1014,7 @@ class CapabilityRegistry {
         final result = await runWithFeedback<String>(
           context.context,
           busyLabel: 'Verifying $path...',
-          action: () => AutopilotService().pktVerify(path),
+          action: () => context.engine.pktVerify(path),
           successLabel: 'Verified',
         );
         if (result == null || !context.context.mounted) return;
@@ -912,8 +1028,8 @@ class CapabilityRegistry {
       icon: Icons.description_outlined,
       group: pktGroup,
       keywords: ['report', 'last save', 'comparison', 'artifact'],
-      probe: () async {
-        final report = await AutopilotService().pktReport();
+      probe: (engine) async {
+        final report = await engine.pktReport();
         return (
           title: 'Last saved .pkt',
           text: report == null
@@ -931,8 +1047,8 @@ class CapabilityRegistry {
       icon: Icons.history_edu_outlined,
       group: pktGroup,
       keywords: ['ledger', 'undo', 'audit trail', 'history'],
-      probe: () async {
-        final ledger = await AutopilotService().pktLedger();
+      probe: (engine) async {
+        final ledger = await engine.pktLedger();
         return (title: 'Fix ledger', text: _pretty(ledger));
       },
     ),
@@ -945,8 +1061,8 @@ class CapabilityRegistry {
       icon: Icons.category_outlined,
       group: pktGroup,
       keywords: ['templates', 'models', 'library', 'harvest', 'pkt builder'],
-      probe: () async {
-        final status = await AutopilotService().pktTemplatesStatus();
+      probe: (engine) async {
+        final status = await engine.pktTemplatesStatus();
         return (title: 'Template library', text: _pretty(status));
       },
     ),
@@ -963,7 +1079,7 @@ class CapabilityRegistry {
         final report = await runWithFeedback<Map<String, dynamic>>(
           context.context,
           busyLabel: 'Harvesting models (this can take a minute)...',
-          action: () => AutopilotService().pktTemplatesHarvest(),
+          action: () => context.engine.pktTemplatesHarvest(),
         );
         if (report == null || !context.context.mounted) return;
         await showArtifactDialog(
@@ -996,7 +1112,7 @@ class CapabilityRegistry {
         final report = await runWithFeedback<Map<String, dynamic>>(
           context.context,
           busyLabel: 'Reading ${paths.length} file(s)...',
-          action: () => AutopilotService().pktTemplatesBuild(
+          action: () => context.engine.pktTemplatesBuild(
             paths,
             outDir: context.settings?.outputDir ?? '',
           ),
@@ -1018,8 +1134,8 @@ class CapabilityRegistry {
       icon: Icons.monitor_heart_outlined,
       group: pktGroup,
       keywords: ['engine', 'sidecar', 'health', 'status', 'connection'],
-      probe: () async {
-        final health = await AutopilotService().healthDetails();
+      probe: (engine) async {
+        final health = await engine.healthDetails();
         return (title: 'Engine health', text: _pretty(health));
       },
     ),
@@ -1032,8 +1148,8 @@ class CapabilityRegistry {
       icon: Icons.inventory_2_outlined,
       group: pktGroup,
       keywords: ['inventory', 'devices', 'ports', 'capture'],
-      probe: () async {
-        final inventory = await AutopilotService().inventory();
+      probe: (engine) async {
+        final inventory = await engine.inventory();
         return (title: 'Live inventory', text: _pretty(inventory));
       },
     ),
@@ -1044,8 +1160,8 @@ class CapabilityRegistry {
       icon: Icons.receipt_long_outlined,
       group: pktGroup,
       keywords: ['events', 'log', 'journal', 'trace'],
-      probe: () async {
-        final events = await AutopilotService().events(limit: 120);
+      probe: (engine) async {
+        final events = await engine.events(limit: 120);
         return (
           title: 'Engine events',
           text: events.isEmpty
@@ -1066,8 +1182,8 @@ class CapabilityRegistry {
       icon: Icons.photo_library_outlined,
       group: pktGroup,
       keywords: ['screenshots', 'evidence', 'shots', 'images'],
-      probe: () async {
-        final shots = await AutopilotService().shots();
+      probe: (engine) async {
+        final shots = await engine.shots();
         return (
           title: 'Run screenshots',
           text: shots.isEmpty
@@ -1088,8 +1204,8 @@ class CapabilityRegistry {
       icon: Icons.lightbulb_outline,
       group: pktGroup,
       keywords: ['suggest', 'advice', 'rules', 'patterns'],
-      probe: () async {
-        final suggestion = await AutopilotService().aiSuggest(
+      probe: (engine) async {
+        final suggestion = await engine.aiSuggest(
           project: 'default',
         );
         return (title: 'Engine suggestion', text: _pretty(suggestion));
@@ -1105,8 +1221,8 @@ class CapabilityRegistry {
       group: pktGroup,
       touchesDevices: true,
       keywords: ['prove', 'calibrate', 'click', 'grid', 'test'],
-      probe: () async {
-        final result = await AutopilotService().prove();
+      probe: (engine) async {
+        final result = await engine.prove();
         return (title: 'Click grid proof', text: result);
       },
     ),
@@ -1117,8 +1233,8 @@ class CapabilityRegistry {
       icon: Icons.visibility_outlined,
       group: pktGroup,
       keywords: ['inspect', 'window', 'state', 'screenshot'],
-      probe: () async {
-        final result = await AutopilotService().inspect();
+      probe: (engine) async {
+        final result = await engine.inspect();
         return (title: 'Window inspection', text: result);
       },
     ),
@@ -1126,15 +1242,15 @@ class CapabilityRegistry {
       id: 'pt.run.stop',
       label: 'Emergency stop',
       description:
-          'Cancels the running job immediately. The same thing the Esc key '
-          'does.',
+          'Cancels the running job immediately. The run releases the Packet '
+          'Tracer window at its next safe boundary.',
       icon: Icons.stop_circle_outlined,
       group: pktGroup,
       touchesDevices: true,
       keywords: ['stop', 'cancel', 'abort', 'emergency'],
       run: (context) async {
         try {
-          await AutopilotService().stop();
+          await context.engine.stop();
           context.toast('Emergency stop requested');
         } catch (e) {
           context.toast('Stop could not reach the engine: $e');
@@ -1146,7 +1262,7 @@ class CapabilityRegistry {
       label: 'Pause or resume the run',
       description:
           'Holds the job at a safe boundary with its progress kept, or '
-          'releases it. Same as F9.',
+          'releases it.',
       icon: Icons.pause_circle_outline,
       group: pktGroup,
       touchesDevices: true,
@@ -1155,7 +1271,7 @@ class CapabilityRegistry {
         final result = await runWithFeedback<Map<String, dynamic>>(
           context.context,
           busyLabel: 'Toggling pause...',
-          action: () => AutopilotService().pauseToggle(),
+          action: () => context.engine.pauseToggle(),
         );
         if (result == null) return;
         context.toast(
@@ -1241,7 +1357,11 @@ class CapabilityRegistry {
         await showArtifactDialog(
           context.context,
           title: 'Cisco IOS configuration',
-          subtitle: _filesLocked(context.intent),
+          subtitle: _withSupportNotes(
+            _filesLocked(context.intent),
+            context.intent,
+            'cisco-ssh',
+          ),
           text: rendered.entries
               .map((entry) => '! ===== ${entry.key} =====\n${entry.value}')
               .join('\n\n'),
@@ -1261,7 +1381,11 @@ class CapabilityRegistry {
         await showArtifactDialog(
           context.context,
           title: 'Packet Tracer CLI configuration',
-          subtitle: _filesLocked(context.intent),
+          subtitle: _withSupportNotes(
+            _filesLocked(context.intent),
+            context.intent,
+            'packet-tracer',
+          ),
           text: rendered.entries
               .map((entry) => '! ===== ${entry.key} =====\n${entry.value}')
               .join('\n\n'),
@@ -1280,7 +1404,11 @@ class CapabilityRegistry {
         await showArtifactDialog(
           context.context,
           title: 'GNS3 project JSON',
-          subtitle: _filesLocked(context.intent),
+          subtitle: _withSupportNotes(
+            _filesLocked(context.intent),
+            context.intent,
+            'gns3',
+          ),
           text: Gns3Adapter.exportJson(context.intent!),
         );
       },
@@ -1298,7 +1426,11 @@ class CapabilityRegistry {
         await showArtifactDialog(
           context.context,
           title: 'Terraform - AWS VPC',
-          subtitle: _filesLocked(context.intent),
+          subtitle: _withSupportNotes(
+            _filesLocked(context.intent),
+            context.intent,
+            'aws-vpc',
+          ),
           text: TerraformAdapter.renderAwsVpc(context.intent!),
         );
       },
@@ -1316,7 +1448,7 @@ class CapabilityRegistry {
         final archive = await runWithFeedback<Map<String, dynamic>>(
           context.context,
           busyLabel: 'Building the archive...',
-          action: () => AutopilotService().exportDiagnostics(),
+          action: () => context.engine.exportDiagnostics(),
         );
         if (archive == null || !context.context.mounted) return;
         await showArtifactDialog(
@@ -1443,8 +1575,8 @@ class CapabilityRegistry {
       icon: Icons.school_outlined,
       group: memoryGroup,
       keywords: ['learning', 'experiences', 'reuse', 'strategies'],
-      probe: () async {
-        final experiences = await AutopilotService().learningExperiences();
+      probe: (engine) async {
+        final experiences = await engine.learningExperiences();
         return (
           title: 'Learned experiences',
           text: experiences.isEmpty
@@ -1460,8 +1592,8 @@ class CapabilityRegistry {
       icon: Icons.insights_outlined,
       group: memoryGroup,
       keywords: ['stats', 'statistics', 'journal', 'failures'],
-      probe: () async {
-        final stats = await AutopilotService().stats();
+      probe: (engine) async {
+        final stats = await engine.stats();
         return (title: 'Failure journal', text: _pretty(stats));
       },
     ),
@@ -1583,6 +1715,18 @@ class CapabilityRegistry {
       group: systemGroup,
       keywords: ['sidecar', 'engine', 'start', 'python', 'service'],
       run: (context) async {
+        // On a phone there is nothing here to start; the engine is on the PC.
+        // Trying anyway is what produced "install Python 3" on Android.
+        if (!EngineStatus.instance.canStartLocally) {
+          context.toast(SidecarSupervisor.phoneEngineMessage);
+          return;
+        }
+        // Nor is there anything to start when the configured engine is on
+        // another machine: that process is not this app's to start.
+        if (!EngineStatus.instance.isLocalEngine) {
+          context.toast(EngineStatus.instance.remoteEngineMessage);
+          return;
+        }
         final started = await runWithFeedback<bool>(
           context.context,
           busyLabel: 'Starting the local engine...',
@@ -1605,8 +1749,8 @@ class CapabilityRegistry {
       icon: Icons.summarize_outlined,
       group: systemGroup,
       keywords: ['summary', 'run', 'progress', 'report'],
-      probe: () async {
-        final summary = await AutopilotService().runSummary();
+      probe: (engine) async {
+        final summary = await engine.runSummary();
         return (title: 'Run summary', text: _pretty(summary));
       },
     ),
@@ -1618,8 +1762,8 @@ class CapabilityRegistry {
       icon: Icons.smart_toy_outlined,
       group: systemGroup,
       keywords: ['llm', 'model', 'api', 'status', 'provider'],
-      probe: () async {
-        final status = await AutopilotService().llmStatus();
+      probe: (engine) async {
+        final status = await engine.llmStatus();
         return (title: 'Model status', text: _pretty(status));
       },
     ),

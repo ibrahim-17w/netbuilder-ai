@@ -38,10 +38,7 @@ Future<void> showArtifactDialog(
     builder: (dialogContext) => Dialog(
       insetPadding: const EdgeInsets.all(AppTheme.s24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: 900,
-          maxHeight: 640,
-        ),
+        constraints: const BoxConstraints(maxWidth: 900, maxHeight: 640),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -105,17 +102,21 @@ Future<void> showArtifactDialog(
             const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.all(AppTheme.s12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              // An OverflowBar wraps this row onto a second line on a narrow
+              // window or at large text, instead of clipping the buttons off
+              // the right edge.
+              child: OverflowBar(
+                alignment: MainAxisAlignment.end,
+                overflowAlignment: OverflowBarAlignment.end,
+                spacing: AppTheme.s8,
+                overflowSpacing: AppTheme.s8,
                 children: [
                   ...actions,
-                  const SizedBox(width: AppTheme.s8),
                   OutlinedButton.icon(
                     onPressed: () => copyText(dialogContext, text),
                     icon: const Icon(Icons.copy_all_outlined, size: 18),
                     label: Text(copyLabel),
                   ),
-                  const SizedBox(width: AppTheme.s8),
                   FilledButton(
                     onPressed: () => Navigator.of(dialogContext).pop(),
                     child: const Text('Done'),
@@ -313,7 +314,10 @@ Future<T?> runWithFeedback<T>(
     messenger?.hideCurrentSnackBar();
     if (successLabel.isNotEmpty) {
       messenger?.showSnackBar(
-        SnackBar(content: Text(successLabel), behavior: SnackBarBehavior.floating),
+        SnackBar(
+          content: Text(successLabel),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     }
     return result;

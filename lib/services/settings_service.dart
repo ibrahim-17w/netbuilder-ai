@@ -20,11 +20,16 @@ class SettingsService extends ChangeNotifier {
   static const _kOpenAiOrg = 'openai_organization';
   static const _kPrivate = 'private_mode';
   static const _kGns3 = 'gns3_endpoint';
+  static const _kAutoLearn = 'auto_learn_enabled';
+  static const _kAutoSuggest = 'auto_learn_suggest_after_run';
+  static const _kAutoTeach = 'auto_learn_auto_teach';
   static const _kGns3User = 'gns3_user';
   static const _kGns3Pass = 'gns3_pass';
   static const _kTarget = 'default_target';
   static const _kLlmFix = 'llm_fix_when_stuck';
   static const _kContext = 'context_budget';
+  static const _kRuntimeWindow = 'runtime_window';
+  static const _kContextDebug = 'context_debug';
   static const _kLastProject = 'last_project';
   static const _kEngineBase = 'engine_base';
   static const _kOutputDir = 'output_dir';
@@ -47,6 +52,13 @@ class SettingsService extends ChangeNotifier {
   String _openAiOrg = '';
   bool _privateMode = false;
   bool _llmFix = true;
+  /// Auto-learning: with these on, the engine proposes, verifies and settles
+  /// corrections on its own after a run with recurring failures - no button
+  /// press.  Every promotion still has to pass the verify-before-promote
+  /// gate; these only control whether the engine bothers to try.
+  bool _autoLearn = true;
+  bool _autoSuggest = true;
+  bool _autoTeach = true;
   /// Whether the live run summary is included in the prompt. It used to be a
   /// chip on the chat screen; it is a preference, so it lives here.
   bool _liveContext = true;
@@ -61,6 +73,13 @@ class SettingsService extends ChangeNotifier {
   // The chat's context ceiling. Documented in one place
   // (ContextBudget.defaultContextTokens ~= 256k) and editable in Settings.
   int _contextBudget = ContextBudget.defaultContextTokens;
+  /// The runtime's own context window, when the user knows it better than the
+  /// probe does. 0 = detect it (the default), which is what makes the chat
+  /// work without anyone configuring anything.
+  int _runtimeWindow = 0;
+  /// Print every assembled request with its token breakdown. Off by default:
+  /// this is a development view, not something a user needs.
+  bool _contextDebug = false;
   String _lastProject = 'default';
   // First-run tour + changelog tracking. The tour shows once; the changelog
   // card reappears whenever the app version changes.
@@ -115,10 +134,20 @@ class SettingsService extends ChangeNotifier {
   bool _keyUnreadable = false;
   bool get keyUnreadable => _keyUnreadable;
 
-  /// True when this build is running on a phone or tablet.
+  /// Set by tests that need to be a phone.
   ///
-  /// Guarded because a unit test can run without a real platform underneath.
+  /// Deliberately not `defaultTargetPlatform`: the widget-test binding reports
+  /// that as android for every test, which would quietly turn the whole suite
+  /// into phone tests. The real platform cannot be changed inside a test
+  /// process, so the phone paths need an explicit switch - and they are worth
+  /// covering, because the phone is the platform with no engine and no Python.
+  @visibleForTesting
+  static bool? mobileOverrideForTests;
+
+  /// True when this build is running on a phone or tablet.
   static bool get isMobile {
+    final forced = mobileOverrideForTests;
+    if (forced != null) return forced;
     try {
       return Platform.isAndroid || Platform.isIOS;
     } catch (_) {
@@ -129,12 +158,21 @@ class SettingsService extends ChangeNotifier {
   /// True when the platform is Android specifically, which is the only one
   /// where the emulator's host alias applies.
   static bool get isAndroid {
+    if (mobileOverrideForTests == true) return true;
     try {
       return Platform.isAndroid;
     } catch (_) {
       return false;
     }
   }
+
+  /// True when this platform can host the .pkt engine itself.
+  ///
+  /// The engine is a Python sidecar that drives a Packet Tracer window: it
+  /// needs a desktop OS and a process the app can start. On a phone it does not
+  /// exist, so this is what stops the app from looking for Python it will
+  /// never find and reporting the failure as if it were the user's fault.
+  static bool get canHostEngine => !isMobile;
 
   /// Where the offline `.pkt` engine listens, by default.
   ///
@@ -151,6 +189,94 @@ class SettingsService extends ChangeNotifier {
   static String defaultEngineBase() {
     if (isAndroid) return 'http://10.0.2.2:5005';
     return 'http://127.0.0.1:5005';
+  }
+
+  /// The port the engine listens on when the address does not name one.
+  static const defaultEnginePort = 5005;
+
+  /// Turn whatever the user (or an installer) typed into a usable base URL.
+  ///
+  /// One place does this, because getting it wrong in one caller is how
+  /// `http://host:5005/` and `host` ended up becoming two different
+  /// addresses for the same machine. Whitespace, a missing scheme, a missing
+  /// port and a trailing slash are all settled here.
+  ///
+  /// Returns null for input that cannot be a base URL at all (an empty
+  /// string, a scheme http cannot use), so the caller can keep the last good
+  /// address instead of saving something that can never answer.
+  static String? normalizeEngineBase(String? value) {
+    var v = (value ?? '').trim();
+    if (v.isEmpty) return null;
+
+    // A scheme, if present, must be one an HTTP client can actually use.
+    var scheme = 'http';
+    final schemeSplit = v.indexOf('://');
+    if (schemeSplit >= 0) {
+      scheme = v.substring(0, schemeSplit).toLowerCase();
+      if (scheme != 'http' && scheme != 'https') return null;
+      v = v.substring(schemeSplit + 3);
+    }
+
+    // Only the authority is the engine's base; a path, query or fragment
+    // typed by accident is dropped rather than becoming part of every URL.
+    for (final stop in const ['/', '?', '#']) {
+      final at = v.indexOf(stop);
+      if (at >= 0) v = v.substring(0, at);
+    }
+    v = v.trim();
+    if (v.isEmpty) return null;
+
+    // Split the authority into host and port. An IPv6 literal is bracketed,
+    // so a colon inside it is not a port separator.
+    var host = v;
+    var port = '';
+    if (v.startsWith('[')) {
+      final close = v.indexOf(']');
+      if (close < 0) return null;
+      host = v.substring(0, close + 1);
+      final rest = v.substring(close + 1);
+      if (rest.isNotEmpty) {
+        if (!rest.startsWith(':')) return null;
+        port = rest.substring(1);
+      }
+    } else {
+      final colon = v.lastIndexOf(':');
+      if (colon >= 0) {
+        host = v.substring(0, colon);
+        port = v.substring(colon + 1);
+      }
+    }
+    host = host.trim();
+    if (host.isEmpty) return null;
+    if (port.isNotEmpty) {
+      final parsed = int.tryParse(port);
+      if (parsed == null || parsed < 1 || parsed > 65535) return null;
+    }
+    return '$scheme://$host:${port.isEmpty ? '$defaultEnginePort' : port}';
+  }
+
+  /// Same rules, for a call that must produce an address. An unusable
+  /// value falls back rather than becoming a dead end.
+  static String engineBaseOr(String? value, {String? fallback}) {
+    return normalizeEngineBase(value) ??
+        normalizeEngineBase(fallback) ??
+        defaultEngineBase();
+  }
+
+  /// Whether the address names this machine.
+  ///
+  /// One source of truth, because "may the app start an engine for this?" and
+  /// "is this the address I told the user to start one on?" have to agree. An
+  /// unparseable address counts as local: a bad value is a settings problem,
+  /// and refusing to launch on top of it would hide the real message.
+  static bool isLoopbackEngineBase(String base) {
+    final host = Uri.tryParse(engineBaseOr(base))?.host.toLowerCase() ?? '';
+    if (host.isEmpty) return true;
+    return host == '127.0.0.1' ||
+        host == 'localhost' ||
+        host == '::1' ||
+        host == '0.0.0.0' ||
+        host.endsWith('.localhost');
   }
 
   /// Same reasoning for GNS3, which is also a desktop service.
@@ -261,11 +387,16 @@ class SettingsService extends ChangeNotifier {
   }
   bool get privateMode => _privateMode;
   bool get llmFix => _llmFix;
+  bool get autoLearn => _autoLearn;
+  bool get autoSuggest => _autoSuggest;
+  bool get autoTeach => _autoTeach;
   String get gns3Endpoint => _gns3Endpoint;
   String get gns3User => _gns3User;
   String get gns3Pass => _gns3Pass;
   String get defaultTarget => _defaultTarget;
   int get contextBudget => _contextBudget;
+  int get runtimeWindow => _runtimeWindow;
+  bool get contextDebug => _contextDebug;
   String get lastProject => _lastProject;
   String get engineBase => _engineBase;
   String get outputDir => _outputDir;
@@ -325,49 +456,95 @@ class SettingsService extends ChangeNotifier {
     _openAiOrg = _prefs!.getString(_kOpenAiOrg) ?? _openAiOrg;
     _privateMode = _prefs!.getBool(_kPrivate) ?? false;
     _llmFix = _prefs!.getBool(_kLlmFix) ?? true;
+    _autoLearn = _prefs!.getBool(_kAutoLearn) ?? true;
+    _autoSuggest = _prefs!.getBool(_kAutoSuggest) ?? true;
+    _autoTeach = _prefs!.getBool(_kAutoTeach) ?? true;
     _liveContext = _prefs!.getBool(_kLiveContext) ?? true;
     _themeMode = _prefs!.getString(_kThemeMode) ?? _themeMode;
     _gns3Endpoint = _prefs!.getString(_kGns3) ?? _gns3Endpoint;
     // Migrate older plaintext GNS3 credentials into secure storage.
+    //
+    // Each read stands on its own: secure storage is one dependency with many
+    // ways to fail on a device, and a single unreadable value used to throw
+    // out of load() and take every OTHER setting with it - which is how a
+    // broken keystore could look like the whole configuration was lost.
     final oldUser = _prefs!.getString(_kGns3User);
     final oldPass = _prefs!.getString(_kGns3Pass);
-    final secureUser = await _secure.read(key: _kGns3User);
-    final securePass = await _secure.read(key: _kGns3Pass);
+    final secureUser = await _readSecure(_kGns3User);
+    final securePass = await _readSecure(_kGns3Pass);
     _gns3User = secureUser ?? oldUser ?? _gns3User;
     _gns3Pass = securePass ?? oldPass ?? _gns3Pass;
     if (oldUser != null) {
       if (secureUser == null) {
-        await _secure.write(key: _kGns3User, value: oldUser);
+        await _writeSecure(_kGns3User, oldUser);
       }
       await _prefs!.remove(_kGns3User);
     }
     if (oldPass != null) {
       if (securePass == null) {
-        await _secure.write(key: _kGns3Pass, value: oldPass);
+        await _writeSecure(_kGns3Pass, oldPass);
       }
       await _prefs!.remove(_kGns3Pass);
     }
     _defaultTarget = _prefs!.getString(_kTarget) ?? _defaultTarget;
     _contextBudget = _prefs!.getInt(_kContext) ?? _contextBudget;
+    _runtimeWindow = _prefs!.getInt(_kRuntimeWindow) ?? 0;
+    _contextDebug = _prefs!.getBool(_kContextDebug) ?? false;
     await _loadInstallInfo();
     _lastProject = _prefs!.getString(_kLastProject) ?? _lastProject;
     _tourDone = _prefs!.getBool(_kTourDone) ?? false;
     _seenChangelog = _prefs!.getString(_kSeenChangelog) ?? '';
-    _engineBase = _prefs!.getString(_kEngineBase) ?? _engineBase;
+    // A saved address is normalized on the way in, so a value that predates
+    // these rules (or was written by hand) becomes the address the app will
+    // actually call.
+    _engineBase = engineBaseOr(
+      _prefs!.getString(_kEngineBase),
+      fallback: _engineBase,
+    );
     // A choice the user made always wins; otherwise a fresh install uses the
     // folders the installer created, so the app works without anyone typing a
     // path or editing a file.
     _outputDir = _prefs!.getString(_kOutputDir) ??
         (_installInfo['outputDir'] ?? '').toString().trim();
 
-    final installedEngine =
-        (_installInfo['engineBase'] ?? '').toString().trim();
-    if (installedEngine.isNotEmpty && !_prefs!.containsKey(_kEngineBase)) {
-      _engineBase = installedEngine;
+    if (!_prefs!.containsKey(_kEngineBase)) {
+      final installedEngine = (_installInfo['engineBase'] ?? '').toString();
+      final fromInstaller = normalizeEngineBase(installedEngine);
+      if (fromInstaller != null) _engineBase = fromInstaller;
     }
     _loaded = true;
     notifyListeners();
   }
+
+  /// A secure read that reports rather than throws.
+  ///
+  /// [loadError] is deliberately a fixed sentence: the exception text from a
+  /// platform keystore can carry the key it failed on, and this string is
+  /// shown in the settings UI and written into bug reports.
+  Future<String?> _readSecure(String key) async {
+    try {
+      return await _secure.read(key: key);
+    } catch (_) {
+      _loadError = 'Some saved credentials could not be read from secure '
+          'storage on this device. Everything else was loaded; re-enter the '
+          'credentials to store them again.';
+      return null;
+    }
+  }
+
+  Future<void> _writeSecure(String key, String value) async {
+    try {
+      await _secure.write(key: key, value: value);
+    } catch (_) {
+      _loadError = 'Some credentials could not be written to secure storage '
+          'on this device. Everything else was saved.';
+    }
+  }
+
+  /// Why a load could not be completed in full, in words safe to show. Empty
+  /// when everything loaded.
+  String get loadError => _loadError;
+  String _loadError = '';
 
   /// The stored Gemini key, or null.
   ///
@@ -438,6 +615,28 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Master switch for engine-driven learning.  Off means the app never lets
+  /// the sidecar propose or verify by itself; the manual buttons still work.
+  Future<void> setAutoLearn(bool v) async {
+    _autoLearn = v;
+    await _prefs?.setBool(_kAutoLearn, v);
+    notifyListeners();
+  }
+
+  /// Whether a failing run may trigger a suggest pass on its own.
+  Future<void> setAutoSuggest(bool v) async {
+    _autoSuggest = v;
+    await _prefs?.setBool(_kAutoSuggest, v);
+    notifyListeners();
+  }
+
+  /// Whether a proposed correction may be verified by an automatic teach run.
+  Future<void> setAutoTeach(bool v) async {
+    _autoTeach = v;
+    await _prefs?.setBool(_kAutoTeach, v);
+    notifyListeners();
+  }
+
   Future<void> setGns3Endpoint(String v) async {
     _gns3Endpoint = v.trim();
     await _prefs?.setString(_kGns3, _gns3Endpoint);
@@ -460,30 +659,57 @@ class SettingsService extends ChangeNotifier {
 
   /// Move the chat's context ceiling. Clamped to a sane range so a typo
   /// cannot ask for a 2-token or 100-million-token window.
+  ///
+  /// This is a CEILING, not a promise: the request is fitted to the smaller of
+  /// this and the runtime's real window, so setting 1,024k on a runtime that
+  /// allocates 4k changes nothing except the number in Settings.
   Future<void> setContextBudget(int v) async {
-    _contextBudget = v.clamp(8192, 1048576);
+    _contextBudget = v.clamp(2048, 1048576);
     await _prefs?.setInt(_kContext, _contextBudget);
     notifyListeners();
   }
 
+  /// Pin the runtime's context window instead of probing for it. 0 = detect.
+  Future<void> setRuntimeWindow(int v) async {
+    _runtimeWindow = v <= 0 ? 0 : v.clamp(512, 1048576);
+    await _prefs?.setInt(_kRuntimeWindow, _runtimeWindow);
+    notifyListeners();
+  }
+
+  Future<void> setContextDebug(bool v) async {
+    _contextDebug = v;
+    await _prefs?.setBool(_kContextDebug, v);
+    notifyListeners();
+  }
+
   /// Point the app at the machine running the offline engine. Accepts
-  /// 'host', 'host:port' or a full http(s) URL.
+  /// 'host', 'host:port' or a full http(s) URL, and settles whitespace,
+  /// scheme, port and trailing slash through the same rules the loader uses.
+  ///
+  /// An address that could never be called (an ftp:// scheme, a missing
+  /// host) is rejected rather than stored: the previous address stays, and
+  /// [engineBaseError] says why, because silently keeping a bad value would
+  /// make the app look broken at a place the user never typed.
   Future<void> setEngineBase(String value) async {
-    var v = value.trim();
-    if (v.isEmpty) return;
-    if (!v.contains('://')) {
-      v = 'http://$v';
+    final v = normalizeEngineBase(value);
+    if (v == null) {
+      _engineBaseError = value.trim().isEmpty
+          ? 'Enter an engine address, for example 192.168.1.20:5005.'
+          : '"${value.trim()}" is not an address the app can call. Use a host '
+              'or host:port, optionally with http:// or https://.';
+      notifyListeners();
+      return;
     }
-    if (!RegExp(r':\d+$').hasMatch(v)) {
-      v = '$v:5005';
-    }
-    while (v.endsWith('/')) {
-      v = v.substring(0, v.length - 1);
-    }
+    _engineBaseError = '';
     _engineBase = v;
     await _prefs?.setString(_kEngineBase, _engineBase);
     notifyListeners();
   }
+
+  /// Why the last [setEngineBase] was refused. Empty when the last one was
+  /// accepted.
+  String get engineBaseError => _engineBaseError;
+  String _engineBaseError = '';
 
   /// The folder every generated / fixed .pkt is saved to. Empty restores
   /// the engine's default folder.

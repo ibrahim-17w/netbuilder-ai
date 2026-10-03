@@ -184,6 +184,107 @@ def test_diff_unchanged_detects_identical(proof_pkt, tmp_path):
     assert d["unchanged"] is True
 
 
+def _two_router_plan(cable=""):
+    link = {"a": "R1", "aIf": "g0/0", "b": "R2", "bIf": "g0/0"}
+    if cable:
+        link["cable"] = cable
+    return {
+        "projectName": "cable-test",
+        "steps": [
+            {"action": "create_nodes", "nodes": [
+                {"name": "R1", "type": "router", "model": "2911"},
+                {"name": "R2", "type": "router", "model": "2911"}]},
+            {"action": "create_links", "links": [link]},
+        ],
+    }
+
+
+def test_links_report_the_cable_kind(proof_pkt):
+    """The cable kind is what decides whether a link can carry traffic."""
+    xml = pkt_audit.decode(proof_pkt)
+    lks = pkt_audit.links(xml)
+    assert lks
+    assert {l["medium"] for l in lks} == {"eCopper"}
+    assert {l["cable"] for l in lks} == {"eStraightThrough"}
+
+
+def test_straight_through_between_two_routers_is_reported(tmp_path):
+    """The failure that makes a whole lab dead in Packet Tracer.
+
+    A generated plan that leaves the cable kind unset gets the default
+    straight-through; between two routers Packet Tracer then holds BOTH ports
+    down, draws the cable red and drops every packet that has to cross it -
+    while the file itself looks complete. The audit used to say "nothing to
+    fix" about exactly that file.
+    """
+    path = str(tmp_path / "straight.pkt")
+    pkt_builder.generate_pkt_file(_two_router_plan(), path,
+                                  project="cable-test", replace=True)
+    rep = pkt_audit.audit(path, "cable-test")
+    high = [f for f in rep["findings"] if f["severity"] == "high"]
+    assert [f["device"] for f in high] == ["R1-R2"], rep["findings"]
+    assert "Cross-Over" in high[0]["text"]
+
+
+def test_crossover_between_two_routers_is_clean(tmp_path):
+    path = str(tmp_path / "cross.pkt")
+    pkt_builder.generate_pkt_file(_two_router_plan("copper-cross"), path,
+                                  project="cable-test", replace=True)
+    rep = pkt_audit.audit(path, "cable-test")
+    assert rep["findings"] == [], rep["findings"]
+    assert {l["cable"] for l in rep["links"]} == {"eCrossOver"}
+
+
+def test_a_switch_uplink_keeps_its_straight_through(tmp_path):
+    """A straight-through between a switch port and a router is CORRECT."""
+    plan = _two_router_plan()
+    plan["steps"][0]["nodes"].append({"name": "SW1", "type": "switch"})
+    plan["steps"][1]["links"] = [
+        {"a": "R1", "aIf": "g0/0", "b": "SW1", "bIf": "f0/1"},
+        {"a": "R2", "aIf": "g0/0", "b": "SW1", "bIf": "f0/2"},
+    ]
+    path = str(tmp_path / "lan.pkt")
+    pkt_builder.generate_pkt_file(plan, path, project="cable-test",
+                                  replace=True)
+    rep = pkt_audit.audit(path, "cable-test")
+    assert rep["findings"] == [], rep["findings"]
+
+
+def test_the_offline_audit_card_reports_links_and_the_dead_cable(tmp_path):
+    """The report behind "Analyze this capture offline".
+
+    It used to read "Devices: 35, links: ?, findings: 0" on a file whose two
+    transit links could not come up in Packet Tracer: no link count anywhere,
+    and no cable check at all.
+    """
+    import pt_autopilot as pt
+
+    path = str(tmp_path / "straight.pkt")
+    pkt_builder.generate_pkt_file(_two_router_plan(), path,
+                                  project="cable-test", replace=True)
+    rep = pt.pkt_audit_network(path, "cable-test")
+    assert rep["linkCount"] == 1
+    assert rep["links"][0]["a"] == "R1"
+    findings = [f for d in rep["devices"] for f in d["findings"]]
+    assert len(findings) == 1
+    assert "R1 and R2" in findings[0]["text"]
+    assert "Cross-Over" in findings[0]["text"]
+    assert findings[0]["severity"] == "high"
+    # Advice only: nothing is typed anywhere from an offline read.
+    assert findings[0]["offline_advice"] is True
+    assert findings[0]["fix_cli"] == []
+
+
+def test_the_offline_audit_is_quiet_on_a_correctly_wired_lab(tmp_path):
+    import pt_autopilot as pt
+
+    path = str(tmp_path / "cross.pkt")
+    pkt_builder.generate_pkt_file(_two_router_plan("copper-cross"), path,
+                                  project="cable-test", replace=True)
+    rep = pt.pkt_audit_network(path, "cable-test")
+    assert [f for d in rep["devices"] for f in d["findings"]] == []
+
+
 def test_aaa_broken_server_produces_findings(tmp_path):
     plan = _proof_plan()
     # SRV2 AAA enabled but NO users and NO clients -> PT turns the tab Off,

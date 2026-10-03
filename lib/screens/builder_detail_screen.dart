@@ -17,7 +17,9 @@ import '../services/settings_service.dart';
 import '../services/validator_service.dart';
 import '../widgets/correction_badges.dart';
 import '../widgets/verification_report.dart';
+import '../theme/app_kit.dart';
 import '../theme/app_palette.dart';
+import '../theme/app_theme.dart';
 
 class BuilderDetailScreen extends StatefulWidget {
   final BuildRecord record;
@@ -86,7 +88,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
     if (!widget.monitorSidecar) return;
     // A previous error message is local Flutter state, not proof that the
     // sidecar is still busy. Refresh immediately and keep the status chip in
-    // sync when Stop/Esc is pressed outside this screen.
+    // sync when Stop is pressed outside this screen.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(_refreshSidecarState());
     });
@@ -104,7 +106,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       if (_correctionsTick % 5 != 0) return;
     }
     try {
-      final snap = await AutopilotService().correctionSnapshot();
+      final snap = await AutopilotService.of(context).correctionSnapshot();
       if (!mounted) return;
       setState(() => _corrections = snap);
     } catch (_) {
@@ -140,7 +142,8 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
         stale: row?.stale == true && row?.status == 'verified',
         rejected: row?.status == 'rejected' || teach?.promoted == false,
         pending: row?.status == 'proposed' && teach == null,
-        verified: teach?.promoted == true ||
+        verified:
+            teach?.promoted == true ||
             (row?.status == 'verified' && row?.stale != true),
         thrash: (row?.thrash ?? 0) > 0,
         thrashCount: row?.thrash ?? 0,
@@ -177,14 +180,18 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
 
   bool _sidecarPaused(Map<String, dynamic> status) {
     final pause = status['pause'];
-    if (pause is Map) return pause['paused'] == true || pause['pauseRequested'] == true;
+    if (pause is Map) {
+      return pause['paused'] == true || pause['pauseRequested'] == true;
+    }
     return false;
   }
 
   String _describeSidecarState(Map<String, dynamic> status) {
     if (status['running'] != true) return 'Idle - no active sidecar job.';
     final activity = (status['activity'] ?? 'job').toString();
-    if (_sidecarPaused(status)) return 'Busy - $activity (PAUSED; F9 or Pause to resume).';
+    if (_sidecarPaused(status)) {
+      return 'Busy - $activity (PAUSED; press Pause to resume).';
+    }
     final suffix = status['stopRequested'] == true
         ? ' (stop requested; releasing)'
         : '';
@@ -195,7 +202,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
     if (_statusRefreshInFlight) return;
     _statusRefreshInFlight = true;
     try {
-      final status = await AutopilotService().statusDetails();
+      final status = await AutopilotService.of(context).statusDetails();
       if (!mounted) return;
       final state = _describeSidecarState(status);
       setState(() {
@@ -224,7 +231,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
   Future<void> _showExecutionError(Object error) async {
     final message = error.toString().replaceFirst('Exception: ', '');
     try {
-      final status = await AutopilotService().statusDetails();
+      final status = await AutopilotService.of(context).statusDetails();
       if (!mounted) return;
       final state = _describeSidecarState(status);
       setState(() {
@@ -246,31 +253,36 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
   Future<void> _runAiSuggest() async {
     setState(() => _busy = true);
     try {
-      final svc = AutopilotService();
+      final svc = AutopilotService.of(context);
       if (!await svc.healthy) {
         if (!mounted) return;
-        setState(() => _log = AutopilotService.startHint);
+        setState(() => _log = svc.hint);
         return;
       }
       await _pushLlmConfig();
       final res = await svc.aiSuggest(project: widget.intent.projectName);
       if (res['ok'] != true) {
         if (!mounted) return;
-        setState(() => _log =
-            'AI suggestions unavailable: ${res['error'] ?? 'unknown'}');
+        setState(
+          () =>
+              _log = 'AI suggestions unavailable: ${res['error'] ?? 'unknown'}',
+        );
         return;
       }
       if (res['started'] != true) {
         if (!mounted) return;
-        setState(() =>
-            _log = res['message']?.toString() ??
-                'Nothing for the AI to fix right now.');
+        setState(
+          () => _log =
+              res['message']?.toString() ??
+              'Nothing for the AI to fix right now.',
+        );
         return;
       }
       if (!mounted) return;
       setState(() {
         _aiSuggesting = true;
-        _log = 'AI is proposing and evaluating fixes for recurring '
+        _log =
+            'AI is proposing and evaluating fixes for recurring '
             'failures (two Gemini passes)...';
       });
       for (var i = 0; i < 60; i++) {
@@ -282,12 +294,13 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
           if (!mounted) return;
           setState(() {
             _aiSuggesting = false;
-            _aiSuggest =
-                st['last'] == null ? null : Map<String, dynamic>.from(st['last'] as Map);
+            _aiSuggest = st['last'] == null
+                ? null
+                : Map<String, dynamic>.from(st['last'] as Map);
             _log = st['error']?.toString().isNotEmpty == true
                 ? 'AI suggest pass failed: ${st['error']}'
                 : 'AI suggestions ready (${_aiSuggest?['acceptedCount'] ?? 0} '
-                  'accepted - see the AI suggestions card).';
+                      'accepted - see the AI suggestions card).';
           });
           // Accepted proposals just became PENDING corrections on the
           // sidecar - pull them in now instead of waiting for the tick.
@@ -304,8 +317,10 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() =>
-          _log = 'AI suggestions failed: ${e.toString().replaceFirst('Exception: ', '')}');
+      setState(
+        () => _log =
+            'AI suggestions failed: ${e.toString().replaceFirst('Exception: ', '')}',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -323,14 +338,14 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       _log = offline
           ? 'Auditing offline - reading the saved .pkt (no Packet Tracer)...'
           : 'Auditing network - opening each device and reading its '
-              'state (this opens/closes PT windows)...';
+                'state (this opens/closes PT windows)...';
     });
     try {
-      final svc = AutopilotService();
+      final svc = AutopilotService.of(context);
       if (!await svc.healthy) {
         if (!mounted) return;
         setState(() {
-          _log = AutopilotService.startHint;
+          _log = svc.hint;
           _auditing = false;
         });
         return;
@@ -340,24 +355,29 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
         if (path == null) {
           if (!mounted) return;
           setState(() {
-            _log = 'No .pkt found in the sidecar\'s output folder '
+            _log =
+                'No .pkt found in the sidecar\'s output folder '
                 '(pkt_output). Generate or save one first.';
             _auditing = false;
           });
           return;
         }
-        final rep = await svc.pktAudit(path,
-            project: widget.intent.projectName);
+        final rep = await svc.pktAudit(
+          path,
+          project: widget.intent.projectName,
+        );
         if (!mounted) return;
         setState(() {
           _audit = rep;
           _auditing = false;
         });
         _prepareAuditSelection();
-        setState(() => _log =
-            'Offline audit finished (read from ${rep['path'] ?? 'the file'}). '
-            'Findings are ADVICE ONLY - Packet Tracer was not opened. Run a '
-            'live audit to apply fixes to the real devices.');
+        setState(
+          () => _log =
+              'Offline audit finished (read from ${rep['path'] ?? 'the file'}). '
+              'Findings are ADVICE ONLY - Packet Tracer was not opened. Run a '
+              'live audit to apply fixes to the real devices.',
+        );
         return;
       }
       await svc.auditStart(widget.intent.projectName);
@@ -403,7 +423,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
   /// The .pkt the offline audit should read: the last generated/saved
   /// artifact the sidecar remembers (generate or save_verified).
   Future<String?> _latestPktPath() async {
-    final svc = AutopilotService();
+    final svc = AutopilotService.of(context);
     final report = await svc.pktReport();
     final path = (report?['path'] ?? '').toString();
     return path.isEmpty ? null : path;
@@ -497,10 +517,10 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       _log = 'Applying $count fix(es)... keep Packet Tracer in front.';
     });
     try {
-      final svc = AutopilotService();
+      final svc = AutopilotService.of(context);
       if (!await svc.healthy) {
         if (!mounted) return;
-        setState(() => _log = AutopilotService.startHint);
+        setState(() => _log = svc.hint);
         return;
       }
       final res = await svc.start({
@@ -540,90 +560,115 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
     final services = Map<String, dynamic>.from(
       (summary['services'] as Map? ?? const {}),
     );
-    return Card(
-      margin: const EdgeInsets.only(top: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Audit results${_audit?['generated'] != null ? ' (${_audit!['generated']})' : ''}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            Text(
-              'Red link indicators on canvas: $reds',
-              style: TextStyle(
-                color: reds > 0 ? Colors.red : Colors.green,
-                fontSize: 12,
-              ),
-            ),
-            if (summary.isNotEmpty) ...[
-              Text(
-                'Read ${summary['device_count'] ?? 0} device(s), '
-                '${summary['finding_count'] ?? 0} finding(s) · '
-                '${byType.entries.map((e) => '${e.key}=${e.value}').join(', ')}',
-                style: const TextStyle(fontSize: 12),
-              ),
-              Text(
-                'Severity H/M/I: ${severity['high'] ?? 0}/'
-                '${severity['medium'] ?? 0}/${severity['info'] ?? 0}',
-                style: const TextStyle(fontSize: 12),
-              ),
-              if ((services['checked'] ?? 0) != 0)
-                Text(
-                  'Services: ${services['checked']} checked · '
-                  '${services['on'] ?? 0} on · ${services['off'] ?? 0} off · '
-                  '${services['unknown'] ?? 0} unknown · '
-                  '${services['saved_data'] ?? 0} saved tables · '
-                  '${services['rules_verified'] ?? 0} rules verified · '
-                  '${services['state_only'] ?? 0} state only',
-                  style: const TextStyle(fontSize: 12),
-                ),
-            ],
-            if ((_audit?['scope'] as List? ?? []).isNotEmpty)
-              Text(
-                'Evidence: ${(_audit!['scope'] as List).join(' · ')}',
-                style: TextStyle(fontSize: 11, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
-              ),
-            if ((_audit?['error'] ?? '').toString().isNotEmpty)
-              Text(
-                'Audit error: ${_audit!['error']}',
-                style: const TextStyle(color: Colors.red, fontSize: 12),
-              ),
-            if ((_audit?['note'] ?? '').toString().isNotEmpty)
-              Text(
-                _audit!['note'].toString(),
-                style: const TextStyle(fontSize: 12),
-              ),
-            const SizedBox(height: 4),
-            if ((_audit?['reachability'] as Map? ?? {}).isNotEmpty)
-              _buildReachabilityCard(
-                Map<String, dynamic>.from(_audit!['reachability'] as Map),
-              ),
-            for (final devRaw in devices) _buildDeviceAudit(devRaw as Map),
-            const SizedBox(height: 8),
-            if (_audit?['mode'] == 'offline')
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  'Offline mode: findings are advice only - nothing can be '
-                  'applied from here. Run a live audit (Audit Network) to '
-                  'fix the real devices.',
-                  style: TextStyle(fontSize: 12, color: Colors.deepOrange),
-                ),
-              ),
-            ElevatedButton(
-              onPressed: _audit?['mode'] == 'offline' ||
-                      _selectedFixes.isEmpty ||
-                      _busy
-                  ? null
-                  : _applyFixes,
-              child: Text('Apply ${_selectedFixes.length} selected fix(es)'),
-            ),
-          ],
+    return AppPanel(
+      icon: Icons.fact_check_outlined,
+      tone: reds > 0 ? AppTone.warning : AppTone.success,
+      title: 'Audit results',
+      subtitle: _audit?['generated'] != null
+          ? 'Generated ${_audit!['generated']}'
+          : null,
+      children: [
+        AppBanner(
+          dense: true,
+          tone: reds > 0 ? AppTone.danger : AppTone.success,
+          icon: reds > 0 ? Icons.link_off_outlined : Icons.check_circle_outline,
+          message: reds > 0
+              ? 'Red link indicators on canvas: $reds - something is not '
+                    'passing traffic.'
+              : 'No red link indicators on canvas.',
         ),
-      ),
+        if (summary.isNotEmpty) ...[
+          Wrap(
+            spacing: AppTheme.s8,
+            runSpacing: AppTheme.s8,
+            children: [
+              AppTag(
+                label: '${summary['device_count'] ?? 0} device(s)',
+                tone: AppTone.accent,
+                icon: Icons.devices_other_outlined,
+              ),
+              AppTag(
+                label: '${summary['finding_count'] ?? 0} finding(s)',
+                tone: (summary['finding_count'] ?? 0) == 0
+                    ? AppTone.success
+                    : AppTone.warning,
+                icon: Icons.report_outlined,
+              ),
+              for (final e in byType.entries)
+                AppTag(
+                  label: '${e.key}=${e.value}',
+                  tone: AppTone.neutral,
+                  mono: true,
+                ),
+              AppTag(
+                label:
+                    'H/M/I ${severity['high'] ?? 0}/'
+                    '${severity['medium'] ?? 0}/${severity['info'] ?? 0}',
+                tone: AppTone.info,
+                icon: Icons.priority_high,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.s10),
+          if ((services['checked'] ?? 0) != 0)
+            Text(
+              'Services: ${services['checked']} checked · '
+              '${services['on'] ?? 0} on · ${services['off'] ?? 0} off · '
+              '${services['unknown'] ?? 0} unknown · '
+              '${services['saved_data'] ?? 0} saved tables · '
+              '${services['rules_verified'] ?? 0} rules verified · '
+              '${services['state_only'] ?? 0} state only',
+              style: const TextStyle(fontSize: 12),
+            ),
+        ],
+        if ((_audit?['scope'] as List? ?? []).isNotEmpty)
+          Text(
+            'Evidence: ${(_audit!['scope'] as List).join(' · ')}',
+            style: TextStyle(
+              fontSize: 11,
+              color: AppPalette.mutedText(Theme.of(context).colorScheme),
+            ),
+          ),
+        if ((_audit?['error'] ?? '').toString().isNotEmpty)
+          AppBanner(
+            dense: true,
+            tone: AppTone.danger,
+            message: 'Audit error: ${_audit!['error']}',
+          ),
+        if ((_audit?['note'] ?? '').toString().isNotEmpty)
+          Text(
+            _audit!['note'].toString(),
+            style: const TextStyle(fontSize: 12),
+          ),
+        const SizedBox(height: 4),
+        if ((_audit?['reachability'] as Map? ?? {}).isNotEmpty)
+          _buildReachabilityCard(
+            Map<String, dynamic>.from(_audit!['reachability'] as Map),
+          ),
+        for (final devRaw in devices) _buildDeviceAudit(devRaw as Map),
+        const SizedBox(height: 8),
+        if (_audit?['mode'] == 'offline')
+          const AppBanner(
+            dense: true,
+            tone: AppTone.warning,
+            icon: Icons.visibility_off_outlined,
+            message:
+                'Offline mode: findings are advice only - nothing can be '
+                'applied from here. Run a live audit (Audit Network) to fix '
+                'the real devices.',
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: ElevatedButton.icon(
+            onPressed:
+                _audit?['mode'] == 'offline' || _selectedFixes.isEmpty || _busy
+                ? null
+                : _applyFixes,
+            icon: const Icon(Icons.build_outlined, size: 18),
+            label: Text('Apply ${_selectedFixes.length} selected fix(es)'),
+          ),
+        ),
+      ],
     );
   }
 
@@ -680,16 +725,21 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
                 '${(probe['evidence'] as List? ?? []).isEmpty ? '' : ' · ${(probe['evidence'] as List).take(3).join(' | ')}'}',
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppPalette.mutedText(Theme.of(context).colorScheme),
+                ),
               ),
             ),
           ),
         if (findings.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(8),
+          Padding(
+            padding: const EdgeInsets.all(8),
             child: Text(
               'Clean - nothing to fix.',
-              style: TextStyle(color: Colors.green),
+              style: TextStyle(
+                color: AppPalette.success(Theme.of(context).colorScheme),
+              ),
             ),
           ),
         for (final fRaw in findings)
@@ -701,12 +751,14 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
                     ? Icons.error_outline
                     : Icons.info_outline,
                 color: fRaw['severity'] == 'high'
-                    ? Colors.red
+                    ? AppPalette.danger(Theme.of(context).colorScheme)
                     : AppPalette.mutedText(Theme.of(context).colorScheme),
                 size: 20,
               ),
-              title: Text(fRaw['text'].toString(),
-                  style: const TextStyle(fontSize: 13)),
+              title: Text(
+                fRaw['text'].toString(),
+                style: const TextStyle(fontSize: 13),
+              ),
               subtitle: Text(
                 'advice only'
                 '${((fRaw['fix_cli'] as List? ?? []).isNotEmpty) ? ' - suggested commands: ${(fRaw['fix_cli'] as List).join(' → ')}' : ''}',
@@ -783,55 +835,54 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
         .whereType<Map>()
         .toList();
     final failed = reachability['failed'] ?? 0;
-    return Card(
-      color: failed is num && failed > 0
-          ? AppPalette.dangerFill(Theme.of(context).colorScheme)
-          : AppPalette.successFill(Theme.of(context).colorScheme),
-      margin: const EdgeInsets.only(top: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Live connectivity tests',
-              style: TextStyle(fontWeight: FontWeight.bold),
+    final anyFailed = failed is num && failed > 0;
+    return AppPanel(
+      dense: true,
+      framed: false,
+      tone: anyFailed ? AppTone.danger : AppTone.success,
+      icon: Icons.network_ping,
+      title: 'Live connectivity tests',
+      subtitle:
+          'Attempted ${reachability['attempted'] ?? 0} · '
+          'passed ${reachability['passed'] ?? 0} · failed $failed · '
+          'skipped ${skipped.length}',
+      children: [
+        for (final result in results)
+          AppRowTile(
+            dense: true,
+            icon: result['ok'] == true
+                ? Icons.check_circle_outline
+                : Icons.error_outline,
+            tone: result['ok'] == true ? AppTone.success : AppTone.danger,
+            title: '${result['source']} → ${result['target']}',
+            subtitle:
+                '${result['ok'] == true ? 'Reply received' : 'No verified reply'} · '
+                'attempts ${result['attempts'] ?? '?'}'
+                '${(result['evidence'] ?? '').toString().isEmpty ? '' : '\n${result['evidence']}'}',
+          ),
+        for (final item in skipped)
+          Padding(
+            padding: const EdgeInsets.only(top: AppTheme.s4),
+            child: Text(
+              'Skipped ${item['source']}: ${item['reason']}',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppPalette.mutedText(Theme.of(context).colorScheme),
+              ),
             ),
-            Text(
-              'Attempted ${reachability['attempted'] ?? 0} · '
-              'passed ${reachability['passed'] ?? 0} · failed $failed · '
-              'skipped ${skipped.length}',
+          ),
+        if (reachability['note'] != null)
+          Padding(
+            padding: const EdgeInsets.only(top: AppTheme.s4),
+            child: Text(
+              reachability['note'].toString(),
+              style: TextStyle(
+                fontSize: 11,
+                color: AppPalette.mutedText(Theme.of(context).colorScheme),
+              ),
             ),
-            for (final result in results)
-              ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  result['ok'] == true ? Icons.check_circle : Icons.error,
-                  color: result['ok'] == true ? Colors.green : Colors.red,
-                ),
-                title: Text('${result['source']} → ${result['target']}'),
-                subtitle: Text(
-                  '${result['ok'] == true ? 'Reply received' : 'No verified reply'} · '
-                  'attempts ${result['attempts'] ?? '?'}'
-                  '${(result['evidence'] ?? '').toString().isEmpty ? '' : '\n${result['evidence']}'}',
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            for (final item in skipped)
-              Text(
-                'Skipped ${item['source']}: ${item['reason']}',
-                style: TextStyle(fontSize: 12, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
-              ),
-            if (reachability['note'] != null)
-              Text(
-                reachability['note'].toString(),
-                style: TextStyle(fontSize: 11, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
-              ),
-          ],
-        ),
-      ),
+          ),
+      ],
     );
   }
 
@@ -919,6 +970,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
   /// outcome into memory.db - failures finally persist with zero manual
   /// steps and shape future Gemini prompts (similar-build context).
   Future<void> _watchRun() async {
+    final engine = AutopilotService.of(context);
     if (_watching) return;
     _watching = true;
     try {
@@ -928,9 +980,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
         await Future.delayed(const Duration(seconds: 5));
         if (!mounted) return;
         try {
-          final s =
-              jsonDecode(await AutopilotService().status())
-                  as Map<String, dynamic>;
+          final s = jsonDecode(await engine.status()) as Map<String, dynamic>;
           if (s['running'] == true) {
             started = true;
             break;
@@ -944,9 +994,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
         if (!mounted) return;
         var running = true;
         try {
-          final s =
-              jsonDecode(await AutopilotService().status())
-                  as Map<String, dynamic>;
+          final s = jsonDecode(await engine.status()) as Map<String, dynamic>;
           running = s['running'] == true;
         } catch (_) {
           continue; // transient sidecar hiccup - keep watching
@@ -954,7 +1002,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
         if (!running) break;
       }
       if (!mounted) return;
-      final summary = await AutopilotService().runSummary();
+      final summary = await engine.runSummary();
       final ok = summary['ok'] == true;
       final skipped = summary['devices_skipped'] ?? 0;
       final unrec = summary['errors_unrecovered'] ?? 0;
@@ -995,7 +1043,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
           ? ''
           : 'CLI PROOF: lines saved by the settled re-read=$promptRecovered'
                 '${blockReasons.isEmpty ? '' : '  blocked: '
-                    '${blockReasons.entries.map((e) => '${e.key}=${e.value}').join(', ')}'}'
+                          '${blockReasons.entries.map((e) => '${e.key}=${e.value}').join(', ')}'}'
                 '\n';
       // CROSS-RUN LEARNING: what the engine escalated once and then stopped
       // retrying, plus the lines it stopped re-asking the model about. A
@@ -1035,13 +1083,13 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       if (mem.ready) {
         List<Map<String, dynamic>> events = [];
         try {
-          events = await AutopilotService().events(limit: 80);
+          events = await engine.events(limit: 80);
         } catch (_) {}
         await _saveExecutionEvidence(summary: summary, events: events);
         // AUTO-LEARN: recurring failure patterns become rules with no
         // manual step - the training loop closes itself after each run.
         try {
-          final sug = await AutopilotService().suggestions();
+          final sug = await engine.suggestions();
           final existing = (await mem.allRules())
               .map((r) => r.ruleText)
               .toSet();
@@ -1117,14 +1165,17 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
   /// Rows for the AI suggestions card: each proposal with its evaluation
   /// score, the evaluator's concern, and where it was recorded.
   List<Widget> _aiSuggestRows() {
-    final proposals =
-        (_aiSuggest?['proposals'] as List? ?? const [])
-            .whereType<Map>()
-            .map((m) => Map<String, dynamic>.from(m))
-            .toList();
+    final proposals = (_aiSuggest?['proposals'] as List? ?? const [])
+        .whereType<Map>()
+        .map((m) => Map<String, dynamic>.from(m))
+        .toList();
     if (proposals.isEmpty) {
-      return const [Text('No usable proposals for the current failures.',
-          style: TextStyle(fontSize: 12))];
+      return const [
+        Text(
+          'No usable proposals for the current failures.',
+          style: TextStyle(fontSize: 12),
+        ),
+      ];
     }
     return [
       for (final p in proposals)
@@ -1142,10 +1193,9 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
     final what = (p['target'] == 'cli')
         ? (p['cli'] as List? ?? []).join(' ; ')
         : (p['label']?.toString().isNotEmpty == true
-            ? p['label']
-            : p['pointHint'] ?? p['reason'] ?? '');
-    final score =
-        p['score'] != null ? '  (AI score ${p['score']}/5)' : '';
+              ? p['label']
+              : p['pointHint'] ?? p['reason'] ?? '');
+    final score = p['score'] != null ? '  (AI score ${p['score']}/5)' : '';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1155,18 +1205,22 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
           style: const TextStyle(fontSize: 12),
         ),
         if (p['screenedOut'] != null)
-          Text('  rejected before evaluation: ${p['screenedOut']}',
-              style: const TextStyle(
-                  fontSize: 11, fontStyle: FontStyle.italic)),
+          Text(
+            '  rejected before evaluation: ${p['screenedOut']}',
+            style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic),
+          ),
         if (p['accepted'] == true && p['correctionId'] != null)
-          const Text('  saved as a proposed correction - verify it '
-              'with a teach run',
-              style: TextStyle(fontSize: 11)),
+          const Text(
+            '  saved as a proposed correction - verify it '
+            'with a teach run',
+            style: TextStyle(fontSize: 11),
+          ),
         if (p['accepted'] != true &&
             p['concern']?.toString().isNotEmpty == true)
-          Text('  why not: ${p['concern']}',
-              style: const TextStyle(
-                  fontSize: 11, fontStyle: FontStyle.italic)),
+          Text(
+            '  why not: ${p['concern']}',
+            style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic),
+          ),
         _proposalBadges(p),
       ],
     );
@@ -1335,19 +1389,22 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
   }
 
   Future<void> _checkSidecar() async {
+    final svc = AutopilotService.of(context);
     setState(() {
       _busy = true;
-      _log = 'Checking sidecar http://127.0.0.1:5005/health ...';
+      _log = 'Checking sidecar ${svc.base}/health ...';
     });
     try {
-      final svc = AutopilotService();
       final health = await svc.healthDetails();
       final status = await svc.statusDetails();
       if (!mounted) return;
       final esc = health['emergencyEsc'] as Map?;
       final escText = esc?['available'] == true
-          ? 'Global Esc stop is ENABLED.'
-          : 'Global Esc stop is NOT available: ${esc?['error'] ?? 'unknown reason'}';
+          ? 'Global Esc stop is ENABLED on the sidecar (it intercepts keys '
+                'system-wide; start the sidecar with '
+                'NETBUILDER_ENABLE_GLOBAL_HOTKEYS=1 to get it).'
+          : 'Global Esc stop is off: ${esc?['error'] ?? 'not enabled on the sidecar'}. '
+                'Use the Stop button here, or POST /stop to the engine.';
       final state = _describeSidecarState(status);
       setState(() {
         _sidecarState = state;
@@ -1372,7 +1429,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       });
     }
     try {
-      final svc = AutopilotService();
+      final svc = AutopilotService.of(context);
       final res = await svc.stop();
       Map<String, dynamic>? latest;
       // /stop is deliberately an acknowledgement, not a false claim that
@@ -1412,8 +1469,8 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
   }
 
   /// Pause/resume the active run. Pause holds the worker at its next safe
-  /// boundary and keeps all progress; the sidecar's global F9 key does the
-  /// same from anywhere (even with Packet Tracer in front).
+  /// boundary and keeps all progress; the app's Pause button and the
+  /// sidecar's HTTP /pause_toggle both do this from anywhere.
   Future<void> _ptPauseToggle() async {
     if (_pausePending) return;
     _pausePending = true;
@@ -1422,22 +1479,22 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       setState(() {
         _log = wantPause
             ? 'Pause requested - the worker will hold at the next safe '
-                'boundary (progress is kept)...'
+                  'boundary (progress is kept)...'
             : 'Resume requested - continuing the run...';
       });
     }
     try {
-      final svc = AutopilotService();
+      final svc = AutopilotService.of(context);
       final res = wantPause ? await svc.pause() : await svc.resume();
       if (!mounted) return;
       final msg = (res['message'] ?? '').toString();
       final pause = res['pause'];
       setState(() {
         if (pause is Map) {
-          _sidecarIsPaused = pause['paused'] == true ||
-              pause['pauseRequested'] == true;
+          _sidecarIsPaused =
+              pause['paused'] == true || pause['pauseRequested'] == true;
           _sidecarState = _sidecarIsPaused
-              ? 'Busy - job (PAUSED; F9 or Pause to resume).'
+              ? 'Busy - job (PAUSED; press Pause to resume).'
               : _sidecarState;
         }
         _log = msg.isEmpty
@@ -1465,7 +1522,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
           'Mouse test: watch Packet Tracer - the cursor should draw a square...';
     });
     try {
-      final res = await AutopilotService().prove();
+      final res = await AutopilotService.of(context).prove();
       if (!mounted) return;
       setState(
         () => _log =
@@ -1481,7 +1538,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
 
   Future<void> _loadCal() async {
     try {
-      final cal = await AutopilotService().calGet();
+      final cal = await AutopilotService.of(context).calGet();
       if (!mounted) return;
       setState(() {
         _gridX0 = ((cal['grid_x0'] as num?)?.toDouble() ?? _gridX0).clamp(
@@ -1514,11 +1571,9 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       _log = 'Saving calibration...';
     });
     try {
-      final res = await AutopilotService().calSet({
-        'grid_x0': _gridX0,
-        'grid_step': _gridStep,
-        'grid_y': _gridY,
-      });
+      final res = await AutopilotService.of(
+        context,
+      ).calSet({'grid_x0': _gridX0, 'grid_step': _gridStep, 'grid_y': _gridY});
       if (!mounted) return;
       setState(() => _log = 'Saved: $res');
     } catch (e) {
@@ -1532,7 +1587,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
   Future<void> _clickSlot(int idx) async {
     setState(() => _log = 'Click test grid$idx - watch PT...');
     try {
-      final res = await AutopilotService().clickTest('grid$idx');
+      final res = await AutopilotService.of(context).clickTest('grid$idx');
       if (!mounted) return;
       setState(
         () => _log =
@@ -1547,9 +1602,9 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
   Future<void> _showRemembered() async {
     setState(() => _log = 'Loading remembered devices...');
     try {
-      final devs = await AutopilotService().devicesGet(
-        widget.record.projectName,
-      );
+      final devs = await AutopilotService.of(
+        context,
+      ).devicesGet(widget.record.projectName);
       if (!mounted) return;
       if (devs.isEmpty) {
         setState(
@@ -1576,9 +1631,9 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
 
   Future<void> _forgetRemembered() async {
     try {
-      final res = await AutopilotService().devicesClear(
-        widget.record.projectName,
-      );
+      final res = await AutopilotService.of(
+        context,
+      ).devicesClear(widget.record.projectName);
       if (!mounted) return;
       setState(() => _log = 'Forgot spots: $res');
     } catch (e) {
@@ -1590,7 +1645,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
   Future<void> _inspectPt() async {
     setState(() => _log = 'Inspecting Packet Tracer buttons by name...');
     try {
-      final res = await AutopilotService().inspect();
+      final res = await AutopilotService.of(context).inspect();
       if (!mounted) return;
       setState(
         () => _log =
@@ -1608,7 +1663,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
           'TEACH $key: you have 3 seconds - HOVER the $hint in Packet Tracer NOW, then keep still...',
     );
     try {
-      final res = await AutopilotService().teach(key);
+      final res = await AutopilotService.of(context).teach(key);
       if (!mounted) return;
       setState(
         () => _log =
@@ -1622,7 +1677,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
 
   Future<void> _pollLogs() async {
     try {
-      final s = await AutopilotService().status();
+      final s = await AutopilotService.of(context).status();
       if (!mounted) return;
       setState(() => _log = 'Sidecar log:\n$s');
     } catch (e) {
@@ -1634,7 +1689,8 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
   Future<void> _showInventory() async {
     setState(() => _log = 'Reading the latest live Packet Tracer inventory...');
     try {
-      final report = (await AutopilotService().inventory())['report'] as Map?;
+      final report =
+          (await AutopilotService.of(context).inventory())['report'] as Map?;
       if (!mounted) return;
       final data = report == null ? null : Map<String, dynamic>.from(report);
       setState(() {
@@ -1666,11 +1722,11 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       _log = 'Cables+CLI only (devices already placed, no duplicates)...';
     });
     try {
-      final svc = AutopilotService();
+      final svc = AutopilotService.of(context);
       final ok = await svc.healthy;
       if (!ok) {
         if (!mounted) return;
-        setState(() => _log = AutopilotService.startHint);
+        setState(() => _log = svc.hint);
         return;
       }
       await _pushLlmConfig();
@@ -1713,13 +1769,20 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
   /// Give the sidecar the Gemini credential for this run. Best effort: a
   /// missing key or an unreachable sidecar must never block a build.
   Future<void> _pushLlmConfig() async {
+    final engine = AutopilotService.of(context);
     try {
       final s = context.read<SettingsService>();
       final key = await s.getApiKey() ?? '';
-      await AutopilotService().pushLlmConfig(
+      await engine.pushLlmConfig(
         apiKey: key,
         model: s.model,
         enabled: key.isNotEmpty && !s.privateMode && s.llmFix,
+        // Auto-learning rides along with the key: with it on, a failing run
+        // proposes and (when a PT window is present) verifies a correction
+        // with no button press.  The fail-closed gate is unchanged.
+        autoLearn: s.autoLearn,
+        autoSuggest: s.autoLearn && s.autoSuggest,
+        autoTeach: s.autoLearn && s.autoTeach,
       );
     } catch (_) {
       // optional helper - never fail the run over it
@@ -1733,11 +1796,11 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       _log = 'Checking sidecar first...';
     });
     try {
-      final svc = AutopilotService();
+      final svc = AutopilotService.of(context);
       final ok = await svc.healthy;
       if (!ok) {
         if (!mounted) return;
-        setState(() => _log = AutopilotService.startHint);
+        setState(() => _log = svc.hint);
         return;
       }
       await _pushLlmConfig();
@@ -1780,11 +1843,10 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       _verifyReport = null;
     });
     try {
-      final svc = AutopilotService();
+      final svc = AutopilotService.of(context);
       if (!await svc.healthy) {
         if (!mounted) return;
-        setState(() =>
-            _log = AutopilotService.startHint);
+        setState(() => _log = svc.hint);
         return;
       }
       final plan = PacketTracerAdapter.autopilotPlan(widget.intent);
@@ -1819,11 +1881,11 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       _log = 'Generating .pkt offline (no Packet Tracer needed)...';
     });
     try {
-      final svc = AutopilotService();
+      final svc = AutopilotService.of(context);
       final ok = await svc.healthy;
       if (!ok) {
         if (!mounted) return;
-        setState(() => _log = AutopilotService.startHint);
+        setState(() => _log = svc.hint);
         return;
       }
       final plan = PacketTracerAdapter.autopilotPlan(widget.intent);
@@ -1831,7 +1893,10 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
           .toIso8601String()
           .replaceAll(RegExp(r'[^0-9]'), '')
           .substring(0, 12);
-      final res = await svc.pktGenerate(plan, filename: 'netbuilder-$stamp.pkt');
+      final res = await svc.pktGenerate(
+        plan,
+        filename: 'netbuilder-$stamp.pkt',
+      );
       if (!mounted) return;
       final warnings = (res['warnings'] as List?) ?? const [];
       final path = (res['path'] ?? '').toString();
@@ -1847,12 +1912,13 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
                 "${learning['note']}"
           : '';
       setState(() {
-        _log = 'Generated: $path\n'
+        _log =
+            'Generated: $path\n'
             'devices: ${res['deviceCount']}, links: ${res['linkCount']}\n'
             '$warningText\n'
             '${substituted ? 'A model this plan asked for was not in the library, '
-                'so the nearest match was used. Press "Extend model library" to '
-                'read the models Packet Tracer ships with, then generate again.\n' : ''}'
+                      'so the nearest match was used. Press "Extend model library" to '
+                      'read the models Packet Tracer ships with, then generate again.\n' : ''}'
             'Open it in Packet Tracer to verify, then run Analyze on it.'
             '$learningText';
       });
@@ -1874,10 +1940,10 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       _log = 'Reading local .pkt files for device models...';
     });
     try {
-      final svc = AutopilotService();
+      final svc = AutopilotService.of(context);
       if (!await svc.healthy) {
         if (!mounted) return;
-        setState(() => _log = AutopilotService.startHint);
+        setState(() => _log = svc.hint);
         return;
       }
       final res = await svc.pktTemplatesHarvest();
@@ -1886,7 +1952,8 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
           .map((e) => e.toString())
           .toList();
       setState(() {
-        _log = 'Model library now covers ${res['deviceCount']} models, '
+        _log =
+            'Model library now covers ${res['deviceCount']} models, '
             'read from ${res['scanned']} .pkt file(s).'
             '${added.isEmpty ? '\nNo new models: this machine already had them all.' : '\nAdded ${added.length}:\n- ${added.take(40).join('\n- ')}'}'
             '${added.length > 40 ? '\n- ...' : ''}';
@@ -1927,470 +1994,597 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       widget.intent,
       target: widget.record.target,
     );
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            '${widget.record.projectName} [${widget.record.target}]',
-            style: Theme.of(context).textTheme.titleLarge,
+    return AppPage(
+      maxWidth: 980,
+      header: AppPageHeader(
+        eyebrow: 'Build',
+        title: widget.record.projectName,
+        trailing: AppTag(
+          label: widget.record.target,
+          tone: AppTone.info,
+          icon: Icons.place_outlined,
+          mono: true,
+        ),
+        description: widget.record.instruction,
+        actions: [
+          AppTag(
+            label: 'Plan ${widget.record.status.toUpperCase()}',
+            tone: AppTone.neutral,
+            icon: Icons.assignment_outlined,
           ),
-          const SizedBox(height: 4),
-          Text(widget.record.instruction),
-          const SizedBox(height: 8),
-          Card(
-            color: AppPalette.accentFill(Theme.of(context).colorScheme),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Plan status: ${widget.record.status.toUpperCase()}'),
-                  Text('Planning source: ${widget.intent.planningSource}'),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'The AI interpreted the request and the app compiled this output locally. '
-                    'No external network or Packet Tracer change happens until you choose an execution button. '
-                    'Execution results, failures, and misclicks are saved as evidence.',
-                  ),
-                  if (widget.intent.questions.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Review these open questions:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    for (final q in widget.intent.questions) Text('• $q'),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (issues.isEmpty)
-            const Card(
-              child: Padding(
-                padding: EdgeInsets.all(8),
-                child: Text('Validator: clean.'),
-              ),
-            ),
-          for (final i in issues)
-            Card(
-              color: i.severity == 'error'
-                  ? AppPalette.dangerFill(Theme.of(context).colorScheme)
-                  : AppPalette.warningFill(Theme.of(context).colorScheme),
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text('[${i.severity}] ${i.message}'),
-              ),
-            ),
-          if (issues.any((i) => i.severity == 'error'))
-            const Card(
-              color: Color(0xFFFFEBEE),
-              child: Padding(
-                padding: EdgeInsets.all(8),
-                child: Text(
-                  'Execution is blocked until the validator errors above are fixed. '
-                  'Warnings are review items and do not block a run.',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-          const SizedBox(height: 8),
-          const Text(
-            'Deterministic config / export from this plan:',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          Container(
-            padding: const EdgeInsets.all(8),
-            color: AppPalette.infoFill(Theme.of(context).colorScheme),
-            child: SelectableText(widget.configText),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Topology:',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          Text(
-            widget.intent.nodes.map((n) => '${n.name}(${n.type})').join('  '),
-          ),
-          Text(
-            widget.intent.links
-                .map((l) => '${l.a}:${l.aIf} <-> ${l.b}:${l.bIf}')
-                .join('\n'),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Repeat-run safety: the autopilot checks each remembered canvas slot before acting. '
-            'A matching device skips placement, and an exact previously verified router/switch '
-            'configuration skips retyping. Recoverable placement and command errors are retried '
-            'and saved to learning memory. If the screen is still uncertain, it stops that device '
-            'rather than stacking another one. Use “Cables + CLI only” for an existing topology; '
-            'the Fixes action intentionally re-applies selected commands.',
-            style: TextStyle(fontSize: 12),
-          ),
-          const SizedBox(height: 8),
-          Card(
-            color: _sidecarState.startsWith('Busy')
-                ? AppPalette.warningFill(Theme.of(context).colorScheme)
-                : _sidecarState.startsWith('Idle')
-                ? AppPalette.successFill(Theme.of(context).colorScheme)
-                : AppPalette.infoFill(Theme.of(context).colorScheme),
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Text('Sidecar live status: $_sidecarState'),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+        ],
+      ),
+      children: [
+        AppBanner(
+          tone: AppTone.accent,
+          title: 'Compiled locally',
+          icon: Icons.psychology_outlined,
+          message:
+              'The AI interpreted the request and the app compiled this output '
+              'locally. No external network or Packet Tracer change happens '
+              'until you choose an execution button. Execution results, '
+              'failures, and misclicks are saved as evidence.\n'
+              'Planning source: ${widget.intent.planningSource}',
+        ),
+        if (widget.intent.questions.isNotEmpty)
+          AppPanel(
+            icon: Icons.help_outline,
+            tone: AppTone.warning,
+            filled: true,
+            title: 'Review these open questions',
             children: [
-              ElevatedButton(
-                onPressed: _busy ? null : _pushGns3,
-                child: const Text('Push to GNS3'),
-              ),
-              ElevatedButton(
-                onPressed: _busy ? null : _ptAutopilot,
-                child: const Text('PT Autopilot Start'),
-              ),
-              ElevatedButton(
-                onPressed: _busy ? null : _ptCablesOnly,
-                child: const Text('Cables + CLI only'),
-              ),
-              ElevatedButton(
-                onPressed: _busy ? null : _generatePkt,
-                child: const Text('Generate .pkt (no PT)'),
-              ),
-              ElevatedButton(
-                onPressed: (_busy || _verifying) ? null : _verifyBuild,
-                child: const Text('Verify (ping tests)'),
-              ),
-              OutlinedButton(
-                onPressed: _busy ? null : _harvestModels,
-                child: const Text('Extend model library'),
-              ),
-              OutlinedButton(
-                onPressed: _busy ? null : _checkSidecar,
-                child: const Text('Check Sidecar'),
-              ),
-              OutlinedButton(
-                onPressed: _busy ? null : _showInventory,
-                child: const Text('Live Inventory'),
-              ),
-              OutlinedButton(
-                onPressed: _busy ? null : _proveMove,
-                child: const Text('Test Mouse Move'),
-              ),
-              OutlinedButton(
-                onPressed: _inspectPt,
-                child: const Text('Inspect PT'),
-              ),
-              OutlinedButton(
-                onPressed: _busy ? null : _pollLogs,
-                child: const Text('Logs'),
-              ),
-              OutlinedButton.icon(
-                onPressed: _pausePending ? null : _ptPauseToggle,
-                icon: Icon(_sidecarIsPaused
-                    ? Icons.play_arrow
-                    : Icons.pause),
-                label: Text(_sidecarIsPaused ? 'Resume' : 'Pause'),
-              ),
-              OutlinedButton(
-                onPressed: _busy || _stopPending ? null : _ptStop,
-                child: const Text('Stop'),
-              ),
-              OutlinedButton(
-                onPressed: _busy ? null : _previewSearch,
-                child: const Text('Preview Web Search'),
-              ),
-              ElevatedButton(
-                onPressed: _busy ? null : _runSearch,
-                child: const Text('Search Web For Fix'),
-              ),
+              for (final q in widget.intent.questions)
+                AppRowTile(
+                  dense: true,
+                  icon: Icons.arrow_right_alt,
+                  tone: AppTone.warning,
+                  title: q,
+                ),
             ],
           ),
-          const SizedBox(height: 8),
-          if (_busy) const LinearProgressIndicator(),
-          // PAUSE: non-destructive hold. The run parks at its next safe
-          // boundary and keeps all progress; F9 does the same globally.
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _sidecarIsPaused
-                    ? AppPalette.success(Theme.of(context).colorScheme)
-                    : Colors.amber.shade900,
-                side: BorderSide(
-                  color: _sidecarIsPaused
-                      ? Colors.green
-                      : Colors.amber.shade700,
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              icon: Icon(
-                _sidecarIsPaused ? Icons.play_circle : Icons.pause_circle,
-                size: 28,
-              ),
-              label: Text(
-                _sidecarIsPaused ? 'RESUME AUTOPILOT' : 'PAUSE AUTOPILOT',
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              onPressed: _pausePending ? null : _ptPauseToggle,
-            ),
-          ),
-          const SizedBox(height: 6),
-          // SAFETY STOP: big, always visible, red.
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              icon: const Icon(Icons.stop_circle, size: 28),
-              label: const Text(
-                'STOP AUTOPILOT',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              onPressed: _stopPending ? null : _ptStop,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Safety: press Esc or this STOP button to cancel all autopilot work. '
-            'If needed, move the mouse to a screen corner for the emergency failsafe.',
-            style: TextStyle(fontSize: 12, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Pause: press F9 (anywhere) or PAUSE AUTOPILOT to hold the run at '
-            'a safe boundary with all progress kept; pause again to resume.',
-            style: TextStyle(fontSize: 12, color: AppPalette.mutedText(Theme.of(context).colorScheme)),
-          ),
-          const SizedBox(height: 8),
-          Row(
+        if (issues.isEmpty)
+          const AppBanner(
+            tone: AppTone.success,
+            icon: Icons.verified_outlined,
+            message: 'Validator: clean.',
+          )
+        else
+          AppPanel(
+            icon: Icons.rule_outlined,
+            title: 'Validator',
+            subtitle:
+                '${issues.where((i) => i.severity == 'error').length} error(s), '
+                '${issues.where((i) => i.severity != 'error').length} warning(s)',
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
+              for (final i in issues)
+                AppBanner(
+                  dense: true,
+                  tone: i.severity == 'error'
+                      ? AppTone.danger
+                      : AppTone.warning,
+                  message: '[${i.severity}] ${i.message}',
+                ),
+              if (issues.any((i) => i.severity == 'error'))
+                const AppBanner(
+                  dense: true,
+                  tone: AppTone.danger,
+                  icon: Icons.block,
+                  message:
+                      'Execution is blocked until the validator errors above '
+                      'are fixed. Warnings are review items and do not block a '
+                      'run.',
+                ),
+            ],
+          ),
+        AppPanel(
+          icon: Icons.play_circle_outline,
+          title: 'Run this plan',
+          subtitle:
+              'Each button starts one kind of run; nothing runs on its own.',
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _busy ? null : _pushGns3,
+                  icon: const Icon(Icons.hub_outlined, size: 18),
+                  label: const Text('Push to GNS3'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _busy ? null : _ptAutopilot,
+                  icon: const Icon(Icons.smart_toy_outlined, size: 18),
+                  label: const Text('PT Autopilot Start'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _busy ? null : _ptCablesOnly,
+                  icon: const Icon(Icons.cable_outlined, size: 18),
+                  label: const Text('Cables + CLI only'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _busy ? null : _generatePkt,
+                  icon: const Icon(Icons.save_outlined, size: 18),
+                  label: const Text('Generate .pkt (no PT)'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: (_busy || _verifying) ? null : _verifyBuild,
+                  icon: const Icon(Icons.network_ping, size: 18),
+                  label: const Text('Verify (ping tests)'),
+                ),
+              ],
+            ),
+          ],
+        ),
+        AppPanel(
+          icon: Icons.build_outlined,
+          title: 'Diagnostics',
+          subtitle: 'Read-only tools that inspect the app, the sidecar and PT.',
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _harvestModels,
+                  icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                  label: const Text('Extend model library'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _checkSidecar,
+                  icon: const Icon(Icons.health_and_safety_outlined, size: 18),
+                  label: const Text('Check Sidecar'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _showInventory,
+                  icon: const Icon(Icons.devices_other_outlined, size: 18),
+                  label: const Text('Live Inventory'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _proveMove,
+                  icon: const Icon(Icons.mouse_outlined, size: 18),
+                  label: const Text('Test Mouse Move'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _inspectPt,
+                  icon: const Icon(Icons.troubleshoot_outlined, size: 18),
+                  label: const Text('Inspect PT'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _pollLogs,
+                  icon: const Icon(Icons.article_outlined, size: 18),
+                  label: const Text('Logs'),
+                ),
+              ],
+            ),
+          ],
+        ),
+        AppPanel(
+          icon: Icons.travel_explore_outlined,
+          title: 'Search for a fix',
+          subtitle:
+              'Searches leave this machine only when you press the button.',
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _previewSearch,
+                  icon: const Icon(Icons.preview_outlined, size: 18),
+                  label: const Text('Preview Web Search'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _busy ? null : _runSearch,
+                  icon: const Icon(Icons.travel_explore_outlined, size: 18),
+                  label: const Text('Search Web For Fix'),
+                ),
+              ],
+            ),
+          ],
+        ),
+        AppBanner(
+          tone: _sidecarState.startsWith('Busy')
+              ? AppTone.warning
+              : _sidecarState.startsWith('Idle')
+              ? AppTone.success
+              : AppTone.info,
+          title: 'Sidecar live status',
+          icon: _sidecarState.startsWith('Busy')
+              ? Icons.hourglass_top
+              : _sidecarState.startsWith('Idle')
+              ? Icons.pause_circle_outline
+              : Icons.help_outline,
+          message: _sidecarState,
+          actions: [
+            TextButton.icon(
+              onPressed: _busy ? null : _checkSidecar,
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Refresh'),
+            ),
+          ],
+        ),
+        AppPanel(
+          icon: Icons.description_outlined,
+          title: 'Deterministic config / export from this plan',
+          children: [
+            AppCodeBlock(
+              text: widget.configText,
+              title: 'Generated config',
+              maxHeight: 320,
+            ),
+          ],
+        ),
+        AppPanel(
+          icon: Icons.account_tree_outlined,
+          title: 'Topology',
+          subtitle:
+              '${widget.intent.nodes.length} device(s), '
+              '${widget.intent.links.length} link(s)',
+          children: [
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final n in widget.intent.nodes)
+                  AppTag(
+                    label: '${n.name} · ${n.type}',
+                    tone: AppTone.accent,
+                    mono: true,
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppTheme.s10),
+            AppCodeBlock(
+              text: widget.intent.links
+                  .map((l) => '${l.a}:${l.aIf}  <->  ${l.b}:${l.bIf}')
+                  .join('\n'),
+              title: 'Links',
+              maxHeight: 200,
+              compact: true,
+            ),
+          ],
+        ),
+        const AppBanner(
+          tone: AppTone.info,
+          icon: Icons.shield_outlined,
+          title: 'Repeat-run safety',
+          message:
+              'The autopilot checks each remembered canvas slot before acting. '
+              'A matching device skips placement, and an exact previously '
+              'verified router/switch configuration skips retyping. Recoverable '
+              'placement and command errors are retried and saved to learning '
+              'memory. If the screen is still uncertain, it stops that device '
+              'rather than stacking another one. Use "Cables + CLI only" for an '
+              'existing topology; the Fixes action intentionally re-applies '
+              'selected commands.',
+        ),
+        if (_busy) const LinearProgressIndicator(),
+        AppPanel(
+          tone: _sidecarIsPaused ? AppTone.success : AppTone.warning,
+          filled: true,
+          icon: _sidecarIsPaused
+              ? Icons.play_circle_outline
+              : Icons.pause_circle_outline,
+          title: _sidecarIsPaused
+              ? 'The run is paused at a safe boundary'
+              : 'Pause the run',
+          subtitle: _sidecarIsPaused
+              ? 'All progress is kept. Resume to continue where it stopped.'
+              : 'A pause is non-destructive: it parks at the next safe '
+                    'boundary and keeps every step.',
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _sidecarIsPaused
+                      ? AppPalette.success(Theme.of(context).colorScheme)
+                      : AppPalette.warning(Theme.of(context).colorScheme),
+                  side: BorderSide(
+                    color: _sidecarIsPaused
+                        ? AppPalette.success(Theme.of(context).colorScheme)
+                        : AppPalette.warning(Theme.of(context).colorScheme),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                icon: Icon(
+                  _sidecarIsPaused ? Icons.play_circle : Icons.pause_circle,
+                  size: 28,
+                ),
+                label: Text(
+                  _sidecarIsPaused ? 'RESUME AUTOPILOT' : 'PAUSE AUTOPILOT',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                onPressed: _pausePending ? null : _ptPauseToggle,
+              ),
+            ),
+          ],
+        ),
+        AppPanel(
+          tone: AppTone.danger,
+          filled: true,
+          icon: Icons.stop_circle_outlined,
+          title: 'Emergency stop',
+          subtitle: 'Cancels all autopilot work immediately.',
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                icon: const Icon(Icons.stop_circle, size: 28),
+                label: const Text(
+                  'STOP AUTOPILOT',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                onPressed: _stopPending ? null : _ptStop,
+              ),
+            ),
+            const SizedBox(height: AppTheme.s10),
+            Text(
+              'Safety: press STOP to cancel all autopilot work. If needed, '
+              'move the mouse to a screen corner for the emergency failsafe.',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppPalette.mutedText(Theme.of(context).colorScheme),
+              ),
+            ),
+          ],
+        ),
+        AppPanel(
+          icon: Icons.fact_check_outlined,
+          title: 'Audit',
+          subtitle:
+              'Offline reads the .pkt without Packet Tracer; live opens each '
+              'device and checks the real network.',
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final offline = OutlinedButton.icon(
                   onPressed: _busy || _auditing
                       ? null
                       : () => _runAudit(offline: true),
-                  icon: const Icon(Icons.description),
+                  icon: const Icon(Icons.description, size: 18),
                   label: Text(
                     _auditing
                         ? 'Auditing offline...'
                         : 'Audit .pkt (offline, no PT)',
                   ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
+                );
+                final live = OutlinedButton.icon(
                   onPressed: _busy || _auditing ? null : _runAudit,
-                  icon: const Icon(Icons.fact_check),
+                  icon: const Icon(Icons.fact_check, size: 18),
                   label: Text(
                     _auditing
                         ? 'Auditing network (opens each device)...'
                         : 'Audit Network (live)',
                   ),
+                );
+                if (constraints.maxWidth < 620) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      offline,
+                      const SizedBox(height: AppTheme.s8),
+                      live,
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: offline),
+                    const SizedBox(width: 8),
+                    Expanded(child: live),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+        if (_audit != null) _buildAuditCard(),
+        const SizedBox(height: 8),
+        VerificationReport(
+          report: _verifyReport,
+          busy: _verifying,
+          onRerun: _verifyBuild,
+        ),
+        // The run log is the only place a long build reports its own state,
+        // so a screen reader is told when it changes.
+        AppPanel(
+          icon: Icons.terminal_outlined,
+          title: 'Execution log',
+          subtitle: 'Everything this run has done, newest last.',
+          children: [
+            Semantics(
+              liveRegion: true,
+              label: 'Execution log',
+              child: AppCodeBlock(
+                text: _log,
+                title: 'Run log',
+                maxHeight: 280,
+                emptyText: 'Nothing has run yet.',
+                copyable: false,
+              ),
+            ),
+          ],
+        ),
+        AppPanel(
+          icon: Icons.my_location_outlined,
+          title: 'PT click calibration',
+          subtitle: _calLoaded
+              ? 'x0=$_gridX0 step=$_gridStep y=$_gridY'
+              : 'Clicks land off? Load, adjust, then Save. Tap Load first.',
+          children: [
+            Row(
+              children: [
+                OutlinedButton(onPressed: _loadCal, child: const Text('Load')),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _busy ? null : _saveCal,
+                  child: const Text('Save'),
                 ),
-              ),
-            ],
-          ),
-          if (_audit != null) _buildAuditCard(),
-          const SizedBox(height: 8),
-          VerificationReport(
-            report: _verifyReport,
-            busy: _verifying,
-            onRerun: _verifyBuild,
-          ),
-          const SizedBox(height: 8),
-          SelectableText(_log),
-          const SizedBox(height: 12),
-          ExpansionTile(
-            title: const Text(
-              'PT Click Calibration (clicks land off? fix here)',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              ],
             ),
-            subtitle: Text(
-              _calLoaded
-                  ? 'x0=$_gridX0 step=$_gridStep y=$_gridY'
-                  : 'tap Load first',
+            _calSlider(
+              'Grid start X',
+              _gridX0,
+              0.05,
+              0.9,
+              (v) => setState(() => _gridX0 = v),
             ),
-            children: [
-              Row(
-                children: [
-                  OutlinedButton(
-                    onPressed: _loadCal,
-                    child: const Text('Load'),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: _busy ? null : _saveCal,
-                    child: const Text('Save'),
-                  ),
-                ],
-              ),
-              _calSlider(
-                'Grid start X',
-                _gridX0,
-                0.05,
-                0.9,
-                (v) => setState(() => _gridX0 = v),
-              ),
-              _calSlider(
-                'Grid step',
-                _gridStep,
-                0.02,
-                0.3,
-                (v) => setState(() => _gridStep = v),
-              ),
-              _calSlider(
-                'Grid Y',
-                _gridY,
-                0.05,
-                0.9,
-                (v) => setState(() => _gridY = v),
-              ),
-              Wrap(
-                spacing: 8,
-                children: [
-                  OutlinedButton(
-                    onPressed: () => _clickSlot(0),
-                    child: const Text('Test slot 0'),
-                  ),
-                  OutlinedButton(
-                    onPressed: () => _clickSlot(1),
-                    child: const Text('Test slot 1'),
-                  ),
-                  OutlinedButton(
-                    onPressed: () => _clickSlot(2),
-                    child: const Text('Test slot 2'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  OutlinedButton(
-                    onPressed: _showRemembered,
-                    child: const Text('Remembered spots'),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
-                    onPressed: _forgetRemembered,
-                    child: const Text('Forget spots'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'One-time teach (fixes category-only clicks forever):',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-              ),
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  OutlinedButton(
-                    onPressed: () => _teach(
-                      'pal_router',
-                      'Routers CATEGORY icon (bottom bar)',
-                    ),
-                    child: const Text('Teach Router icon'),
-                  ),
-                  OutlinedButton(
-                    onPressed: () =>
-                        _teach('pal_switch', 'Switches CATEGORY icon'),
-                    child: const Text('Teach Switch icon'),
-                  ),
-                  OutlinedButton(
-                    onPressed: () =>
-                        _teach('model_col0', 'FIRST router MODEL thumbnail'),
-                    child: const Text('Teach Model'),
-                  ),
-                ],
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  'Category-only bug = MODEL click lands on empty space so PT never arms placement. '
-                  'Fix: Teach Router icon, Teach Switch icon, Teach Model once each '
-                  '(hover exact spot within 3s, Logs to confirm, Load to refresh). '
-                  'Then autopilot drops real devices. Shots in sidecar/shots/.',
-                  style: TextStyle(fontSize: 12),
+            _calSlider(
+              'Grid step',
+              _gridStep,
+              0.02,
+              0.3,
+              (v) => setState(() => _gridStep = v),
+            ),
+            _calSlider(
+              'Grid Y',
+              _gridY,
+              0.05,
+              0.9,
+              (v) => setState(() => _gridY = v),
+            ),
+            Wrap(
+              spacing: 8,
+              children: [
+                OutlinedButton(
+                  onPressed: () => _clickSlot(0),
+                  child: const Text('Test slot 0'),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // TEACHING-LOOP ALERTS: stale corrections (taught but no longer
-          // verifying) and rejected ones (a teach run disproved them) shown
-          // right where the user decides what to fix next.
-          CorrectionsCard(
-            snapshot: _corrections,
-            onRefresh: () => _refreshCorrections(force: true),
-          ),
-          const SizedBox(height: 12),
-          // AI FIX SUGGESTIONS: uses the Gemini key from Settings. Proposals
-          // are evaluated by a second Gemini call; accepted ones only ever
-          // become `proposed` corrections - teach runs still verify them.
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('AI fix suggestions (Gemini):',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Proposes fixes for steps that keep failing, then judges '
-                    'each proposal with a second AI pass. Accepted label/skip '
-                    'fixes are saved as PROPOSED corrections - run Verify to '
-                    'prove one on screen. Point/CLI suggestions stay as advice.',
-                    style: TextStyle(fontSize: 12),
+                OutlinedButton(
+                  onPressed: () => _clickSlot(1),
+                  child: const Text('Test slot 1'),
+                ),
+                OutlinedButton(
+                  onPressed: () => _clickSlot(2),
+                  child: const Text('Test slot 2'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                OutlinedButton(
+                  onPressed: _showRemembered,
+                  child: const Text('Remembered spots'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: _forgetRemembered,
+                  child: const Text('Forget spots'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'One-time teach (fixes category-only clicks forever):',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                OutlinedButton(
+                  onPressed: () => _teach(
+                    'pal_router',
+                    'Routers CATEGORY icon (bottom bar)',
                   ),
-                  const SizedBox(height: 8),
-                  Row(children: [
-                    ElevatedButton(
-                      onPressed:
-                          (_busy || _aiSuggesting) ? null : _runAiSuggest,
-                      child: Text(_aiSuggesting
-                          ? 'AI thinking...'
-                          : 'Suggest fixes with AI'),
-                    ),
-                  ]),
-                  if (_aiSuggest != null) ..._aiSuggestRows(),
-                ],
+                  child: const Text('Teach Router icon'),
+                ),
+                OutlinedButton(
+                  onPressed: () =>
+                      _teach('pal_switch', 'Switches CATEGORY icon'),
+                  child: const Text('Teach Switch icon'),
+                ),
+                OutlinedButton(
+                  onPressed: () =>
+                      _teach('model_col0', 'FIRST router MODEL thumbnail'),
+                  child: const Text('Teach Model'),
+                ),
+              ],
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'Category-only bug = MODEL click lands on empty space so PT never arms placement. '
+                'Fix: Teach Router icon, Teach Switch icon, Teach Model once each '
+                '(hover exact spot within 3s, Logs to confirm, Load to refresh). '
+                'Then autopilot drops real devices. Shots in sidecar/shots/.',
+                style: TextStyle(fontSize: 12),
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Teach a correction (learns a rule):',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          TextField(
-            controller: _fix,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              hintText: 'e.g. always use OSPF area 0 with auth, VLAN 10 users',
-              border: OutlineInputBorder(),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // TEACHING-LOOP ALERTS: stale corrections (taught but no longer
+        // verifying) and rejected ones (a teach run disproved them) shown
+        // right where the user decides what to fix next.
+        CorrectionsCard(
+          snapshot: _corrections,
+          onRefresh: () => _refreshCorrections(force: true),
+        ),
+        // AI FIX SUGGESTIONS: uses the Gemini key from Settings. Proposals
+        // are evaluated by a second Gemini call; accepted ones only ever
+        // become `proposed` corrections - teach runs still verify them.
+        AppPanel(
+          icon: Icons.auto_awesome_outlined,
+          title: 'AI fix suggestions (Gemini)',
+          subtitle:
+              'Proposes fixes for steps that keep failing, then judges each '
+              'proposal with a second AI pass. Accepted label/skip fixes are '
+              'saved as PROPOSED corrections - run Verify to prove one on '
+              'screen. Point/CLI suggestions stay as advice.',
+          children: [
+            Row(
+              children: [
+                ElevatedButton.icon(
+                  onPressed: (_busy || _aiSuggesting) ? null : _runAiSuggest,
+                  icon: const Icon(Icons.auto_fix_high, size: 18),
+                  label: Text(
+                    _aiSuggesting ? 'AI thinking...' : 'Suggest fixes with AI',
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
-          ElevatedButton(
-            onPressed: _saveCorrection,
-            child: const Text('Save correction as rule'),
-          ),
-        ],
-      ),
+            if (_aiSuggest != null) ..._aiSuggestRows(),
+          ],
+        ),
+        AppPanel(
+          icon: Icons.school_outlined,
+          title: 'Teach a correction',
+          subtitle:
+              'The rule is saved to memory and reused for matching targets.',
+          children: [
+            TextField(
+              controller: _fix,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText:
+                    'e.g. always use OSPF area 0 with auth, VLAN 10 users',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _saveCorrection,
+                  icon: const Icon(Icons.save_outlined, size: 18),
+                  label: const Text('Save correction as rule'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/autopilot_service.dart';
+import '../theme/app_kit.dart';
 import '../theme/app_palette.dart';
 
 /// Badge chips for the teaching-loop correction states.
@@ -54,27 +55,38 @@ class CorrectionBadges extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final chips = <Widget>[
       if (stale)
         _badge(
           'STALE',
-          Colors.orange,
+          AppPalette.warning(scheme),
           'User-taught, but the screen stopped verifying it. '
           'Re-teach it or un-teach it from the corrections list.',
         ),
       if (rejected)
         _badge(
           'REJECTED',
-          Colors.red,
+          AppPalette.danger(scheme),
           'A teach run tried this and the screen disagreed; '
           'nothing was written to memory.',
         ),
-      if (pending) _badge('PENDING', Colors.blue, 'Awaiting a teach run'),
-      if (verified) _badge('VERIFIED', Colors.green, 'Promoted to memory'),
+      if (pending)
+        _badge(
+          'PENDING',
+          scheme.primary,
+          'Awaiting a teach run',
+        ),
+      if (verified)
+        _badge(
+          'VERIFIED',
+          AppPalette.success(scheme),
+          'Promoted to memory',
+        ),
       if (thrash && !pending)
         _badge(
           'x$thrashCount',
-          Colors.purple,
+          scheme.tertiary,
           'Corrected $thrashCount time(s) before - a repeated edit on the '
           'same element is a sign the wrong thing is being blamed.',
         ),
@@ -125,88 +137,68 @@ class CorrectionsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: snapshot.hasStale ? AppPalette.warningFill(Theme.of(context).colorScheme) : AppPalette.infoFill(Theme.of(context).colorScheme),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Teaching-loop corrections',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                ),
-                if (onRefresh != null)
-                  IconButton(
-                    tooltip: 'Refresh corrections',
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.refresh, size: 18),
-                    onPressed: onRefresh,
-                  ),
-              ],
-            ),
-            Text(
-              '${snapshot.proposedCount} proposed · '
-              '${snapshot.verifiedCount} verified · '
-              '${snapshot.stale.length} stale · '
-              '${snapshot.rejected.length} rejected · '
-              '${snapshot.hits} verified hits',
-              style: const TextStyle(fontSize: 11, color: Colors.black87),
-            ),
-            const SizedBox(height: 4),
-            if (snapshot.isEmpty)
-              const Text(
-                'No corrections yet. Every fix you teach lands here first as '
-                'PENDING; a teach run verifies it on screen.',
-                style: TextStyle(fontSize: 11, color: Colors.black54),
-              ),
-            if (snapshot.hasStale)
-              Padding(
-                padding: const EdgeInsets.only(top: 4, bottom: 2),
-                child: Text(
-                  'A correction you taught stopped verifying. It is reported, '
-                  'never silently dropped - re-teach it or un-teach it below.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppPalette.warning(Theme.of(context).colorScheme),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            for (final row in snapshot.stale)
-              _rowTile(
-                context,
-                row,
-                leading: Icons.history_toggle_off,
-                iconColor: Colors.orange,
-                onRevert: onRevert,
-              ),
-            for (final row in snapshot.rejected)
-              _rowTile(
-                context,
-                row,
-                leading: Icons.block,
-                iconColor: Colors.red,
-                onRevert: onRevert,
-                subtitleExtra: row.rejectReason.isEmpty
-                    ? null
-                    : 'why: ${row.rejectReason}',
-              ),
-            for (final row in snapshot.pending)
-              _rowTile(
-                context,
-                row,
-                leading: Icons.hourglass_top,
-                iconColor: Colors.blue,
-                onRevert: onRevert,
-              ),
-          ],
-        ),
-      ),
+    return AppPanel(
+      icon: Icons.psychology_alt_outlined,
+      tone: snapshot.hasStale ? AppTone.warning : AppTone.info,
+      title: 'Teaching-loop corrections',
+      subtitle:
+          '${snapshot.proposedCount} proposed · '
+          '${snapshot.verifiedCount} verified · '
+          '${snapshot.stale.length} stale · '
+          '${snapshot.rejected.length} rejected · '
+          '${snapshot.hits} verified hits',
+      actions: [
+        if (onRefresh != null)
+          IconButton(
+            tooltip: 'Refresh corrections',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.refresh, size: 18),
+            onPressed: onRefresh,
+          ),
+      ],
+      children: [
+        if (snapshot.isEmpty)
+          const Text(
+            'No corrections yet. Every fix you teach lands here first as '
+            'PENDING; a teach run verifies it on screen.',
+            style: TextStyle(fontSize: 11),
+          ),
+        if (snapshot.hasStale)
+          const AppBanner(
+            dense: true,
+            tone: AppTone.warning,
+            message:
+                'A correction you taught stopped verifying. It is reported, '
+                'never silently dropped - re-teach it or un-teach it below.',
+          ),
+        for (final row in snapshot.stale)
+          _rowTile(
+            context,
+            row,
+            leading: Icons.history_toggle_off,
+            iconColor: AppPalette.warning(Theme.of(context).colorScheme),
+            onRevert: onRevert,
+          ),
+        for (final row in snapshot.rejected)
+          _rowTile(
+            context,
+            row,
+            leading: Icons.block,
+            iconColor: AppPalette.danger(Theme.of(context).colorScheme),
+            onRevert: onRevert,
+            subtitleExtra: row.rejectReason.isEmpty
+                ? null
+                : 'why: ${row.rejectReason}',
+          ),
+        for (final row in snapshot.pending)
+          _rowTile(
+            context,
+            row,
+            leading: Icons.hourglass_top,
+            iconColor: Theme.of(context).colorScheme.primary,
+            onRevert: onRevert,
+          ),
+      ],
     );
   }
 }
@@ -235,10 +227,10 @@ Widget _rowTile(
               if (subtitleExtra != null)
                 Text(
                   subtitleExtra,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontStyle: FontStyle.italic,
-                    color: Colors.black54,
+                    color: AppPalette.mutedText(Theme.of(context).colorScheme),
                   ),
                 ),
               Row(
@@ -246,27 +238,39 @@ Widget _rowTile(
                   CorrectionBadges.fromRow(row),
                   if (onRevert != null && row.status == 'verified') ...[
                     const SizedBox(width: 6),
-                    InkWell(
-                      onTap: () => onRevert(row),
-                      child: Padding(
-                        padding: const EdgeInsets.all(2),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.undo,
-                              size: 12,
-                              color: AppPalette.mutedText(Theme.of(context).colorScheme),
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              'un-teach',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: AppPalette.mutedText(Theme.of(context).colorScheme),
+                    // A 44x44 target: the label is 10px, so the tap area around
+                    // it used to be far smaller than a finger can hit.
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minWidth: 44,
+                        minHeight: 44,
+                      ),
+                      child: Tooltip(
+                        message: 'Un-teach ${row.summaryLine}',
+                        child: InkWell(
+                          onTap: () => onRevert(row),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.undo,
+                                size: 12,
+                                color: AppPalette.mutedText(
+                                  Theme.of(context).colorScheme,
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 2),
+                              Text(
+                                'un-teach',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppPalette.mutedText(
+                                    Theme.of(context).colorScheme,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
