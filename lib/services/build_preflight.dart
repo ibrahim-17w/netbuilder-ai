@@ -125,10 +125,50 @@ class BuildPreflight {
     ]..sort();
     final linksChecked = builtPorts.isNotEmpty;
 
+    // THE SEMANTIC HALF. Everything above asks "is this the lab we asked
+    // for?". That is not the same question as "is this a working lab": a file
+    // can match its plan name-for-name and port-for-port and still carry a
+    // duplicate address, a device wired to nothing, or a service role the
+    // plan called for that the file never enabled. Those are exactly the
+    // defect classes PlanRepairService fixes, so a file that has them is not
+    // verified - otherwise a .pkt can come back clean holding the very defect
+    // the repair pass was supposed to eliminate.
+    final semantic = <String>[];
+    final auditedFindings = audit['findings'];
+    if (auditedFindings is List) {
+      semantic.addAll(auditedFindings.map((f) => '$f'));
+    }
+    // A service the plan gave a role but the file never enabled. The audit
+    // reports services per device, so this is checked device by device.
+    final servicesByName = <String, Set<String>>{};
+    for (final d in devices) {
+      if (d is! Map) continue;
+      final name = '${d['name'] ?? ''}'.trim();
+      final svcs = d['services'];
+      if (name.isEmpty || svcs is! List) continue;
+      servicesByName[name] =
+          svcs.map<String>((e) => '$e'.toLowerCase()).toSet();
+    }
+    final roleGaps = <String>[];
+    for (final n in intent.nodes) {
+      if (n.services.isEmpty) continue;
+      final have = servicesByName[n.name.trim()];
+      if (have == null) continue; // device not in the file: reported above
+      final absent = n.services
+          .map((s) => s.toLowerCase())
+          .where((s) => !have.contains(s))
+          .toList();
+      if (absent.isNotEmpty) {
+        roleGaps.add('${n.name} is missing ${absent.join(', ')}');
+      }
+    }
+    semantic.addAll(roleGaps);
+
     if (missing.isEmpty &&
         extra.isEmpty &&
         unbuilt.isEmpty &&
-        doubled.isEmpty) {
+        doubled.isEmpty &&
+        semantic.isEmpty) {
       final links = linksChecked
           ? '${intent.links.length} link(s) verified against the ports the '
                 'generator wrote'
@@ -161,6 +201,17 @@ class BuildPreflight {
         '    - one interface carries more than one cable: '
             '${_cap(doubled)} - Packet Tracer cannot load a second cable on '
             'a port, and the extra interface config overwrites the first',
+      );
+    }
+    if (semantic.isNotEmpty) {
+      out.add(
+        '    - the file matches the plan but is not a working lab: '
+        '${_cap(_sortedCopy(semantic))}',
+      );
+      out.add(
+        '    - these are the same defect classes the repair pass fixes '
+        '(duplicate address, uncabled device, missing service role), so a '
+        'clean name-for-name match is not a clean build',
       );
     }
     if (!linksChecked) {
@@ -220,6 +271,9 @@ class BuildPreflight {
         return target.trim().isEmpty ? 'the default target' : target.trim();
     }
   }
+
+  static List<String> _sortedCopy(List<String> items) =>
+      items.toList()..sort();
 
   static String _cap(List<String> items, [int n = 8]) => items.length <= n
       ? items.join(', ')

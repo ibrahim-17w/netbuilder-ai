@@ -384,12 +384,20 @@ def test_loading_a_new_teach_block_disarms_the_previous_one():
 
 
 def _arm(store, key, dev="MGR1", fx=0.99, fy=0.11, cid="c1", project="office"):
-    """Arm one override the way a teach run does, with RUN primed."""
+    """Arm one override the way a teach run does, with RUN primed.
+
+    The lookup is part of the simulation: a real run reaches the step and
+    consults the override, and settlement only gives a verdict (promote or
+    reject) to a correction the run actually exercised.  A correction the
+    run never reached stays proposed instead of collecting a false verdict.
+    """
     pt._load_teach_overrides([{"store": store, "key": key, "device": dev,
                                "fx": fx, "fy": fy, "correctionId": cid}])
     pt.RUN["teachRun"] = [{"store": store, "key": key, "device": dev,
                            "correctionId": cid}]
     pt.RUN["project"] = project
+    pt.RUN.pop("teachConsulted", None)
+    pt._teach_override(store, key, dev)
 
 
 def test_settle_promotes_a_verified_teach_run(tmp_path):

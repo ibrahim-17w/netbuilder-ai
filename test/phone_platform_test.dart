@@ -122,7 +122,10 @@ void main() {
         }
 
         expect(find.textContaining('No .pkt engine at'), findsOneWidget);
-        expect(find.textContaining('On a phone the engine runs on your PC'),
+        // On a phone the engine is optional: the bundled template library
+        // builds the file on the device, so the banner is a status, not an
+        // alarm.
+        expect(find.textContaining('Builds run on this device'),
             findsOneWidget);
         expect(find.text('Set address'), findsOneWidget);
         expect(find.text('Start engine'), findsNothing,

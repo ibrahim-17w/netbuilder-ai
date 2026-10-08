@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:net_builder/models/network_intent.dart';
+import 'package:net_builder/services/casual_english.dart';
+import 'package:net_builder/services/validator_service.dart';
 
 /// What the standing plan becomes after one more turn. This is the difference
 /// between a conversation and a series of unrelated labs, and getting it wrong
@@ -135,6 +137,117 @@ void main() {
         '2 routers over a serial WAN, 4 pcs each side',
       );
       expect(plan.nodes.any((n) => n.name.startsWith('HQ_')), isFalse);
+    });
+  });
+
+  group('a count correction of the standing lab', () {
+    // The confirmed failure this group pins: "actually 8 pcs" re-planned
+    // from the fragment alone and replaced the lab with eight orphan PCs,
+    // while a bare "actually 8" did nothing at all - both while the
+    // understood card reported the correction.
+    final base = start('2 routers, 2 switches and 50 PCs with OSPF');
+
+    test('"actually 8 pcs" corrects the PC count and keeps the rest', () {
+      final after = next(base, 'actually 8 pcs');
+      expect(after.plan.nodes.where((n) => n.type == 'pc').length, 8,
+          reason: 'the correction replaces the 50');
+      expect(after.plan.nodes.where((n) => n.type == 'router').length, 2,
+          reason: 'the routers were not part of the correction');
+      expect(after.plan.nodes.where((n) => n.type == 'switch').length, 2);
+      expect(after.plan.routing, 'ospf',
+          reason: 'the routing the original brief asked for stays');
+      expect(after.plan.nodes.length, 12);
+    });
+
+    test('a bare "actually 8" corrects the kind the lab was last about', () {
+      final after = next(base, 'actually 8');
+      expect(after.plan.nodes.where((n) => n.type == 'pc').length, 8);
+      expect(after.plan.nodes.where((n) => n.type == 'router').length, 2);
+      expect(after.plan.nodes.where((n) => n.type == 'switch').length, 2);
+    });
+
+    test('"no wait, 8 pcs" reads as the same correction', () {
+      final after = next(base, 'no wait, 8 pcs');
+      expect(after.plan.nodes.where((n) => n.type == 'pc').length, 8);
+      expect(after.plan.nodes.where((n) => n.type == 'router').length, 2);
+    });
+
+    test('corrections chain: the newest number wins', () {
+      final first = next(base, 'actually 8 pcs');
+      expect(first.plan.nodes.where((n) => n.type == 'pc').length, 8);
+      final second = next(first, 'actually 60 pcs');
+      expect(second.plan.nodes.where((n) => n.type == 'pc').length, 60);
+      expect(second.plan.nodes.where((n) => n.type == 'router').length, 2,
+          reason: 'the earlier correction did not loosen the lab');
+    });
+
+    test('several kinds can be corrected in one breath', () {
+      final after = next(base, 'actually 2 routers and 4 pcs');
+      expect(after.plan.nodes.where((n) => n.type == 'router').length, 2);
+      expect(after.plan.nodes.where((n) => n.type == 'pc').length, 4);
+      expect(after.plan.nodes.where((n) => n.type == 'switch').length, 2,
+          reason: 'the switches were not part of the correction');
+    });
+
+    test('correcting a kind the lab does not have yet adds it', () {
+      final infra = start('2 routers and 2 switches');
+      final after = next(infra, 'actually 8 pcs');
+      expect(after.plan.nodes.where((n) => n.type == 'pc').length, 8);
+      expect(after.plan.nodes.where((n) => n.type == 'router').length, 2);
+      expect(after.plan.nodes.where((n) => n.type == 'switch').length, 2);
+    });
+
+    test('a correction may carry a service of its own', () {
+      final after = next(base, 'actually 8 pcs with a web server');
+      expect(after.plan.nodes.where((n) => n.type == 'pc').length, 8);
+      expect(after.plan.nodes.where((n) => n.type == 'server').length, 1,
+          reason: 'the server the correction names is part of the lab');
+      expect(after.plan.nodes.where((n) => n.type == 'switch').length, 2);
+    });
+
+    test('the corrected plan is still buildable', () {
+      final after = next(base, 'actually 8 pcs');
+      final blocking = ValidatorService.validate(
+        after.plan,
+        target: 'packet-tracer',
+      ).where((issue) => issue.blocks);
+      expect(blocking, isEmpty,
+          reason: 'a correction must never leave the plan unbuildable');
+    });
+
+    test('the corrected count survives the normalize step the chat runs',
+        () {
+      final normalized = CasualEnglish.normalize('Actually, 8 pcs');
+      final after = NetworkIntent.followUp(
+        previous: base.plan,
+        previousBrief: base.brief,
+        brief: normalized,
+        parsed: NetworkIntent.parseSimple('chat', normalized),
+        project: 'chat',
+      );
+      expect(after.plan.nodes.where((n) => n.type == 'pc').length, 8);
+      expect(after.plan.nodes.where((n) => n.type == 'router').length, 2);
+    });
+
+    test('an addition is still an addition, not a correction', () {
+      final after = next(base, 'add 2 more pcs');
+      expect(after.plan.nodes.where((n) => n.type == 'pc').length, 52,
+          reason: '"add" means plus on the standing lab');
+    });
+
+    test('a rebuild that names devices still re-plans on purpose', () {
+      final after = next(base, 'make it 2 routers and 4 pcs');
+      expect(after.plan.nodes.where((n) => n.type == 'pc').length, 4);
+      expect(after.plan.nodes.where((n) => n.type == 'router').length, 2);
+      expect(after.plan.nodes.where((n) => n.type == 'switch').length, 0,
+          reason: 'the documented re-plan reading is unchanged');
+    });
+
+    test('a corrected floor restates the bound instead of growing to it', () {
+      final floored = start('more than 100 pcs');
+      final after = next(floored, 'no wait, actually more than 8 pcs');
+      expect(after.plan.nodes.where((n) => n.type == 'pc').length, 9,
+          reason: 'the new bound replaces the old one');
     });
   });
 }

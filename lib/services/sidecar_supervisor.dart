@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart' as p;
 
 import 'settings_service.dart';
@@ -185,8 +186,66 @@ class SidecarSupervisor {
 
   /// Interpreters named on PATH, with the Store placeholders dropped. Visible
   /// for testing: the filtering is the part that fails silently in the wild.
+  ///
+  /// Synchronous, and kept so. It blocks on `where.exe`, so the LAUNCH path
+  /// must not use it - see [pathInterpretersAsync]. Tests and any caller that
+  /// already knows the list keep working unchanged.
   static List<String> pathInterpreters([List<String>? override]) {
-    final raw = override ?? _where(['pythonw.exe', 'python.exe', 'python3', 'python']);
+    final raw = override ?? _where(_pathNames);
+    return _filterInterpreters(raw);
+  }
+
+  /// The same list as [pathInterpreters], without blocking the UI isolate.
+  ///
+  /// This is what the launch path uses. `Process.runSync` BLOCKS the calling
+  /// isolate until the child exits, so looking up PATH on the UI isolate froze
+  /// the frame for the length of four process spawns - on the only path every
+  /// desktop user takes, before the app has drawn anything. `where.exe` is
+  /// cheap when the disk is warm and can be very slow the first time an
+  /// antivirus or a cold cache gets to it, and there is no partial-frame
+  /// benefit to paying that on the UI thread.
+  ///
+  /// The four lookups run CONCURRENTLY, but the results are flattened in the
+  /// original name order, so the candidate list is byte-for-byte what
+  /// [pathInterpreters] returns. Order decides which interpreter
+  /// [candidateTargets] offers first, and `_start` takes the first one that
+  /// verifies, so this is load-bearing and deliberately preserved.
+  static Future<List<String>> pathInterpretersAsync([
+    List<String>? override,
+  ]) async {
+    if (override != null) return _filterInterpreters(override);
+    final raw = await (_pathScan ??= _whereAsync(_pathNames).whenComplete(() {
+      _pathScan = null;
+    }));
+    return _filterInterpreters(raw);
+  }
+
+  /// Names probed on PATH, most preferred first. One list so the sync and
+  /// async lookups can never drift into probing different sets.
+  static const List<String> _pathNames = [
+    'pythonw.exe',
+    'python.exe',
+    'python3',
+    'python',
+  ];
+
+  /// In-flight PATH scan, shared so two launches do not spawn eight
+  /// `where.exe` processes between them. Cleared when the scan settles.
+  static Future<List<String>>? _pathScan;
+
+  /// How many PATH scans have actually run.
+  ///
+  /// The memo above is an optimisation nobody can see: two callers get the
+  /// same list whether they shared one scan or each spawned four processes,
+  /// so a test asserting only the results passes with the memo deleted. This
+  /// counter is what makes "they shared" an assertable fact instead of a
+  /// claim in a comment.
+  @visibleForTesting
+  static int pathScanCount = 0;
+
+  /// The one filtering rule, shared by both lookups. Trims, drops the Windows
+  /// Store shims, and de-duplicates while keeping first-seen order.
+  static List<String> _filterInterpreters(List<String> raw) {
     final result = <String>[];
     for (final entry in raw) {
       final trimmed = entry.trim();
@@ -203,16 +262,42 @@ class SidecarSupervisor {
       try {
         final r = Process.runSync('where.exe', [name], runInShell: false);
         if (r.exitCode == 0) {
-          found.addAll(r.stdout
-              .toString()
-              .split(RegExp(r'[\r\n]+'))
-              .map((l) => l.trim())
-              .where((l) => l.isNotEmpty));
+          found.addAll(_lines(r.stdout));
         }
       } catch (_) {}
     }
     return found;
   }
+
+  /// [_where] without the blocking call.
+  ///
+  /// Each name is probed concurrently; [Future.wait] hands the results back in
+  /// the order they were started, and flattening in that order reproduces
+  /// [_where]'s sequential output exactly. A name that cannot be spawned, or
+  /// that is simply not on PATH, contributes nothing - the same silent skip
+  /// [_where] has always made, because "not installed" is the normal case here
+  /// rather than an error worth surfacing.
+  static Future<List<String>> _whereAsync(List<String> names) async {
+    pathScanCount++;
+    final perName = await Future.wait(names.map((name) async {
+      try {
+        final r = await Process.run('where.exe', [name], runInShell: false)
+            .timeout(const Duration(seconds: 5));
+        if (r.exitCode != 0) return <String>[];
+        return _lines(r.stdout);
+      } catch (_) {
+        return <String>[];
+      }
+    }));
+    return [for (final group in perName) ...group];
+  }
+
+  static List<String> _lines(Object? stdout) => stdout
+      .toString()
+      .split(RegExp(r'[\r\n]+'))
+      .map((l) => l.trim())
+      .where((l) => l.isNotEmpty)
+      .toList();
 
   /// `%LOCALAPPDATA%\Programs\Python\Python3xx\pythonw.exe`, newest first.
   /// A per-user install that is not on PATH is extremely common.
@@ -341,9 +426,13 @@ class SidecarSupervisor {
     String? logPath,
   }) async {
     final searchRoots = roots ?? SidecarSupervisor.searchRoots();
+    // Resolved BEFORE discovery, and asynchronously: `candidateTargets` stays
+    // pure and synchronous, while the one thing in here that costs a process
+    // spawn per name happens off the UI isolate. Passing the resolved list in
+    // also means the PATH scan cannot run twice for one start.
     final targets = candidateTargets(
       roots: searchRoots,
-      pythonsOnPath: pythonsOnPath,
+      pythonsOnPath: pythonsOnPath ?? await pathInterpretersAsync(),
     );
     if (targets.isEmpty) {
       return lastResult = SidecarLaunchResult(

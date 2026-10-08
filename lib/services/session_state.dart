@@ -75,6 +75,23 @@ class SessionState {
   /// starting a new one.
   String intentJson;
 
+  /// An active interactive troubleshooting flow ({'flow', 'step', 'data'}),
+  /// so a mid-diagnosis conversation survives a reopen. Empty when no flow
+  /// is running. JSON-serializable primitives only, by contract with
+  /// [TroubleshootFlowEngine].
+  Map<String, dynamic> flowState;
+
+  /// The conversation's design brief (see [DesignBrief]), as JSON. This is
+  /// what makes "what we've settled so far" survive a reopen: the brief card
+  /// and the readiness gate read the same accumulated facts the user saw
+  /// before they closed the window.
+  String briefJson;
+
+  /// Clarification questions asked and not yet answered (their ids, see
+  /// [ClarificationService]), so a question survives a reopen and the next
+  /// message is still read as its answer.
+  List<String> pendingQuestionIds;
+
   SessionState({
     this.project = '',
     List<String>? focus,
@@ -92,12 +109,17 @@ class SessionState {
     this.artifactUpdatedAt = '',
     List<Map<String, String>>? artifacts,
     this.intentJson = '',
+    Map<String, dynamic>? flowState,
+    this.briefJson = '',
+    List<String>? pendingQuestionIds,
   })  : focus = focus ?? <String>[],
         confirmedFindings = confirmedFindings ?? <String>[],
         openFindings = openFindings ?? <String>[],
         changesMade = changesMade ?? <Map<String, dynamic>>[],
         proposedChanges = proposedChanges ?? <Map<String, dynamic>>[],
-        artifacts = artifacts ?? <Map<String, String>>[];
+        artifacts = artifacts ?? <Map<String, String>>[],
+        flowState = flowState ?? <String, dynamic>{},
+        pendingQuestionIds = pendingQuestionIds ?? <String>[];
 
   static const int maxFocus = 6;
   static const int maxFindings = 8;
@@ -451,6 +473,9 @@ class SessionState {
     'artifactUpdatedAt': artifactUpdatedAt,
     'artifacts': artifacts,
     'intentJson': intentJson,
+    if (briefJson.isNotEmpty) 'briefJson': briefJson,
+    if (pendingQuestionIds.isNotEmpty) 'pendingQuestionIds': pendingQuestionIds,
+    if (flowState.isNotEmpty) 'flowState': flowState,
   };
 
   String encode() => jsonEncode(toJson());
@@ -483,6 +508,11 @@ class SessionState {
     artifactUpdatedAt: (j['artifactUpdatedAt'] ?? '').toString(),
     artifacts: _stringMaps(j['artifacts']),
     intentJson: (j['intentJson'] ?? '').toString(),
+    briefJson: (j['briefJson'] ?? '').toString(),
+    pendingQuestionIds: _strings(j['pendingQuestionIds']),
+    flowState: j['flowState'] is Map
+        ? Map<String, dynamic>.from(j['flowState'] as Map)
+        : <String, dynamic>{},
   );
 
   // --- deterministic extraction -------------------------------------------

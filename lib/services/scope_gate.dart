@@ -161,12 +161,15 @@ class ScopeGate {
     r'sure|alright|bye|goodbye|see\s+ya|later|good\s+night|welcome)\b',
   );
 
-  /// Questions about what this assistant is or can do.
+  /// Questions about what this assistant is or can do. "how are you" and
+  /// "how's it going" belong here too: they are conversation about the
+  /// assistant, and parsing them as a brief would invent a lab the same
+  /// way "hello" once did.
   static final RegExp _identityAsk = RegExp(
     r'\b(who\s+(are|r)\s+you|what\s+(are|r)\s+you|what\s+can\s+you\s+do|'
     r'what\s+do\s+you\s+do|what\s+are\s+you\s+for|help\s+me|'
     r'how\s+(do|can)\s+(you|this)\s+(work|help)|are\s+you\s+(an?\s+)?'
-    r'(ai|bot|human|robot))\b',
+    r'(ai|bot|human|robot)|how\s+(are|r)\s+you|how.?s\s+it\s+going)\b',
   );
 
   /// True when the message is conversation rather than a network request.

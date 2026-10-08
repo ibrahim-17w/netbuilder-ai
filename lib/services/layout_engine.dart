@@ -17,8 +17,12 @@ const List<String> kLayoutStyles = <String>[
   'rows',
   'grouped',
   'layered',
+  'backbone',
+  'campus',
+  'star',
   'radial',
   'circle',
+  'ring',
   'grid',
   'split',
 ];
@@ -29,11 +33,23 @@ const List<String> kLayoutStyles = <String>[
 /// These are the ones that read differently at a glance. `tree`, `wide` and
 /// `compact` are the same tree at three sizes, which is why offering them side
 /// by side looked like three near-identical pictures.
+///
+/// `ring`, `star`, `backbone` and `campus` are flat in the same sense - a
+/// device's spot comes from its role and (for star/backbone/campus) from the
+/// neighbour it hangs off, never from being nested under an uplink - so they
+/// live here too. They have their own placement functions, dispatched in
+/// [computeLayoutSnapshot]; the sidecar's `LAYOUT_FLAT_STYLES` mirror does not
+/// know them yet, which is safe only because every build carries the resolved
+/// `positions` map the sidecar honours spot for spot.
 const List<String> kFlatLayoutStyles = <String>[
   'radial',
   'circle',
   'grid',
   'split',
+  'ring',
+  'star',
+  'backbone',
+  'campus',
 ];
 
 /// One group of devices parked at one edge, as the engine reads it.
@@ -58,8 +74,12 @@ const Map<String, LayoutShape> kLayoutStyleShapes = <String, LayoutShape>{
   'rows': LayoutShape(1.0, 4),
   'grouped': LayoutShape(1.0, 4),
   'layered': LayoutShape(1.0, 4),
+  'backbone': LayoutShape(1.0, 4),
+  'campus': LayoutShape(1.0, 4),
+  'star': LayoutShape(1.0, 4),
   'radial': LayoutShape(1.0, 4),
   'circle': LayoutShape(1.0, 4),
+  'ring': LayoutShape(1.0, 4),
   'grid': LayoutShape(1.0, 4),
   'split': LayoutShape(1.0, 4),
 };
@@ -108,8 +128,12 @@ String layoutStyleLabel(String style) => switch (style) {
   'rows' => 'Straight rows',
   'grouped' => 'Grouped to one side',
   'layered' => 'Layered left to right',
+  'backbone' => 'Backbone riser',
+  'campus' => 'Campus tiers',
+  'star' => 'Star',
   'radial' => 'Radial rings',
   'circle' => 'One circle',
+  'ring' => 'Ring',
   'grid' => 'Even grid',
   'split' => 'One column per kind',
   _ => 'Site trees',
@@ -122,8 +146,12 @@ String layoutStyleBlurb(String style) => switch (style) {
   'rows' => 'One band per device kind, left to right',
   'grouped' => 'Servers in their own column, clear of the hosts',
   'layered' => 'Ranks become columns - the classic hierarchy, sideways',
+  'backbone' => 'One horizontal backbone - PCs drop below, servers sit above',
+  'campus' => 'Core on top, switches in the middle, endpoints in columns',
+  'star' => 'Switches radiate from the router, their PCs fanned outward',
   'radial' => 'Core in the middle, endpoints on the outside',
   'circle' => 'Every device on one ring - a quick overview',
+  'ring' => 'Switches alternate with endpoints on one ring, core in the middle',
   'grid' => 'An evenly spaced box, ignoring the topology',
   'split' => 'A vertical column per kind of device',
   _ => 'Each site a tree, hosts under the switch they use',
@@ -374,14 +402,30 @@ LayoutSnapshot computeLayoutSnapshot(
 
   // Whole-pixel spots, and never two devices on the same point.
   if (kFlatLayoutStyles.contains(style)) {
-    spots = _flatPositions(
-      style,
-      entries,
-      tier,
-      pitch,
-      gap,
-      rowStep,
-    );
+    spots = switch (style) {
+      'ring' => _ringPositions(entries, tier, pitch),
+      'star' => _starPositions(entries, tier, children, pitch),
+      'backbone' => _backbonePositions(
+        entries,
+        tier,
+        children,
+        pitch,
+        gap,
+        rowStep,
+        gridColumns,
+      ),
+      'campus' => _campusPositions(
+        entries,
+        tier,
+        children,
+        pitch,
+        gap,
+        rowStep,
+        bandStep,
+        gridColumns,
+      ),
+      _ => _flatPositions(style, entries, tier, pitch, gap, rowStep),
+    };
   } else if (style == 'layered') {
     spots = _layeredPositions(
       entries,
@@ -608,6 +652,472 @@ Map<String, List<double>> _keepOnCanvas(Map<String, List<double>> spots) {
 int _ceilSqrt(int value) {
   if (value <= 1) return 1;
   return math.sqrt(value).ceil();
+}
+
+/// One device (or a small cluster of them) exactly on a drawing's centre.
+///
+/// Two routers cannot share a point, so a group spreads on a tiny circle just
+/// big enough to keep one pitch between neighbours - the same guarantee the
+/// ring drawings use for their own circumference.
+void _parkAtCentre(
+  List<String> names,
+  Map<String, List<double>> spots,
+  double centreX,
+  double centreY,
+  double pitch,
+) {
+  if (names.isEmpty) return;
+  if (names.length == 1) {
+    spots[names.first] = [centreX, centreY];
+    return;
+  }
+  final radius = math.max(
+    pitch * 0.75,
+    pitch / (2 * math.sin(math.pi / names.length)),
+  );
+  for (var i = 0; i < names.length; i++) {
+    final angle = -math.pi / 2 + 2 * math.pi * i / names.length;
+    spots[names[i]] = [
+      centreX + radius * math.cos(angle),
+      centreY + radius * math.sin(angle),
+    ];
+  }
+}
+
+/// The `ring` drawing: one circle, the core in the middle of it.
+///
+/// Switches alternate with the machines they serve as you walk round the
+/// ring - the textbook token/ring-network picture - and the routers sit at
+/// the centre rather than on the ring, because a ring lab's core is what
+/// everything on the ring hangs off.
+Map<String, List<double>> _ringPositions(
+  List<List<String>> entries,
+  Map<String, int> tier,
+  double pitch,
+) {
+  final core = <String>[];
+  final switches = <String>[];
+  final rest = <String>[];
+  for (final e in entries) {
+    final t = tier[e[0]] ?? kTierHosts;
+    if (t == kTierCore) {
+      core.add(e[0]);
+    } else if (t == kTierAggregation || t == kTierAccess) {
+      switches.add(e[0]);
+    } else {
+      rest.add(e[0]);
+    }
+  }
+
+  // Interleave: switch, endpoint, switch, endpoint ... When one side runs
+  // out the remainder follows consecutively, so every count still closes the
+  // ring. Plan order inside each half keeps the drawing deterministic.
+  final ring = <String>[];
+  final rounds = math.max(switches.length, rest.length);
+  for (var i = 0; i < rounds; i++) {
+    if (i < switches.length) ring.add(switches[i]);
+    if (i < rest.length) ring.add(rest[i]);
+  }
+
+  final spots = <String, List<double>>{};
+  final centreX = kCanvasWidth / 2;
+  if (ring.isEmpty) {
+    // A lab of nothing but core devices: they take the centre together.
+    _parkAtCentre(core, spots, centreX, kRowTop, pitch);
+    return spots;
+  }
+  // The circumference has to hold one pitch per device, like `circle`'s.
+  final radius = math.max(
+    pitch * (ring.length / (2 * math.pi)) + pitch,
+    pitch * 1.8,
+  );
+  final centreY = kRowTop + radius;
+  for (var i = 0; i < ring.length; i++) {
+    final angle = -math.pi / 2 + 2 * math.pi * i / ring.length;
+    spots[ring[i]] = [
+      centreX + radius * math.cos(angle),
+      centreY + radius * math.sin(angle),
+    ];
+  }
+  _parkAtCentre(core, spots, centreX, centreY, pitch);
+  return _keepOnCanvas(spots);
+}
+
+/// The `star` drawing: routers at the centre, access switches radiating at
+/// even angles, each switch's endpoints fanned between its switch and the
+/// canvas edge.
+///
+/// The fans follow the plan's links (`children`), so a PC sits on its own
+/// switch's spoke - this is the drawing that makes "every PC hangs off the
+/// switch it is cabled to" visible. Endpoints no switch claims (unlinked, or
+/// hung off a router or a server) share the fans round-robin in plan order
+/// rather than disappearing; a lab with no switches at all draws its
+/// endpoints as one-device spokes, which is the same ring of rays a star
+/// with empty switches degenerates to.
+Map<String, List<double>> _starPositions(
+  List<List<String>> entries,
+  Map<String, int> tier,
+  Map<String, List<String>> children,
+  double pitch,
+) {
+  final core = <String>[];
+  final switches = <String>[];
+  for (final e in entries) {
+    final t = tier[e[0]] ?? kTierHosts;
+    if (t == kTierCore) {
+      core.add(e[0]);
+    } else if (t == kTierAggregation || t == kTierAccess) {
+      switches.add(e[0]);
+    }
+  }
+
+  final spots = <String, List<double>>{};
+  final centreX = kCanvasWidth / 2;
+  final count = math.max(switches.length, 1);
+  // Adjacent spokes have to clear one pitch where the switches sit, so the
+  // ring grows with the switch count; the floor keeps two or three switches
+  // from crowding the centre.
+  final firstRing = math.max(
+    pitch * 1.8,
+    count >= 2 ? pitch / (2 * math.sin(math.pi / count)) : 0.0,
+  );
+  final centreY = kRowTop + firstRing + pitch;
+  _parkAtCentre(core, spots, centreX, centreY, pitch);
+
+  if (switches.isEmpty) {
+    // No switches to radiate: every endpoint becomes its own one-device
+    // spoke, evenly spread round the centre. Still the star silhouette -
+    // rays from the core - and no device is dropped or quietly redrawn as
+    // some other style.
+    final spokes = <String>[
+      for (final e in entries)
+        if ((tier[e[0]] ?? kTierHosts) >= kTierServices) e[0],
+    ];
+    final radius = math.max(
+      pitch * (spokes.length / (2 * math.pi)) + pitch,
+      pitch * 1.8,
+    );
+    for (var i = 0; i < spokes.length; i++) {
+      final angle = -math.pi / 2 + 2 * math.pi * i / spokes.length;
+      spots[spokes[i]] = [
+        centreX + radius * math.cos(angle),
+        centreY + radius * math.sin(angle),
+      ];
+    }
+    return _keepOnCanvas(spots);
+  }
+
+  // Each switch's fan: the machines that hang off it, plan order. A fan
+  // takes endpoints only - another switch hanging off a multi-layer device
+  // is itself on the radiating ring, never a machine at the end of a spoke.
+  final fans = <List<String>>[
+    for (final name in switches)
+      <String>[
+        for (final kid in children[name] ?? const <String>[])
+          if ((tier[kid] ?? kTierHosts) >= kTierServices) kid,
+      ],
+  ];
+  // Endpoints no switch claims join the fans round-robin so no drawing ever
+  // drops a device.
+  final claimed = <String>{for (final fan in fans) ...fan};
+  var fanIndex = 0;
+  for (final e in entries) {
+    final name = e[0];
+    if ((tier[name] ?? kTierHosts) < kTierServices) continue;
+    if (claimed.contains(name)) continue;
+    fans[fanIndex % fans.length].add(name);
+    fanIndex++;
+  }
+
+  for (var i = 0; i < switches.length; i++) {
+    final angle = -math.pi / 2 + 2 * math.pi * i / switches.length;
+    spots[switches[i]] = [
+      centreX + firstRing * math.cos(angle),
+      centreY + firstRing * math.sin(angle),
+    ];
+    final fan = fans[i];
+    // The fan spreads across the arc this spoke owns. One ring of the spoke
+    // holds as many endpoints as fit with an arc-length pitch between them,
+    // keeping a margin so neighbouring switches' fans never touch; the rest
+    // wrap onto a further ring, a little way out.
+    var placed = 0;
+    for (var ring = 0; placed < fan.length; ring++) {
+      final radius = firstRing + pitch * (ring + 1);
+      final cap = _fanCapacity(radius, switches.length, pitch);
+      final inRing = math.min(cap, fan.length - placed);
+      for (var slot = 0; slot < inRing; slot++) {
+        final spread = angle + (slot - (inRing - 1) / 2) * (pitch / radius);
+        spots[fan[placed]] = [
+          centreX + radius * math.cos(spread),
+          centreY + radius * math.sin(spread),
+        ];
+        placed++;
+      }
+    }
+  }
+  return _keepOnCanvas(spots);
+}
+
+/// How many endpoints one ring of a star spoke holds at [radius]: the arc
+/// that spoke owns there (a fair share of the circle), at an arc-length
+/// [pitch] between neighbours, with a margin so adjacent switches' fans keep
+/// a visible gap. At least one - a spoke never refuses its machine.
+int _fanCapacity(double radius, int switchCount, double pitch) {
+  final count = math.max(switchCount, 1);
+  final owned = 2 * math.pi * radius / count;
+  return math.max(1, (owned * 0.8 / pitch).floor());
+}
+
+/// The `backbone` drawing - the classic ISP/campus riser.
+///
+/// One horizontal line of routers and switches across the middle, core at
+/// the left and access at the right; PCs hang below the device they are
+/// cabled to on short drops, and servers sit above it, so traffic literally
+/// reads top-to-bottom. Each line device owns a horizontal block wide enough
+/// for its own drops (wrapped when a switch serves more endpoints than fit
+/// in one row), so neighbours' machines never land on each other.
+Map<String, List<double>> _backbonePositions(
+  List<List<String>> entries,
+  Map<String, int> tier,
+  Map<String, List<String>> children,
+  double pitch,
+  double gap,
+  double rowStep,
+  int gridColumns,
+) {
+  final spots = <String, List<double>>{};
+  // The line, core first: routers, then aggregation, then access, plan
+  // order inside a tier.
+  final line = <String>[
+    for (var t = kTierCore; t <= kTierAccess; t++)
+      for (final e in entries)
+        if ((tier[e[0]] ?? kTierHosts) == t) e[0],
+  ];
+
+  // Drops: servers above the line, hosts below, grouped by the line device
+  // they hang off. Endpoints nothing on the line claims (unlinked, or hung
+  // off a server) share one block at the far end rather than disappearing.
+  final serverFan = <String, List<String>>{};
+  final hostFan = <String, List<String>>{};
+  final claimed = <String>{};
+  for (final name in line) {
+    for (final kid in children[name] ?? const <String>[]) {
+      final t = tier[kid] ?? kTierHosts;
+      if (t == kTierServices) {
+        serverFan.putIfAbsent(name, () => <String>[]).add(kid);
+        claimed.add(kid);
+      } else if (t == kTierHosts) {
+        hostFan.putIfAbsent(name, () => <String>[]).add(kid);
+        claimed.add(kid);
+      }
+    }
+  }
+  final looseServers = <String>[];
+  final looseHosts = <String>[];
+  for (final e in entries) {
+    final name = e[0];
+    final t = tier[name] ?? kTierHosts;
+    if (claimed.contains(name) || t <= kTierAccess) continue;
+    if (t == kTierServices) {
+      looseServers.add(name);
+    } else {
+      looseHosts.add(name);
+    }
+  }
+
+  double fanWidth(int count) => math.min(count, gridColumns) * pitch;
+
+  // How many rows a fan wraps into at its own width.
+  int rowsFor(int count) {
+    if (count == 0) return 0;
+    final columns = math.min(count, gridColumns);
+    return (count + columns - 1) ~/ columns;
+  }
+
+  var maxServerRows = rowsFor(looseServers.length);
+  for (final name in line) {
+    maxServerRows = math.max(
+      maxServerRows,
+      rowsFor((serverFan[name] ?? const <String>[]).length),
+    );
+  }
+  // The line sits far enough down that the tallest stack of servers still
+  // starts on the canvas.
+  final backboneY = kRowTop + maxServerRows * rowStep;
+
+  final hasLoose = looseServers.isNotEmpty || looseHosts.isNotEmpty;
+  final looseWidth = math.max(
+    pitch,
+    math.max(fanWidth(looseServers.length), fanWidth(looseHosts.length)),
+  );
+  var total = hasLoose ? looseWidth : 0.0;
+  for (final name in line) {
+    total += math.max(
+      pitch,
+      math.max(
+        fanWidth((serverFan[name] ?? const <String>[]).length),
+        fanWidth((hostFan[name] ?? const <String>[]).length),
+      ),
+    );
+  }
+  total += gap * math.max(line.length + (hasLoose ? 1 : 0) - 1, 0);
+  var cursor = kXStart + math.max((kCanvasWidth - 2 * kXStart - total) / 2, 0);
+
+  // One fan around a centre x: rows wrap, each row centred, [direction]
+  // above (-1) or below (+1) the line. The first row is one rowStep off the
+  // line - a short drop, not a device on the line itself.
+  void parkFan(List<String> fan, double centreX, int direction) {
+    if (fan.isEmpty) return;
+    final columns = math.min(fan.length, gridColumns);
+    for (var index = 0; index < fan.length; index++) {
+      final row = index ~/ columns;
+      final column = index % columns;
+      final inRow = math.min(columns, fan.length - row * columns);
+      final gridWidth = columns * pitch;
+      final rowLeft = centreX - gridWidth / 2 + (gridWidth - inRow * pitch) / 2;
+      spots[fan[index]] = [
+        rowLeft + column * pitch + pitch / 2,
+        backboneY + direction * (row + 1) * rowStep,
+      ];
+    }
+  }
+
+  for (final name in line) {
+    final width = math.max(
+      pitch,
+      math.max(
+        fanWidth((serverFan[name] ?? const <String>[]).length),
+        fanWidth((hostFan[name] ?? const <String>[]).length),
+      ),
+    );
+    final centreX = cursor + width / 2;
+    spots[name] = [centreX, backboneY];
+    parkFan(serverFan[name] ?? const <String>[], centreX, -1);
+    parkFan(hostFan[name] ?? const <String>[], centreX, 1);
+    cursor += width + gap;
+  }
+  if (hasLoose) {
+    final centreX = cursor + looseWidth / 2;
+    parkFan(looseServers, centreX, -1);
+    parkFan(looseHosts, centreX, 1);
+  }
+  return spots;
+}
+
+/// The `campus` drawing: two strict tiers over an aligned endpoint field.
+///
+/// Core routers centred on the top tier, distribution/access switches on the
+/// middle tier directly under the core they hang off, and PCs and servers on
+/// the bottom tier in columns aligned under their own switch - the standard
+/// three-layer campus picture read from any direction. Endpoints no switch
+/// claims take a column of their own at the end; a switch serving more
+/// machines than fit in one row wraps them within its column block.
+Map<String, List<double>> _campusPositions(
+  List<List<String>> entries,
+  Map<String, int> tier,
+  Map<String, List<String>> children,
+  double pitch,
+  double gap,
+  double rowStep,
+  double bandStep,
+  int gridColumns,
+) {
+  final spots = <String, List<double>>{};
+  final cores = <String>[];
+  final mids = <String>[];
+  for (final e in entries) {
+    final t = tier[e[0]] ?? kTierHosts;
+    if (t == kTierCore) {
+      cores.add(e[0]);
+    } else if (t == kTierAggregation || t == kTierAccess) {
+      mids.add(e[0]);
+    }
+  }
+
+  // One column block per switch; endpoints nothing on the middle tier
+  // claims take their own block at the end.
+  final endpointFan = <String, List<String>>{};
+  final claimed = <String>{};
+  for (final name in mids) {
+    for (final kid in children[name] ?? const <String>[]) {
+      if ((tier[kid] ?? kTierHosts) >= kTierServices) {
+        endpointFan.putIfAbsent(name, () => <String>[]).add(kid);
+        claimed.add(kid);
+      }
+    }
+  }
+  final loose = <String>[
+    for (final e in entries)
+      if ((tier[e[0]] ?? kTierHosts) >= kTierServices &&
+          !claimed.contains(e[0]))
+        e[0],
+  ];
+
+  double fanWidth(int count) => math.min(count, gridColumns) * pitch;
+  final widths = <double>[
+    for (final name in mids)
+      math.max(pitch, fanWidth((endpointFan[name] ?? const <String>[]).length)),
+    if (loose.isNotEmpty) math.max(pitch, fanWidth(loose.length)),
+  ];
+  var total = 0.0;
+  for (final width in widths) {
+    total += width;
+  }
+  total += gap * math.max(widths.length - 1, 0);
+  var cursor = kXStart + math.max((kCanvasWidth - 2 * kXStart - total) / 2, 0);
+
+  final yTop = kRowTop;
+  final yMid = kRowTop + bandStep;
+  final yBase = kRowTop + 2 * bandStep;
+
+  // Cores centred over the whole drawing. They share the top tier only with
+  // each other, so a wide column field below never pushes them around.
+  final centreX = cursor + total / 2;
+  for (var i = 0; i < cores.length; i++) {
+    spots[cores[i]] = [
+      centreX + (i - (cores.length - 1) / 2) * pitch,
+      yTop,
+    ];
+  }
+
+  var block = 0;
+  for (final name in mids) {
+    final width = widths[block];
+    final midX = cursor + width / 2;
+    spots[name] = [midX, yMid];
+    final fan = endpointFan[name] ?? const <String>[];
+    final columns = math.min(fan.length, gridColumns);
+    for (var index = 0; index < fan.length; index++) {
+      final row = index ~/ columns;
+      final column = index % columns;
+      final inRow = math.min(columns, fan.length - row * columns);
+      final gridWidth = columns * pitch;
+      final rowLeft = midX - gridWidth / 2 + (gridWidth - inRow * pitch) / 2;
+      spots[fan[index]] = [
+        rowLeft + column * pitch + pitch / 2,
+        yBase + row * rowStep,
+      ];
+    }
+    cursor += width + gap;
+    block++;
+  }
+  if (loose.isNotEmpty) {
+    final width = widths[block];
+    final columns = math.min(loose.length, gridColumns);
+    final looseX = cursor + width / 2;
+    for (var index = 0; index < loose.length; index++) {
+      final row = index ~/ columns;
+      final column = index % columns;
+      final inRow = math.min(columns, loose.length - row * columns);
+      final gridWidth = columns * pitch;
+      final rowLeft = looseX - gridWidth / 2 + (gridWidth - inRow * pitch) / 2;
+      spots[loose[index]] = [
+        rowLeft + column * pitch + pitch / 2,
+        yBase + row * rowStep,
+      ];
+    }
+  }
+  return spots;
 }
 
 /// The industry hierarchical drawing, read left to right.

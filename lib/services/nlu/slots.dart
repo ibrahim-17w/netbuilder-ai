@@ -1,4 +1,5 @@
 import '../../models/network_intent.dart';
+import 'lexicon.dart';
 import '../domain_vocabulary.dart';
 
 /// One extracted slot: what was found and where it was said.
@@ -111,7 +112,11 @@ class BriefSlotPipeline {
   /// mentions, AAA and service roles provisioning a server, the rest of the
   /// catalog, wifi, per-site multiplication, explicit labels, named server
   /// labels, and the tiny-office default.
-  static Map<String, int> extractCounts(String lower, String normText) {
+  static Map<String, int> extractCounts(
+    String lower,
+    String normText, {
+    bool tinyOfficeDefault = true,
+  }) {
     final counts = <String, int>{};
 
     // Every quantity the brief states, clause by clause, so a count split
@@ -239,8 +244,11 @@ class BriefSlotPipeline {
 
     // all-empty default: a tiny office. Only the four kinds count here,
     // exactly as the parser applies it: "2 firewalls" with no router still
-    // gets its router and switch.
-    if ((counts['router'] ?? 0) == 0 &&
+    // gets its router and switch. A caller counting a CORRECTION fragment
+    // ("actually 8 pcs") opts out: the kinds the correction did not name
+    // must stay with the standing lab, not grow an office out of nothing.
+    if (tinyOfficeDefault &&
+        (counts['router'] ?? 0) == 0 &&
         (counts['switch'] ?? 0) == 0 &&
         (counts['pc'] ?? 0) == 0 &&
         (counts['server'] ?? 0) == 0) {
@@ -248,6 +256,20 @@ class BriefSlotPipeline {
       counts['switch'] = 1;
     }
     return counts;
+  }
+
+  /// The kind the brief counted LAST, or null when it counted nothing.
+  ///
+  /// A bare correction ("actually 8") names no kind of its own; it corrects
+  /// the kind the conversation was last talking about - the same recency the
+  /// elliptical quantities ("... and the ground floor 4") already resolve
+  /// by. "2 routers, 2 switches and 50 PCs, actually 8" is eight PCs.
+  static String? lastCountedKind(String lower) {
+    final records = _quantityRecords(lower);
+    for (var i = records.length - 1; i >= 0; i--) {
+      if (records[i].value > 0) return records[i].kind;
+    }
+    return null;
   }
 
   /// Server roles in the order the brief said them, sentence by sentence,

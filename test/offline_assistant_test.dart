@@ -130,4 +130,90 @@ void main() {
       expect(bigger.nodes.length, greaterThanOrEqualTo(2));
     });
   });
+
+  group('the assistant can talk about itself', () {
+    test('"who are you" introduces the offline assistant, not a plan', () {
+      final r = ask('who are you');
+      expect(r.intent, 'identity');
+      expect(r.text, contains('NetBuilder assistant'));
+      expect(r.text.toLowerCase(), contains('offline'));
+      expect(r.text.toLowerCase(), contains('leaves this device'));
+      expect(r.repairedPlan, isNull);
+      expect(r.text, isNot(contains('lab I understand')));
+    });
+
+    test('"what can you do" lists real abilities with examples', () {
+      final r = ask('what can you do');
+      expect(r.intent, 'identity');
+      expect(r.text, contains('Plan a lab'));
+      expect(r.text, contains('.pkt'));
+      expect(r.quickReplies, isNotEmpty);
+      expect(r.quickReplies.length, lessThanOrEqualTo(4));
+    });
+
+    test('"how are you" is answered warmly and locally', () {
+      final r = ask('how are you');
+      expect(r.intent, 'identity');
+      expect(r.text.toLowerCase(), contains('local'));
+    });
+
+    test('"are you an AI" is answered honestly: rules, no model', () {
+      final r = ask('are you an AI');
+      expect(r.intent, 'identity');
+      expect(r.text.toLowerCase(), contains('no model'));
+      expect(r.text.toLowerCase(), contains('rule-based'));
+    });
+
+    test('"who made you" names no invented maker', () {
+      final r = ask('who made you');
+      expect(r.intent, 'identity');
+      expect(r.text, contains('NetBuilder AI'));
+      expect(r.text, isNot(contains('OpenAI')));
+    });
+
+    test('"do you need internet" confirms the fully local operation', () {
+      final r = ask('do you need internet');
+      expect(r.intent, 'identity');
+      expect(r.text.toLowerCase(), contains('offline'));
+      expect(r.text.toLowerCase(), contains('no api key'));
+    });
+
+    test('an identity opener over a network question keeps its route', () {
+      final r = ask('what can you do about the OSPF adjacency');
+      expect(r.intent, isNot('identity'));
+      expect(r.text.toLowerCase(), contains('ospf'));
+    });
+  });
+
+  group('a farewell is answered like a farewell', () {
+    test('"bye" says goodbye and that nothing leaves the device', () {
+      final r = ask('bye');
+      expect(r.intent, 'bye');
+      expect(r.text.toLowerCase(), contains('device'));
+      expect(r.text, isNot(contains('lab I understand')));
+    });
+
+    test('the other farewells farewell too', () {
+      expect(ask('goodbye').intent, 'bye');
+      expect(ask('good night').intent, 'bye');
+      expect(ask('see you').intent, 'bye');
+      expect(ask('later').intent, 'bye', reason: 'later is a goodbye, not a no');
+    });
+  });
+
+  group('the greeting set covers how people actually open', () {
+    for (final g in const ['hiya', 'heyo', 'howdy', 'greetings', 'good day']) {
+      test('"$g" is a greeting', () {
+        final r = ask(g);
+        expect(r.intent, 'greeting', reason: g);
+        expect(r.text.toLowerCase(), contains('offline'));
+      });
+    }
+
+    test('cheers is not swallowed by the greeting set', () {
+      // "cheers" is acknowledgement/small-talk territory elsewhere (the
+      // scope gate); the greeting branch must not take it over.
+      expect(ask('cheers').intent, isNot('greeting'));
+    });
+  });
 }

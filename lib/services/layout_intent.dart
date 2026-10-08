@@ -1,3 +1,8 @@
+// The engine's own style list is the one source of truth for what a drawing
+// is called: [LayoutRequest.allStyles] aliases it so a style the gallery
+// offers is always a style the note reader accepts back.
+import 'layout_engine.dart' show kLayoutStyles;
+
 /// One group of devices sent to one edge.
 ///
 /// "Put the servers on one side and the routers on the other" is two of these;
@@ -94,28 +99,28 @@ class LayoutRequest {
   /// tree's bands without nesting, so cycling between them handed back the
   /// picture the user was already looking at - which is what "all the layouts
   /// look the same" meant. Every entry here draws a different silhouette.
+  ///
+  /// `grid` stays LAST: the cycle reads `nextStyle('grid') == 'tree'`, so a
+  /// full turn of the wheel lands back where it started.
   static const List<String> styles = <String>[
     'tree',
     'layered',
+    'backbone',
+    'campus',
     'split',
+    'star',
+    'ring',
     'radial',
     'circle',
     'grid',
   ];
 
-  /// Every drawing the engine knows, gallery order.
-  static const List<String> allStyles = <String>[
-    'tree',
-    'wide',
-    'compact',
-    'rows',
-    'grouped',
-    'layered',
-    'split',
-    'radial',
-    'circle',
-    'grid',
-  ];
+  /// Every drawing the engine knows, gallery order - [kLayoutStyles] itself,
+  /// so the reader and the gallery can never disagree about what exists. A
+  /// style missing here would be stamped into a note and then unreadable by
+  /// [styleFromNote], which is how a picked drawing silently reverted to the
+  /// default on the next build.
+  static const List<String> allStyles = kLayoutStyles;
 
   /// The kinds a placement request falls back to when it names no device. In a
   /// network diagram "move it to the side" means the servers far more often
@@ -185,6 +190,10 @@ class LayoutRequest {
       'rows' => 'straight rows - one row per kind of device',
       'layered' => 'layered - the hierarchy drawn left to right',
       'split' => 'split - one vertical column per kind of device',
+      'backbone' => 'backbone - one horizontal line, endpoints on drops below',
+      'campus' => 'campus - core, distribution and access on aligned tiers',
+      'star' => 'star - switches radiating from the router, PCs fanned outward',
+      'ring' => 'ring - one ring, switches alternating with endpoints',
       'radial' => 'radial - the core in the middle, endpoints outside',
       'circle' => 'one circle - every device on a single ring',
       'grid' => 'an even grid - a box of devices, topology ignored',
@@ -206,6 +215,10 @@ class LayoutRequest {
     'grouped' => 'grouped - one kind of device in its own column',
     'layered' => 'layered - the hierarchy drawn left to right',
     'split' => 'split - one vertical column per kind of device',
+    'backbone' => 'backbone - one horizontal line, endpoints on drops below',
+    'campus' => 'campus - core, distribution and access on aligned tiers',
+    'star' => 'star - switches radiating from the router, PCs fanned outward',
+    'ring' => 'ring - one ring, switches alternating with endpoints',
     'radial' => 'radial - the core in the middle, endpoints outside',
     'circle' => 'one circle - every device on a single ring',
     'grid' => 'an even grid - a box of devices, topology ignored',
@@ -220,6 +233,10 @@ class LayoutRequest {
     'grouped' => 'Move the servers to the side',
     'layered' => 'Draw it left to right',
     'split' => 'Give each kind of device its own column',
+    'backbone' => 'Draw it as one horizontal backbone',
+    'campus' => 'Draw it as a two-tier campus',
+    'star' => 'Draw it as a star around the core',
+    'ring' => 'Put the devices on a single ring',
     'radial' => 'Draw it as rings around the core',
     'circle' => 'Put every device in one circle',
     'grid' => 'Lay it out as an even grid',
@@ -296,7 +313,7 @@ class LayoutRequest {
     caseSensitive: false,
   );
 
-  // The five drawings that are a different ALGORITHM rather than another size
+  // The drawings that are a different ALGORITHM rather than another size
   // of the tree. Longest phrases first so "one column per kind" is `split` and
   // not `layered`, and "rings around" is `radial` and not `circle`.
   static final RegExp _namedSplit = RegExp(
@@ -309,6 +326,27 @@ class LayoutRequest {
   static final RegExp _namedLayered = RegExp(
     r'\b(layered|hierarch\w*|left\s+to\s+right|right\s+to\s+left|sideways|'
     r'top\s+to\s+bottom|bottom\s+to\s+top)\b',
+    caseSensitive: false,
+  );
+  // The engineer's four. Deliberately narrow where they could cannibalise an
+  // older drawing: `ring` never matches a bare plural "rings around" (that is
+  // `radial`), and `star` matches the noun "star", not "start"/"restart".
+  static final RegExp _namedBackbone = RegExp(
+    r'\b(backbone|riser|horizontal\s+bus|bus\s+topology)\b',
+    caseSensitive: false,
+  );
+  static final RegExp _namedCampus = RegExp(
+    r'\b(campus|two-?\s?tier|three-?\s?tier|multi-?\s?tier|'
+    r'distribution\s+(?:layer|switches?))\b',
+    caseSensitive: false,
+  );
+  static final RegExp _namedStar = RegExp(
+    r'\b(star|star-?shaped|spokes?|hub\s+and\s+spoke)\b',
+    caseSensitive: false,
+  );
+  static final RegExp _namedRing = RegExp(
+    r'\b((?:a|one|single|big|token)\s+ring|ring\s+(?:topology|network)|'
+    r'token\s+ring)\b',
     caseSensitive: false,
   );
   static final RegExp _namedRadial = RegExp(
@@ -494,6 +532,14 @@ static final RegExp _separation = RegExp(
       named = 'split';
     } else if (_namedLayered.hasMatch(t)) {
       named = 'layered';
+    } else if (_namedBackbone.hasMatch(t)) {
+      named = 'backbone';
+    } else if (_namedCampus.hasMatch(t)) {
+      named = 'campus';
+    } else if (_namedStar.hasMatch(t)) {
+      named = 'star';
+    } else if (_namedRing.hasMatch(t)) {
+      named = 'ring';
     } else if (_namedRadial.hasMatch(t)) {
       named = 'radial';
     } else if (_namedCircle.hasMatch(t)) {

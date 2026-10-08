@@ -10,6 +10,7 @@ import '../models/network_intent.dart';
 import '../services/adapters/gns3_adapter.dart';
 import '../services/adapters/packet_tracer_adapter.dart';
 import '../services/autopilot_service.dart';
+import '../services/build_artifact_service.dart';
 import '../services/gemini_service.dart';
 import '../services/memory_service.dart';
 import '../services/privacy_search_service.dart';
@@ -100,6 +101,43 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
   /// Refresh the stale/rejected/pending correction badges.  Throttled to
   /// every 5th status tick (10 s) - the corrections file only changes when
   /// a teach run or a learn attempt settles something.
+  /// Start ONE bounded teach run for a proposed correction.
+  ///
+  /// Nothing is taught by this call: it asks the sidecar to re-attempt the
+  /// single step the correction names, with the correction armed as a
+  /// one-shot override. The run promotes it only if the screen verifies the
+  /// step, and rejects it with the observed reason if not - and the card's
+  /// badges show which happened on the next refresh. A correction the sidecar
+  /// cannot resolve says so here instead of starting something unverifiable.
+  Future<void> _teachCorrection(CorrectionRow row) async {
+    if (row.id.isEmpty) return;
+    final engine = AutopilotService.of(context);
+    setState(() => _log = 'Teach run started for ${row.summaryLine}...');
+    try {
+      final out = await engine.teachCorrection(
+        correctionId: row.id,
+        project: row.project.isEmpty ? widget.record.projectName : row.project,
+      );
+      if (!mounted) return;
+      final ok = out['ok'] == true;
+      setState(() {
+        _log = ok
+            ? '${out['message'] ?? 'Teach run started.'}\n'
+                  'It is promoted only if the step verifies; poll this screen '
+                  'for the verdict.'
+            : 'Cannot teach this one: '
+                  '${out['error'] ?? out['reason'] ?? 'the sidecar refused it'}';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(
+        () => _log = 'Teach run refused: '
+            '${e.toString().replaceFirst('Exception: ', '')}',
+      );
+    }
+    await _refreshCorrections(force: true);
+  }
+
   Future<void> _refreshCorrections({bool force = false}) async {
     if (!force) {
       _correctionsTick++;
@@ -1086,8 +1124,10 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
           events = await engine.events(limit: 80);
         } catch (_) {}
         await _saveExecutionEvidence(summary: summary, events: events);
-        // AUTO-LEARN: recurring failure patterns become rules with no
-        // manual step - the training loop closes itself after each run.
+        // AUTO-LEARN: recurring failure patterns are filed with no manual
+        // step. They carry an `autopilot` target so planners and model
+        // prompts skip them - advice only changes a plan when the user
+        // teaches a rule that says so.
         try {
           final sug = await engine.suggestions();
           final existing = (await mem.allRules())
@@ -1123,8 +1163,8 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
                   '$cliProofLine'
                   '$learningLine'
                   '$artifactLine'
-                  'AUTO-LEARNED $learned new rule(s) from recurring '
-                  'patterns - saved to memory.',
+                  'RECORDED $learned recurring pattern(s) for review - '
+                  'not applied to plans.',
             );
             return;
           }
@@ -1889,13 +1929,15 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
         return;
       }
       final plan = PacketTracerAdapter.autopilotPlan(widget.intent);
-      final stamp = DateTime.now()
-          .toIso8601String()
-          .replaceAll(RegExp(r'[^0-9]'), '')
-          .substring(0, 12);
       final res = await svc.pktGenerate(
         plan,
-        filename: 'netbuilder-$stamp.pkt',
+        // Named for the network: the record's own instruction is the
+        // description, so the file in the folder reads like the lab it is.
+        filename: BuildArtifactService.networkFileName(
+          plan: widget.intent,
+          brief: widget.record.instruction,
+          taken: const {},
+        ),
       );
       if (!mounted) return;
       final warnings = (res['warnings'] as List?) ?? const [];
@@ -2530,6 +2572,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
         CorrectionsCard(
           snapshot: _corrections,
           onRefresh: () => _refreshCorrections(force: true),
+          onTeach: _teachCorrection,
         ),
         // AI FIX SUGGESTIONS: uses the Gemini key from Settings. Proposals
         // are evaluated by a second Gemini call; accepted ones only ever

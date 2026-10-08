@@ -1,6 +1,26 @@
 import '../models/network_intent.dart';
 import 'validator_service.dart';
 
+/// One thing the repair pass changed, in the shape learning can use.
+///
+/// [changes] is written for the user and is therefore unusable as learning:
+/// it names the device, the address and the port of THIS plan, so reading it
+/// back as a rule would tell a later plan to reuse one network's numbers.
+/// A [RepairFix] keeps the same event as a stable [kind] plus a positive,
+/// self-contained [rule] - what a good plan does - which is all a planner may
+/// be told.
+class RepairFix {
+  /// Stable id for the finding this fixes ('shared_port', ...). Used for
+  /// de-duplication, never for display.
+  final String kind;
+
+  /// One prescriptive sentence, scoped to the class of problem rather than to
+  /// the plan it was found in.
+  final String rule;
+
+  const RepairFix(this.kind, this.rule);
+}
+
 /// What one repair pass did, in the user's words, and what it could not do.
 class PlanRepair {
   /// The repaired plan (the original when nothing could be fixed).
@@ -9,6 +29,11 @@ class PlanRepair {
   /// One plain sentence per change, in the order they were made.
   final List<String> changes;
 
+  /// The same events in machine form, for the learning loop. Never empty when
+  /// [changes] is not: a change that cannot state its own rule is a change
+  /// the app does not learn from.
+  final List<RepairFix> fixes;
+
   /// The findings that still block a build, computed from the repaired plan
   /// with the same validator and target the build card uses.
   final List<ValidationIssue> remaining;
@@ -16,6 +41,7 @@ class PlanRepair {
   const PlanRepair({
     required this.plan,
     required this.changes,
+    required this.fixes,
     required this.remaining,
   });
 
@@ -73,6 +99,7 @@ class PlanRepairService {
     var links = [...intent.links];
     var addressing = [...intent.addressing];
     final changes = <String>[];
+    final fixes = <RepairFix>[];
 
     // 1. One address per interface: a second row on an interface is a parse
     //    artefact, never a second address a router can hold.
@@ -82,6 +109,13 @@ class PlanRepairService {
       if (slots.add(key)) return true;
       changes.add(
         'removed the second address (${a.ipCidr}) from ${a.node} ${a.iface}',
+      );
+      fixes.add(
+        const RepairFix(
+          'duplicate_interface_address',
+          'Plan one address per interface: a second address on the same '
+              'interface is a parse artefact and is dropped from the .pkt.',
+        ),
       );
       return false;
     }).toList();
@@ -112,6 +146,13 @@ class PlanRepairService {
         'cabled ${node.name} to ${uplink.$1} ${uplink.$2} so it is not '
         'standing alone on the canvas',
       );
+      fixes.add(
+        const RepairFix(
+          'uncabled_device',
+          'Cable every device in the plan: a device with no link is not part '
+              'of the topology and is left standing alone on the canvas.',
+        ),
+      );
     }
 
     // 2b. One cable per interface. Two cables on one port is not a topology,
@@ -140,6 +181,14 @@ class PlanRepairService {
         changes.add(
           'moved ${end.key} off the shared port ${end.value} onto $free, so '
           'each interface carries one cable',
+        );
+        fixes.add(
+          const RepairFix(
+            'shared_port',
+            'Give every interface its own port: two cables landing on one '
+                'port cannot be carried into the .pkt and the second is '
+                'dropped on the way in.',
+          ),
         );
         current = moved;
       }
@@ -187,6 +236,14 @@ class PlanRepairService {
           'moved $peer from ${node.name} to ${target.name} $free: ${node.name} '
           'has only $capacity ports and was cabled to ${mine.length} devices',
         );
+        fixes.add(
+          const RepairFix(
+            'switch_overflow',
+            'Count the cables on a switch against its port capacity and '
+                'spread the overflow onto a switch that has room, rather '
+                'than over-filling the first one.',
+          ),
+        );
         final stale = addressing.where(
           (a) => a.node.toLowerCase() == peer.toLowerCase(),
         );
@@ -200,6 +257,14 @@ class PlanRepairService {
           changes.add(
             'cleared $peer\'s old address so it gets one on the '
             '${target.name} LAN',
+          );
+          fixes.add(
+            const RepairFix(
+              'stale_address_after_move',
+              'Re-address a device on the LAN it now sits on: moving a cable '
+                  'onto another switch means the address it carried with it '
+                  'is no longer reachable.',
+            ),
           );
         }
       }
@@ -240,6 +305,14 @@ class PlanRepairService {
         'gave ${node.name} $host so its Desktop > IP Configuration has an '
         'address instead of 0.0.0.0',
       );
+      fixes.add(
+        const RepairFix(
+          'missing_ip_config',
+          'Give every device that uses Desktop > IP Configuration an '
+              'address on the LAN it is cabled to, instead of leaving it '
+              'at 0.0.0.0.',
+        ),
+      );
     }
 
     // 4. One address, one interface: the later holder moves. This runs LAST,
@@ -265,6 +338,14 @@ class PlanRepairService {
       changes.add(
         'moved ${a.node} ${a.iface} off the shared address $ip to $moved',
       );
+      fixes.add(
+        const RepairFix(
+          'duplicate_lan_address',
+          'Give every interface its own address: when two interfaces claim '
+              'one address, the later one takes a free host on the LAN it '
+              'sits on.',
+        ),
+      );
     }
 
     final repaired = intent.copyWith(
@@ -281,6 +362,7 @@ class PlanRepairService {
     return PlanRepair(
       plan: repaired,
       changes: changes,
+      fixes: fixes,
       remaining: remaining,
     );
   }

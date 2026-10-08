@@ -1,0 +1,105 @@
+{
+  "project": "parity2",
+  "layout": {
+    "style": "tree",
+    "positions": {
+      "R1": [700, 60],
+      "R2": [1000, 60],
+      "SW1": [520, 250],
+      "PC1": [380, 440],
+      "SRV1": [640, 440]
+    }
+  },
+  "steps": [
+    {
+      "action": "create_nodes",
+      "nodes": [
+        { "name": "R1", "type": "router", "model": "2911" },
+        { "name": "R2", "type": "router", "model": "1941" },
+        { "name": "SW1", "type": "switch", "model": "2960" },
+        { "name": "PC1", "type": "pc" },
+        { "name": "SRV1", "type": "server", "services": ["dhcp", "aaa"] }
+      ]
+    },
+    {
+      "action": "create_links",
+      "links": [
+        {
+          "a": "R1",
+          "aIf": "Serial0/1/0",
+          "b": "R2",
+          "bIf": "Serial0/1/0",
+          "cable": "serial"
+        },
+        {
+          "a": "R1",
+          "aIf": "GigabitEthernet0/0",
+          "b": "SW1",
+          "bIf": "GigabitEthernet0/1",
+          "cable": "copper"
+        },
+        {
+          "a": "SW1",
+          "aIf": "FastEthernet0/1",
+          "b": "PC1",
+          "bIf": "FastEthernet0",
+          "cable": "copper"
+        },
+        {
+          "a": "SW1",
+          "aIf": "FastEthernet0/2",
+          "b": "SRV1",
+          "bIf": "FastEthernet0",
+          "cable": "copper"
+        }
+      ]
+    },
+    {
+      "action": "paste_cli",
+      "configs": {
+        "R1": "hostname R1\n!\ninterface Serial0/1/0\n ip address 172.16.0.1 255.255.255.252\n clock rate 64000\n no shutdown\n!\ninterface GigabitEthernet0/0\n ip address 192.168.1.1 255.255.255.0\n no shutdown\n!\nend",
+        "R2": "hostname R2\n!\ninterface Serial0/1/0\n ip address 172.16.0.2 255.255.255.252\n no shutdown\n!\nend"
+      }
+    },
+    {
+      "action": "config_pcs",
+      "pcs": {
+        "PC1": {
+          "ip": "192.168.1.10",
+          "mask": "255.255.255.0",
+          "gw": "192.168.1.1",
+          "dns": "192.168.1.50",
+          "ipv6": "true"
+        },
+        "SRV1": {
+          "ip": "192.168.1.50",
+          "mask": "255.255.255.0",
+          "gw": "192.168.1.1"
+        }
+      }
+    },
+    {
+      "action": "config_servers",
+      "servers": {
+        "SRV1": {
+          "services": {
+            "dhcp": {
+              "startIp": "192.168.1.100",
+              "mask": "255.255.255.0",
+              "gateway": "192.168.1.1",
+              "dnsServer": "192.168.1.50"
+            },
+            "aaa": {
+              "users": [
+                { "username": "admin", "password": "cisco", "description": "net admin" }
+              ],
+              "clients": [
+                { "name": "R1", "ip": "192.168.1.1", "key": "cisco123", "serverType": "radius" }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

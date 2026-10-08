@@ -65,23 +65,27 @@ class SeedLibrary {
   /// Index the devices in an already-decrypted save document.
   factory SeedLibrary.fromXml(String xml) {
     final devices = <SeedDevice>[];
-    final blocks = _deviceBlocks(xml);
-    for (final block in blocks) {
-      final type = _tagValue(block, 'TYPE', engineOnly: true);
-      if (type == null) continue;
-      final customModel = _attribute(_typeTag(block), 'customModel');
-      final model = _attribute(_typeTag(block), 'model');
-      devices.add(
-        SeedDevice(
-          name: _tagValue(block, 'NAME') ?? '',
-          type: type,
-          model: model ?? '',
-          customModel: customModel ?? '',
-          xml: block,
-        ),
-      );
+    for (final block in _deviceBlocks(xml)) {
+      final device = deviceFromBlock(block);
+      if (device != null) devices.add(device);
     }
     return SeedLibrary(devices: devices, document: xml);
+  }
+
+  /// One device block -> the [SeedDevice] describing it, or null when the
+  /// block carries no engine TYPE.
+  static SeedDevice? deviceFromBlock(String block) {
+    final type = _tagValue(block, 'TYPE', engineOnly: true);
+    if (type == null) return null;
+    final customModel = _attribute(_typeTag(block), 'customModel');
+    final model = _attribute(_typeTag(block), 'model');
+    return SeedDevice(
+      name: _tagValue(block, 'NAME') ?? '',
+      type: type,
+      model: model ?? '',
+      customModel: customModel ?? '',
+      xml: block,
+    );
   }
 
   bool get isEmpty => devices.isEmpty;
@@ -139,6 +143,12 @@ class SeedLibrary {
         });
 
   // --- scanning -----------------------------------------------------------
+
+  /// Every top-level `<DEVICE>...</DEVICE>` block in a save document.
+  ///
+  /// Public so the on-device audit can walk the same blocks the library was
+  /// indexed from: one splitter, one definition of "a device in this file".
+  static List<String> deviceBlocksOf(String xml) => _deviceBlocks(xml);
 
   /// Every top-level `<DEVICE>...</DEVICE>` block in the document.
   ///

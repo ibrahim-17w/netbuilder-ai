@@ -385,4 +385,80 @@ void main() {
       expect(LayoutRequest.read('reset the layout to normal')?.style, 'tree');
     });
   });
+
+  // The four engineer drawings. A style the gallery offers has to be one the
+  // reader can name, phrase, stamp into a note and read back - or the pick
+  // silently reverts to the default on the next build.
+  group('the engineer drawings: backbone, campus, star, ring', () {
+    test('the gallery chip phrasing reads back as its style', () {
+      for (final style in const ['backbone', 'campus', 'star', 'ring']) {
+        final phrase = LayoutRequest.phraseFor(style);
+        expect(
+          LayoutRequest.read(phrase)?.style,
+          style,
+          reason: 'the gallery chip "$phrase" does not ask for $style',
+        );
+      }
+    });
+
+    test('ordinary wording names them', () {
+      expect(
+        LayoutRequest.read('draw it as a backbone with a riser')?.style,
+        'backbone',
+      );
+      expect(LayoutRequest.read('make it a two tier campus')?.style, 'campus');
+      expect(
+        LayoutRequest.read('draw a star topology from the router')?.style,
+        'star',
+      );
+      expect(LayoutRequest.read('hub and spoke please')?.style, 'star');
+      expect(LayoutRequest.read('put the devices in a ring')?.style, 'ring');
+      expect(LayoutRequest.read('ring topology')?.style, 'ring');
+    });
+
+    test('the older drawings keep their sentences', () {
+      // "rings around" stays radial: the ring reader must not steal it, and
+      // "one circle" stays circle.
+      expect(
+        LayoutRequest.read('draw it as rings around the core')?.style,
+        'radial',
+      );
+      expect(
+        LayoutRequest.read('put every device in one circle')?.style,
+        'circle',
+      );
+      expect(
+        LayoutRequest.read('restart the router')?.style,
+        isNull,
+        reason: '"restart" is not a star request',
+      );
+    });
+
+    test('the style survives a note round-trip', () {
+      for (final style in const ['backbone', 'campus', 'star', 'ring']) {
+        final note = LayoutRequest.noteFor(style);
+        expect(LayoutRequest.styleFromNote(note), style, reason: note);
+      }
+    });
+
+    test('the payload the engine reads carries the style', () {
+      expect(LayoutRequest(style: 'star').toPayload(), {'style': 'star'});
+      expect(LayoutRequest(style: 'ring').toPayload(), {'style': 'ring'});
+    });
+
+    test('they join the vague cycle, which still skips grouped', () {
+      expect(
+        LayoutRequest.styles,
+        containsAll(['backbone', 'campus', 'star', 'ring']),
+      );
+      expect(LayoutRequest.styles, isNot(contains('grouped')));
+      expect(LayoutRequest.styles, isNot(contains('wide')));
+      expect(LayoutRequest.styles, isNot(contains('compact')));
+      for (final style in LayoutRequest.styles) {
+        expect(LayoutRequest.nextStyle(style), isNot(style));
+        expect(LayoutRequest.nextStyle(style), isNot('grouped'));
+      }
+      expect(LayoutRequest.nextStyle('grid'), 'tree');
+    });
+  });
 }

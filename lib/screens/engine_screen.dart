@@ -308,6 +308,20 @@ class _EngineScreenState extends State<EngineScreen> {
               ],
             ),
           ),
+        if (!local && widget.settings != null)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Build .pkt files on this device'),
+            subtitle: const Text(
+              'Use the bundled template library when the engine is down - '
+              'no PC needed. Turn off to always build with the engine.',
+            ),
+            value: widget.settings!.preferOnDevicePkt,
+            onChanged: (value) {
+              setState(() {});
+              widget.settings!.setPreferOnDevicePkt(value);
+            },
+          ),
         Row(
           children: [
             TextButton.icon(

@@ -639,11 +639,18 @@ class AutopilotService {
   /// Start ONE bounded teach run for a proposed correction (the sidecar's
   /// POST /teach). The run re-attempts the step with the correction armed
   /// as a one-shot override and promotes it only if the screen verifies it.
+  ///
+  /// [store], [key] and [steps] are optional: when they are omitted the
+  /// sidecar resolves the correction's own verification from the failing
+  /// run's remembered plan, which is what makes "teach this one" reachable
+  /// from a list of pending corrections instead of from a caller that has
+  /// already done the engine's work for it. A correction that cannot be
+  /// resolved is refused with the reason - never guessed at.
   Future<Map<String, dynamic>> teachCorrection({
     required String correctionId,
-    required String store,
-    required String key,
-    required List<Map<String, dynamic>> steps,
+    String store = '',
+    String key = '',
+    List<Map<String, dynamic>> steps = const [],
     String? project,
     String mode = 'fixes',
   }) async {
@@ -654,12 +661,12 @@ class AutopilotService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'correctionId': correctionId,
-              'store': store,
-              'key': key,
               'mode': mode,
+              if (store.isNotEmpty) 'store': store,
+              if (key.isNotEmpty) 'key': key,
+              if (steps.isNotEmpty) 'steps': steps,
               if (project != null && project.isNotEmpty)
                 'project': project,
-              'steps': steps,
             }),
           )
           .timeout(const Duration(seconds: 10));

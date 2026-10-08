@@ -147,7 +147,7 @@ class _NewBuildScreenState extends State<NewBuildScreen> {
       try {
         parsed = PlannerMemoryService.apply(
           parsed,
-          rules: (await mem.allRules()).map((r) => r.ruleText).toList(),
+          rules: await mem.plannerRuleTexts(),
           preferences: await mem.allPrefs(),
         );
       } catch (_) {}
@@ -186,7 +186,7 @@ class _NewBuildScreenState extends State<NewBuildScreen> {
         try {
           offlineCandidate = PlannerMemoryService.apply(
             offlineCandidate,
-            rules: (await mem.allRules()).map((r) => r.ruleText).toList(),
+            rules: await mem.plannerRuleTexts(),
             preferences: await mem.allPrefs(),
           );
         } catch (_) {}
@@ -208,7 +208,7 @@ class _NewBuildScreenState extends State<NewBuildScreen> {
             attempts = MemoryService.attemptSummaries(
               await mem.recentAttempts(limit: 10),
             );
-            rules = (await mem.allRules()).map((r) => r.ruleText).toList();
+            rules = await mem.plannerRuleTexts();
             prefs = await mem.allPrefs();
           }
           // CROSS-RUN FAILURE SIGNAL: what real runs kept failing to do, and

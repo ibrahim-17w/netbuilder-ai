@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -7,8 +7,13 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import '../models/build_record.dart';
 import '../models/build_attempt.dart';
 import '../models/chat_message.dart';
+import '../models/environment_profile.dart';
 import '../models/network_intent.dart';
+import 'learned_answers_service.dart';
+import 'misparse_ledger.dart';
 import 'phrasing_memory_service.dart';
+import 'plan_repair_service.dart';
+import 'repair_learning_service.dart';
 
 /// On-device learning memory: builds + rules + preferences + chat.
 /// SQLite file stays on device; nothing is uploaded.
@@ -47,7 +52,7 @@ class MemoryService extends ChangeNotifier {
     // sqflite creates dirs on most platforms, but be explicit with ffi.
     _db = await openDatabase(
       path,
-      version: 7,
+      version: 10,
       onCreate: (db, v) async => _create(db),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -100,6 +105,22 @@ CREATE TABLE attempts(
           await db.execute(
             "ALTER TABLE chat ADD COLUMN source TEXT NOT NULL DEFAULT ''",
           );
+        }
+        if (oldVersion < 8) {
+          // Answers learned from keyed-model replies (see
+          // [LearnedAnswers]): question -> answer, replayed offline.
+          await db.execute(_learnedAnswerTableSql);
+          await db.execute(_learnedAnswerIndexSql);
+        }
+        if (oldVersion < 9) {
+          // The remembered environment (venue, scale, budget, skill) the
+          // advisor used to re-derive from every message and forget.
+          await db.execute(_envProfileTableSql);
+        }
+        if (oldVersion < 10) {
+          // Answers to clarifying questions, remembered so the same person
+          // is never asked the same thing twice (see [ClarificationService]).
+          await db.execute(_clarificationAnswerTableSql);
         }
       },
     );
@@ -155,6 +176,10 @@ CREATE TABLE attempts(
     await db.execute(_changesTableSql);
     await db.execute(_changesIndexSql);
     await db.execute(_phrasingTableSql);
+    await db.execute(_learnedAnswerTableSql);
+    await db.execute(_learnedAnswerIndexSql);
+    await db.execute(_envProfileTableSql);
+    await db.execute(_clarificationAnswerTableSql);
   }
 
   /// Attachments are paths on disk, not blobs: screenshots are hundreds of
@@ -225,6 +250,48 @@ CREATE TABLE phrasing(
  createdAt TEXT NOT NULL
 )''';
 
+  static const _learnedAnswerTableSql = '''
+CREATE TABLE learned_answer(
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ qkey TEXT NOT NULL,
+ question TEXT NOT NULL,
+ answer TEXT NOT NULL,
+ source TEXT NOT NULL DEFAULT '',
+ seenCount INTEGER NOT NULL DEFAULT 1,
+ confirmed INTEGER NOT NULL DEFAULT 0,
+ createdAt TEXT NOT NULL,
+ lastSeenAt TEXT NOT NULL
+)''';
+
+  static const _learnedAnswerIndexSql = '''
+CREATE INDEX idx_learned_answer_qkey ON learned_answer(qkey)
+''';
+
+  /// The remembered environment (see [EnvironmentProfile]): exactly one row,
+  /// because "the user's environment" is one fact, not a history - the newest
+  /// merge replaces the row, and the JSON carries its own timestamp.
+  static const _envProfileTableSql = '''
+CREATE TABLE environment_profile(
+ id INTEGER PRIMARY KEY CHECK(id = 1),
+ json TEXT NOT NULL,
+ updatedAt TEXT NOT NULL
+)''';
+
+  /// Answers to clarifying questions (see [ClarificationService]): "OSPF or
+  /// static?" -> "OSPF", remembered WITH the venue/scale it was answered
+  /// under, so a home-lab answer never silently becomes the office answer.
+  /// A row with no venue applies anywhere - the user said it without a site
+  /// in play.
+  static const _clarificationAnswerTableSql = '''
+CREATE TABLE clarification_answer(
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ question_id TEXT NOT NULL,
+ answer TEXT NOT NULL,
+ venue TEXT NOT NULL DEFAULT '',
+ scale INTEGER NOT NULL DEFAULT 0,
+ created_at TEXT NOT NULL
+)''';
+
   /// Used by unit tests to create schema on an in-memory db.
   static Future<void> createSchema(DatabaseExecutor db) => _create(db);
 
@@ -249,6 +316,154 @@ CREATE TABLE phrasing(
     if (fix != null) values['fix'] = fix;
     await _active!.update('builds', values, where: 'id=?', whereArgs: [id]);
     notifyListeners();
+    // THE REPAIR LOOP CLOSES HERE. This is the one choke point every build
+    // path reports through (PT autopilot evidence, GNS3 push, the offline
+    // .pkt write), so it is also the only place worth teaching from: a rule
+    // the repair pass proposed is promoted only when the plan it was found in
+    // actually built, and is dropped when that build failed. Learning must
+    // never be wired to "a repair ran" - that would teach the app to repeat
+    // fixes that do not survive a build.
+    try {
+      final plan = await planForBuild(id);
+      if (plan != null) {
+        await confirmRepairedPlan(plan, verified: success && status == 'verified');
+      }
+    } catch (_) {
+      // A learning hiccup must never cost a build its outcome.
+    }
+  }
+
+  /// The plan a build row was written for, or null when it cannot be read
+  /// back. Used to match a build against the repair that shaped it.
+  Future<NetworkIntent?> planForBuild(int id) async {
+    final db = _active;
+    if (db == null) return null;
+    final rows = await db.query(
+      'builds',
+      columns: ['intentJson'],
+      where: 'id=?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    try {
+      final raw = rows.first['intentJson']?.toString() ?? '';
+      if (raw.isEmpty) return null;
+      return NetworkIntent.fromJson(
+        Map<String, dynamic>.from(jsonDecode(raw) as Map),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // --- repair learning ---------------------------------------------------
+  // The repair pass finds real defects in a real plan. When the plan it
+  // produced BUILDS, the defect is worth teaching. Until then the candidate
+  // rules are parked under the plan's fingerprint with no effect at all.
+
+  /// prefs key holding the parked, not-yet-proven repair rules.
+  static const repairLearningKey = 'repair_learning';
+
+  /// Park the rules a repair pass would like to teach, keyed by the shape of
+  /// the plan it repaired.
+  ///
+  /// Parking teaches nothing. The rules are promoted by [confirmRepairedPlan]
+  /// once a build of this exact plan comes back verified, and are dropped when
+  /// it fails. Nothing here is visible to a planner in the meantime.
+  Future<void> noteRepairedPlan({
+    required NetworkIntent plan,
+    required List<RepairFix> fixes,
+    required String target,
+  }) async {
+    final db = _active;
+    if (db == null) return;
+    final rules = RepairLearning.rulesFrom(fixes);
+    if (rules.isEmpty) return;
+    final fp = RepairLearning.fingerprint(plan);
+    final parked = await _repairCandidates();
+    // One entry per plan shape: a second repair of the same plan replaces the
+    // first, rather than stacking two copies of the same lesson.
+    final kept = <Map<String, dynamic>>[
+      {
+        'fp': fp,
+        'target': target.trim().isEmpty ? 'all' : target.trim(),
+        'rules': rules,
+        'at': DateTime.now().toIso8601String(),
+      },
+      for (final entry in parked)
+        if (entry['fp'] != fp) entry,
+    ].take(RepairLearning.maxCandidates).toList();
+    await setPref(repairLearningKey, jsonEncode(kept));
+  }
+
+  /// Resolve what a build of [plan] means for the rules a repair parked.
+  ///
+  /// Verified promotes them into [rules] (scoped to the target the plan was
+  /// repaired for, and skipped when the app already knows the rule); anything
+  /// else discards them. Returns how many rules were promoted, so callers and
+  /// tests can see the promotion actually happened.
+  ///
+  /// Nothing negative is ever recorded. A failed build teaches the app what
+  /// NOT to do, and storing that is how a store starts steering plans away
+  /// from a fix that was merely unlucky; the failing build is already in
+  /// [recentBuilds] for anything that needs the evidence.
+  Future<int> confirmRepairedPlan(
+    NetworkIntent plan, {
+    required bool verified,
+  }) async {
+    final db = _active;
+    if (db == null) return 0;
+    final fp = RepairLearning.fingerprint(plan);
+    final parked = await _repairCandidates();
+    final match = parked.where((e) => e['fp'] == fp).toList();
+    if (match.isEmpty) return 0;
+    final rest = parked.where((e) => e['fp'] != fp).toList();
+    if (!verified) {
+      await setPref(repairLearningKey, jsonEncode(rest));
+      return 0;
+    }
+    var promoted = 0;
+    for (final entry in match) {
+      final known = {
+        for (final rule in await allRules())
+          rule.ruleText.trim().toLowerCase(),
+      };
+      for (final rule in (entry['rules'] as List?) ?? const []) {
+        final text = rule.toString().trim();
+        if (text.isEmpty || known.contains(text.toLowerCase())) continue;
+        known.add(text.toLowerCase());
+        await addRule(text, targets: entry['target']?.toString() ?? 'all');
+        promoted++;
+      }
+    }
+    await setPref(repairLearningKey, jsonEncode(rest));
+    return promoted;
+  }
+
+  /// The parked repair candidates, newest first. Unparseable content is
+  /// treated as empty: a corrupt pref must not stop the app.
+  Future<List<Map<String, dynamic>>> _repairCandidates() async {
+    final db = _active;
+    if (db == null) return const [];
+    final rows = await db.query(
+      'prefs',
+      columns: ['v'],
+      where: 'k=?',
+      whereArgs: [repairLearningKey],
+      limit: 1,
+    );
+    if (rows.isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(rows.first['v']?.toString() ?? '[]');
+      if (decoded is! List) return const [];
+      return [
+        for (final item in decoded)
+          if (item is Map) Map<String, dynamic>.from(item),
+      ];
+    } catch (_) {
+      return const [];
+    }
   }
 
   Future<int> logAttempt(BuildAttempt attempt) async {
@@ -351,6 +566,32 @@ CREATE TABLE phrasing(
     return rows.map(LearnedRule.fromMap).toList();
   }
 
+  /// Only the rules a user actually taught the app.
+  ///
+  /// The Memory screen also files the sidecar's journal advice (the
+  /// `/suggest` suggestion strings) as rules with an `autopilot` target.
+  /// That text is troubleshooting prose, not a rule - feeding it to the
+  /// planner's rule reader meant one sentence that merely *mentions* OSPF
+  /// silently rewrote every later keyless plan. Journal rows stay in
+  /// [allRules] so they remain reviewable and deletable, but planners and
+  /// model context must read rules through this method instead.
+  static bool _isPlannerRule(LearnedRule rule) {
+    final targets = rule.targets
+        .toLowerCase()
+        .split(',')
+        .map((t) => t.trim())
+        .where((t) => t.isNotEmpty);
+    return !targets.contains('autopilot');
+  }
+
+  /// Rule texts safe to steer a plan or a model prompt: user-taught rules
+  /// only. Journal advice is excluded, including legacy rows written before
+  /// the targets were recorded.
+  Future<List<String>> plannerRuleTexts() async => [
+        for (final rule in await allRules())
+          if (_isPlannerRule(rule)) rule.ruleText,
+      ];
+
   Future<void> markRule(int id, bool helpful) async {
     await _active!.rawUpdate(
       helpful
@@ -374,6 +615,144 @@ CREATE TABLE phrasing(
     if (db == null) return const {};
     final rows = await db.query('prefs', limit: 200);
     return {for (final r in rows) (r['k'] as String): (r['v'] as String)};
+  }
+
+  // --- environment profile -------------------------------------------------
+
+  /// The remembered environment (venue, scale, budget, skill), or null when
+  /// nothing has been learned yet. A row whose JSON will not parse reads as
+  /// "nothing learned" - the advisor then just answers from the message, as
+  /// it always did, instead of the chat breaking over one bad value.
+  Future<EnvironmentProfile?> environmentProfile() async {
+    final db = _active;
+    if (db == null) return null;
+    final rows = await db.query(
+      'environment_profile',
+      where: 'id = 1',
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return EnvironmentProfile.tryDecode('${rows.first['json'] ?? ''}');
+  }
+
+  /// Store the environment, replacing whatever was there: one row, newest
+  /// merge wins.
+  Future<void> setEnvironmentProfile(EnvironmentProfile profile) async {
+    final db = _active;
+    if (db == null) return;
+    final now = DateTime.now().toIso8601String();
+    final stamped = profile.updatedAt.isEmpty
+        ? EnvironmentProfile(
+            venue: profile.venue,
+            scale: profile.scale,
+            budget: profile.budget,
+            skill: profile.skill,
+            updatedAt: now,
+            source: profile.source,
+          )
+        : profile;
+    await db.insert(
+      'environment_profile',
+      {
+        'id': 1,
+        'json': jsonEncode(stamped.toJson()),
+        'updatedAt': stamped.updatedAt,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    notifyListeners();
+  }
+
+  /// Forget the environment entirely. The advisor goes back to deriving
+  /// everything from each message, which is the behaviour this store was
+  /// added on top of - forgetting is always safe.
+  Future<void> forgetEnvironmentProfile() async {
+    final db = _active;
+    if (db == null) return;
+    await db.delete('environment_profile');
+    notifyListeners();
+  }
+
+  // --- clarification answers ------------------------------------------------
+
+  /// Remember one answered clarification (see [ClarificationService]).
+  /// [venue]/[scale] stamp the environment it was answered under, so the
+  /// lookup can prefer an answer given for the same kind of site.
+  Future<void> rememberClarification(
+    String questionId,
+    String answer, {
+    String venue = '',
+    int scale = 0,
+  }) async {
+    final db = _active;
+    if (db == null) return;
+    await db.insert('clarification_answer', {
+      'question_id': questionId,
+      'answer': answer,
+      'venue': venue,
+      'scale': scale,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+    notifyListeners();
+  }
+
+  /// Every remembered answer, newest first - what the Memory screen lists.
+  Future<List<Map<String, dynamic>>> clarificationAnswers() async {
+    final db = _active;
+    if (db == null) return const [];
+    return db.query(
+      'clarification_answer',
+      orderBy: 'id DESC',
+      limit: 200,
+    );
+  }
+
+  /// The remembered answer for [questionId], or null.
+  ///
+  /// Preference order: an answer given under the SAME venue (newest first),
+  /// then a venue-less global answer. A home-lab answer must never silently
+  /// become the office answer, but an answer given with no site in play
+  /// applies everywhere. The scale stamp stays informational - it shows the
+  /// Memory screen what the answer was given for.
+  Future<String?> answerForClarification(
+    String questionId,
+    EnvironmentProfile? profile,
+  ) async {
+    final db = _active;
+    if (db == null) return null;
+    final rows = await db.query(
+      'clarification_answer',
+      where: 'question_id = ?',
+      whereArgs: [questionId],
+      orderBy: 'id DESC',
+    );
+    if (rows.isEmpty) return null;
+    final venue = profile?.venue ?? '';
+    Map<String, dynamic>? venueMatch;
+    Map<String, dynamic>? globalMatch;
+    for (final row in rows) {
+      final rowVenue = '${row['venue'] ?? ''}';
+      if (venue.isNotEmpty && rowVenue == venue) {
+        venueMatch ??= row;
+      } else if (rowVenue.isEmpty) {
+        globalMatch ??= row;
+      }
+    }
+    final picked = venueMatch ?? globalMatch;
+    if (picked == null) return null;
+    return '${picked['answer'] ?? ''}';
+  }
+
+  /// Forget one remembered answer.
+  Future<void> forgetClarification(int id) async {
+    final db = _active;
+    if (db == null) return;
+    await db.delete(
+      'clarification_answer',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    notifyListeners();
   }
 
   // --- phrasing memory ---------------------------------------------------
@@ -434,11 +813,328 @@ CREATE TABLE phrasing(
     notifyListeners();
   }
 
+  // --- misparse ledger (user corrections, counted) -------------------------
+
+  /// The pref holding the ledger AND its turn counter. One blob, the way the
+  /// repair candidates are stored, so the numerator and the denominator
+  /// cannot drift apart.
+  static const misparseLedgerKey = 'misparse_ledger';
+
+  /// Read the raw ledger blob. Unparseable content is empty: a corrupt pref
+  /// must not stop the app.
+  Future<({List<MisparseEntry> entries, int turns})> _misparseState() async {
+    final db = _active;
+    if (db == null) return (entries: const <MisparseEntry>[], turns: 0);
+    final rows = await db.query(
+      'prefs',
+      columns: ['v'],
+      where: 'k=?',
+      whereArgs: [misparseLedgerKey],
+      limit: 1,
+    );
+    if (rows.isEmpty) return (entries: const <MisparseEntry>[], turns: 0);
+    try {
+      final decoded =
+          jsonDecode(rows.first['v']?.toString() ?? '{}');
+      if (decoded is! Map) return (entries: const <MisparseEntry>[], turns: 0);
+      final raw = decoded['entries'];
+      return (
+        entries: [
+          if (raw is List)
+            for (final item in raw)
+              if (item is Map)
+                MisparseEntry.fromMap(Map<String, dynamic>.from(item)),
+        ],
+        turns: (decoded['turns'] as num?)?.toInt() ?? 0,
+      );
+    } catch (_) {
+      return (entries: const <MisparseEntry>[], turns: 0);
+    }
+  }
+
+  Future<void> _writeMisparseState(
+    List<MisparseEntry> entries,
+    int turns, {
+    bool notify = true,
+  }) async {
+    final db = _active;
+    if (db == null) return;
+    await db.insert(
+      'prefs',
+      {
+        'k': misparseLedgerKey,
+        'v': jsonEncode({
+          'turns': turns,
+          'entries': [for (final e in entries) e.toMap()],
+        }),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    if (notify) notifyListeners();
+  }
+
+  /// One more turn the app parsed into a plan. The denominator of the
+  /// misparse rate: without it, "improving" would be unmeasurable.
+  Future<void> noteParsedTurn() async {
+    final db = _active;
+    if (db == null) return;
+    final state = await _misparseState();
+    // No notify: a counter is not something any widget renders on its own,
+    // and rebuilding the world once per turn is a cost for no one.
+    await _writeMisparseState(state.entries, state.turns + 1, notify: false);
+  }
+
+  /// Log one user correction. Returns the row after the merge - its [count]
+  /// and [MisparseEntry.status] say whether this wording has been corrected
+  /// enough times to be worth reviewing - or null when nothing was recorded
+  /// (no store, or a correction that would not replay).
+  Future<MisparseEntry?> recordMisparse({
+    required String original,
+    required String understood,
+    required String corrected,
+    required String slot,
+    required String source,
+  }) async {
+    final db = _active;
+    if (db == null) return null;
+    final state = await _misparseState();
+    final result = MisparseLedger.record(
+      entries: state.entries,
+      original: original,
+      understood: understood,
+      corrected: corrected,
+      slot: slot,
+      source: source,
+    );
+    await _writeMisparseState(result.entries, state.turns);
+    return result.entry;
+  }
+
+  /// Every logged correction, newest first.
+  Future<List<MisparseEntry>> misparseLedger() async =>
+      (await _misparseState()).entries;
+
+  /// The numbers the Memory health strip shows.
+  ///
+  /// [corrections] is every correction the user ever had to make;
+  /// [turns] every turn parsed into a plan. The rate is corrections per
+  /// parsed turn, so a falling number means the lessons are landing - it is
+  /// counted, not felt.
+  Future<
+      ({
+        int turns,
+        int corrections,
+        int proposed,
+        int taught,
+        int dismissed,
+      })> misparseStats() async {
+    final state = await _misparseState();
+    var corrections = 0;
+    var proposed = 0;
+    var taught = 0;
+    var dismissed = 0;
+    for (final e in state.entries) {
+      corrections += e.count;
+      switch (e.status) {
+        case 'proposed':
+          proposed++;
+        case 'taught':
+          taught++;
+        case 'dismissed':
+          dismissed++;
+      }
+    }
+    return (
+      turns: state.turns,
+      corrections: corrections,
+      proposed: proposed,
+      taught: taught,
+      dismissed: dismissed,
+    );
+  }
+
+  /// Promote a proposed correction into the live phrasing index.
+  ///
+  /// This is the only way a misparse lesson becomes a lesson: the row is
+  /// taught, marked, and the very next parse can replay it.
+  Future<bool> teachMisparse(String key, String corrected) async {
+    final db = _active;
+    if (db == null) return false;
+    final state = await _misparseState();
+    final at = state.entries
+        .indexWhere((e) => e.key == key && e.corrected == corrected);
+    if (at < 0) return false;
+    await teachPhrasing(key, corrected);
+    final next = [...state.entries];
+    next[at] = MisparseEntry(
+      key: next[at].key,
+      original: next[at].original,
+      understood: next[at].understood,
+      corrected: next[at].corrected,
+      slot: next[at].slot,
+      source: next[at].source,
+      status: 'taught',
+      count: next[at].count,
+      createdAt: next[at].createdAt,
+      updatedAt: DateTime.now().toIso8601String(),
+    );
+    await _writeMisparseState(next, state.turns);
+    return true;
+  }
+
+  /// Reject a proposed correction. It stays in the ledger as evidence - the
+  /// rate still counts it - but it never reaches the parser.
+  Future<void> dismissMisparse(String key, String corrected) async {
+    final db = _active;
+    if (db == null) return;
+    final state = await _misparseState();
+    final at = state.entries
+        .indexWhere((e) => e.key == key && e.corrected == corrected);
+    if (at < 0) return;
+    final next = [...state.entries];
+    next[at] = MisparseEntry(
+      key: next[at].key,
+      original: next[at].original,
+      understood: next[at].understood,
+      corrected: next[at].corrected,
+      slot: next[at].slot,
+      source: next[at].source,
+      status: 'dismissed',
+      count: next[at].count,
+      createdAt: next[at].createdAt,
+      updatedAt: DateTime.now().toIso8601String(),
+    );
+    await _writeMisparseState(next, state.turns);
+  }
+
+  // --- learned answers (from keyed-model replies, replayed offline) ---------
+
+  /// Learn one model answer for [question]. The decision (learn / agree /
+  /// reject) belongs to [LearnedAnswers]; this only persists it. Returns
+  /// the affected row id, or -1 when the answer was rejected.
+  Future<int> learnAnswer({
+    required String question,
+    required String answer,
+    required String source,
+  }) async {
+    final db = _active;
+    if (db == null) return -1;
+    final key = LearnedAnswers.keyFor(question);
+    final existing = await _learnedCandidates(key);
+    final capture = LearnedAnswers.capture(
+      question: question,
+      answer: answer,
+      source: source,
+      existing: existing,
+    );
+    final now = DateTime.now().toIso8601String();
+    final id = switch (capture.action) {
+      LearnedCapture.learned => await db.insert('learned_answer', {
+        'qkey': key,
+        'question': question.trim(),
+        'answer': capture.candidate!.answer,
+        'source': source,
+        'seenCount': 1,
+        'confirmed': capture.candidate!.confirmed ? 1 : 0,
+        'createdAt': now,
+        'lastSeenAt': now,
+      }),
+      LearnedCapture.agrees => () {
+        final row = existing.firstWhere(
+          (e) => e.id == capture.existingId,
+          orElse: () => existing.first,
+        );
+        db.update(
+          'learned_answer',
+          {
+            'seenCount': row.seenCount + 1,
+            // Agreement across independent model calls is confirmation.
+            'confirmed': row.seenCount + 1 >= 2 ? 1 : 0,
+            'lastSeenAt': now,
+          },
+          where: 'id = ?',
+          whereArgs: [row.id],
+        );
+        return row.id;
+      }(),
+      _ => -1,
+    };
+    if (id > 0) await _capLearnedAnswers();
+    notifyListeners();
+    return id;
+  }
+
+  /// The best learned answer for this question, or null. Exact-key match:
+  /// the same wording the model answered is the wording it is replayed
+  /// for; paraphrases stay with the curated corpus.
+  Future<LearnedAnswer?> bestLearnedAnswer(String question) async {
+    final db = _active;
+    if (db == null) return null;
+    final candidates = await _learnedCandidates(LearnedAnswers.keyFor(question));
+    return LearnedAnswers.pickBest(candidates);
+  }
+
+  Future<List<LearnedAnswer>> _learnedCandidates(String key) async {
+    final db = _active;
+    if (db == null) return const [];
+    final rows = await db.query(
+      'learned_answer',
+      where: 'qkey = ?',
+      whereArgs: [key],
+      orderBy: 'lastSeenAt DESC',
+      limit: 10,
+    );
+    return [for (final r in rows) _learnedFromRow(r)];
+  }
+
+  /// Every learned answer, newest-seen first - what the Memory screen lists.
+  Future<List<Map<String, dynamic>>> allLearnedAnswers() async {
+    final db = _active;
+    if (db == null) return const [];
+    return db.query('learned_answer', orderBy: 'lastSeenAt DESC', limit: 500);
+  }
+
+  /// Drop one learned answer by id.
+  Future<void> forgetLearnedAnswer(int id) async {
+    final db = _active;
+    if (db == null) return;
+    await db.delete('learned_answer', where: 'id = ?', whereArgs: [id]);
+    notifyListeners();
+  }
+
+  /// Working memory, not an archive: beyond the cap the least-recently-seen
+  /// answers are dropped.
+  Future<void> _capLearnedAnswers() async {
+    final db = _active;
+    if (db == null) return;
+    await db.delete(
+      'learned_answer',
+      where:
+          'id NOT IN (SELECT id FROM learned_answer '
+          'ORDER BY lastSeenAt DESC LIMIT ?)',
+      whereArgs: [LearnedAnswers.maxAnswers],
+    );
+  }
+
+  LearnedAnswer _learnedFromRow(Map<String, Object?> r) => LearnedAnswer(
+    id: (r['id'] as num?)?.toInt() ?? 0,
+    qkey: (r['qkey'] ?? '').toString(),
+    question: (r['question'] ?? '').toString(),
+    answer: (r['answer'] ?? '').toString(),
+    source: (r['source'] ?? '').toString(),
+    seenCount: (r['seenCount'] as num?)?.toInt() ?? 1,
+    confirmed: (r['confirmed'] as num?)?.toInt() == 1,
+    createdAt: (r['createdAt'] ?? '').toString(),
+    lastSeenAt: (r['lastSeenAt'] ?? '').toString(),
+  );
+
   /// The version stamped on [exportJson]. A backup whose shape can change
   /// silently is not a backup: this is what lets a reader (a future importer,
   /// a person) tell what it is looking at before trusting it.
   /// v2: adds the learned-phrasing table.
-  static const exportSchemaVersion = 2;
+  /// v3: adds the environment profile (one row or null).
+  /// v4: adds the clarification answers.
+  static const exportSchemaVersion = 4;
 
   /// Everything the app remembers, as one JSON document.
   ///
@@ -464,6 +1160,8 @@ CREATE TABLE phrasing(
         'chat': <Map<String, dynamic>>[],
         'changes': <Map<String, dynamic>>[],
         'phrasing': <Map<String, dynamic>>[],
+        'clarificationAnswers': <Map<String, dynamic>>[],
+        'environmentProfile': null,
       });
     }
     final builds = await db.query('builds', orderBy: 'id ASC');
@@ -474,6 +1172,15 @@ CREATE TABLE phrasing(
     final chat = await _exportChat();
     final changes = await _exportChanges();
     final phrasing = await db.query('phrasing', orderBy: 'createdAt ASC');
+    final clarifications = await db.query(
+      'clarification_answer',
+      orderBy: 'id ASC',
+    );
+    final envRow = await db.query(
+      'environment_profile',
+      where: 'id = 1',
+      limit: 1,
+    );
     return const JsonEncoder.withIndent('  ').convert({
       'schemaVersion': exportSchemaVersion,
       'exportedAt': DateTime.now().toIso8601String(),
@@ -485,6 +1192,11 @@ CREATE TABLE phrasing(
       'chat': chat,
       'changes': changes,
       'phrasing': phrasing,
+      'clarificationAnswers': clarifications,
+      'environmentProfile': envRow.isEmpty
+          ? null
+          : EnvironmentProfile.tryDecode('${envRow.first['json'] ?? ''}')
+                ?.toJson(),
     });
   }
 
@@ -560,6 +1272,77 @@ CREATE TABLE phrasing(
     row.remove('id');
     await _active!.update('chat', row, where: 'id=?', whereArgs: [id]);
     notifyListeners();
+  }
+
+  /// Remove one conversation's transcript FROM a turn onward, in place.
+  ///
+  /// "Answer again" and "Edit and resend" both rewrite history: the turn
+  /// they start from and everything after it are gone. Cutting only the
+  /// screen copies would leave the rows in SQLite, and the next reload
+  /// would grow the abandoned branch straight back.
+  ///
+  /// The anchor is the row id when the caller knows it (a turn read back
+  /// from the store carries its id); a turn created this session does not,
+  /// so it is matched by the exact (createdAt, role, text) that was written
+  /// to its row - and if that is somehow ambiguous, the EARLIEST match wins,
+  /// so the deletion always covers at least what the screen removed and
+  /// never leaves rows behind it. Fail-closed on purpose:
+  ///
+  ///  * an empty [conversation] deletes nothing - an unnamed "all" is how
+  ///    one chat's Clear once wiped every transcript;
+  ///  * a [fromId] that is not a row OF this conversation deletes nothing,
+  ///    or `id >= ?` would cut into whatever was logged after it;
+  ///  * an anchor that matches no row deletes nothing: a truncation that
+  ///    cannot find its place must not become a wipe.
+  ///
+  /// Returns the number of rows removed, so callers and tests can tell a
+  /// truncation from a no-op.
+  ///
+  /// The change log is deliberately left alone. A `changes` row records an
+  /// edit that was really made to a device, keyed by its own actionId - it
+  /// has no link to a chat row, and discarding a branch of the conversation
+  /// does not un-configure what that branch already applied.
+  Future<int> deleteChatFrom(
+    String conversation, {
+    int? fromId,
+    String fromCreatedAt = '',
+    String fromRole = '',
+    String fromText = '',
+  }) async {
+    final db = _active;
+    if (db == null) return 0;
+    final name = conversation.trim();
+    if (name.isEmpty) return 0;
+    final int anchor;
+    if (fromId != null) {
+      final own = await db.query(
+        'chat',
+        columns: ['id'],
+        where: 'id = ? AND conversation = ?',
+        whereArgs: [fromId, name],
+        limit: 1,
+      );
+      if (own.isEmpty) return 0;
+      anchor = fromId;
+    } else {
+      final rows = await db.query(
+        'chat',
+        columns: ['id'],
+        where: 'conversation = ? AND createdAt = ? AND role = ? AND text = ?',
+        whereArgs: [name, fromCreatedAt, fromRole, fromText],
+        orderBy: 'id ASC',
+        limit: 1,
+      );
+      if (rows.isEmpty) return 0;
+      anchor = (rows.first['id'] as num).toInt();
+    }
+    final removed = await db.delete(
+      'chat',
+      where: 'conversation = ? AND id >= ?',
+      whereArgs: [name, anchor],
+    );
+    notifyListeners();
+    return removed;
   }
 
   /// Oldest first, so the list reads like a conversation.
@@ -891,6 +1674,8 @@ CREATE TABLE phrasing(
     await _active!.delete('conversations');
     await _active!.delete('changes');
     await _active!.delete('phrasing');
+    await _active!.delete('environment_profile');
+    await _active!.delete('clarification_answer');
     PhrasingMemoryService.clearIndex();
     notifyListeners();
   }

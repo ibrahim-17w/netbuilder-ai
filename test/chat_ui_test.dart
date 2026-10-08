@@ -151,6 +151,48 @@ class _FakeStore extends MemoryService {
   @override
   Future<void> updateChat(int id, ChatMessage message) async {}
 
+  /// Every history rewrite the screen asked for, in order: the store side of
+  /// "Answer again" and "Edit and resend".
+  final List<({String conversation, int? fromId, String fromRole, String fromText})>
+  truncations = <({String conversation, int? fromId, String fromRole, String fromText})>[];
+
+  @override
+  Future<int> deleteChatFrom(
+    String conversation, {
+    int? fromId,
+    String fromCreatedAt = '',
+    String fromRole = '',
+    String fromText = '',
+  }) async {
+    truncations.add((
+      conversation: conversation,
+      fromId: fromId,
+      fromRole: fromRole,
+      fromText: fromText,
+    ));
+    // The real store's semantics, mirrored on the fake: everything FROM the
+    // anchor onward goes, so a test can see the screen and the store agree.
+    final transcript = transcripts[conversation];
+    if (transcript == null) return 0;
+    var anchor = -1;
+    for (var i = 0; i < transcript.length; i++) {
+      final m = transcript[i];
+      final matched = (fromId != null && m.id == fromId) ||
+          (fromId == null &&
+              m.createdAt == fromCreatedAt &&
+              m.role == fromRole &&
+              m.text == fromText);
+      if (matched) {
+        anchor = i;
+        break;
+      }
+    }
+    if (anchor < 0) return 0;
+    final removed = transcript.length - anchor;
+    transcripts[conversation] = transcript.sublist(0, anchor);
+    return removed;
+  }
+
   @override
   Future<List<Map<String, dynamic>>> recentChanges({
     String conversation = '',
@@ -260,7 +302,7 @@ void main() {
 
       await tester.tap(find.text('New chat').first);
       await tester.pumpAndSettle();
-      expect(find.text('How can I help?'), findsOneWidget);
+      expect(find.text("What are we building today?"), findsOneWidget);
     });
 
     testWidgets('collapses to a rail and comes back', (tester) async {
@@ -334,7 +376,7 @@ void main() {
       await tester.tap(find.text('New chat').first);
       await tester.pumpAndSettle();
 
-      expect(find.text('How can I help?'), findsOneWidget);
+      expect(find.text("What are we building today?"), findsOneWidget);
       for (final label in const [
         'Analyze a network',
         'Troubleshoot connectivity',
@@ -495,15 +537,20 @@ void main() {
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Next steps'), findsOneWidget,
-          reason: 'the offline assistant answers with real advice');
+      // THE BRIEF CONVERSATION: a brief with critical gaps (scale, routing)
+      // asks instead of dumping a plan with a build button. The way out is
+      // still a tap: answer the questions, or take the defaults.
+      expect(find.textContaining('before I plan this'), findsOneWidget,
+          reason: 'a brief with critical gaps asks before it plans');
       expect(
         store.logged.where((m) => m.role == 'model'),
         isNotEmpty,
         reason: 'an answer that is not stored is an answer lost on restart',
       );
-      expect(find.text('Build the .pkt'), findsOneWidget,
-          reason: 'its own suggestion is a tap, not a typing exercise');
+      expect(find.text('Just build it with defaults'), findsOneWidget,
+          reason: 'its own way out is a tap, not a typing exercise');
+      expect(find.textContaining('Still open'), findsNothing,
+          reason: 'the questions ARE the still-open list');
     });
 
     testWidgets('a screen reader hears the suggestions and the field',
@@ -579,8 +626,16 @@ void main() {
       );
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pumpAndSettle();
-      expect(find.textContaining('10 PC(s)'), findsOneWidget,
-          reason: 'the lab is planned from the user\'s own words');
+      // The brief conversation: the lab parsed (10 PCs, a server), but the
+      // segmentation gap asks before a plan is committed.
+      expect(find.textContaining('before I plan this'), findsOneWidget,
+          reason: 'the lab parsed, but the ask comes before the plan dump');
+
+      // Answer the one gap this lab has (one router: no routing question).
+      await tester.enterText(_composer(), 'one flat network');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('VLANs: one flat network'), findsWidgets);
 
       await tester.enterText(_composer(), 'can we add AAA server to it as well ?');
       await tester.testTextInput.receiveAction(TextInputAction.send);
@@ -595,7 +650,7 @@ void main() {
       expect(find.textContaining('Devices: 1,'), findsNothing);
     });
 
-    testWidgets('a tapped suggestion is a real turn, and it changes the plan',
+    testWidgets('an answer is a real turn, and it fills the brief',
         (tester) async {
       _wide(tester);
       final store = _seeded();
@@ -608,15 +663,117 @@ void main() {
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Use OSPF for routing'));
+      // The ask offered answers as taps; an answer sent as a message (typed
+      // or tapped - same path) is confirmed, remembered, and the scale
+      // answer grows the lab to serve it.
+      await tester.enterText(_composer(), '25');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pumpAndSettle();
 
-      // The tapped words are a message like any other, and the assistant tells
-      // the user what changed instead of repeating the lab.
       expect(store.logged.where((m) => m.role == 'user'),
-          contains(predicate((ChatMessage m) =>
-              m.text.trim() == 'Use OSPF for routing')));
-      expect(find.textContaining('routing is now ospf'), findsOneWidget);
+          contains(predicate((ChatMessage m) => m.text.trim() == '25')));
+      expect(find.textContaining('Scale: 25 users'), findsWidgets);
+      expect(find.byKey(const ValueKey('brief-card')), findsWidgets);
+      // Routing is still open: the conversation continues with the next
+      // question rather than a plan.
+      expect(find.textContaining('How should the routers route'),
+          findsWidgets);
+
+      // Answering the last question readies the brief - the way out is a
+      // tap, and the ack says so.
+      await tester.enterText(_composer(), 'OSPF');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Routing: OSPF'), findsWidgets);
+      expect(find.textContaining('everything I need'), findsWidgets);
+      expect(find.text('Build the .pkt'), findsOneWidget);
+    });
+
+    testWidgets('a what-if about the lab does not change the lab',
+        (tester) async {
+      _wide(tester);
+      final store = _seeded();
+      await tester.pumpWidget(_chat(store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('New chat').first);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), '2 routers and 4 switches');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('before I plan this'), findsOneWidget,
+          reason: 'the brief is open, with scale and routing unanswered');
+
+      // The wondering turn. It is answered like any other - it lands in the
+      // transcript and it is written down - but nothing about the lab moves.
+      await tester.enterText(_composer(), 'what if we had 40 pcs instead?');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(
+        store.logged.where((m) => m.role == 'model'),
+        isNotEmpty,
+        reason: 'a what-if that is not written down is lost on restart',
+      );
+      expect(
+        find.textContaining('Scale: 40'),
+        findsNothing,
+        reason: 'wondering about 40 PCs must not plan 40 PCs',
+      );
+      expect(
+        find.textContaining('Build a .pkt from this plan'),
+        findsNothing,
+        reason: 'nothing was built by wondering',
+      );
+      expect(
+        find.textContaining('Nothing in your lab changed'),
+        findsWidgets,
+        reason: 'the gate says out loud that it changed nothing',
+      );
+
+      // And the question it did not answer is still there to be answered -
+      // the gate neither resolved nor dismissed it.
+      await tester.enterText(_composer(), '25');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Scale: 25 users'), findsWidgets);
+    });
+
+    testWidgets('a what-if does not answer the open question either',
+        (tester) async {
+      _wide(tester);
+      final store = _seeded();
+      await tester.pumpWidget(_chat(store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('New chat').first);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), '2 routers and 4 switches');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('before I plan this'), findsOneWidget);
+
+      // The routing question is open, and this names a protocol - so the
+      // tempting reading is "answer: OSPF". It is a wondering about the
+      // protocol, not the answer, and it must leave the question open.
+      await tester.enterText(_composer(), 'what if we used OSPF instead?');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Routing: OSPF'), findsNothing,
+          reason: 'a what-if must not fill in the open question');
+      expect(
+        find.textContaining('Nothing in your lab changed'),
+        findsWidgets,
+        reason: 'the gate says out loud that it changed nothing',
+      );
+
+      // The question is still there to be answered properly.
+      await tester.enterText(_composer(), '25');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Scale: 25 users'), findsWidgets);
+      expect(find.textContaining('How should the routers route'), findsWidgets,
+          reason: 'routing is still open - the what-if did not answer it');
     });
   });
 
@@ -678,8 +835,9 @@ void main() {
       await tester.pumpAndSettle();
 
       // Private mode is a promise that nothing leaves the device, so the answer
-      // says private mode - not "no API key", which is a different problem.
-      expect(find.textContaining('Private mode is on'), findsWidgets);
+      // says private mode - which is now the top bar's AI pill, not a line
+      // in the chat. The transcript itself stays free of mode labels.
+      expect(find.textContaining('Private mode is on'), findsNothing);
       // The plan is still parsed and offered, so offline work keeps working.
       expect(find.textContaining('10 PC(s)'), findsNothing);
       expect(store.logged.where((m) => m.role == 'user'), hasLength(1));
@@ -796,6 +954,287 @@ void main() {
       expect(settings.lastTarget, 'cisco-ssh',
           reason: 'a refused switch must not change anything');
       expect(find.textContaining('Unknown target'), findsOneWidget);
+    });
+  });
+
+  group('rewriting history in place', () {
+    testWidgets('"Answer again" replaces the last answer instead of stacking '
+        'a duplicate', (tester) async {
+      _wide(tester);
+      final store = _seeded();
+      await tester.pumpWidget(_chat(store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Trunk Problem'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Answer again'));
+      await tester.pumpAndSettle();
+
+      // The store was asked to cut from the last user turn, and from no
+      // other conversation than the one that is open.
+      expect(store.truncations, hasLength(1));
+      final cut = store.truncations.single;
+      expect(cut.conversation, 'trunk-lab');
+      expect(cut.fromRole, 'user');
+      expect(cut.fromText, 'why is the trunk down?');
+      expect(store.transcripts['trunk-lab'], isEmpty,
+          reason: 'the old turn is gone from the store, not just the screen');
+
+      // The old answer does not survive under the new one...
+      expect(find.text('SW1 f0/1 is not trunking.'), findsNothing);
+      // ...and the same question went out again as a fresh turn, stored.
+      expect(
+        store.logged.where((m) => m.role == 'user').map((m) => m.text),
+        contains('why is the trunk down?'),
+      );
+      // One user bubble on screen: the resent turn, not the resent turn plus
+      // a leftover copy.
+      expect(find.text('why is the trunk down?'), findsOneWidget);
+    });
+
+    testWidgets('"Edit and resend" removes the branch and refills the '
+        'composer', (tester) async {
+      _wide(tester);
+      final store = _seeded();
+      await tester.pumpWidget(_chat(store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Trunk Problem'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Edit and resend'));
+      await tester.pumpAndSettle();
+
+      // The turn being edited and everything after it are gone, in the store
+      // as well as on the screen.
+      expect(store.truncations, hasLength(1));
+      expect(store.truncations.single.conversation, 'trunk-lab');
+      expect(store.truncations.single.fromText, 'why is the trunk down?');
+      expect(store.transcripts['trunk-lab'], isEmpty);
+      expect(find.text('SW1 f0/1 is not trunking.'), findsNothing);
+
+      // The original words are back in the composer for editing; exactly one
+      // copy of them is on screen (the field), so the bubble is gone too.
+      final composer = tester.widget<TextField>(_composer());
+      expect(composer.controller?.text, 'why is the trunk down?');
+      expect(find.text('why is the trunk down?'), findsOneWidget);
+      // Nothing was sent by choosing to edit.
+      expect(store.logged.where((m) => m.role == 'user'), isEmpty);
+
+      // Sending the edit goes out as a fresh turn.
+      await tester.enterText(_composer(), 'why is the trunk down on SW1?');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      expect(
+        store.logged.where((m) => m.role == 'user').map((m) => m.text).last,
+        'why is the trunk down on SW1?',
+      );
+      expect(find.text('why is the trunk down on SW1?'), findsOneWidget,
+          reason: 'the edited turn took the old one\'s place');
+    });
+  });
+
+  group('the in-conversation search', () {
+    testWidgets('finds the turn, says where it is, and jumps to it',
+        (tester) async {
+      _wide(tester);
+      final store = _seeded();
+      await tester.pumpWidget(_chat(store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Trunk Problem'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Search in this conversation'));
+      await tester.pumpAndSettle();
+
+      final field = find.byWidgetPredicate(
+        (w) =>
+            w is TextField &&
+            w.decoration?.hintText == 'Search this conversation',
+      );
+      // A hit from another conversation must not leak in: this search reads
+      // the open transcript only.
+      await tester.enterText(field, 'R7');
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.textContaining(
+              'No messages in this conversation match that.'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.enterText(field, 'trunk');
+      await tester.pumpAndSettle();
+      final hit = find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.textContaining('why is the trunk down?'),
+      );
+      expect(hit, findsOneWidget,
+          reason: 'the hit shows the line it was found on');
+
+      await tester.tap(hit);
+      await tester.pumpAndSettle();
+      // The sheet closed to take the reader to the turn, and nothing threw
+      // on the way (the jump is allowed to no-op on a message that is not
+      // staged - it is never allowed to crash).
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('the transcript export', () {
+    test('the shared document is markdown a ticket can quote', () {
+      final doc = ChatScreen.transcriptMarkdown(
+        const [
+          ChatMessage(
+            role: 'user',
+            text: 'fix this:\n```\nip route 0.0.0.0 0.0.0.0 10.0.0.1\n```',
+            createdAt: '2026-01-01T10:30:00',
+          ),
+          ChatMessage(
+            role: 'model',
+            text: 'The gateway is on the wrong side.',
+            createdAt: '2026-01-01T10:31:00',
+          ),
+          ChatMessage(
+            role: 'system',
+            text: 'Saved.',
+            createdAt: '2026-01-01T10:32:00',
+          ),
+          ChatMessage(role: 'user', text: '   '),
+        ],
+        conversation: 'trunk-lab',
+        exportedAt: DateTime.parse('2026-01-02T08:00:00'),
+      );
+      expect(doc, startsWith('# NetBuilder chat - trunk-lab\n'));
+      expect(doc, contains('Exported 2026-01-02T08:00:00.000 - 4 messages.'));
+      expect(doc, contains('**You** (10:30):'));
+      // Fenced code goes out verbatim, still fenced and runnable.
+      expect(doc, contains('```\nip route 0.0.0.0 0.0.0.0 10.0.0.1\n```'));
+      expect(doc, contains('**Assistant** (10:31):'));
+      expect(doc, contains('**App** (10:32):'));
+      expect(doc, contains('**You**:\n'), reason: 'a blank turn says so');
+      expect(doc, contains('_(no text)_'));
+    });
+
+    testWidgets('"Share the transcript" lives in the tools sheet and an '
+        'empty conversation is said out loud', (tester) async {
+      _wide(tester);
+      await tester.pumpWidget(_chat(_seeded()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Tools: run, capture, and integrations'));
+      await tester.pumpAndSettle();
+      expect(find.text('Share the transcript'), findsOneWidget);
+      await tester.tap(find.text('Share the transcript'));
+      await tester.pumpAndSettle();
+
+      // Nothing to share is an answer in the chat, not a silent no-op - and
+      // the share sheet is never asked for an empty document.
+      expect(find.textContaining('Nothing to share yet'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('the parse can be argued with', () {
+    testWidgets('a count chip fixes the plan where the user can see it',
+        (tester) async {
+      _wide(tester);
+      await tester.pumpWidget(_chat(_seeded()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('New chat').first);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), '2 routers and 4 switches');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Understood'), findsOneWidget);
+      expect(find.text('2 routers'), findsOneWidget);
+
+      // The chip is not only a label. Tapping it asks for the number that
+      // was actually meant, and the plan on screen is the thing that
+      // changes - no re-typed English, no "maybe I said it differently".
+      await tester.tap(find.text('2 routers'));
+      await tester.pumpAndSettle();
+      final field = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      );
+      expect(field, findsOneWidget, reason: 'the fix asks for a value');
+      await tester.enterText(field, '5');
+      await tester.tap(find.text('Fix it'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('5 routers'), findsOneWidget);
+      expect(find.text('2 routers'), findsNothing,
+          reason: 'the wrong parse must not still be on screen');
+      // A correction is never silent: the card says what it became.
+      expect(find.textContaining('Fixed: 5 routers'), findsOneWidget);
+      expect(find.text('Understood'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a fix the user backs out of changes nothing',
+        (tester) async {
+      _wide(tester);
+      await tester.pumpWidget(_chat(_seeded()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('New chat').first);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), '2 routers and 4 switches');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('2 routers'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.byType(TextField),
+        ),
+        '9',
+      );
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 routers'), findsOneWidget);
+      expect(find.text('9 routers'), findsNothing);
+      expect(find.textContaining('Fixed:'), findsNothing);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('the routing protocol is a slot too, and it is always shown',
+        (tester) async {
+      _wide(tester);
+      await tester.pumpWidget(_chat(_seeded()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('New chat').first);
+      await tester.pumpAndSettle();
+
+      // A default nobody chose is exactly what a user wants to argue with,
+      // so the routing chip is on the card even when it says STATIC.
+      await tester.enterText(_composer(), '2 routers and 4 switches');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      expect(find.text('STATIC'), findsOneWidget);
+
+      await tester.tap(find.text('STATIC'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.byType(TextField),
+        ),
+        'ospf',
+      );
+      await tester.tap(find.text('Fix it'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('OSPF'), findsOneWidget);
+      expect(find.textContaining('Fixed: ospf'), findsOneWidget);
     });
   });
 }

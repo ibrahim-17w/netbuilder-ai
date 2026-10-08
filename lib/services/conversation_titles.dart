@@ -11,6 +11,23 @@ import 'session_state.dart';
 class ConversationTitles {
   const ConversationTitles._();
 
+  /// Raw conversation ids are storage keys ("chat 0:1228"), not names. A
+  /// conversation the user has not sent anything to yet - or a legacy one
+  /// that never got a title - displays as "New conversation" everywhere a
+  /// human reads it: sidebar, pane header, welcome subtitle.
+  static final RegExp _rawId = RegExp(r'^chat \d+:\d+$');
+
+  /// The name a person should see for [title].
+  static String display(String title) {
+    final t = title.trim();
+    if (t.isEmpty || _rawId.hasMatch(t)) return 'New conversation';
+    return t;
+  }
+
+  /// True when [project] is a raw storage id rather than a real name - the
+  /// welcome subtitle must not say "This conversation is about chat 0:1228".
+  static bool isRawId(String project) => _rawId.hasMatch(project.trim());
+
   /// What the chat is about, when the wording says so. Order matters: the
   /// first match wins, so the more specific protocol names come before the
   /// broader ones.

@@ -103,4 +103,89 @@ class BuildArtifactService {
             .join('\n');
     }
   }
+
+  /// A human-meaningful .pkt file name for [plan]: content words from the
+  /// brief ("small office with OSPF" saves as `small-office-ospf.pkt`),
+  /// because in chat builds [plan]'s projectName is the CONVERSATION key
+  /// ("chat"), not the network's name. The topology signature is the last
+  /// resort for a lab nobody described. A timestamp hides a lab from the
+  /// person who built it; a name does not.
+  ///
+  /// [taken] holds names already written (session artifacts, the output
+  /// directory); a collision gets -2, -3 ... because a newer build must
+  /// never silently clobber an older lab with the same name.
+  static String networkFileName({
+    required NetworkIntent plan,
+    String brief = '',
+    required Set<String> taken,
+  }) {
+    var source = _briefWords(brief);
+    if (source.isEmpty) {
+      source = plan.projectName.trim();
+      if (_isGenericName(source)) {
+        // The topology itself names the file: the device mix plus the
+        // routing is the shortest honest description of a lab nobody named.
+        final routers = plan.nodes.where((n) => n.type == 'router').length;
+        final switches = plan.nodes.where((n) => n.type == 'switch').length;
+        final pcs = plan.nodes.where((n) => n.type == 'pc').length;
+        final servers = plan.nodes.where((n) => n.type == 'server').length;
+        final routing = plan.routing.trim().toLowerCase();
+        source = [
+          if (routers > 0) '$routers-routers',
+          if (switches > 0) '$switches-switches',
+          if (pcs > 0) '$pcs-pcs',
+          if (servers > 0) '$servers-servers',
+          if (routing.isNotEmpty) routing,
+        ].join('-');
+      }
+    }
+    var base = _slug(source);
+    if (base.isEmpty || base == 'net') base = 'network';
+    var name = '$base.pkt';
+    var n = 2;
+    while (taken.contains(name)) {
+      name = '$base-$n.pkt';
+      n += 1;
+    }
+    return name;
+  }
+
+  /// Parser fallback names that say nothing about the network.
+  static bool _isGenericName(String name) {
+    final t = name.trim().toLowerCase();
+    return t.isEmpty || t == 'net' || t == 'network';
+  }
+
+  /// Content words of [brief]: stopwords and bare numbers dropped, capped
+  /// at four, so a brief becomes at most four dashes of name.
+  static String _briefWords(String brief) {
+    const stopwords = {
+      'the', 'a', 'an', 'and', 'or', 'with', 'for', 'of', 'in', 'on', 'at',
+      'to', 'from', 'plus', 'also', 'that', 'this', 'lab', 'network',
+      'build', 'make', 'create', 'plan', 'set', 'up', 'please', 'give',
+      'me', 'i', 'want', 'need', 'have', 'has', 'use', 'using', 'some',
+    };
+    final words = brief
+        .toLowerCase()
+        .split(RegExp(r'[^a-z0-9]+'))
+        .where(
+          (w) =>
+              w.length > 1 &&
+              !stopwords.contains(w) &&
+              !RegExp(r'^\d+$').hasMatch(w),
+        )
+        .take(4)
+        .toList();
+    return words.join('-');
+  }
+
+  static String _slug(String s) {
+    var t = s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+    t = t.replaceAll(RegExp(r'-+'), '-');
+    t = t.replaceAll(RegExp(r'^-+|-+$'), '');
+    if (t.length > 48) {
+      t = t.substring(0, 48).replaceAll(RegExp(r'-+$'), '');
+    }
+    return t;
+  }
 }

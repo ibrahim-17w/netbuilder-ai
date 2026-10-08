@@ -414,6 +414,10 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
               actions: [
                 const Padding(
                   padding: EdgeInsets.only(right: AppTheme.s8),
+                  child: _AiPill(),
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(right: AppTheme.s8),
                   child: _EnginePill(),
                 ),
                 Padding(
@@ -523,6 +527,51 @@ class _DestinationHeader extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// The AI's state, in the top bar next to the engine's: is an API key
+/// active (and for which provider), is private mode on, or is the built-in
+/// planner on its own. One glance answers "will the model answer this?"
+/// without opening Settings - which is why the per-answer source lines in
+/// the chat were retired: the mode is a property of the app, not of each
+/// message, and the app bar is where the app's state lives.
+class _AiPill extends StatelessWidget {
+  const _AiPill();
+
+  @override
+  Widget build(BuildContext context) {
+    // The shell renders without providers in widget tests; a missing
+    // SettingsService costs the pill, never the screen - the same rule the
+    // shell's own nullable settings getter follows.
+    final SettingsService settings;
+    try {
+      settings = context.watch<SettingsService>();
+    } catch (_) {
+      return const SizedBox.shrink();
+    }
+    final (detail, ok, warn) = switch ((
+      settings.privateMode,
+      settings.aiKeyPresent,
+    )) {
+      // Engine-pill brevity: 'AI on / off / private' must hold at a 360px
+      // phone width beside the engine pill; the provider lives in the
+      // tooltip.
+      (true, _) => ('private', false, true),
+      (false, true) => ('on', true, false),
+      (false, false) => ('off', false, true),
+    };
+    return Tooltip(
+      message: switch ((settings.privateMode, settings.aiKeyPresent)) {
+        (true, _) => 'Private mode is on - the model is never called',
+        (false, true) =>
+          'AI on - API key active (${settings.providerName == 'openai' ? 'OpenAI-compatible' : 'Google Gemini'})'
+              '; questions are answered by the model and learned for offline replay',
+        _ => 'AI off - no API key set; the built-in planner answers '
+            'everything offline',
+      },
+      child: AppStatusPill(label: 'AI', detail: detail, ok: ok, warn: warn),
     );
   }
 }

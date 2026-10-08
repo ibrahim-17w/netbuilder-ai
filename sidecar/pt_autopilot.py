@@ -51,7 +51,7 @@ import threading
 import time
 import zipfile
 from dataclasses import dataclass, field
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 try:
     import pyautogui
@@ -240,7 +240,7 @@ def _run_hidden(command, **kwargs):
 # Bump on every behaviour change. Served on /health so a stale process
 # (old code, old port-holder, double instance) is detectable remotely
 # instead of producing "nothing changed" mystery runs.
-VERSION = "2026-09-29-tier-tree-layout"
+VERSION = "2026-09-29-tier-tree-layout-threaded-server"
 
 
 def _engine_identity() -> dict:
@@ -308,6 +308,28 @@ CORRECTIONS = CorrectionStore(
 _TEACH_OVERRIDES: dict = {}
 
 
+# True only while `_settle_teach_run` is promoting/rejecting, so the settle
+# pass's own lookups do not count as "the run consulted this override".
+_TEACH_SETTLING = False
+
+
+def _mark_teach_consulted(store: str, key: str, dev: str = "") -> None:
+    """Record that a run actually looked up this override (bounded).
+
+    Settlement uses this to tell "the screen disagreed" apart from "the run
+    never reached the step": only a CONSULTED override can be rejected, and
+    only a consulted one may promote.  A correction the run never reached
+    keeps its `proposed` status for the next teach run instead of collecting
+    a verdict it was never given the chance to earn.
+    """
+    if _TEACH_SETTLING:
+        return
+    tag = f"{store}|{key}|{dev}" if dev else f"{store}|{key}"
+    tried = RUN.setdefault("teachConsulted", [])
+    if tag not in tried:
+        tried.append(tag)
+
+
 def _teach_override(store: str, key: str, dev: str = "") -> dict:
     """The override for one store lookup, or {} - which is the normal case."""
     if not _TEACH_OVERRIDES:
@@ -322,6 +344,7 @@ def _teach_override(store: str, key: str, dev: str = "") -> dict:
     for candidate in candidates:
         row = _TEACH_OVERRIDES.get(candidate)
         if isinstance(row, dict):
+            _mark_teach_consulted(store, key, dev)
             return dict(row)
     return {}
 
@@ -537,63 +560,119 @@ def _settle_teach_run(ok: bool, reason: str = "") -> list:
     Every branch is idempotent: promotion marks the row verified, and the
     overrides are cleared, so a second call is a no-op.
     """
+    global _TEACH_SETTLING
     if not _TEACH_OVERRIDES:
         return []
     armed = [dict(item) for item in RUN.get("teachRun") or []]
+    consulted = {str(item) for item in (RUN.get("teachConsulted") or [])}
+
+    def _was_consulted(store: str, key: str, dev: str) -> bool:
+        """True when the run actually used this override.
+
+        A capability declaration has no lookup site in the run - its proof is
+        the completed run itself - so it counts as consulted when the run
+        reached its verdict.
+        """
+        if store == "capability":
+            return True
+        return (f"{store}|{key}|{dev}" in consulted
+                or f"{store}|{key}" in consulted)
+
     results = []
-    for item in armed:
-        cid = str(item.get("correctionId") or "")
-        store = str(item.get("store") or "")
-        key = str(item.get("key") or "")
-        dev = str(item.get("device") or "")
-        row = CORRECTIONS.get(cid)
-        if not row:
-            continue
-        if row.get("status") == "verified":
-            results.append({"correctionId": cid, "promoted": True,
-                            "alreadyVerified": True})
-            continue
-        if not ok:
-            # Distinguish 'the screen disagreed' from 'the run never tried':
-            # a crash or a stop leaves no verdict to learn from, so the
-            # hypothesis survives for the next teach run.
-            if str(reason).strip().lower() in ("", "run crashed", "stopped"):
-                results.append({"correctionId": cid, "promoted": False,
-                                "pending": True, "reason": str(reason)[:120]})
+    _TEACH_SETTLING = True
+    try:
+        for item in armed:
+            cid = str(item.get("correctionId") or "")
+            store = str(item.get("store") or "")
+            key = str(item.get("key") or "")
+            dev = str(item.get("device") or "")
+            row = CORRECTIONS.get(cid)
+            if not row:
                 continue
-            updated = CORRECTIONS.mark_rejected(
-                cid, str(reason or "step did not verify")[:200])
+            if row.get("status") == "verified":
+                results.append({"correctionId": cid, "promoted": True,
+                                "alreadyVerified": True})
+                continue
+            if not ok:
+                # Distinguish 'the screen disagreed' from 'the run never
+                # tried': a crash or a stop leaves no verdict to learn from,
+                # so the hypothesis survives for the next teach run.
+                if str(reason).strip().lower() in ("", "run crashed",
+                                                   "stopped"):
+                    results.append({"correctionId": cid, "promoted": False,
+                                    "pending": True,
+                                    "reason": str(reason)[:120]})
+                    continue
+                if not _was_consulted(store, key, dev):
+                    # The run failed, but not at this step - it was never
+                    # reached, so the screen gave no verdict on the
+                    # correction. Rejecting here would be a false 'it did not
+                    # work' report.
+                    record_event(
+                        "correction_unreached",
+                        f"teach run never reached {store}:{key} - correction "
+                        f"{cid} stays proposed for the next teach run",
+                        device=dev, recovered=None,
+                        extra={"correctionId": cid})
+                    log(f"TEACH UNREACHED {store}:{key} - correction {cid} "
+                        f"stays proposed (the run did not get there)")
+                    results.append({"correctionId": cid, "promoted": False,
+                                    "pending": True,
+                                    "reason": "step not reached"})
+                    continue
+                updated = CORRECTIONS.mark_rejected(
+                    cid, str(reason or "step did not verify")[:200])
+                record_event(
+                    "correction_rejected",
+                    f"teach run could not verify {store}:{key} "
+                    f"({str(reason)[:80]}) - nothing was written to memory",
+                    device=dev, recovered=False,
+                    extra={"correctionId": cid})
+                log(f"TEACH REJECTED {store}:{key} - {str(reason)[:100]}; "
+                    f"correction {cid} kept for adjustment, nothing promoted")
+                results.append({"correctionId": cid, "promoted": False,
+                                "status": updated.get("status", "rejected"),
+                                "reason": str(reason)[:120]})
+                continue
+            if not _was_consulted(store, key, dev):
+                # The run finished OK, but never at this step - nothing on
+                # the screen proved this correction, and promoting it anyway
+                # would be exactly the kind of unverified learning the loop
+                # exists to refuse.
+                record_event(
+                    "correction_unreached",
+                    f"teach run finished without reaching {store}:{key} - "
+                    f"correction {cid} stays proposed for the next teach run",
+                    device=dev, recovered=None,
+                    extra={"correctionId": cid})
+                log(f"TEACH UNREACHED {store}:{key} - correction {cid} "
+                    f"stays proposed (the run never exercised the step)")
+                results.append({"correctionId": cid, "promoted": False,
+                                "pending": True,
+                                "reason": "step not reached"})
+                continue
+            ref = _promote_teach_override(store, key, dev, cid)
+            if not ref:
+                results.append({"correctionId": cid, "promoted": False,
+                                "reason": f"unknown store {store}"})
+                continue
+            updated = CORRECTIONS.mark_verified(cid, ref)
+            CORRECTIONS.record_hit(cid)
             record_event(
-                "correction_rejected",
-                f"teach run could not verify {store}:{key} "
-                f"({str(reason)[:80]}) - nothing was written to memory",
-                device=dev, recovered=False,
-                extra={"correctionId": cid})
-            log(f"TEACH REJECTED {store}:{key} - {str(reason)[:100]}; "
-                f"correction {cid} kept for adjustment, nothing promoted")
-            results.append({"correctionId": cid, "promoted": False,
-                            "status": updated.get("status", "rejected"),
-                            "reason": str(reason)[:120]})
-            continue
-        ref = _promote_teach_override(store, key, dev, cid)
-        if not ref:
-            results.append({"correctionId": cid, "promoted": False,
-                            "reason": f"unknown store {store}"})
-            continue
-        updated = CORRECTIONS.mark_verified(cid, ref)
-        CORRECTIONS.record_hit(cid)
-        record_event(
-            "correction_verified",
-            f"teach run verified {store}:{key}; promoted to {ref} "
-            f"- user-taught entries outrank learned ones",
-            device=dev, recovered=True,
-            extra={"correctionId": cid, "promotion": ref})
-        log(f"TEACH VERIFIED {store}:{key} - promoted ({ref}); "
-            f"user-taught entries now outrank learned ones")
-        results.append({"correctionId": cid, "promoted": True,
-                        "promotion": ref,
-                        "status": updated.get("status", "verified")})
+                "correction_verified",
+                f"teach run verified {store}:{key}; promoted to {ref} "
+                f"- user-taught entries outrank learned ones",
+                device=dev, recovered=True,
+                extra={"correctionId": cid, "promotion": ref})
+            log(f"TEACH VERIFIED {store}:{key} - promoted ({ref}); "
+                f"user-taught entries now outrank learned ones")
+            results.append({"correctionId": cid, "promoted": True,
+                            "promotion": ref,
+                            "status": updated.get("status", "verified")})
+    finally:
+        _TEACH_SETTLING = False
     RUN["teachResults"] = results
+    RUN["teachConsulted"] = []
     _TEACH_OVERRIDES.clear()
     return results
 
@@ -616,7 +695,15 @@ def _promote_teach_override(store: str, key: str, dev: str,
         scoped = _pc_spot_key(key, dev)
         fx, fy = override.get("fx"), override.get("fy")
         if fx is None or fy is None:
-            return ""
+            # Label-only correction: the run verified the tile THROUGH the
+            # taught label (that is what made it consulted), and `_learn_spot`
+            # recorded exactly that spot.  Promote the spot the run itself
+            # verified instead of failing a correction the screen accepted.
+            learned = PC_LEARNED.get(scoped)
+            try:
+                fx, fy = float(learned["fx"]), float(learned["fy"])
+            except (KeyError, TypeError, ValueError):
+                return ""
         PC_LEARNED[scoped] = {"fx": round(float(fx), 4),
                               "fy": round(float(fy), 4), **meta}
         try:
@@ -628,7 +715,11 @@ def _promote_teach_override(store: str, key: str, dev: str,
     if store == "srv_field":
         fx, fy = override.get("fx"), override.get("fy")
         if fx is None or fy is None:
-            return ""
+            learned = SRV_MEM["fields"].get(key)
+            try:
+                fx, fy = float(learned["fx"]), float(learned["fy"])
+            except (KeyError, TypeError, ValueError):
+                return ""
         SRV_MEM["fields"][key] = {"fx": round(float(fx), 4),
                                   "fy": round(float(fy), 4),
                                   "kind": str(override.get("kind") or "single"),
@@ -638,7 +729,11 @@ def _promote_teach_override(store: str, key: str, dev: str,
     if store == "srv_button":
         fx, fy = override.get("fx"), override.get("fy")
         if fx is None or fy is None:
-            return ""
+            learned = SRV_MEM["buttons"].get(key)
+            try:
+                fx, fy = float(learned["fx"]), float(learned["fy"])
+            except (KeyError, TypeError, ValueError):
+                return ""
         SRV_MEM["buttons"][key] = {"fx": round(float(fx), 4),
                                    "fy": round(float(fy), 4), **meta}
         _save_srv_mem()
@@ -1508,25 +1603,64 @@ def _ai_target_kind_of_failure(kind: str) -> dict:
             "verify": plan.get("verify", "")}
 
 
+def _journal_latest_rows() -> dict:
+    """Newest raw journal row per signature, for evidence the aggregate drops.
+
+    `journal_stats()` keeps counts; the row's `device` and its `extra` (which
+    names the slot a failing lookup was aimed at, e.g. the Desktop tile key)
+    exist only in the raw event - and without them a proposal cannot say
+    where its fix applies, which is exactly what a teach run needs.  One
+    pass, from the same stamped parse the rest of the file uses.
+    """
+    latest = {}
+    for row in _journal_rows():
+        if not isinstance(row, dict):
+            continue
+        sig = _journal_signature(row)
+        stamp = str(row.get("ts", ""))
+        prior = latest.get(sig)
+        if prior is None or stamp >= str(prior.get("ts", "")):
+            latest[sig] = row
+    return latest
+
+
 def _ai_failure_context(project: str) -> list:
     """The journal's worst recurring failures, as proposal inputs.
 
     Unrecovered signatures only: something that already recovered is not a
-    fix worth teaching.  Bounded so one prompt can never blow up.
+    fix worth teaching.  Bounded so one prompt can never blow up.  `device`
+    and `slotKey` travel with each row when the raw event names them, so an
+    accepted proposal can later be taught by a real teach run instead of
+    sitting unverifiable forever.
     """
     st = journal_stats()
+    latest = _journal_latest_rows()
     out = []
     for sig, row in st.get("signatures", []):
         if row.get("recovered"):
             continue
-        kind = str(sig).split("|", 1)[0]
+        # The aggregate keys signatures `kind:detail`; older callers seeded
+        # `kind|detail`.  Accept both, or a real failure never reaches the
+        # model at all (which is how this pipeline stayed silent).
+        text = str(sig)
+        kind = re.split(r"[:|]", text, maxsplit=1)[0]
         aim = _ai_target_kind_of_failure(kind)
         if not aim:
             continue
-        out.append({"kind": kind, "signature": sig,
+        raw = latest.get(text) or {}
+        extras = raw.get("extra") if isinstance(raw.get("extra"), dict) else {}
+        slot = next((str(extras[key]).strip() for key in
+                     ("tile", "field", "button", "key")
+                     if str(extras.get(key) or "").strip()), "")
+        detail = str(row.get("detail") or "")
+        if not detail:
+            detail = text.split(":", 1)[1] if ":" in text else text
+        out.append({"kind": kind, "signature": text,
                     "count": int(row.get("count", 0)),
                     "lastSeen": str(row.get("last", ""))[:19],
-                    "detail": sig.split("|", 1)[1] if "|" in sig else sig,
+                    "detail": detail[:120],
+                    "device": str(raw.get("device") or "")[:60],
+                    "slotKey": slot[:60],
                     **aim})
         if len(out) >= 6:
             break
@@ -1598,6 +1732,10 @@ def _ai_parse_proposals(answer: str, failures: list) -> list:
             "store": f.get("store", ""),
             "verify": f.get("verify", ""),
             "count": f.get("count", 0),
+            # Evidence the raw journal row carried: without it the accepted
+            # correction could never name a device or slot to be verified on.
+            "device": str(f.get("device", ""))[:60],
+            "slotKey": str(f.get("slotKey", ""))[:60],
         })
     return out[:AI_SUGGEST_MAX_PROPOSALS]
 
@@ -1704,8 +1842,10 @@ def _ai_proposal_to_correction(p: dict) -> dict:
     if p.get("target") == "label":
         return CORRECTIONS.propose(
             failure_kind=p["failureKind"], project=_last_project(),
+            device=p.get("device", ""),
             target={"kind": "label", "label": p.get("label", ""),
-                    "scope": p.get("scope", "dtype")},
+                    "scope": p.get("scope", "dtype"),
+                    "key": p.get("slotKey", "")},
             evidence={"source": "ai_suggest",
                       "reason": p.get("reason", "")[:180],
                       "evaluation": "gemini"})
@@ -1897,13 +2037,152 @@ def maybe_auto_suggest(project: str = "") -> dict:
     return result
 
 
-def _auto_teach_after_suggest(project: str) -> dict:
-    """Wait for the suggest pass, then run ONE bounded teach run.
+# How many pending corrections one automatic pass may examine, and how many
+# teach runs it may actually start.  A teach run drives Packet Tracer, so the
+# budget is explicit and tiny: the first correction that can be verified opens
+# a run, and the rest wait for the next pass.
+AUTO_TEACH_MAX_CORRECTIONS = 4
+AUTO_TEACH_MAX_RUNS = 1
 
-    The teach run is the same path a human-triggered one uses (POST /teach),
-    so an auto-learned correction is verified on screen exactly like a typed
-    one.  If no Packet Tracer window or RPA is available the run is refused
-    and the proposal simply stays `proposed` for a later manual teach.
+# The step each teachable store is (re-)attempted by, and where its device
+# entry lives inside that step, so an auto-teach run can be narrowed to the
+# one device the correction is about.  A store with no entry here has no
+# re-runnable step and is refused rather than guessed at.
+# NB: the PLAN step actions are plural (`config_pcs`, `config_servers`);
+# the per-device action names in RUN/ledger are singular.  These values must
+# match the plan, because they select the step that is re-attempted.
+_TEACH_STORE_STEP = {
+    "pc_tile": ("config_pcs", "pcs"),
+    "pc_field": ("config_pcs", "pcs"),
+    "srv_button": ("config_servers", "servers"),
+    "srv_field": ("config_servers", "servers"),
+    "cli_fallback": ("paste_cli", "configs"),
+    "placement": ("create_nodes", "nodes"),
+}
+
+
+def _teach_spec_for(row: dict, project: str = "") -> tuple[dict, str]:
+    """Resolve a pending correction into (spec, "") or ({}, reason).
+
+    A teach run needs four things the correction has to carry itself - the
+    store it promotes into, the slot key it applies to, the device it was
+    seen on, and a step that re-attempts it.  Anything missing is refused
+    with the reason, never guessed: an unverifiable correction stays
+    `proposed` for a later teach run instead of being promoted on faith.
+    """
+    plan = correction_plan(str(row.get("failureKind") or ""))
+    if not plan.get("teachable"):
+        return {}, str(plan.get("reason") or "failure kind is not teachable")
+    store = str(plan.get("store") or "")
+    target = dict(row.get("target") or {})
+    key = str(target.get("key") or "").strip()
+    if not key:
+        return {}, "correction does not name the slot key it applies to"
+    dev = str(row.get("device") or "").strip()
+    if not dev:
+        return {}, "correction does not name the device it was seen on"
+    step = _TEACH_STORE_STEP.get(store)
+    if not step:
+        return {}, f"{store} has no re-runnable step yet"
+    action, slot = step
+    last = LAST_PLAN if isinstance(LAST_PLAN, dict) else {}
+    wanted = str(project or row.get("project") or "default")
+    have = str(last.get("project") or "default")
+    if not last or have != wanted:
+        return {}, "the failing run's plan is no longer in memory"
+    steps = []
+    for item in last.get("steps") or []:
+        if not isinstance(item, dict) or item.get("action") != action:
+            continue
+        narrowed = dict(item)
+        entries = item.get(slot)
+        if slot == "nodes":
+            if not isinstance(entries, list):
+                continue
+            picked = [n for n in entries
+                      if isinstance(n, dict) and n.get("name") == dev]
+            if not picked:
+                continue
+            narrowed["nodes"] = picked
+        else:
+            if not isinstance(entries, dict) or dev not in entries:
+                continue
+            narrowed[slot] = {dev: entries[dev]}
+        steps.append(narrowed)
+    if not steps:
+        return {}, (f"the step that failed ({action} on {dev}) is not in "
+                    f"the remembered plan")
+    return {"store": store, "key": key, "device": dev,
+            "steps": steps[:1], "target": target}, ""
+
+
+def _begin_teach_run(cid: str, store: str, key: str, steps: list, *,
+                     project: str = "", mode: str = "fixes",
+                     target=None, field_kind: str = "") -> tuple[dict, int]:
+    """Arm one bounded teach run and start it.  The ONLY way one starts.
+
+    Both the human path (POST /teach) and the automatic one go through this,
+    so an auto-learned correction is verified on screen through exactly the
+    same run, activity lock and settlement as a typed one.  The caller has
+    already validated the correction; this builds the plan and launches it.
+    Nothing is saved here: the run either verifies the step and promotes, or
+    `_settle_teach_run` decides what the screen's verdict means.
+    """
+    row = CORRECTIONS.get(cid)
+    if not row:
+        return {"ok": False, "error": f"no such correction: {cid}"}, 404
+    chosen = dict(target if isinstance(target, dict) else {})
+    dev = str(row.get("device") or "")
+    entry = {
+        "store": store,
+        "key": key,
+        "device": dev,
+        "correctionId": cid,
+        "label": chosen.get("label"),
+        "cli": chosen.get("cli"),
+        "fieldKind": str(field_kind or ""),
+    }
+    for axis in ("fx", "fy", "clickAbove"):
+        if chosen.get(axis) is not None:
+            entry[axis] = chosen[axis]
+    plan = {
+        "project": str(project or row.get("project") or "default"),
+        "mode": str(mode or "fixes"),
+        "steps": steps,
+        "teach": [entry],
+        "teachOf": cid,
+    }
+    acquired, busy = begin_activity("build")
+    if not acquired:
+        return {"ok": False,
+                "error": f"busy - {busy} active",
+                "activity": activity_snapshot()}, 409
+    try:
+        CORRECTIONS._data["corrections"][cid]["teachRunAt"] = (
+            time.strftime("%Y-%m-%d %H:%M:%S"))
+        CORRECTIONS._save_locked()
+    except Exception as exc:
+        log(f"teach run stamp failed: {exc}")
+    threading.Thread(target=run_plan, args=(plan,), daemon=True).start()
+    return {"ok": True, "correctionId": cid,
+            "teach": {"store": store, "key": key, "device": dev},
+            "message": "Teach run started; nothing is saved unless the "
+                       "step verifies. Poll /status."}, 200
+
+
+def _auto_teach_after_suggest(project: str) -> dict:
+    """Wait for the suggest pass, then START one bounded teach run.
+
+    This is the link that used to be missing: the suggest pass could propose,
+    but nothing ever re-attempted the step, so accepted proposals sat
+    `proposed` forever.  A correction is only started when it can name its
+    own verification - store, slot key, device and a step from the failing
+    run's plan - so an auto-learned correction is verified on screen through
+    exactly the same run, lock and settlement as a human-triggered one
+    (POST /teach -> run_plan -> `_settle_teach_run`).  Anything unresolvable
+    stays `proposed` with the reason recorded, never promoted on faith.  If
+    no Packet Tracer window or RPA is available the run is refused the same
+    way and the proposal remains for a later manual teach.
     """
     deadline = time.time() + 120.0
     while time.time() < deadline:
@@ -1914,26 +2193,59 @@ def _auto_teach_after_suggest(project: str) -> dict:
         record_event("auto_teach_skipped",
                      "suggest pass did not finish in time; corrections "
                      "remain proposed", recovered=None)
-        return {"ok": False, "reason": "suggest pass still running"}
+        return {"ok": False, "started": False,
+                "reason": "suggest pass still running"}
     if not HAS_RPA:
         record_event("auto_teach_skipped",
                      "auto-teach needs the RPA stack (pyautogui/pywinauto); "
                      "corrections remain proposed", recovered=None)
-        return {"ok": False, "reason": "no RPA"}
+        return {"ok": False, "started": False, "reason": "no RPA"}
     try:
-        pending = CORRECTIONS.pending()
+        pending = CORRECTIONS.pending()[:AUTO_TEACH_MAX_CORRECTIONS]
     except Exception:
         pending = []
     if not pending:
         return {"ok": True, "started": False, "reason": "nothing proposed"}
-    with LOCK:
-        AUTO_LEARN["lastAutoTeach"] = _now()
-        AUTO_LEARN["autoTeachRuns"] = int(
-            AUTO_LEARN.get("autoTeachRuns", 0)) + 1
-    record_event("auto_teach_queued",
-                 f"{len(pending)} proposed correction(s) ready for a "
-                 f"verification run", recovered=None)
-    return {"ok": True, "started": True, "pending": len(pending)}
+    refusals = []
+    started = 0
+    for row in pending:
+        if started >= AUTO_TEACH_MAX_RUNS:
+            break
+        spec, why = _teach_spec_for(row, project)
+        if not spec:
+            refusals.append(f"{row.get('id')}: {why}")
+            continue
+        payload, code = _begin_teach_run(
+            str(row.get("id") or ""), spec["store"], spec["key"],
+            spec["steps"],
+            project=project or str(row.get("project") or ""),
+            mode="fixes", target=spec["target"])
+        if code != 200:
+            refusals.append(f"{row.get('id')}: {payload.get('error')}")
+            break
+        started += 1
+        with LOCK:
+            AUTO_LEARN["lastAutoTeach"] = _now()
+            AUTO_LEARN["autoTeachRuns"] = int(
+                AUTO_LEARN.get("autoTeachRuns", 0)) + 1
+        record_event(
+            "auto_teach_started",
+            f"started a teach run for correction {row.get('id')} "
+            f"({spec['store']}:{spec['key']} on "
+            f"{spec['device'] or 'any device'})",
+            device=spec["device"], recovered=None,
+            extra={"correctionId": row.get("id"),
+                   "pending": len(pending)})
+        return {"ok": True, "started": True,
+                "correctionId": row.get("id"), "pending": len(pending)}
+    if refusals:
+        record_event(
+            "auto_teach_skipped",
+            f"no proposed correction could be verified automatically: "
+            f"{'; '.join(refusals[:3])}", recovered=None)
+    return {"ok": True, "started": False,
+            "reason": "no correction had a complete teach spec",
+            "refusals": refusals[:AUTO_TEACH_MAX_CORRECTIONS]}
 
 
 def _now() -> str:
@@ -2415,11 +2727,15 @@ def _status_payload_locked() -> dict:
     ``threading.Lock`` - not reentrant - and the HTTP handler calls this while
     holding it, so anything in here that re-acquired LOCK would deadlock.  It
     is not a theoretical hazard: this function used to call
-    ``pause_snapshot()``, which does ``with LOCK``, and because the sidecar
-    serves with a single-threaded ``HTTPServer`` that one call wedged the
+    ``pause_snapshot()``, which does ``with LOCK``, and back when the sidecar
+    served with a single-threaded ``HTTPServer`` that one call wedged the
     ENTIRE process - /status never answered, and neither did /health or
     anything else, for the life of the server.  `activity_snapshot()` had
     already been given the same treatment for the same reason.
+    (The server is threaded now - see ``_ThreadingHTTPServer`` - so a repeat
+    would cost one request its latency instead of the whole engine.  This
+    function still takes no locks: the lock is non-reentrant, so a nested
+    acquisition is a self-deadlock on whichever thread called it.)
 
     Extracted from the handler so the property "building this while holding
     LOCK cannot block" is directly testable.
@@ -2941,6 +3257,7 @@ def _run_reset():
     RUN["phases"] = {}
     RUN["action_results"] = {}
     RUN["link_results"] = {}
+    RUN["teachConsulted"] = []
     RUN["security_checks"] = []
     RUN["service_results"] = []
     RUN["ping_results"] = []
@@ -9990,13 +10307,15 @@ def _pc_open_desktop_app(win, dev: str, tile_key: str, tile_names: list,
             log(f"{dev}: WRONG PANEL '{title.strip()[:60]}' - closing "
                 f"and retrying with next strategy")
             record_event("pc_wrong_panel", title.strip()[:80],
-                         device=dev, recovered=False)
+                         device=dev, recovered=False,
+                         extra={"tile": tile_key})
             _close_open_panel(win)
         else:
             log(f"{dev}: {tile_names[0]} panel not confirmed "
                 f"(attempt {attempt}: {how})")
     record_event("pc_tile_missing", f"{tile_names[0]} tile would not open",
-                 device=dev, recovered=False)
+                 device=dev, recovered=False,
+                 extra={"tile": tile_key})
     return False
 
 
@@ -13523,6 +13842,14 @@ def pkt_audit_network(path: str, project: str = "") -> dict:
     path = _pkt_path(path, must_exist=True)
     project = (project or "default").strip() or "default"
     xml = pkt_builder.decode_pkt_file(path)
+    # FINDINGS THIS PROJECT HAS ALREADY FIXED.  The read side of the repair
+    # loop: a class a re-audit once proved cleared is reported as proven, so
+    # the answer to "have we seen this before?" comes from what actually
+    # worked rather than from what was merely tried.
+    try:
+        proven_repairs = pkt_learning.verified_repairs(project)
+    except Exception:  # noqa: BLE001 - never fail an audit over memory
+        proven_repairs = {}
     devices_report = []
     for block in re.findall(rb"<DEVICE>.*?</DEVICE>", xml, re.S):
         name_match = re.search(
@@ -13543,6 +13870,9 @@ def pkt_audit_network(path: str, project: str = "") -> dict:
 
         def add(severity: str, text: str, fix_cli=None):
             counter["n"] += 1
+            klass = pkt_learning.finding_class({
+                "severity": severity, "text": text})
+            proven = (proven_repairs.get(klass) or {}) if klass else {}
             findings.append({
                 "id": f"{name}:offline:{counter['n']}",
                 "severity": severity,
@@ -13550,6 +13880,9 @@ def pkt_audit_network(path: str, project: str = "") -> dict:
                 "fix_cli": list(fix_cli or []),
                 "fix_pc": False,
                 "offline_advice": True,
+                # Positive evidence only: `fixedBefore` is ever set from a
+                # repair a re-audit verified, never from one that was tried.
+                "fixedBefore": int(proven.get("count", 0)),
             })
 
         for ifname, fact in facts.items():
@@ -15777,7 +16110,79 @@ def _idle_learning_loop():
                 IDLE_LEARN["lastError"] = str(exc)[:120]
 
 
+def build_server(host: str = None, port: int = None, handler=None):
+    """Construct the engine's HTTP server.
+
+    Every path that serves the engine goes through here - ``main`` and the
+    concurrency tests alike - so there is exactly one place where "threaded?"
+    and "bound where?" are decided.  A test that builds its own server
+    instead of calling this proves nothing about the server the engine
+    actually runs: that mistake made the first version of
+    ``test_http_concurrency.py`` pass happily against a reverted,
+    single-threaded bootstrap.  The regression gate is only worth anything if
+    it exercises THIS function.
+    """
+    return _ThreadingHTTPServer(
+        (HOST if host is None else host, PORT if port is None else port),
+        H if handler is None else handler)
+
+
+class _ThreadingHTTPServer(ThreadingHTTPServer):
+    """A threaded engine HTTP server.
+
+    WHY THIS EXISTS.  The server used to be a plain ``HTTPServer``, which
+    serves ONE request at a time.  That made every endpoint a global
+    serialization point: while any single handler ran, *no other request
+    could be answered at all* - not even ``/health``.  The failure mode is
+    total, not degraded, and it is not hypothetical: ``_status_payload_locked``
+    records that one call holding ``LOCK`` while the handler re-acquired it
+    "wedged the ENTIRE process - /status never answered, and neither did
+    /health or anything else, for the life of the server".
+
+    The lock discipline added afterwards fixed that one call.  It did not
+    fix the cause, so any FUTURE handler that blocks - on IO, on a sleep, on a
+    subprocess, on a slow ``_jsonl_cached`` rebuild - re-arms the same outage
+    with no code change anywhere near the lock.  Threading removes the class of
+    bug: a slow request now costs that request its own latency instead of
+    taking the whole engine down with it.
+
+    This does NOT make the engine safe to call concurrently by itself; it makes
+    a stall *containable*.  The existing discipline still has to hold:
+
+      * ``LOCK`` is still a plain, NON-reentrant ``threading.Lock``.  Two
+        threads wanting it now actually contend for it, where before they were
+        simply serialized by the server.  Nothing may re-acquire ``LOCK`` from
+        a thread that already holds it - hence ``*_locked`` helpers, which are
+        called with the lock already held and take none of their own.
+      * Every LOCK block stays short and does no IO.  That invariant is now
+        load-bearing for *availability*, where before it only mattered for
+        correctness.  ``test_http_concurrency.py`` gates it.
+      * Build entry points stay mutually exclusive through
+        ``begin_activity()``, which claims the PT UI atomically under LOCK and
+        returns 409 to the loser.  Two ``/start`` calls arriving together now
+        reach that check concurrently instead of one queueing behind the other;
+        the check is still a single atomic claim, so only one run starts.
+
+    ``daemon_threads`` matters for shutdown: a build job holding a connection
+    open must not keep the process alive after the engine is asked to stop.
+    """
+
+    daemon_threads = True
+    # A dropped connection (the UI closed it mid-poll, or the caller went
+    # away) must not print a traceback or take the thread down with it.
+    handle_error = ThreadingHTTPServer.handle_error
+
+
 class H(BaseHTTPRequestHandler):
+    # A socket timeout, because this handler now runs on its own thread.
+    # `do_POST` reads exactly Content-Length bytes from `self.rfile`, so a
+    # client that connects, sends headers, and then goes quiet would block
+    # that read indefinitely.  Single-threaded, that froze every endpoint for
+    # the life of the process; threaded, it would quietly leak one thread per
+    # stalled caller until the engine stopped accepting work.  Bounding the
+    # read turns both into one timed-out request.
+    timeout = 30
+
     def _json(self, obj, code=200):
         b = json.dumps(obj).encode()
         self.send_response(code)
@@ -16114,11 +16519,23 @@ class H(BaseHTTPRequestHandler):
             store = str(req.get("store") or "").strip()
             key = str(req.get("key") or "").strip()
             steps = req.get("steps")
+            project = str(req.get("project") or row.get("project") or "")
             if not store or not key or not isinstance(steps, list) or not steps:
-                self._json({"ok": False,
-                            "error": "a teach run needs store, key and a "
-                                     "non-empty steps list"}, 400)
-                return
+                # A caller that only knows the correction id still gets the
+                # same run: the correction and the failing run's remembered
+                # plan are enough to resolve its own verification, exactly as
+                # the automatic path does.  What cannot be resolved is
+                # refused with the reason rather than guessed at - a teach
+                # run with an invented step proves nothing.
+                spec, why = _teach_spec_for(row, project)
+                if not spec:
+                    self._json({
+                        "ok": False,
+                        "error": "this correction cannot be taught "
+                                 "automatically: %s" % why,
+                        "reason": why}, 409)
+                    return
+                store, key, steps = spec["store"], spec["key"], spec["steps"]
             if len(steps) > 4:
                 # A teach run is meant to be tiny.  If it needs more than a
                 # handful of steps it is a build, and a build is not a
@@ -16126,43 +16543,15 @@ class H(BaseHTTPRequestHandler):
                 self._json({"ok": False,
                             "error": "a teach run takes at most 4 steps"}, 400)
                 return
-            target = row.get("target") or {}
-            entry = {
-                "store": store,
-                "key": key,
-                "device": str(row.get("device") or ""),
-                "correctionId": cid,
-                "label": target.get("label"),
-                "cli": target.get("cli"),
-                "fieldKind": str(req.get("fieldKind") or ""),
-            }
-            for axis in ("fx", "fy", "clickAbove"):
-                if target.get(axis) is not None:
-                    entry[axis] = target[axis]
-            plan = {
-                "project": str(req.get("project") or row.get("project")
-                               or "default"),
-                "mode": str(req.get("mode") or "fixes"),
-                "steps": steps,
-                "teach": [entry],
-                "teachOf": cid,
-            }
-            acquired, busy = begin_activity("build")
-            if not acquired:
-                self._json({"ok": False,
-                            "error": f"busy - {busy} active",
-                            "activity": activity_snapshot()}, 409)
-                return
-            CORRECTIONS._data["corrections"][cid]["teachRunAt"] = (
-                time.strftime("%Y-%m-%d %H:%M:%S"))
-            CORRECTIONS._save_locked()
-            threading.Thread(target=run_plan, args=(plan,),
-                             daemon=True).start()
-            self._json({"ok": True, "correctionId": cid,
-                        "teach": {"store": store, "key": key,
-                                  "device": entry["device"]},
-                        "message": "Teach run started; nothing is saved "
-                                   "unless the step verifies. Poll /status."})
+            # The launch itself lives in `_begin_teach_run` so this handler
+            # and the automatic path start runs through ONE implementation.
+            payload, code = _begin_teach_run(
+                cid, store, key, steps,
+                project=project,
+                mode=str(req.get("mode") or "fixes"),
+                target=row.get("target") or {},
+                field_kind=str(req.get("fieldKind") or ""))
+            self._json(payload, code)
             return
         if self.path == "/pkt/deep_audit":
             # Deep offline audit: services, VLANs, AAA state + findings.
@@ -16364,6 +16753,37 @@ class H(BaseHTTPRequestHandler):
             except Exception as exc:  # noqa: BLE001 - last-resort report
                 self._json({"ok": False, "error": str(exc)}, 500)
                 return
+            # THE REPAIR LOOP, WRITE SIDE. `verify_repair` is the only tool
+            # whose answer is evidence: it re-audits the repaired save, so a
+            # `fixed` verdict is proof that the approved change cleared the
+            # finding. That verdict - and only that verdict - is remembered.
+            # An unverified, unchanged or still-broken verdict teaches
+            # nothing, so a repair that does not survive a re-audit can never
+            # come back as a lesson.
+            if str(req.get("name") or "") == "verify_repair":
+                try:
+                    args = req.get("args") or {}
+                    learned = pkt_learning.record_repair(
+                        str((args.get("before") or {}).get("project")
+                            or (args.get("after") or {}).get("project")
+                            or req.get("project") or "default"),
+                        result if isinstance(result, dict) else {},
+                        audit if isinstance(audit, dict) else None,
+                        args.get("fixes"),
+                    )
+                    if learned.get("recorded"):
+                        with LOCK:
+                            RUN["repairsVerified"] = int(
+                                RUN.get("repairsVerified", 0)) + 1
+                        record_event(
+                            "repair_verified",
+                            f"a re-audit proved the repair worked for "
+                            f"{learned['recorded']} finding(s); remembered "
+                            f"for the next audit of this project",
+                            recovered=True,
+                            extra={"classes": learned.get("classes", [])})
+                except Exception as exc:  # noqa: BLE001 - never fail a read
+                    log(f"repair learning skipped: {exc}")
             self._json({"ok": True, "result": result})
             return
         if self.path == "/pkt/identify":
@@ -16769,5 +17189,6 @@ if __name__ == "__main__":
     threading.Thread(target=_hotkey_loop, daemon=True).start()
     # Loopback only: this HTTP API has no authentication, so binding it to a
     # routable interface would hand anyone on the LAN a way to drive this
-    # machine's mouse.
-    HTTPServer((HOST, PORT), H).serve_forever()
+    # machine's mouse.  Threading changes WHO can be in flight at once, never
+    # WHO can reach it - the bind address is untouched.
+    build_server().serve_forever()

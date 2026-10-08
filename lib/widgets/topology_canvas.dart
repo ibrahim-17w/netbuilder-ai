@@ -164,11 +164,416 @@ Color vlanColor(int vlan) {
   return HSLColor.fromAHSL(1, hue.toDouble(), 0.55, 0.45).toColor();
 }
 
+/// The workspace palette. Packet Tracer's canvas is a pale green-cream sheet
+/// with a dot grid, dark-ink devices and dark cables - and it looks the same
+/// whatever theme the app around it uses, because it is a picture of a
+/// desktop tool's workspace, not app chrome. Every canvas colour is therefore
+/// fixed, never derived from [ColorScheme].
+const Color kWorkspaceBackground = Color(0xFFF5F2E9);
+const Color kWorkspaceDot = Color(0xFFDCD6C2);
+const Color kWorkspaceInk = Color(0xFF37474F);
+const Color kWorkspaceGlyphFill = Color(0xFFFDFCF8);
+const Color kWorkspaceSerial = Color(0xFFC62828);
+const Color kWorkspaceLabel = Color(0xFF263238);
+
+/// The Packet Tracer-style glyph a device type renders as. One kind per
+/// classic shape: the Cisco router circle, the switch rectangle, the CRT
+/// monitor, the server tower, the brick wall, the cloud, the antennas.
+enum PtGlyphKind {
+  router,
+  switchGlyph,
+  pc,
+  server,
+  firewall,
+  cloud,
+  wirelessAp,
+  wirelessRouter,
+  box,
+}
+
+/// Maps a plan's device type onto its workspace glyph. Unknown types fall
+/// back to a plain labelled box, the same shape they always drew.
+PtGlyphKind ptGlyphKind(String type) => switch (type) {
+      'router' => PtGlyphKind.router,
+      'switch' => PtGlyphKind.switchGlyph,
+      'pc' || 'laptop' => PtGlyphKind.pc,
+      'server' => PtGlyphKind.server,
+      'firewall' => PtGlyphKind.firewall,
+      'cloud' => PtGlyphKind.cloud,
+      'wireless' => PtGlyphKind.wirelessAp,
+      'wireless-router' => PtGlyphKind.wirelessRouter,
+      _ => PtGlyphKind.box,
+    };
+
+/// Paints one Packet Tracer-style device glyph inside a box.
+///
+/// The glyphs are drawn parametrically from the box they are given, so the
+/// same painter serves the full-size canvas, the zoomed view and the
+/// scaled-down thumbnail.
+class PtGlyphPainter extends CustomPainter {
+  final PtGlyphKind kind;
+  final Color stroke;
+  final Color fill;
+  final double strokeWidth;
+
+  const PtGlyphPainter({
+    required this.kind,
+    this.stroke = kWorkspaceInk,
+    this.fill = kWorkspaceGlyphFill,
+    this.strokeWidth = 1.4,
+  });
+
+  static void paintGlyph(
+    Canvas canvas,
+    PtGlyphKind kind,
+    Rect box, {
+    required Color stroke,
+    required Color fill,
+    double strokeWidth = 1.4,
+  }) {
+    if (box.width <= 2 || box.height <= 2) return;
+    final ink = _GlyphInk(stroke, fill, strokeWidth);
+    switch (kind) {
+      case PtGlyphKind.router:
+        _router(canvas, box, ink);
+      case PtGlyphKind.switchGlyph:
+        _switch(canvas, box, ink);
+      case PtGlyphKind.pc:
+        _pc(canvas, box, ink);
+      case PtGlyphKind.server:
+        _server(canvas, box, ink);
+      case PtGlyphKind.firewall:
+        _firewall(canvas, box, ink);
+      case PtGlyphKind.cloud:
+        _cloud(canvas, box, ink);
+      case PtGlyphKind.wirelessAp:
+        _wirelessAp(canvas, box, ink);
+      case PtGlyphKind.wirelessRouter:
+        _wirelessRouter(canvas, box, ink);
+      case PtGlyphKind.box:
+        _box(canvas, box, ink);
+    }
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) => paintGlyph(
+        canvas,
+        kind,
+        Offset.zero & size,
+        stroke: stroke,
+        fill: fill,
+        strokeWidth: strokeWidth,
+      );
+
+  @override
+  bool shouldRepaint(covariant PtGlyphPainter old) =>
+      old.kind != kind ||
+      old.stroke != stroke ||
+      old.fill != fill ||
+      old.strokeWidth != strokeWidth;
+
+  // -- the glyphs ----------------------------------------------------------
+
+  /// Router: the iconic Cisco symbol - a circle with four arrowheads
+  /// pointing N/E/S/W.
+  static void _router(Canvas canvas, Rect box, _GlyphInk ink) {
+    final c = box.center;
+    final r = math.min(box.width, box.height) / 2 - ink.width;
+    canvas.drawCircle(c, r, ink.fill);
+    canvas.drawCircle(c, r, ink.stroke);
+    for (final dir in const [
+      Offset(0, -1),
+      Offset(1, 0),
+      Offset(0, 1),
+      Offset(-1, 0),
+    ]) {
+      _arrow(canvas, c + dir * (r * 0.15), c + dir * (r * 0.58), ink.stroke,
+          ink.mark, head: r * 0.36);
+    }
+  }
+
+  /// Switch: a rounded rectangle, smaller and wider than the router, with
+  /// two opposing horizontal arrows.
+  static void _switch(Canvas canvas, Rect box, _GlyphInk ink) {
+    final rrect = RRect.fromRectAndRadius(
+        box, Radius.circular(box.height * 0.28));
+    canvas.drawRRect(rrect, ink.fill);
+    canvas.drawRRect(rrect, ink.stroke);
+    final x0 = box.left + box.width * 0.18;
+    final x1 = box.right - box.width * 0.18;
+    final head = box.height * 0.24;
+    _arrow(
+      canvas,
+      Offset(x0, box.center.dy - box.height * 0.16),
+      Offset(x1, box.center.dy - box.height * 0.16),
+      ink.stroke,
+      ink.mark,
+      head: head,
+    );
+    _arrow(
+      canvas,
+      Offset(x1, box.center.dy + box.height * 0.16),
+      Offset(x0, box.center.dy + box.height * 0.16),
+      ink.stroke,
+      ink.mark,
+      head: head,
+    );
+  }
+
+  /// PC and laptop: a small CRT monitor - screen, stand, base.
+  static void _pc(Canvas canvas, Rect box, _GlyphInk ink) {
+    final screen = Rect.fromLTWH(
+      box.left + box.width * 0.10,
+      box.top,
+      box.width * 0.80,
+      box.height * 0.60,
+    );
+    final rrect = RRect.fromRectAndRadius(
+        screen, Radius.circular(screen.height * 0.12));
+    canvas.drawRRect(rrect, ink.fill);
+    canvas.drawRRect(rrect, ink.stroke);
+    final cx = box.center.dx;
+    final neck = Rect.fromLTWH(
+      cx - box.width * 0.07,
+      screen.bottom,
+      box.width * 0.14,
+      box.height * 0.26,
+    );
+    canvas.drawRect(neck, ink.fill);
+    canvas.drawRect(neck, ink.stroke);
+    final base = Rect.fromLTWH(
+      cx - box.width * 0.24,
+      box.bottom - box.height * 0.14,
+      box.width * 0.48,
+      box.height * 0.14,
+    );
+    final baseRrect = RRect.fromRectAndRadius(
+        base, Radius.circular(base.height * 0.4));
+    canvas.drawRRect(baseRrect, ink.fill);
+    canvas.drawRRect(baseRrect, ink.stroke);
+  }
+
+  /// Server: a tower of stacked units with vent slots and an LED.
+  static void _server(Canvas canvas, Rect box, _GlyphInk ink) {
+    final tower = Rect.fromLTWH(
+      box.center.dx - box.width * 0.28,
+      box.top,
+      box.width * 0.56,
+      box.height,
+    );
+    final rrect = RRect.fromRectAndRadius(tower, const Radius.circular(2));
+    canvas.drawRRect(rrect, ink.fill);
+    canvas.drawRRect(rrect, ink.stroke);
+    final unit = tower.height / 3;
+    for (var i = 1; i < 3; i++) {
+      final y = tower.top + unit * i;
+      canvas.drawLine(Offset(tower.left, y), Offset(tower.right, y), ink.stroke);
+    }
+    for (var i = 0; i < 3; i++) {
+      final y = tower.top + unit * i + unit * 0.55;
+      canvas.drawLine(
+        Offset(tower.left + tower.width * 0.18, y),
+        Offset(tower.left + tower.width * 0.66, y),
+        ink.stroke,
+      );
+    }
+    canvas.drawCircle(
+      Offset(tower.right - tower.width * 0.16, tower.top + unit * 0.5),
+      math.min(1.4, unit * 0.16),
+      ink.mark,
+    );
+  }
+
+  /// Firewall: a brick wall - courses with offset joints.
+  static void _firewall(Canvas canvas, Rect box, _GlyphInk ink) {
+    canvas.drawRect(box, ink.fill);
+    canvas.drawRect(box, ink.stroke);
+    final course = box.height / 3;
+    for (var i = 1; i < 3; i++) {
+      final y = box.top + course * i;
+      canvas.drawLine(Offset(box.left, y), Offset(box.right, y), ink.stroke);
+    }
+    for (var i = 0; i < 3; i++) {
+      final y0 = box.top + course * i;
+      for (final f in i.isOdd ? const [0.25, 0.75] : const [0.5]) {
+        final x = box.left + box.width * f;
+        canvas.drawLine(Offset(x, y0), Offset(x, y0 + course), ink.stroke);
+      }
+    }
+  }
+
+  /// Cloud: a puffy three-lobed outline.
+  static void _cloud(Canvas canvas, Rect box, _GlyphInk ink) {
+    final l = box.left;
+    final t = box.top;
+    final w = box.width;
+    final h = box.height;
+    final path = Path()
+      ..moveTo(l + w * 0.08, t + h * 0.88)
+      ..cubicTo(l - w * 0.02, t + h * 0.52, l + w * 0.16, t + h * 0.26,
+          l + w * 0.34, t + h * 0.38)
+      ..cubicTo(l + w * 0.38, t + h * 0.06, l + w * 0.72, t + h * 0.06,
+          l + w * 0.76, t + h * 0.34)
+      ..cubicTo(l + w * 0.94, t + h * 0.30, l + w * 1.00, t + h * 0.58,
+          l + w * 0.90, t + h * 0.88)
+      ..close();
+    canvas.drawPath(path, ink.fill);
+    canvas.drawPath(path, ink.stroke);
+  }
+
+  /// Wireless AP: a small unit with two arcs radiating upward.
+  static void _wirelessAp(Canvas canvas, Rect box, _GlyphInk ink) {
+    final unit = Rect.fromLTWH(
+      box.center.dx - box.width * 0.26,
+      box.bottom - box.height * 0.34,
+      box.width * 0.52,
+      box.height * 0.34,
+    );
+    final rrect = RRect.fromRectAndRadius(
+        unit, Radius.circular(unit.height * 0.3));
+    canvas.drawRRect(rrect, ink.fill);
+    canvas.drawRRect(rrect, ink.stroke);
+    final cx = box.center.dx;
+    canvas.drawCircle(
+      Offset(cx, unit.center.dy),
+      math.min(1.6, unit.height * 0.16),
+      ink.mark,
+    );
+    // Arcs open upward: angles run clockwise from +x, and +y points DOWN.
+    for (final f in const [0.30, 0.56]) {
+      final arcRect = Rect.fromCircle(
+          center: Offset(cx, unit.top),
+          radius: math.min(box.width, box.height) * f);
+      canvas.drawArc(arcRect, math.pi, math.pi, false, ink.stroke);
+    }
+  }
+
+  /// Wireless router: a wider unit with two antennas and a signal arc.
+  static void _wirelessRouter(Canvas canvas, Rect box, _GlyphInk ink) {
+    final body = Rect.fromLTWH(
+      box.left + box.width * 0.14,
+      box.top + box.height * 0.42,
+      box.width * 0.72,
+      box.height * 0.46,
+    );
+    final rrect = RRect.fromRectAndRadius(
+        body, Radius.circular(body.height * 0.28));
+    canvas.drawRRect(rrect, ink.fill);
+    canvas.drawRRect(rrect, ink.stroke);
+    for (final f in const [0.28, 0.72]) {
+      final x = box.left + box.width * f;
+      canvas.drawLine(
+          Offset(x, body.top), Offset(x, box.top + box.height * 0.10), ink.stroke);
+    }
+    final arcRect = Rect.fromCircle(
+        center: Offset(box.center.dx, body.top), radius: body.width * 0.26);
+    canvas.drawArc(arcRect, math.pi * 1.25, math.pi * 0.5, false, ink.stroke);
+  }
+
+  /// Fallback for unknown types: a plain rounded box (the name under it does
+  /// the labelling).
+  static void _box(Canvas canvas, Rect box, _GlyphInk ink) {
+    final rrect = RRect.fromRectAndRadius(
+        box, Radius.circular(box.height * 0.22));
+    canvas.drawRRect(rrect, ink.fill);
+    canvas.drawRRect(rrect, ink.stroke);
+  }
+
+  /// A shaft with a filled triangular arrowhead, the recurring mark inside
+  /// the router and switch glyphs.
+  static void _arrow(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    Paint linePaint,
+    Paint headPaint, {
+    required double head,
+  }) {
+    final d = to - from;
+    final length = d.distance;
+    if (length < 0.5 || head < 0.5) return;
+    canvas.drawLine(from, to, linePaint);
+    final dir = d / length;
+    final side = Offset(-dir.dy, dir.dx) * (head * 0.55);
+    final base = to - dir * head;
+    canvas.drawPath(
+      Path()
+        ..moveTo(to.dx, to.dy)
+        ..lineTo(base.dx + side.dx, base.dy + side.dy)
+        ..lineTo(base.dx - side.dx, base.dy - side.dy)
+        ..close(),
+      headPaint,
+    );
+  }
+}
+
+/// The three paints a glyph needs: shape outlines, shape fills, and small
+/// solid marks (arrowheads, LEDs) drawn in the outline colour.
+class _GlyphInk {
+  final Paint stroke;
+  final Paint fill;
+  final Paint mark;
+  final double width;
+
+  _GlyphInk(Color strokeColor, Color fillColor, this.width)
+      : stroke = Paint()
+          ..color = strokeColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = width
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+        fill = Paint()..color = fillColor,
+        mark = Paint()..color = strokeColor;
+}
+
+/// Paints [value] centred at [centre]: a white stroke pass underneath and the
+/// coloured fill on top. The halo is what keeps a label readable where a link
+/// or the workspace dot grid runs beneath it.
+void drawHaloText(
+  Canvas canvas,
+  String value,
+  Offset centre,
+  double fontSize,
+  Color color, {
+  required double maxWidth,
+  FontWeight fontWeight = FontWeight.w400,
+  double haloWidth = 2.0,
+}) {
+  final base = TextStyle(fontSize: fontSize, fontWeight: fontWeight);
+  final fill = TextPainter(
+    text: TextSpan(text: value, style: base.copyWith(color: color)),
+    textDirection: TextDirection.ltr,
+    maxLines: 1,
+    ellipsis: '...',
+  )..layout(maxWidth: maxWidth);
+  final halo = TextPainter(
+    text: TextSpan(
+      text: value,
+      style: base.copyWith(
+        foreground: Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = haloWidth,
+      ),
+    ),
+    textDirection: TextDirection.ltr,
+    maxLines: 1,
+    ellipsis: '...',
+  )..layout(maxWidth: maxWidth);
+  final at = centre - Offset(fill.width / 2, fill.height / 2);
+  halo.paint(canvas, at);
+  fill.paint(canvas, at);
+}
+
 class _PaintedEdge {
   final String a;
   final String b;
   final bool serial;
-  const _PaintedEdge(this.a, this.b, this.serial);
+
+  /// Whether the clocking (DCE) end of a serial run is [a] - the red zigzag
+  /// is drawn at that end, the way Packet Tracer marks the cable.
+  final bool dceIsA;
+  const _PaintedEdge(this.a, this.b, this.serial, {this.dceIsA = true});
 }
 
 /// Compute a deterministic VLAN id per node from its subnet (1..n by first
@@ -297,7 +702,14 @@ class _TopologyCanvasState extends State<TopologyCanvas> {
     final edges = [
       for (final l in intent.links)
         if (positions.containsKey(l.a) && positions.containsKey(l.b))
-          _PaintedEdge(l.a, l.b, l.isSerial),
+          _PaintedEdge(
+            l.a,
+            l.b,
+            l.isSerial,
+            // The clocking end carries the red zigzag, the way Packet
+            // Tracer marks a DCE cable; null defaults to end A.
+            dceIsA: l.dce != 'b',
+          ),
     ];
 
     return Semantics(

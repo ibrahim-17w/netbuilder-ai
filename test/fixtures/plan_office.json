@@ -1,0 +1,125 @@
+{
+  "project": "parity",
+  "layout": {
+    "style": "tree",
+    "columns": 4,
+    "spacing": 1.0,
+    "positions": {
+      "R1": [700, 60],
+      "R2": [1000, 60],
+      "SW1": [520, 250],
+      "SW2": [820, 250],
+      "PC1": [380, 440],
+      "SRV1": [640, 440]
+    }
+  },
+  "steps": [
+    {
+      "action": "create_nodes",
+      "nodes": [
+        { "name": "R1", "type": "router" },
+        { "name": "R2", "type": "router" },
+        { "name": "SW1", "type": "switch" },
+        { "name": "SW2", "type": "switch" },
+        { "name": "PC1", "type": "pc" },
+        {
+          "name": "SRV1",
+          "type": "server",
+          "services": ["dhcp", "dns", "http"]
+        }
+      ]
+    },
+    {
+      "action": "create_links",
+      "links": [
+        {
+          "a": "R1",
+          "aIf": "GigabitEthernet0/0",
+          "b": "R2",
+          "bIf": "GigabitEthernet0/0",
+          "cable": "copper"
+        },
+        {
+          "a": "R1",
+          "aIf": "GigabitEthernet0/1",
+          "b": "SW1",
+          "bIf": "GigabitEthernet0/1",
+          "cable": "copper"
+        },
+        {
+          "a": "R2",
+          "aIf": "GigabitEthernet0/1",
+          "b": "SW2",
+          "bIf": "GigabitEthernet0/1",
+          "cable": "copper"
+        },
+        {
+          "a": "SW1",
+          "aIf": "FastEthernet0/1",
+          "b": "PC1",
+          "bIf": "FastEthernet0",
+          "cable": "copper"
+        },
+        {
+          "a": "SW1",
+          "aIf": "FastEthernet0/2",
+          "b": "SRV1",
+          "bIf": "FastEthernet0",
+          "cable": "copper"
+        }
+      ]
+    },
+    {
+      "action": "paste_cli",
+      "configs": {
+        "R1": "hostname R1\n!\ninterface GigabitEthernet0/0\n ip address 10.0.0.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/1\n ip address 192.168.1.1 255.255.255.0\n no shutdown\n!\nrouter ospf 1\n network 10.0.0.0 0.0.0.255 area 0\n network 192.168.1.0 0.0.0.255 area 0\n!\nend",
+        "R2": "hostname R2\n!\ninterface GigabitEthernet0/0\n ip address 10.0.0.2 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/1\n ip address 192.168.2.1 255.255.255.0\n no shutdown\n!\nrouter ospf 1\n network 10.0.0.0 0.0.0.255 area 0\n!\nend",
+        "SW1": "hostname SW1\n!\ninterface Vlan1\n ip address 192.168.1.2 255.255.255.0\n no shutdown\n!\nend",
+        "SW2": "hostname SW2\n!\ninterface Vlan1\n ip address 192.168.2.2 255.255.255.0\n no shutdown\n!\nend"
+      }
+    },
+    {
+      "action": "config_pcs",
+      "pcs": {
+        "PC1": {
+          "ip": "192.168.1.10",
+          "mask": "255.255.255.0",
+          "gw": "192.168.1.1",
+          "dns": "192.168.1.50"
+        },
+        "SRV1": {
+          "ip": "192.168.1.50",
+          "mask": "255.255.255.0",
+          "gw": "192.168.1.1"
+        }
+      }
+    },
+    {
+      "action": "config_servers",
+      "servers": {
+        "SRV1": {
+          "services": {
+            "dhcp": {
+              "pools": [
+                {
+                  "poolName": "LAN",
+                  "startIp": "192.168.1.100",
+                  "mask": "255.255.255.0",
+                  "gateway": "192.168.1.1",
+                  "dnsServer": "192.168.1.50",
+                  "maxUsers": "100"
+                }
+              ]
+            },
+            "dns": {
+              "records": [
+                { "name": "srv1.lab.local", "address": "192.168.1.50" }
+              ]
+            },
+            "http": { "https": true, "verification": "state_only" }
+          }
+        }
+      }
+    }
+  ]
+}

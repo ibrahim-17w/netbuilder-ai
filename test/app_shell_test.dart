@@ -148,7 +148,7 @@ void main() {
 
     // The welcome screen asks the question an assistant is for, and offers
     // the openers as pills - not a pile of cards.
-    expect(find.text('How can I help?'), findsOneWidget);
+    expect(find.text("What are we building today?"), findsOneWidget);
     expect(find.text('Troubleshoot connectivity'), findsOneWidget);
     expect(find.text('Create a network'), findsOneWidget);
 
@@ -186,10 +186,12 @@ void main() {
     await tester.tap(find.byTooltip('New chat'));
     await tester.pumpAndSettle();
 
-    // A fresh conversation is a fresh transcript under its own name, and the
-    // welcome screen comes back.
-    expect(find.textContaining('chat '), findsWidgets);
-    expect(find.text('How can I help?'), findsOneWidget);
+    // A fresh conversation is a fresh transcript, shown as "New
+    // conversation" until the first message names it - a raw storage id
+    // ("chat 0:1228") is never a name a person reads. The welcome screen
+    // comes back.
+    expect(find.text('New conversation'), findsWidgets);
+    expect(find.text("What are we building today?"), findsOneWidget);
   });
 
   testWidgets('a sent message gets its own name, time and actions',

@@ -127,12 +127,14 @@ class CorrectionsCard extends StatelessWidget {
   final CorrectionSnapshot snapshot;
   final VoidCallback? onRefresh;
   final void Function(CorrectionRow row)? onRevert;
+  final void Function(CorrectionRow row)? onTeach;
 
   const CorrectionsCard({
     super.key,
     required this.snapshot,
     this.onRefresh,
     this.onRevert,
+    this.onTeach,
   });
 
   @override
@@ -197,6 +199,7 @@ class CorrectionsCard extends StatelessWidget {
             leading: Icons.hourglass_top,
             iconColor: Theme.of(context).colorScheme.primary,
             onRevert: onRevert,
+            onTeach: onTeach,
           ),
       ],
     );
@@ -210,6 +213,7 @@ Widget _rowTile(
   required IconData leading,
   required Color iconColor,
   void Function(CorrectionRow row)? onRevert,
+  void Function(CorrectionRow row)? onTeach,
   String? subtitleExtra,
 }) {
   return Padding(
@@ -236,6 +240,45 @@ Widget _rowTile(
               Row(
                 children: [
                   CorrectionBadges.fromRow(row),
+                  if (onTeach != null && row.status == 'proposed') ...[
+                    const SizedBox(width: 6),
+                    // The only way a PROPOSED fix becomes taught: run the
+                    // verification against the live screen. Same 44x44 target
+                    // as un-teach above.
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minWidth: 44,
+                        minHeight: 44,
+                      ),
+                      child: Tooltip(
+                        message:
+                            'Teach ${row.summaryLine} - re-runs this step and '
+                            'keeps the fix only if it verifies',
+                        child: InkWell(
+                          onTap: () => onTeach(row),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.play_arrow,
+                                size: 12,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                'teach',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color:
+                                      Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   if (onRevert != null && row.status == 'verified') ...[
                     const SizedBox(width: 6),
                     // A 44x44 target: the label is 10px, so the tap area around

@@ -669,6 +669,12 @@ CORRECTION_TAXONOMY.update({
         "reason": "The user un-taught this correction and its promoted "
                   "entry was removed. An outcome, not a step.",
     },
+    "correction_unreached": {
+        "teachable": False,
+        "reason": "The teach run never reached the step this correction "
+                  "applies to, so nothing was proven either way and the "
+                  "correction stays proposed for the next teach run.",
+    },
 })
 
 # --- proven platform gaps ---------------------------------------------
@@ -835,7 +841,8 @@ def _norm_target(target, default_scope: str = "") -> dict:
              or str(default_scope or "").strip().lower())
     out["scope"] = scope if scope in SCOPES else "dtype"
     for text_key, limit in (("label", 80), ("panel", 60), ("cli", 400),
-                            ("text", 300), ("store", 40), ("note", 300)):
+                            ("text", 300), ("store", 40), ("note", 300),
+                            ("key", 60)):
         value = str(src.get(text_key, "") or "").strip()
         if value:
             out[text_key] = value[:limit]

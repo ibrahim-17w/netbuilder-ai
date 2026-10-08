@@ -134,6 +134,107 @@ void main() {
     });
   });
 
+  group('truncation rewrites history in place', () {
+    // The store side of "Answer again" / "Edit and resend": the turn a
+    // rewrite starts from and everything after it must be gone from SQLite,
+    // or the next reload grows the abandoned branch straight back.
+    test('cuts a turn and everything after it, in that conversation only',
+        () async {
+      final mem = await fresh();
+      final first = await mem.logChat(_turn('user', 'why is the trunk down?'),
+          conversation: 'chi');
+      await mem.logChat(_turn('model', 'SW1 f0/1 is not trunking.'),
+          conversation: 'chi');
+      await mem.logChat(_turn('user', 'a different chat'),
+          conversation: 'other');
+
+      final removed = await mem.deleteChatFrom('chi', fromId: first);
+      expect(removed, 2);
+      expect(await mem.recentChat(conversation: 'chi'), isEmpty);
+      expect((await mem.recentChat(conversation: 'other')).single.text,
+          'a different chat');
+    });
+
+    test('a mid-transcript cut keeps the turns before it', () async {
+      final mem = await fresh();
+      await mem.logChat(_turn('user', 'kept'), conversation: 'chi');
+      final second = await mem.logChat(_turn('user', 'cut from here'),
+          conversation: 'chi');
+      await mem.logChat(_turn('model', 'and its answer'), conversation: 'chi');
+
+      final removed = await mem.deleteChatFrom('chi', fromId: second);
+      expect(removed, 2);
+      expect((await mem.recentChat(conversation: 'chi')).map((m) => m.text),
+          ['kept']);
+    });
+
+    test('a fromId that is not a row of this conversation deletes nothing',
+        () async {
+      final mem = await fresh();
+      final foreign = await mem.logChat(_turn('user', 'mine'),
+          conversation: 'other');
+      await mem.logChat(_turn('user', 'a'), conversation: 'chi');
+      await mem.logChat(_turn('model', 'b'), conversation: 'chi');
+
+      // id >= ? across conversations would cut into whatever was logged
+      // after it; a foreign id must be a no-op, not a wipe.
+      expect(await mem.deleteChatFrom('chi', fromId: foreign), 0);
+      expect(await mem.recentChat(conversation: 'chi'), hasLength(2));
+      expect(await mem.recentChat(conversation: 'other'), hasLength(1));
+    });
+
+    test('a turn created this session (no row id) is cut by what was written',
+        () async {
+      final mem = await fresh();
+      await mem.logChat(_turn('user', 'kept'), conversation: 'chi');
+      final stamp = DateTime.now().toIso8601String();
+      await mem.logChat(
+          ChatMessage(role: 'user', text: 'edited turn', createdAt: stamp),
+          conversation: 'chi');
+      await mem.logChat(
+          ChatMessage(role: 'model', text: 'answer', createdAt: stamp),
+          conversation: 'chi');
+
+      final removed = await mem.deleteChatFrom(
+        'chi',
+        fromCreatedAt: stamp,
+        fromRole: 'user',
+        fromText: 'edited turn',
+      );
+      expect(removed, 2);
+      expect((await mem.recentChat(conversation: 'chi')).single.text, 'kept');
+    });
+
+    test('an empty conversation name deletes nothing at all', () async {
+      final mem = await fresh();
+      await mem.logChat(_turn('user', 'a'), conversation: 'chi');
+
+      // An unnamed cut once meant "every transcript"; an empty name must
+      // never delete anything.
+      expect(await mem.deleteChatFrom(''), 0);
+      expect(await mem.deleteChatFrom('   '), 0);
+      expect(await mem.recentChat(conversation: 'chi'), hasLength(1));
+    });
+
+    test('an anchor that matches no row deletes nothing', () async {
+      final mem = await fresh();
+      await mem.logChat(_turn('user', 'a'), conversation: 'chi');
+      await mem.logChat(_turn('model', 'b'), conversation: 'chi');
+
+      expect(
+        await mem.deleteChatFrom(
+          'chi',
+          fromCreatedAt: '2020-01-01T00:00:00.000',
+          fromRole: 'user',
+          fromText: 'never said',
+        ),
+        0,
+      );
+      expect(await mem.deleteChatFrom('chi', fromId: 99999), 0);
+      expect(await mem.recentChat(conversation: 'chi'), hasLength(2));
+    });
+  });
+
   group('the change log makes undo a lookup', () {
     test('TEST 5: the newest change to a named device is found exactly',
         () async {

@@ -3,42 +3,59 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../widgets/chat_markdown.dart';
 import '../models/chat_message.dart';
+import '../models/design_brief.dart';
+import '../models/environment_profile.dart';
 import '../models/network_intent.dart';
 import '../services/adapters/packet_tracer_adapter.dart';
+import '../services/advisor_service.dart' show AdviceAnswer;
 import '../services/ai_provider.dart';
 import '../services/autopilot_service.dart';
 import '../services/build_preflight.dart';
 import '../services/build_request_reader.dart';
 import '../services/casual_english.dart';
+import '../services/clarification_service.dart';
+import '../services/design_brief_service.dart';
+import '../services/environment_profile_service.dart';
+import '../services/learned_answers_service.dart';
 import '../services/chat_service.dart';
 import '../services/file_edit_intent.dart';
 import '../services/generation_control.dart';
 import '../services/layout_engine.dart';
 import '../services/layout_intent.dart';
 import '../screens/layout_gallery_screen.dart';
+import '../screens/pkt_viewer_screen.dart';
+import '../services/packet_tracer_locator.dart';
 import '../services/provider_chat_service.dart';
 import '../services/context_budget.dart';
 import '../services/context_report.dart';
 import '../services/conversation_titles.dart';
 import '../services/design_library.dart';
 import '../services/pkt/on_device_pkt_builder.dart';
+import '../services/pkt/pkt_export_service.dart';
+import '../services/pkt/template_library.dart' show PktBuildFailure;
 import '../services/design_memory.dart';
 import '../services/design_review.dart';
 import '../services/engine_status.dart';
 import '../services/memory_service.dart';
 import '../services/message_understanding.dart';
+import '../services/misparse_ledger.dart';
 import '../services/phrasing_memory_service.dart';
 import '../services/runtime_window.dart';
 import '../services/scope_gate.dart';
 import '../services/skill_catalog.dart';
 import '../services/session_state.dart';
+import '../services/tentative_language.dart';
 import '../services/offline_assistant_service.dart';
+import '../services/plan_repair_service.dart';
+import '../services/build_artifact_service.dart';
 import '../services/planner_memory_service.dart';
 import '../services/planner_suggestions_service.dart';
 import '../services/rule_packs_service.dart';
@@ -51,6 +68,8 @@ import '../theme/app_palette.dart';
 import 'package:path_provider/path_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/chat_activity.dart';
+import '../widgets/advice_card.dart';
+import '../widgets/brief_card.dart';
 import '../widgets/conversation_sidebar.dart';
 import '../widgets/gemini_model_picker.dart';
 
@@ -84,6 +103,57 @@ class ChatScreen extends StatefulWidget {
     this.onOpenProject,
     this.initialDraft = '',
   });
+
+  /// HH:mm in the device's local time, or '' when [createdAt] does not parse.
+  /// One formatter for the message header and the transcript export, so a
+  /// turn reads the same time on screen and in the file a user shares.
+  static String _stamp(String createdAt) {
+    final parsed = DateTime.tryParse(createdAt);
+    if (parsed == null) return '';
+    final local = parsed.toLocal();
+    final hh = local.hour.toString().padLeft(2, '0');
+    final mm = local.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
+  }
+
+  /// The conversation as one markdown document, exactly what "Share the
+  /// transcript" hands to the share sheet: who said what, in order, each
+  /// turn's text verbatim (so fenced code arrives still fenced and runnable),
+  /// under a header line that says when it was taken and of which chat.
+  ///
+  /// Pure and static so the format is testable without driving the screen or
+  /// the share sheet: the transcript is a record, and a record whose shape
+  /// drifts is a record nobody can cite.
+  @visibleForTesting
+  static String transcriptMarkdown(
+    List<ChatMessage> messages, {
+    String conversation = 'default',
+    DateTime? exportedAt,
+  }) {
+    final buffer = StringBuffer();
+    final when = (exportedAt ?? DateTime.now()).toIso8601String();
+    buffer.writeln('# NetBuilder chat - $conversation');
+    buffer.writeln();
+    buffer.writeln('Exported $when - ${messages.length} messages.');
+    buffer.writeln();
+    for (final message in messages) {
+      final who = message.isUser
+          ? 'You'
+          : message.isError
+          ? 'App'
+          : 'Assistant';
+      final stamp = _stamp(message.createdAt);
+      buffer.write('**$who**');
+      if (stamp.isNotEmpty) buffer.write(' ($stamp)');
+      buffer.writeln(':');
+      buffer.writeln();
+      buffer.writeln(
+        message.text.trim().isEmpty ? '_(no text)_' : message.text.trim(),
+      );
+      buffer.writeln();
+    }
+    return buffer.toString();
+  }
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -185,6 +255,11 @@ class _ChatScreenState extends State<ChatScreen> {
   /// plan the current message did not produce.
   bool _understoodOk = false;
 
+  /// What the last tap-to-fix changed, for the card to say back: "Fixed: 40
+  /// PCs". Cleared on the next send - a correction belongs to the turn that
+  /// was corrected, not to every turn after it.
+  String? _slotFixNote;
+
   /// The conversation this screen is showing. A conversation is named by the
   /// project context, which is how the sidebar lists and switches them.
   String get _conversation {
@@ -218,7 +293,19 @@ class _ChatScreenState extends State<ChatScreen> {
   /// not a view setting. It survives an edit and a restart (read back from the
   /// artifact's note), because a redraw the user asked for must not silently
   /// revert on the next build.
-  Map<String, dynamic> _layout = const <String, dynamic>{'style': 'tree'};
+  ///
+  /// EMPTY means "no drawing picked yet" - and that emptiness is load
+  /// bearing: a non-empty default here would be handed to autopilotPlan as
+  /// if it were a choice, and the note-stamped style from a gallery pick
+  /// would never be consulted. Read [_pickDrawing], not this field, at the
+  /// build call.
+  Map<String, dynamic> _layout = const <String, dynamic>{};
+
+  /// The conversation's design brief: what has been settled so far, and
+  /// what is still open. The brief - not the presence of a parse - decides
+  /// when a build card is offered, so a describing conversation is a
+  /// conversation until it is actually ready to build.
+  DesignBrief _brief = const DesignBrief();
 
   /// The standing plan as it was before the current turn, so the offline
   /// assistant can say what changed instead of describing the lab from scratch.
@@ -228,6 +315,10 @@ class _ChatScreenState extends State<ChatScreen> {
   /// lab is read together with this, which is how "add an AAA server as well"
   /// keeps the 13 devices it was said about.
   String _lastBrief = '';
+
+  /// .pkt names handed out this session, so a second build of the same lab
+  /// gets `-2` instead of silently overwriting the first.
+  final Set<String> _builtNames = {};
 
   /// The words that produced [_previousIntent]. The offline path re-plans the
   /// turn to apply learned rules, and it must merge against the SAME brief/plan
@@ -305,6 +396,23 @@ class _ChatScreenState extends State<ChatScreen> {
     // budget and private mode all change it, and the open chat has to follow.
     _settings?.addListener(_onSettingsChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkEngine());
+    _detectPacketTracer();
+  }
+
+  /// Whether Packet Tracer exists on this machine: null while the first
+  /// probe is still running. Decides what a tap on a built `.pkt` path does
+  /// (open the real app vs. the built-in viewer) and how the open card
+  /// labels itself. Computed once by the locator and remembered there.
+  bool? _ptInstalled;
+  bool _ptDetectStarted = false;
+
+  void _detectPacketTracer() {
+    if (_ptDetectStarted || !_canOpenFiles) return;
+    _ptDetectStarted = true;
+    PacketTracerLocator.instance.isInstalled().then((installed) {
+      if (!mounted) return;
+      setState(() => _ptInstalled = installed);
+    });
   }
 
   /// Everything a conversation owns, and nothing else.
@@ -327,6 +435,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _lastIntent = null;
     _previousIntent = null;
     _appliedDesign = null;
+    _slotFixNote = null;
     _lastBrief = '';
     _previousBrief = '';
     _capturePath = '';
@@ -343,6 +452,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _storedSummary = '';
     _changes = const [];
     _state = SessionState();
+    _brief = const DesignBrief();
     _requestReport = null;
     _status = '';
     _chat?.lastPlan = null;
@@ -440,12 +550,13 @@ class _ChatScreenState extends State<ChatScreen> {
   static Future<void> _noopTeach(String key, String rewrite) async {}
 
   /// Rules/preferences the user taught the app, so the keyless answer
-  /// evolves the same way the build screen's plan does.
+  /// evolves the same way the build screen's plan does. Journal advice the
+  /// autopilot filed for review is deliberately excluded.
   Future<List<String>> _learnedRules() async {
     final mem = _memory;
     if (mem == null || !mem.ready) return const [];
     try {
-      return (await mem.allRules()).map((r) => r.ruleText).toList();
+      return await mem.plannerRuleTexts();
     } catch (_) {
       return const [];
     }
@@ -570,6 +681,21 @@ class _ChatScreenState extends State<ChatScreen> {
               }
             } catch (_) {
               // A plan that will not decode is a plan to rebuild, not a crash.
+            }
+          }
+          // The brief travels with the state: a reopened conversation still
+          // knows what was settled and what is still open.
+          final savedBrief = _state.briefJson.trim();
+          if (savedBrief.isNotEmpty) {
+            try {
+              final decoded = jsonDecode(savedBrief);
+              if (decoded is Map) {
+                _brief = DesignBrief.fromJson(
+                  Map<String, dynamic>.from(decoded),
+                );
+              }
+            } catch (_) {
+              // A corrupt brief is re-established by the conversation.
             }
           }
         });
@@ -746,10 +872,12 @@ class _ChatScreenState extends State<ChatScreen> {
   ) async {
     var rules = <String>[];
     var prefs = <String, String>{};
+    EnvironmentProfile? envProfile;
     if (mem != null && mem.ready) {
       try {
-        rules = (await mem.allRules()).map((r) => r.ruleText).toList();
+        rules = await mem.plannerRuleTexts();
         prefs = await mem.allPrefs();
+        envProfile = await mem.environmentProfile();
       } catch (_) {}
     }
     final svc = _engine();
@@ -761,6 +889,17 @@ class _ChatScreenState extends State<ChatScreen> {
     // in the system prompt where they belong (first, so they are instructions
     // rather than footnotes).
     final network = StringBuffer();
+    // The remembered environment, so keyed answers answer for the same
+    // person the offline advisor does instead of re-deriving from one
+    // message. Stated facts still win: the profile is the fallback, and the
+    // prompt says so.
+    final envLine = envProfile?.summaryLine ?? '';
+    if (envLine.isNotEmpty) {
+      network.writeln('## User environment');
+      network.writeln(
+        '- remembered: $envLine (believe what the user says now over this)',
+      );
+    }
     if (_project.text.trim().isNotEmpty) {
       network.writeln('## Network in this conversation');
       network.writeln('- project: ${_project.text.trim()}');
@@ -1414,6 +1553,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ? name!.trim()
         : trimmed.split(RegExp(r'[/\\]')).last;
     _artifactUpdatedAt = stamp;
+    _builtNames.add(_artifactName);
     _state.withArtifact(
       trimmed,
       name: _artifactName,
@@ -1877,13 +2017,35 @@ class _ChatScreenState extends State<ChatScreen> {
         .where((e) => e.trim().isNotEmpty)
         .toList();
     final current = style.isEmpty ? '${_layout['style'] ?? 'tree'}' : style;
-    await LayoutGalleryScreen.show(
+    final picked = await LayoutGalleryScreen.show(
       context,
       intent: intent,
       currentStyle: LayoutRequest.allStyles.contains(current)
           ? current
           : 'tree',
       side: parked.isEmpty ? const <String>['server'] : parked,
+    );
+    // The pick is the choice: whatever style came back from the gallery is
+    // what the next build draws. Dropping the return value here used to
+    // mean a preview pick silently changed nothing - the user picked a
+    // design and the build ignored them.
+    if (picked == null || picked == current) return true;
+    final parkedForPick = picked == 'grouped'
+        ? (parked.isEmpty ? const <String>['server'] : parked)
+        : <String>[];
+    setState(() {
+      _layout = {
+        'style': picked,
+        if (parkedForPick.isNotEmpty) 'side': parkedForPick,
+      };
+    });
+    _persistLayoutNoteOnIntent();
+    if (!mounted) return true;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text('Layout set to "$picked" - the next build uses it.'),
+        duration: const Duration(seconds: 2),
+      ),
     );
     return true;
   }
@@ -2041,8 +2203,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }) async {
     // The drawing this conversation is using. Sticky on purpose: a user who
     // asked for a compact diagram does not want the next edit to silently go
-    // back to the default one.
-    final drawing = layout ?? _layout;
+    // back to the default one. EMPTY is not a choice - an empty map handed
+    // downstream reads as "the user picked tree", and a note-stamped gallery
+    // pick upstream would never be consulted.
+    final drawing = layout ?? (_layout.isEmpty ? null : _layout);
     final intent = _lastIntent;
     if (intent == null) {
       // An edit with no plan behind it is the one case where saying nothing
@@ -2107,20 +2271,35 @@ class _ChatScreenState extends State<ChatScreen> {
         actions: const <ChatAction>[],
       );
     }
-    try {
-      final svc = _engine();
-      if (!await svc.healthy) {
+    final svc = _engine();
+    // One health answer per compile: probing twice would make a phone with
+    // no engine wait twice for a timeout that answers the same way.
+    final engineHealthy = await svc.healthy;
+    // A phone builds with the bundled template library by default (see
+    // SettingsService.preferOnDevicePkt); a desktop keeps the engine first,
+    // because its builds also drive the Packet Tracer window. When the
+    // on-device route cannot run here - no library and no seed - an engine
+    // that IS answering still gets the job, and one that is not gets a word
+    // in below.
+    final preferOnDevice =
+        _settings?.preferOnDevicePkt ?? SettingsService.isMobile;
+    if (preferOnDevice || !engineHealthy) {
+      final onDevice = await _compilePktOnDevice(
+        intent: intent,
+        drawing: drawing,
+        engineHealthy: engineHealthy,
+      );
+      if (onDevice != null) return onDevice;
+      if (!engineHealthy) {
         return (
           text: AutopilotService.startHint,
           actions: const <ChatAction>[],
         );
       }
+    }
+    try {
       final plan = PacketTracerAdapter.autopilotPlan(intent, layout: drawing);
       final preflight = BuildPreflight.lines(intent: intent, target: _target);
-      final stamp = DateTime.now()
-          .toIso8601String()
-          .replaceAll(RegExp(r'[^0-9]'), '')
-          .substring(0, 12);
       // An in-place edit writes over the file the user already has; the
       // sidecar keeps a timestamped backup of what was there before.
       final editing = inPlacePath.trim().isNotEmpty;
@@ -2128,7 +2307,17 @@ class _ChatScreenState extends State<ChatScreen> {
         plan,
         filename: editing
             ? inPlacePath.split(RegExp(r'[\\/]')).last
-            : 'netbuilder-$stamp.pkt',
+            // THE FILE IS NAMED FOR THE NETWORK, not for the clock: a name
+            // the user picked (or the brief's own words) is findable in a
+            // folder full of labs; a timestamp is not.
+            : BuildArtifactService.networkFileName(
+                plan: intent,
+                brief: _lastBrief,
+                taken: {
+                  for (final a in _state.knownArtifacts) a.name,
+                  ..._builtNames,
+                },
+              ),
         project: _project.text.trim(),
         replace: editing,
       );
@@ -2248,6 +2437,21 @@ class _ChatScreenState extends State<ChatScreen> {
       return (
         text: body.toString(),
         actions: [
+          // OPEN IN PACKET TRACER, on the machines that can: the file goes
+          // to the OS and the .pkt association hands it to Packet Tracer.
+          // On a phone there is no Packet Tracer - the topology preview is
+          // the way to see the network there, so no open action. The label
+          // follows detection: where Packet Tracer was not found the card
+          // says what it actually does (the built-in viewer) instead of
+          // promising an application that is not there.
+          if (_canOpenFiles)
+            ChatAction(
+              kind: 'pkt_open',
+              summary: _ptInstalled == false
+                  ? 'View the network (no Packet Tracer found)'
+                  : 'Open in Packet Tracer',
+              payload: {'path': path, 'name': path.split(RegExp(r'[\\/]')).last},
+            ),
           ChatAction(
             kind: 'pkt_scan',
             summary: 'Analyze the generated file',
@@ -2260,6 +2464,213 @@ class _ChatScreenState extends State<ChatScreen> {
         text:
             'I could not build the .pkt: '
             '${e.toString().replaceFirst('Exception: ', '')}',
+        actions: const <ChatAction>[],
+      );
+    }
+  }
+
+  /// The phone's route: compile the plan with the bundled template library,
+  /// entirely on this device. Same plan JSON as the engine build, same
+  /// report sections in the answer, no PC anywhere in the loop.
+  ///
+  /// Returns null when this device cannot build at all (no bundled library
+  /// and no imported seed) but the engine can take the build instead, so the
+  /// caller falls through. When the engine is down too, the returned text
+  /// names both ways out.
+  Future<({String text, List<ChatAction> actions})?> _compilePktOnDevice({
+    required NetworkIntent intent,
+    required Map<String, dynamic>? drawing,
+    required bool engineHealthy,
+  }) async {
+    final plan = PacketTracerAdapter.autopilotPlan(intent, layout: drawing);
+    final preflight = BuildPreflight.lines(intent: intent, target: _target);
+    // THE FILE IS NAMED FOR THE NETWORK (small-office-ospf.pkt), and the
+    // name is checked against the destination folder on disk, so a second
+    // build of a different lab never clobbers the first. On-device this is
+    // a local check; the engine route dedupes against the session's own
+    // artifacts instead.
+    var filename = BuildArtifactService.networkFileName(
+      plan: intent,
+      brief: _lastBrief,
+      taken: {
+        ..._builtNames,
+        for (final a in _state.knownArtifacts) a.name,
+      },
+    );
+    // WHERE THE FILE GOES. The folder chosen in Settings is the destination
+    // when it is one the app can really write to; otherwise the lab is built
+    // into app-private storage and offered for export, because a file saved
+    // where nobody can browse it is not saved at all.  Resolved INSIDE the
+    // try: a folder that cannot even be probed is a destination problem, and
+    // must never be able to fail the build.
+    // The type is spelled out because the initialiser's `dir: null` infers
+    // the record field as `Null`, which is not assignable from the
+    // `Directory? dir` that resolveFolder returns - the whole function then
+    // fails to compile and the `folder.dir` reads below look dead.
+    ({Directory? dir, String why}) folder = (
+      dir: null,
+      why: 'no folder has been set yet',
+    );
+    try {
+      folder = await PktExportService.resolveFolder(_settings?.outputDir ?? '');
+      // The folder is real: names already ON DISK count as taken too.
+      if (folder.dir != null) {
+        final onDisk = folder.dir!
+            .listSync()
+            .whereType<File>()
+            .map((f) => f.uri.pathSegments.last.toLowerCase())
+            .toSet();
+        var n = 2;
+        while (onDisk.contains(filename.toLowerCase())) {
+          final base = filename.substring(0, filename.length - 4);
+          filename = '$base-$n.pkt';
+          n += 1;
+        }
+      }
+      final built = await OnDevicePktBuilder.buildFromPlan(
+        plan: plan,
+        appDir: getApplicationDocumentsDirectory,
+        filename: filename,
+        project: _project.text.trim(),
+        outDir: folder.dir == null ? null : () async => folder.dir!,
+      );
+      if (built == null) {
+        return (
+          text:
+              'That plan has no devices in it, so there is nothing to '
+              'build.',
+          actions: const <ChatAction>[],
+        );
+      }
+      final path = built.file.path;
+      _capturePath = path;
+      final report = built.report ?? const <String, dynamic>{};
+      // Verification evidence: read the file we just wrote back through the
+      // on-device audit BEFORE claiming the build matches the plan. No
+      // audit collected means the message below says "unverified", not
+      // "done".
+      Map<String, dynamic>? audit;
+      try {
+        final a = OnDevicePktBuilder.auditReport(
+          built.file.readAsBytesSync(),
+          path: path,
+          project: _project.text.trim(),
+        );
+        if (a['devices'] is List) audit = a;
+      } catch (_) {
+        // Not collected; the build message must say so.
+      }
+      final check = audit == null
+          ? null
+          : BuildPreflight.compare(
+              intent: intent,
+              audit: audit,
+              builtDevices: (report['devices'] as List?) ?? const [],
+            );
+      final warnings = (report['warnings'] as List?) ?? built.warnings;
+      final body = StringBuffer()
+        ..writeln('**Preflight (checked before compiling)**')
+        ..writeln()
+        ..writeln(preflight.join('\n'))
+        ..writeln()
+        ..writeln('**Built a .pkt on this device.**')
+        ..writeln()
+        ..writeln('- File: `$path`')
+        ..writeln(
+          '- Devices: ${report['deviceCount'] ?? '?'}, '
+          'links: ${report['linkCount'] ?? '?'}',
+        )
+        ..writeln(
+          '- Compiled on this device: no Packet Tracer, no PC, nothing '
+          'left it.',
+        );
+      _writeVerification(body, check);
+      // Same design review the engine build records, so a phone-built lab
+      // is held to the same rubric and remembered the same way.
+      final review = DesignReviewer.review(intent);
+      DesignMemory.recordBuild(plan: intent, review: review);
+      _writeDesignReview(body, intent, review);
+      // The build reports the drawing it actually used, so the next edit
+      // keeps it.
+      final applied = report['layout'];
+      if (applied is Map && applied.isNotEmpty) {
+        _layout = Map<String, dynamic>.from(applied);
+      }
+      if (warnings.isEmpty) {
+        body.writeln('- Warnings: none');
+      } else {
+        body.writeln('- Warnings:');
+        for (final w in warnings) {
+          body.writeln('    - $w');
+        }
+      }
+      body
+        ..writeln()
+        ..writeln(
+          'The plan came from your own words, so the file is the same '
+          'whether or not an API key is set. Open it in Packet Tracer on a '
+          'PC to check it, or analyze it here.',
+        )
+        ..writeln()
+        ..writeln(
+          folder.dir == null
+              ? 'This device has no folder set for .pkt files '
+                  '(${folder.why}), so the lab was written into the app\'s own '
+                  'storage. Tap "Save it to a folder" below to put a copy '
+                  'somewhere you can browse, or set a folder in Settings - '
+                  'Tools - Settings.'
+              : 'It is in the folder you chose, next to your other labs.',
+        )
+        ..writeln();
+      _rememberArtifact(
+        path,
+        note:
+            'built on-device; ${check == null ? 'verification not collected' : (check.verified ? 'build verified against the file' : 'verification found differences')}'
+            '; ${_layoutNote()}',
+      );
+      _persistLayoutNoteOnIntent();
+      return (
+        text: body.toString(),
+        actions: [
+          if (_canOpenFiles && folder.dir != null)
+            ChatAction(
+              kind: 'pkt_open',
+              summary: _ptInstalled == false
+                  ? 'View the network (no Packet Tracer found)'
+                  : 'Open in Packet Tracer',
+              payload: {'path': path, 'name': filename},
+            ),
+          ChatAction(
+            kind: 'pkt_scan',
+            summary: 'Analyze the generated file',
+            payload: {'path': path, 'name': filename},
+          ),
+          if (folder.dir == null)
+            ChatAction(
+              kind: 'pkt_export',
+              summary: 'Save it to a folder you can browse',
+              payload: {'path': path, 'name': filename},
+            ),
+        ],
+      );
+    } on OnDeviceBuildError catch (e) {
+      if (engineHealthy) return null;
+      return (
+        text:
+            '${e.message}\n\nThe engine is not answering either, so this '
+            'build needs one of the two: import a seed .pkt in Tools, or '
+            'start the engine on your PC and set its address.',
+        actions: const <ChatAction>[],
+      );
+    } on PktBuildFailure catch (e) {
+      if (engineHealthy) return null;
+      return (
+        text: 'I could not build the .pkt on this device: ${e.message}',
+        actions: const <ChatAction>[],
+      );
+    } catch (e) {
+      return (
+        text: 'The on-device build failed: $e',
         actions: const <ChatAction>[],
       );
     }
@@ -2633,6 +3044,33 @@ class _ChatScreenState extends State<ChatScreen> {
       'Open it in Packet Tracer, or Undo to go back.',
     );
     return b.toString();
+  }
+
+  /// Put a file this conversation built into a folder the user can browse.
+  ///
+  /// On Android a lab built on-device lives in app-private storage that no
+  /// file manager can open, so this hands the real bytes to the system's own
+  /// save dialog: the user picks the folder and the file lands there. The
+  /// app's copy is left alone - the manifest next to it still identifies the
+  /// file as one this app generated.
+  Future<String> _exportBuiltPkt(ChatAction action) async {
+    final path = '${action.payload['path'] ?? ''}'.trim();
+    if (path.isEmpty) return 'That card has no file to save.';
+    final file = File(path);
+    if (!file.existsSync()) {
+      return 'That file is gone from this device ($path).';
+    }
+    final companion = File('$path.netbuilder.json');
+    final result = await PktExportService.saveToChosenFolder(
+      file,
+      companion: companion.existsSync() ? companion : null,
+    );
+    if (result.cancelled && result.prompted && result.path.isEmpty) {
+      return result.message;
+    }
+    if (!mounted) return result.message;
+    _appendSystem('**Saved.** ${result.message}');
+    return result.message;
   }
 
   /// Re-audit the result and report what the engine actually finds now.
@@ -3017,6 +3455,7 @@ class _ChatScreenState extends State<ChatScreen> {
     // parses must not be mistaken for the network being edited.
     final hadStandingPlan = _lastIntent != null;
     _understoodOk = false;
+    _slotFixNote = null;
     // A design applied last turn is history now; this turn either applies
     // another one or leaves the plan as it stands.
     _appliedDesign = null;
@@ -3025,7 +3464,18 @@ class _ChatScreenState extends State<ChatScreen> {
     // user never described. With no plan standing there is nothing to edit
     // and nothing to plan from, so the turn is conversation only.
     final smallTalk = !hadStandingPlan && ScopeGate.isSmallTalk(text);
-    if (!ScopeGate.isOffTopic(text) && !smallTalk) {
+    // TENTATIVE LANGUAGE: "could we do it with 40 PCs?" is the user wondering
+    // about the design, not ordering a rebuild. The gate reads the turn BEFORE
+    // the parse, so an exploring sentence never reaches NetworkIntent.followUp
+    // (or the phrasing teacher or the design catalog) and the standing lab
+    // stays exactly as it is - a wrong mutation is the most expensive
+    // misunderstanding this app can make.
+    final exploring = !smallTalk &&
+        !ScopeGate.isOffTopic(text) &&
+        TentativeLanguageService.analyze(
+          CasualEnglish.normalize(text).trim(),
+        ).tentative;
+    if (!ScopeGate.isOffTopic(text) && !smallTalk && !exploring) {
       try {
         final normalized = CasualEnglish.normalize(text);
         final brief = normalized.trim().isEmpty ? text : normalized;
@@ -3071,6 +3521,16 @@ class _ChatScreenState extends State<ChatScreen> {
         _understoodOk = true;
       } catch (_) {
         // Keep the previous plan rather than losing it to a parse failure.
+      }
+      // COUNT THE TURNS THE PARSER WROTE A PLAN FOR. The misparse rate on
+      // the Memory screen is corrections per parsed turn, and without this
+      // denominator "improving" would be a feeling rather than a number.
+      if (_understoodOk) {
+        try {
+          await mem?.noteParsedTurn();
+        } catch (_) {
+          // A missed counter is not worth failing a send over.
+        }
       }
     }
     // The history the provider is given must END BEFORE this turn: both
@@ -3527,6 +3987,31 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mem != null && mem.ready) {
         try {
           await mem.logChat(turn, conversation: _conversation);
+          // LEARNED ANSWERS: a completed keyed-model reply to a
+          // question-shaped ask is knowledge worth replaying offline. The
+          // decision (learn / agree / reject, and the smart pick across
+          // answers the model gave before) is [LearnedAnswers]'s; this
+          // only feeds it, only on a generation that finished on its own
+          // terms, and never lets a learning hiccup cost the turn.
+          if (_generation.isCurrent(token) &&
+              reply.text.isNotEmpty &&
+              LearnedAnswers.isLearnableQuestion(text)) {
+            try {
+              await mem.learnAnswer(
+                question: text,
+                answer: reply.text,
+                source: _aiStatus.source,
+              );
+            } catch (_) {}
+          }
+          // PREFERENCE AUTO-TEACH: "always use OSPF" is a rule for every
+          // plan after it, not just this turn. Stated plainly (always /
+          // from now on / prefer), it is remembered without a button press
+          // - gated by the Learn-automatically setting.
+          await _autoTeachPreference(text);
+          // ENVIRONMENT AUTO-LEARN: "this is for the office, 40 users"
+          // feeds the remembered profile the advisor falls back to.
+          await _updateEnvironmentProfile(text);
           await mem.setSessionState(_conversation, _state.encode());
           // Persist the compacted summary of the turns that did not fit, so
           // the next request re-uses it instead of summarizing a summary.
@@ -3591,6 +4076,32 @@ class _ChatScreenState extends State<ChatScreen> {
     final normalized = CasualEnglish.normalize(text);
     NetworkIntent? plan;
     List<String> suggestions = const [];
+    bool briefChanged = false;
+    // THE TENTATIVE GATE RUNS FIRST - before the pending questions, because a
+    // what-if must not be read as an answer either: "what if we used OSPF?"
+    // while the routing question is open would otherwise fill it in. An
+    // exploring turn is answered as a conversation and changes nothing: no
+    // plan, no brief, no cards, no remembered answer.
+    if (!ScopeGate.isOffTopic(text) &&
+        TentativeLanguageService.analyze(
+          normalized.isEmpty ? text : normalized,
+        ).tentative) {
+      await _answerTentative(text, normalized, privateMode: privateMode);
+      return;
+    }
+    // A PENDING QUESTION TURNS THE NEXT MESSAGE INTO ITS ANSWER: when this
+    // message resolves one, apply it, remember it for this environment, and
+    // do not treat it as a new request. Unresolved text falls through to the
+    // normal routing (the user changed the subject; the questions stay).
+    if (_state.pendingQuestionIds.isNotEmpty && !ScopeGate.isOffTopic(text)) {
+      final answered = await _resolvePendingClarification(
+        normalized.isEmpty ? text : normalized,
+      );
+      if (answered != null) {
+        await _applyClarificationAnswer(answered);
+        return;
+      }
+    }
     // An off-topic message gets the scope decline, never a parsed plan: the
     // standing plan and its action cards stay untouched.
     if (!ScopeGate.isOffTopic(text)) {
@@ -3628,6 +4139,33 @@ class _ChatScreenState extends State<ChatScreen> {
               );
         _lastIntent = reconciled;
         _lastBrief = outcome.brief;
+        // The reconciled plan is what the reply and the build card below
+        // describe, so it is also what this conversation must record: the
+        // caller already recorded its first parse of this turn (which ran
+        // without the learned rules), and leaving that record in place
+        // would bring a different network back on reopen than the one on
+        // the screen right now.
+        _state.withIntentJson(
+          jsonEncode(reconciled.toJson(includeSecrets: false)),
+        );
+        // THE BRIEF: fold what this turn settled into the running brief -
+        // the user's words first, then what the plan shows they decided,
+        // then the environment profile for what nobody said. The brief, not
+        // the parse, decides when a build is offered.
+        final briefTurn = DesignBriefService.briefForTurn(
+          previous: _brief,
+          normalizedText: brief,
+          parsedPlan: reconciled,
+          profile: await _loadEnvironmentProfile(),
+          // Taught rules are the user's own words, just older: they fill
+          // the brief at user rank so the app never asks what it has
+          // already been told ("always use ospf" answers the routing
+          // question before it is asked).
+          standingRules: rules,
+        );
+        _brief = briefTurn.brief;
+        _state.briefJson = jsonEncode(_brief.toJson());
+        briefChanged = briefTurn.changed;
         // The answer describes the plan that actually stands, not the one this
         // message parsed to on its own. "Use OSPF" parses to an empty brief, and
         // the parser's fallback lab is not what the user has been building.
@@ -3646,6 +4184,32 @@ class _ChatScreenState extends State<ChatScreen> {
         .split('\n')
         .first
         .trim();
+    // LEARNED ANSWERS: the same question answered by the keyed model
+    // before is replayed here, offline. Loaded before the reply so the
+    // assistant can lead with the exact answer the model gave.
+    final mem = _memory;
+    LearnedAnswer? learned;
+    if (mem != null && mem.ready) {
+      try {
+        learned = await mem.bestLearnedAnswer(text);
+      } catch (_) {}
+    }
+    // The remembered environment: the advisor still believes the message
+    // first, but facts it leaves unsaid come from here instead of falling
+    // back to generic.
+    final envProfile = await _loadEnvironmentProfile();
+    // ASK BEFORE PLAN: with critical gaps still open, the chat asks instead
+    // of committing a plan - unless the user insisted ("just build it"),
+    // in which case the safe defaults are visible on the brief card.
+    List<ClarificationQuestion> clarifying = const [];
+    if (plan != null && plan.nodes.isNotEmpty) {
+      if (_brief.ready || _isForcedBuild(normalized.isEmpty ? text : normalized)) {
+        _state.pendingQuestionIds = const [];
+      } else {
+        clarifying = await _clarificationsFor(plan, envProfile);
+        _state.pendingQuestionIds = [for (final q in clarifying) q.id];
+      }
+    }
     final reply = OfflineAssistantService.reply(
       rawText: text,
       normalized: normalized,
@@ -3663,7 +4227,24 @@ class _ChatScreenState extends State<ChatScreen> {
       knownArtifacts: [
         for (final f in _state.knownArtifacts) (name: f.name, note: f.note),
       ],
+      // An active troubleshooting ladder owns the turn: hand its state in
+      // so the flow's next step (or its exit) is what gets answered.
+      activeFlow: _state.flowState.isNotEmpty ? _state.flowState : null,
+      // The learned answer for this exact question, when one exists.
+      learnedAnswer: learned,
+      // The remembered venue/scale/budget/skill, when one has been learned.
+      environmentProfile: envProfile,
+      // Critical gaps to ask about instead of committing a plan. Empty once
+      // the brief is ready or the user insisted on a build.
+      clarifyingQuestions: clarifying,
     );
+    // A troubleshooting reply carries the flow's next state: store it (an
+    // empty map means the flow ended and must not ghost into the next
+    // turn), so the ladder survives a conversation reopen via
+    // setSessionState below.
+    if (reply.flowState != null) {
+      _state.flowState = reply.flowState!;
+    }
     // An answer that repaired the plan changed it: the repaired version is
     // what stands from here, so the card below is written for it and the next
     // turn plans on top of it instead of the broken one.
@@ -3672,6 +4253,9 @@ class _ChatScreenState extends State<ChatScreen> {
       _lastIntent = repaired;
       plan = repaired;
       _state.withIntentJson(jsonEncode(repaired.toJson(includeSecrets: false)));
+      // Park what the repair would teach. Nothing reads it until a build of
+      // this exact plan comes back verified - see MemoryService.
+      await _parkRepairLearning(repaired, reply.repairedFixes);
     }
     final turn = ChatMessage(
       role: 'model',
@@ -3691,9 +4275,24 @@ class _ChatScreenState extends State<ChatScreen> {
       // devices, and a build card over it advertised "0 device(s), 0 link(s)"
       // and refused itself with the finding "No nodes defined" - a build
       // button for a network that does not exist yet.
-      actions: plan == null || plan.nodes.isEmpty
-          ? const <ChatAction>[]
-          : <ChatAction>[_buildCardFor(plan)],
+      //
+      // An advice answer carries its structured advice card alongside: the
+      // recommendation, the options and the "Plan this" button render from
+      // the payload, not from parsing the markdown back.
+      //
+      // THE BUILD CARD IS GATED ON THE BRIEF, not on the parse: with
+      // clarifications pending there is nothing to compile yet - the answer
+      // asks instead. The brief card rides when the brief moved, except on
+      // the asking turn itself - see the action list below.
+      actions: [
+        if (plan != null && plan.nodes.isNotEmpty && clarifying.isEmpty)
+          _buildCardFor(plan),
+        // The brief card rides when the brief moved - EXCEPT on the turn
+        // that is asking: there the questions ARE the open list, and a card
+        // repeating "still open" beside them says the same thing twice.
+        if (briefChanged && clarifying.isEmpty) _briefCardFor(_brief),
+        if (reply.advice != null) _adviceCardFor(reply.advice!),
+      ],
     );
     if (!mounted) return;
     setState(() {
@@ -3715,6 +4314,19 @@ class _ChatScreenState extends State<ChatScreen> {
       createdAt: turn.createdAt,
       actions: turn.actions,
     );
+    // THE RECORD MUST NOT WAIT ON THE ANIMATION. The structured state is
+    // written the moment the answer exists: the reveal is a courtesy, and a
+    // conversation reopened - or an app killed - halfway through it must come
+    // back to the plan on the screen, not to the turn's first parse. The
+    // store writes that follow (the log, the teaching) still land when the
+    // answer is whole.
+    _state.observe(answer);
+    final earlyStore = _memory;
+    if (earlyStore != null && earlyStore.ready) {
+      try {
+        await earlyStore.setSessionState(_conversation, _state.encode());
+      } catch (_) {}
+    }
     _revealAnswer(
       turn,
       reply.text,
@@ -3724,16 +4336,112 @@ class _ChatScreenState extends State<ChatScreen> {
       // the app looked like it had lost half the chat.
       onDone: () async {
         final mem = _memory;
-        _state.observe(answer);
         if (mem == null || !mem.ready) return;
         try {
           await mem.logChat(answer, conversation: _conversation);
+          // Same preference auto-teach as the model path: "always use a
+          // 4331" typed while offline is a rule too.
+          await _autoTeachPreference(text);
+          // And the environment profile learns the same way offline.
+          await _updateEnvironmentProfile(text);
           await mem.setSessionState(_conversation, _state.encode());
           await _autoTitleFirstTurn(mem);
         } catch (_) {}
         await _refreshConversations();
       },
     );
+  }
+
+  /// What every exploring answer says when its own branch did not already say
+  /// it: the guarantee this gate exists to keep, in the user's words.
+  static const String _exploringTail =
+      '\n\nNothing in your lab changed - that was a what-if, not a change. '
+      'Ask for it as a change ("make it 40 PCs", "use OSPF instead") and I '
+      'will do it.';
+
+  /// Answer an EXPLORING turn: "could we do it with 40 PCs?", "what if we
+  /// used OSPF instead?", "would a DMZ be better here?".
+  ///
+  /// The standing plan is passed as CONTEXT - the question is about the lab
+  /// that exists - and this method writes none of it back: no
+  /// [NetworkIntent.followUp], no [DesignBrief] update, no build card, no
+  /// remembered clarification. The reply still lands in the transcript like
+  /// any other answer, because a conversation the app does not write down is
+  /// a conversation it cannot continue after a reopen.
+  Future<void> _answerTentative(
+    String text,
+    String normalized, {
+    bool privateMode = false,
+  }) async {
+    final mem = _memory;
+    LearnedAnswer? learned;
+    if (mem != null && mem.ready) {
+      try {
+        learned = await mem.bestLearnedAnswer(text);
+      } catch (_) {}
+    }
+    final reply = OfflineAssistantService.reply(
+      rawText: text,
+      normalized: normalized,
+      target: _target,
+      plan: _lastIntent,
+      previousPlan: _previousIntent,
+      history: _messages.where((m) => !m.isError).toList(),
+      privateMode: privateMode,
+      knownArtifacts: [
+        for (final f in _state.knownArtifacts) (name: f.name, note: f.note),
+      ],
+      activeFlow: _state.flowState.isNotEmpty ? _state.flowState : null,
+      learnedAnswer: learned,
+      environmentProfile: await _loadEnvironmentProfile(),
+      // The questions wait: a what-if is not an answer to one, and asking
+      // again in the middle of somebody wondering out loud is how a
+      // conversation turns into a form.
+      clarifyingQuestions: const [],
+    );
+    // The advice branch already closes with its own "nothing changed" line,
+    // and the scope decline speaks for itself; every other branch gets the
+    // guarantee, so no exploring answer ever leaves it implied.
+    final body = reply.intent == 'advice' || reply.intent == 'offtopic'
+        ? reply.text
+        : '${reply.text}$_exploringTail';
+    if (!mounted) return;
+    final turn = ChatMessage(
+      role: 'model',
+      text: '',
+      createdAt: DateTime.now().toIso8601String(),
+      source: _aiStatus.source,
+      actions: const [],
+    );
+    setState(() {
+      _messages = [..._messages, turn];
+      _status = '';
+      _quickReplies = reply.quickReplies;
+    });
+    _jumpToEnd();
+    final answer = ChatMessage(
+      role: 'model',
+      text: body,
+      createdAt: turn.createdAt,
+      actions: const [],
+    );
+    _state.observe(answer);
+    final store = _memory;
+    if (store != null && store.ready) {
+      try {
+        await store.setSessionState(_conversation, _state.encode());
+      } catch (_) {}
+    }
+    _revealAnswer(turn, body, onDone: () async {
+      final store = _memory;
+      if (store == null || !store.ready) return;
+      try {
+        await store.logChat(answer, conversation: _conversation);
+        await store.setSessionState(_conversation, _state.encode());
+        await _autoTitleFirstTurn(store);
+      } catch (_) {}
+      await _refreshConversations();
+    });
   }
 
   /// Reveal a computed answer at a reading pace.
@@ -4013,6 +4721,21 @@ class _ChatScreenState extends State<ChatScreen> {
           }
           await _scanPkt(scanPath, '${action.payload['name'] ?? scanPath}');
           outcome = 'Re-analyzed.';
+          break;
+        case 'pkt_open':
+          final openPath = '${action.payload['path'] ?? ''}';
+          if (openPath.isEmpty) {
+            outcome = 'That card has no file path.';
+            break;
+          }
+          // Smart route: Packet Tracer when the machine has it, the
+          // built-in viewer when it does not - so the card works honestly
+          // on machines the label could not know about when it was written.
+          final openResult = await _openPktArtifact(openPath);
+          outcome = openResult.message;
+          break;
+        case 'pkt_export':
+          outcome = await _exportBuiltPkt(action);
           break;
         case 'layout_preview':
           final opened = await _previewLayout(
@@ -4391,6 +5114,27 @@ class _ChatScreenState extends State<ChatScreen> {
     return true;
   }
 
+  /// Park what a repair pass would teach, against the plan it repaired.
+  ///
+  /// This records nothing a plan can read: the rules sit next to the plan's
+  /// fingerprint until a build of that plan verifies, and are dropped if it
+  /// fails. Failures here are swallowed on purpose - a memory hiccup must not
+  /// cost the user the answer they asked for.
+  Future<void> _parkRepairLearning(
+    NetworkIntent plan,
+    List<RepairFix> fixes,
+  ) async {
+    final mem = _memory;
+    if (mem == null || !mem.ready || fixes.isEmpty) return;
+    try {
+      await mem.noteRepairedPlan(
+        plan: plan,
+        fixes: fixes,
+        target: _target,
+      );
+    } catch (_) {}
+  }
+
   /// "fix the plan", "fix these findings", "can you fix it" - run the
   /// deterministic repair pass over the standing plan and answer with what
   /// changed and a fresh build card.
@@ -4424,6 +5168,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (repaired != null) {
       _lastIntent = repaired;
       _state.withIntentJson(jsonEncode(repaired.toJson(includeSecrets: false)));
+      await _parkRepairLearning(repaired, reply.repairedFixes);
     }
     final stamp = DateTime.now().toIso8601String();
     final ask = ChatMessage(role: 'user', text: text, createdAt: stamp);
@@ -4643,7 +5388,6 @@ class _ChatScreenState extends State<ChatScreen> {
           query: _conversationQuery,
           busy: _busy,
           project: _project.text.trim(),
-          themeMode: _settings?.themeMode ?? 'system',
           onNewChat: _startNewChat,
           onOpen: _openConversation,
           onRename: (id, title) => _renameConversation(id, title),
@@ -4653,7 +5397,6 @@ class _ChatScreenState extends State<ChatScreen> {
             _refreshConversations();
           },
           onSettings: () => Scaffold.maybeOf(context)?.openDrawer(),
-          onThemeMode: (mode) => _settings?.setThemeMode(mode),
           onCollapse: () {
             _sidebarTouched = true;
             setState(() => _sidebarOpen = false);
@@ -4838,18 +5581,13 @@ class _ChatScreenState extends State<ChatScreen> {
   /// The opening screen: a greeting, a few things worth saying, and the box
   /// to say them in.
   ///
-  /// On a window tall enough the group sits in the middle, which is where the
-  /// eye should land on an empty page. On a short one - a laptop with a small
-  /// window, a landscape phone, large system text - centring it pushes the
-  /// composer below the fold, and an opening screen whose message box you
-  /// have to scroll to find is worse than one that is merely top-aligned.
-  /// So the group is centred only while it genuinely fits.
+  /// The composer is ANCHORED to the bottom, the way every chat app anchors
+  /// it: an input that floats mid-screen with dead space underneath reads as
+  /// broken, and its position would jump once the first answer arrives. The
+  /// greeting and the suggestion chips flex above it - scrolling inside
+  /// themselves when the window is too short for them - so on a landscape
+  /// phone or with large system text the box never leaves the window.
   Widget _openingScreen() {
-    // The composer is NOT allowed to leave the window. It is the one control
-    // the opening screen exists to show, so it keeps its natural height at
-    // the bottom of the group, and the greeting above it flexes - scrolling
-    // inside itself if the window is too short - rather than pushing the box
-    // off the bottom edge.
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppTheme.s16,
@@ -4863,6 +5601,11 @@ class _ChatScreenState extends State<ChatScreen> {
         // minimum and overflows the row by 35px on a 360px phone.
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // One flexible gap ABOVE the group only: the composer sits at the
+          // bottom edge (where a chat input belongs), the greeting floats
+          // between the top and it, and on a short window the spacer
+          // collapses and the greeting scrolls instead of pushing the box
+          // off screen.
           const Spacer(),
           Flexible(
             child: SingleChildScrollView(
@@ -4871,7 +5614,6 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           const SizedBox(height: AppTheme.s16),
           _composer(),
-          const Spacer(),
         ],
       ),
     );
@@ -4879,9 +5621,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget get _welcomeHead => ChatWelcome(
     embedded: true,
-    hasProject:
-        _project.text.trim().isNotEmpty && _project.text.trim() != 'default',
-    project: _project.text.trim(),
+    // A raw storage id ("chat 0:1228") is not a project name: the welcome
+    // line only names REAL projects, otherwise it reads machine-speak.
+    hasProject: _project.text.trim().isNotEmpty &&
+        _project.text.trim() != 'default' &&
+        !ConversationTitles.isRawId(_project.text.trim()),
+    project: ConversationTitles.display(_project.text.trim()),
     onSuggestion: (suggestion) {
       // A chip writes the question into the box (and submits it) rather than
       // sending a canned string: the user keeps the words and can edit them
@@ -5030,7 +5775,7 @@ class _ChatScreenState extends State<ChatScreen> {
           const SizedBox(width: AppTheme.s8),
           Flexible(
             child: Text(
-              _conversation,
+              ConversationTitles.display(_conversation),
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.titleSmall,
             ),
@@ -5049,6 +5794,12 @@ class _ChatScreenState extends State<ChatScreen> {
             icon: const Icon(Icons.lan_outlined, size: 18),
             selectedIcon: const Icon(Icons.lan, size: 18),
             onPressed: () => setState(() => _inspectorOpen = !_inspectorOpen),
+          ),
+          IconButton(
+            tooltip: 'Search in this conversation',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.search, size: 18),
+            onPressed: _openSearch,
           ),
           IconButton(
             tooltip: 'New chat',
@@ -5076,6 +5827,63 @@ class _ChatScreenState extends State<ChatScreen> {
     await _load();
   }
 
+  /// Search the conversation that is open, and nothing else. The sidebar's
+  /// search answers "which chat was that in?"; this one answers "where in
+  /// THIS chat was it said" and takes the reader there. Keeping the two
+  /// apart is what stops a mixed hit list from being one more place to lose
+  /// one's place.
+  void _openSearch() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => _ConversationSearch(
+        messages: _messages,
+        onOpen: (message) {
+          Navigator.of(sheetContext).pop();
+          _scrollToMessage(message);
+        },
+      ),
+    );
+  }
+
+  /// Scroll the transcript to a message, the way a search result asks.
+  ///
+  /// The transcript is a lazy list: a bubble far off-screen has no context
+  /// until it is built. So the jump is estimate-then-correct - a proportional
+  /// guess puts the neighbourhood on stage within the builder's cache
+  /// window, and [Scrollable.ensureVisible] then lands exactly on the turn.
+  /// A bubble that never appears (the list changed while the sheet was
+  /// open) just does not scroll: yanking the viewport somewhere else would
+  /// be a wrong answer to a tap that named a specific turn.
+  void _scrollToMessage(ChatMessage message) {
+    final key = GlobalObjectKey(message);
+    var attempts = 0;
+    void reveal() {
+      if (!mounted) return;
+      final target = key.currentContext;
+      if (target != null) {
+        Scrollable.ensureVisible(
+          target,
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOut,
+          alignment: 0.05,
+        );
+        return;
+      }
+      if (!_scroll.hasClients || ++attempts > 4) return;
+      final index = _messages.indexOf(message);
+      if (index < 0) return;
+      final max = _scroll.position.maxScrollExtent;
+      final estimate = max * ((index + 1) / _messages.length);
+      // clamp answers a num; the controller wants a double.
+      _scroll.jumpTo(estimate.clamp(0.0, max).toDouble());
+      WidgetsBinding.instance.addPostFrameCallback((_) => reveal());
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => reveal());
+  }
+
 
   /// Says plainly that the `.pkt` engine cannot be reached, and offers the
   /// one thing that fixes it.
@@ -5088,6 +5896,11 @@ class _ChatScreenState extends State<ChatScreen> {
     final address = _settings?.engineBase ?? '';
     final mobile = SettingsService.isMobile;
     final status = EngineStatus.instance;
+    // On a phone the engine is optional, not missing: the bundled template
+    // library builds the .pkt on this device. That changes the strip from an
+    // alarm into a status - and pretending otherwise is what made the
+    // Android build feel broken.
+    final onDevice = mobile && (_settings?.preferOnDevicePkt ?? true);
     // One compact line: this strip sits between the header and the
     // transcript, and every extra row it takes is a row the transcript does
     // not get on a short window with large text. It is also given a hard
@@ -5105,9 +5918,14 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           child: AppBanner(
             dense: true,
-            tone: AppTone.danger,
-            icon: Icons.cloud_off_outlined,
-            message: mobile
+            tone: onDevice ? AppTone.info : AppTone.danger,
+            icon: onDevice
+                ? Icons.phone_android_outlined
+                : Icons.cloud_off_outlined,
+            message: onDevice
+                ? 'No .pkt engine at $address. Builds run on this device - '
+                      'planning and .pkt files work without a PC.'
+                : mobile
                 ? 'No .pkt engine at $address. On a phone the engine runs on '
                       'your PC, so this must be that PC\'s address - not '
                       '127.0.0.1.'
@@ -5252,6 +6070,28 @@ class _ChatScreenState extends State<ChatScreen> {
                   _buildOnDevice();
                 },
               ),
+              ListTile(
+                leading: const Icon(Icons.ios_share_outlined),
+                title: const Text('Share the last .pkt'),
+                subtitle: Text(
+                  _artifactName.isEmpty
+                      ? 'Send a built file to a PC or a friend'
+                      : _artifactName,
+                ),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _shareArtifact();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.forum_outlined),
+                title: const Text('Share the transcript'),
+                subtitle: const Text('This conversation as markdown'),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _shareTranscript();
+                },
+              ),
               const Divider(height: 1),
               _sheetHeader(theme, 'Diagnostics'),
               // The model's state and the token report used to live in the
@@ -5358,6 +6198,102 @@ class _ChatScreenState extends State<ChatScreen> {
     await _refreshConversations();
   }
 
+  /// Fix one slot of the parse from the "Understood" card.
+  ///
+  /// Tapping a chip asks for the value the user meant, re-reads THIS turn's
+  /// words with that value in them, and replaces the standing plan with what
+  /// they reparse to. Two things make it worth more than a button:
+  ///
+  /// * the user never has to re-type English and hope the parser does better
+  ///   - the plan is corrected where they can see it;
+  /// * every tap is a LABELED training pair (their exact words, what they
+  ///   meant), which is what the misparse ledger counts and, at three
+  ///   sightings, proposes as a phrasing. Zero ambiguity, because the user
+  ///   supplied the label themselves.
+  Future<void> _fixSlot({
+    required int messageIndex,
+    required String slot,
+    required String label,
+    required String value,
+  }) async {
+    final intent = _lastIntent;
+    if (intent == null || _busy || messageIndex < 0) return;
+    // The controller lives INSIDE the dialog: the route is still animating
+    // out - and still listening - when showDialog returns, so disposing the
+    // controller here broke the very widget that was going away.
+    final fixed = await showDialog<String>(
+      context: context,
+      builder: (_) => _SlotFixDialog(label: label, value: value),
+    );
+    if (fixed == null || !mounted) return;
+    final answer = fixed.trim();
+    if (answer.isEmpty || answer == value) return;
+
+    final original = _messages[messageIndex].text;
+    final corrected = MisparseLedger.correctedBrief(
+      original: original,
+      slot: slot,
+      value: answer,
+      current: intent,
+    );
+    if (corrected == null || corrected.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'I could not rewrite "$original" with $label $answer, so '
+            'nothing was changed. Type the correction instead and I will '
+            'read it.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final understood = MisparseLedger.briefFromPlan(intent);
+    try {
+      final outcome = NetworkIntent.followUp(
+        previous: _previousIntent,
+        previousBrief: _previousBrief,
+        brief: corrected,
+        parsed: NetworkIntent.parseSimple('chat', corrected),
+        project: 'chat',
+      );
+      _lastIntent = outcome.plan;
+      _lastBrief = outcome.brief;
+      _brief = DesignBriefService.briefForTurn(
+        previous: _brief,
+        normalizedText: corrected,
+        parsedPlan: outcome.plan,
+      ).brief;
+      _understoodOk = true;
+      _state.withIntentJson(
+        jsonEncode(outcome.plan.toJson(includeSecrets: false)),
+      );
+      _state.briefJson = jsonEncode(_brief.toJson());
+    } catch (_) {
+      // A fix that cannot be re-parsed changes nothing at all.
+      return;
+    }
+    _slotFixNote = 'Fixed: $answer $label - remembered for "$original".';
+    setState(() {});
+
+    final mem = _memory;
+    if (mem != null) {
+      try {
+        await mem.recordMisparse(
+          original: original,
+          understood: understood,
+          corrected: corrected,
+          slot: slot,
+          source: 'tap',
+        );
+        await mem.setSessionState(_conversation, _state.encode());
+      } catch (_) {
+        // The plan on screen is already right; only the lesson is lost.
+      }
+    }
+  }
+
   /// The "here is exactly what I understood" card: the parse of the
   /// latest user turn as chips - device counts, VLANs, routing, and how
   /// sure the parser is - with the planner's open questions as tappable
@@ -5412,7 +6348,19 @@ class _ChatScreenState extends State<ChatScreen> {
     void addCountChip(String type) {
       final n = counts[type];
       if (n == null || n <= 0 || !shown.add(type)) return;
-      chips.add(_slotChip('$n ${unit(type, n)}'));
+      chips.add(_slotChip(
+        '$n ${unit(type, n)}',
+        // TAP TO FIX. A count is the slot the parser most often gets wrong
+        // and the one a user most wants to change, and the correction is
+        // the clearest learning signal there is: their words, what it
+        // became, no re-typed English in between.
+        onTap: () => _fixSlot(
+          messageIndex: index,
+          slot: 'count:$type',
+          label: unit(type, n),
+          value: '$n',
+        ),
+      ));
     }
 
     for (final t in order) {
@@ -5422,11 +6370,30 @@ class _ChatScreenState extends State<ChatScreen> {
       addCountChip(t);
     }
     for (final v in intent.vlans) {
-      chips.add(_slotChip('VLAN $v', accent: true));
+      chips.add(_slotChip(
+        'VLAN $v',
+        accent: true,
+        onTap: () => _fixSlot(
+          messageIndex: index,
+          slot: 'vlan:$v',
+          label: 'VLAN $v',
+          value: '$v',
+        ),
+      ));
     }
-    if (intent.routing != 'static') {
-      chips.add(_slotChip(intent.routing.toUpperCase(), accent: true));
-    }
+    // Always shown, unlike before: a slot the card does not display is a
+    // slot the user cannot correct, and a default routing choice is exactly
+    // the kind of thing people want to argue with.
+    chips.add(_slotChip(
+      intent.routing.toUpperCase(),
+      accent: intent.routing != 'static',
+      onTap: () => _fixSlot(
+        messageIndex: index,
+        slot: 'routing',
+        label: 'routing protocol',
+        value: intent.routing,
+      ),
+    ));
 
     final questions = intent.questions.take(3).toList();
     final pct = (intent.confidence * 100).round();
@@ -5527,6 +6494,19 @@ class _ChatScreenState extends State<ChatScreen> {
                   children: chips,
                 ),
               ],
+              // The confirmation for the last tap-to-fix, so a correction is
+              // never silent: what it became is said in the card the user
+              // just argued with.
+              if (_slotFixNote != null && _slotFixNote!.isNotEmpty) ...[
+                const SizedBox(height: AppTheme.s6),
+                Text(
+                  _slotFixNote!,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
               if (roleChips.isNotEmpty) ...[
                 const SizedBox(height: AppTheme.s8),
                 Wrap(
@@ -5611,8 +6591,10 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  /// One chip in the Understood card. Tappable only when it carries a
-  /// question - a count is a statement, a question is an offer.
+  /// One chip in the Understood card. It is tappable when it can be
+  /// ANSWERED (a question goes into the composer) or CORRECTED (a count,
+  /// a VLAN, the routing protocol opens [_fixSlot]); a chip with no onTap
+  /// is there to be read, not argued with.
   Widget _slotChip(
     String text, {
     bool accent = false,
@@ -5693,144 +6675,273 @@ class _ChatScreenState extends State<ChatScreen> {
         ? scheme.onSurface
         : scheme.onSurface;
 
-    return Semantics(
-      // A boundary that does NOT absorb its children, so each turn is its
-      // OWN node: a screen reader hears "Assistant said" / "You said"
-      // first, then the content as its own node. Without this the ownership
-      // label merged into one giant node with the whole answer in it - or
-      // into the conversation container - and the speaker was never
-      // announced.
-      container: true,
-      explicitChildNodes: true,
-      label: isUser ? 'You said' : 'Assistant said',
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: AppTheme.s14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: isUser
-              ? MainAxisAlignment.end
-              : MainAxisAlignment.start,
-          children: [
-            if (!isUser && isError) ...[
-              _avatar(isUser, isError),
-              const SizedBox(width: AppTheme.s10),
-            ],
-            Flexible(
-              child: Column(
-                crossAxisAlignment: isUser
-                    ? CrossAxisAlignment.end
-                    : CrossAxisAlignment.start,
-                children: [
-                  _messageHeader(isUser, isError, stamped),
-                  Container(
-                    // ~66 characters at 14px: the reading-optimised measure
-                    // (preset 03, Information Architects).
-                    constraints: const BoxConstraints(
-                      maxWidth: AppTheme.readingMeasure,
-                    ),
-                    padding: const EdgeInsets.fromLTRB(
-                      AppTheme.s14,
-                      AppTheme.s12,
-                      AppTheme.s14,
-                      AppTheme.s12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: fill,
-                      borderRadius: BorderRadius.circular(AppTheme.rLg),
-                      // A whisper of elevation under an assistant answer on
-                      // light surfaces; on dark, separation is contrast.
-                      boxShadow: dark || isUser || isError
-                          ? null
-                          : [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 2),
+    // The key is the message object itself, so a search hit can name the
+    // exact turn to scroll to: the result and the bubble are the same
+    // object, and a rebuilt transcript derives the same key again. Two
+    // live keys can never collide - a message object exists once in the
+    // list.
+    return KeyedSubtree(
+      key: GlobalObjectKey(message),
+      child: Semantics(
+        // A boundary that does NOT absorb its children, so each turn is its
+        // OWN node: a screen reader hears "Assistant said" / "You said"
+        // first, then the content as its own node. Without this the ownership
+        // label merged into one giant node with the whole answer in it - or
+        // into the conversation container - and the speaker was never
+        // announced.
+        container: true,
+        explicitChildNodes: true,
+        label: isUser ? 'You said' : 'Assistant said',
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: AppTheme.s14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: isUser
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
+            children: [
+              if (!isUser && isError) ...[
+                _avatar(isUser, isError),
+                const SizedBox(width: AppTheme.s10),
+              ],
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: isUser
+                      ? CrossAxisAlignment.end
+                      : CrossAxisAlignment.start,
+                  children: [
+                    _messageHeader(isUser, isError, stamped),
+                    Container(
+                      // ~66 characters at 14px: the reading-optimised measure
+                      // (preset 03, Information Architects).
+                      constraints: const BoxConstraints(
+                        maxWidth: AppTheme.readingMeasure,
+                      ),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppTheme.s14,
+                        AppTheme.s12,
+                        AppTheme.s14,
+                        AppTheme.s12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: fill,
+                        borderRadius: BorderRadius.circular(AppTheme.rLg),
+                        // A whisper of elevation under an assistant answer on
+                        // light surfaces; on dark, separation is contrast.
+                        boxShadow: dark || isUser || isError
+                            ? null
+                            : [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (message.text.trim().isNotEmpty)
+                            // The bubble chooses the ink, so text and fill can
+                            // never disagree (the invisible-text bug class).
+                            DefaultTextStyle(
+                              style:
+                                  (theme.textTheme.bodyMedium ??
+                                          const TextStyle())
+                                      .copyWith(color: ink, height: 1.5),
+                              // Headings, bullets, fenced code and tables
+                              // render as such; selection is kept so commands
+                              // can be copied.
+                              child: SelectionArea(
+                                child: ChatMarkdownView(
+                                  source: message.text,
+                                  // A `.pkt` path in the answer is a
+                                  // control: tap opens Packet Tracer when
+                                  // this machine has it, the built-in
+                                  // viewer when it does not.
+                                  onFilePathTap: _onPktPathTap,
+                                ),
                               ),
-                            ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (message.text.trim().isNotEmpty)
-                          // The bubble chooses the ink, so text and fill can
-                          // never disagree (the invisible-text bug class).
-                          DefaultTextStyle(
-                            style:
-                                (theme.textTheme.bodyMedium ??
-                                        const TextStyle())
-                                    .copyWith(color: ink, height: 1.5),
-                            // Headings, bullets, fenced code and tables
-                            // render as such; selection is kept so commands
-                            // can be copied.
-                            child: SelectionArea(
-                              child: ChatMarkdownView(source: message.text),
                             ),
-                          ),
-                        if (message.images.isNotEmpty) ...[
-                          const SizedBox(height: AppTheme.s8),
-                          Wrap(
-                            spacing: AppTheme.s6,
-                            runSpacing: AppTheme.s6,
-                            children: [
-                              for (final image in message.images)
-                                _thumbnail(image),
-                            ],
-                          ),
-                        ],
-                        if (message.actions.isNotEmpty) ...[
-                          const SizedBox(height: AppTheme.s8),
-                          for (var i = 0; i < message.actions.length; i++)
-                            _actionCard(
-                              index,
-                              i,
-                              message.actions[i],
-                              message.executed.contains(i.toString()),
+                          if (message.images.isNotEmpty) ...[
+                            const SizedBox(height: AppTheme.s8),
+                            Wrap(
+                              spacing: AppTheme.s6,
+                              runSpacing: AppTheme.s6,
+                              children: [
+                                for (final image in message.images)
+                                  _thumbnail(image),
+                              ],
                             ),
+                          ],
+                          if (message.actions.isNotEmpty) ...[
+                            const SizedBox(height: AppTheme.s8),
+                            for (var i = 0; i < message.actions.length; i++)
+                              if (message.actions[i].kind == 'advice_card')
+                                _adviceCard(
+                                  index,
+                                  i,
+                                  message.actions[i],
+                                  message.executed.contains(i.toString()),
+                                )
+                              else if (message.actions[i].kind ==
+                                  'brief_card')
+                                BriefCardWidget(
+                                  key: ValueKey(
+                                    'brief-card-$index-$i',
+                                  ),
+                                  brief: _briefFromPayload(
+                                    message.actions[i].payload,
+                                  ),
+                                )
+                              else
+                                _actionCard(
+                                  index,
+                                  i,
+                                  message.actions[i],
+                                  message.executed.contains(i.toString()),
+                                ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                  // The parse of THIS turn, under the turn it belongs to:
-                  // what the planner understood, and the questions it still
-                  // has - shown before the answer arrives, editable now.
-                  if (isUser) _intentUnderstood(index),
-                  // The message's own controls, OUTSIDE the bubble: copy,
-                  // answer again, remember - quiet utilities under the turn.
-                  _messageActions(index, message, isUser),
-                  // WHERE THIS ANSWER CAME FROM, once per turn, in small
-                  // print: the API model or the built-in planner. The state
-                  // behind it is the header's sign; this line is history -
-                  // it travels with the turn so a reopened conversation
-                  // still shows which backend answered it.
-                  if (!isUser && !isError && message.source.isNotEmpty)
-                    _sourceLine(message.source),
-                ],
+                    // The parse of THIS turn, under the turn it belongs to:
+                    // what the planner understood, and the questions it still
+                    // has - shown before the answer arrives, editable now.
+                    if (isUser) _intentUnderstood(index),
+                    // The message's own controls, OUTSIDE the bubble: copy,
+                    // answer again, remember - quiet utilities under the turn.
+                    _messageActions(index, message, isUser),
+                    // WHERE an answer came from used to be a small-print
+                    // line here; the mode is the app's state, not the
+                    // message's, so it lives once in the top bar's AI pill
+                    // and no longer repeats under every turn.
+                  ],
+                ),
               ),
-            ),
-            if (isUser) const SizedBox(width: AppTheme.s10),
-            if (isUser) _avatar(isUser, isError),
-          ],
+              if (isUser) const SizedBox(width: AppTheme.s10),
+              if (isUser) _avatar(isUser, isError),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  /// The small print under an answer naming the backend that produced it.
-  /// Quiet on purpose: it is provenance, not content.
-  Widget _sourceLine(String source) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(top: 2, left: 2),
-      child: Text(
-        source,
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+  /// Whether this machine can hand a file to the operating system at all:
+  /// desktops yes, phones no (there is no Packet Tracer on a phone to open
+  /// it with, and no file association to route it).
+  bool get _canOpenFiles =>
+      !kIsWeb &&
+      (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+
+  /// Hands [path] to the operating system: the file association decides
+  /// what opens it - a .pkt lands in Packet Tracer on a machine that has
+  /// it. Returns false when the OS could not be asked or refused.
+  Future<bool> _openExternally(String path) async {
+    try {
+      if (Platform.isWindows) {
+        // `start` splits its arguments oddly: the empty string is the
+        // window-title slot, so a path with spaces stays one argument.
+        final r = await Process.run('cmd', ['/c', 'start', '', path]);
+        return r.exitCode == 0;
+      }
+      if (Platform.isMacOS) {
+        final r = await Process.run('open', [path]);
+        return r.exitCode == 0;
+      }
+      if (Platform.isLinux) {
+        final r = await Process.run('xdg-open', [path]);
+        return r.exitCode == 0;
+      }
+    } catch (_) {
+      // A shell that will not cooperate is reported, not thrown: the chat
+      // names the folder instead of dying on the user.
+    }
+    return false;
+  }
+
+  /// What tapping a built `.pkt` file does, decided in one place.
+  ///
+  /// Packet Tracer installed: the OS hands the file over and the real
+  /// application opens it. Not installed: the built-in viewer draws the
+  /// same network Packet Tracer-style - because the old behaviour on a
+  /// machine without the app was a shell dialog asking how to open a file
+  /// type it does not know, which reads as the app being broken. Returns
+  /// what happened, in the words the chat (or a snackbar) reports.
+  Future<({bool handled, String message})> _openPktArtifact(String path) async {
+    final name = path.split(RegExp(r'[\\/]')).last;
+    bool installed;
+    try {
+      installed = await PacketTracerLocator.instance.isInstalled();
+    } catch (_) {
+      installed = false;
+    }
+    if (installed) {
+      final opened = await _openExternally(path);
+      return (
+        handled: opened,
+        message: opened
+            ? 'Opening $name in Packet Tracer.'
+            : 'I could not hand the file to the operating system. Open it '
+                  'from its folder: $path',
+      );
+    }
+    if (!mounted) {
+      return (handled: false, message: 'The screen closed before the viewer could open.');
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PktViewerScreen(
+          filePath: path,
+          intent: _lastIntent,
+          positions: _layoutPositions(),
         ),
+      ),
+    );
+    return (
+      handled: true,
+      message: 'Packet Tracer was not found on this device, so the built-in '
+          'viewer is showing $name.',
+    );
+  }
+
+  /// The as-built canvas positions the engine echoed back with the build
+  /// (`layout.positions`, `[x, y]` per device name), as Offsets. Null when
+  /// this conversation holds none - the viewer then lets the canvas lay out
+  /// the plan itself.
+  Map<String, Offset>? _layoutPositions() {
+    if (_layout.isEmpty) return null;
+    final raw = _layout['positions'];
+    if (raw is! Map) return null;
+    final out = <String, Offset>{};
+    raw.forEach((name, xy) {
+      if (xy is List && xy.length >= 2) {
+        final x = (xy[0] as num?)?.toDouble();
+        final y = (xy[1] as num?)?.toDouble();
+        if (x != null && y != null) out[name.toString()] = Offset(x, y);
+      }
+    });
+    return out.isEmpty ? null : out;
+  }
+
+  /// The tap on a `.pkt` path inside an answer. Busy-guarded like every
+  /// other chat control, and the outcome is said in a snackbar - a tap that
+  /// opened something must say what it did.
+  Future<void> _onPktPathTap(String path) async {
+    if (_busy) return;
+    final result = await _openPktArtifact(path);
+    if (!mounted || result.message.isEmpty) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text(result.message),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
 
+  /// The small print under an answer naming the backend that produced it
+  /// was retired: the AI pill in the top bar carries that state now.
   /// Who said it and when. The name is a label rather than a badge: the
   /// bubble's own alignment already says who spoke, and this is the part a
   /// person scans when they come back to a conversation an hour later.
@@ -5900,14 +7011,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// HH:mm from the stored ISO string, or '' when the row has no timestamp
   /// (older transcripts) - an invented time would be worse than none.
-  static String _stamp(String createdAt) {
-    final parsed = DateTime.tryParse(createdAt);
-    if (parsed == null) return '';
-    final local = parsed.toLocal();
-    final hh = local.hour.toString().padLeft(2, '0');
-    final mm = local.minute.toString().padLeft(2, '0');
-    return '$hh:$mm';
-  }
+  static String _stamp(String createdAt) => ChatScreen._stamp(createdAt);
 
   /// The row under a message. Always visible rather than hover-only: hover
   /// does not exist on a tablet, and a control that appears only on hover is a
@@ -5937,18 +7041,7 @@ class _ChatScreenState extends State<ChatScreen> {
               style: style,
               onPressed: _busy
                   ? null
-                  : () {
-                      // Editing and resending in one step: the text goes back
-                      // into the composer, where it can be changed before it
-                      // is sent again.
-                      setState(() {
-                        _input.text = message.text;
-                        _input.selection = TextSelection.collapsed(
-                          offset: _input.text.length,
-                        );
-                      });
-                      _composerFocus.requestFocus();
-                    },
+                  : () => _editAndResend(index, message),
               icon: const Icon(Icons.edit_outlined, size: 14),
               label: const Text('Edit and resend'),
             )
@@ -5971,26 +7064,456 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  /// Ask the same question again. It re-sends the user turn before this one,
-  /// which is the only way to get a different answer for the same question.
+  /// "Answer again": the last answer and the turn that produced it are
+  /// removed - from the screen AND from the store, or the next reload would
+  /// grow the old answer back beneath the new one - and the turn is sent
+  /// again as a fresh one, so the new answer takes the old one's place
+  /// instead of stacking a duplicate under it.
+  ///
+  /// Guards: nothing in flight, a user turn to re-ask, and a transcript that
+  /// ends on the answer being replaced. The rewrite names only the rows of
+  /// the conversation that is open.
   Future<void> _regenerate() async {
-    final lastUser = _messages.lastWhere(
-      (m) => m.isUser,
-      orElse: () => const ChatMessage(role: 'user', text: ''),
-    );
-    if (lastUser.text.trim().isEmpty) {
+    if (_busy) return;
+    var lastUser = -1;
+    for (var i = _messages.length - 1; i >= 0; i--) {
+      if (_messages[i].isUser) {
+        lastUser = i;
+        break;
+      }
+    }
+    final text = lastUser < 0 ? '' : _messages[lastUser].text;
+    if (text.trim().isEmpty) {
       _appendSystem('There is nothing to answer again yet.');
       return;
     }
-    _input.text = lastUser.text;
+    if (_messages.last.isUser) {
+      _appendSystem('The assistant has not answered that yet.');
+      return;
+    }
+    final conversation = _conversation;
+    await _truncateFrom(lastUser, _messages[lastUser]);
+    // The rewrite belongs to the conversation it was asked in: if the user
+    // switched away while the store was being cut, the re-ask must not land
+    // in a different transcript.
+    if (!mounted || _conversation != conversation) return;
+    _input.text = text;
     await _send();
   }
+
+  /// Remove the turn at [index] and everything after it, on screen and in
+  /// the store. The one primitive both history rewrites share: "Answer
+  /// again" cuts from the last user turn, "Edit and resend" from the turn
+  /// being edited.
+  ///
+  /// The screen is cut first, then the rows: the store cut is what makes the
+  /// rewrite real, but the user must never watch a turn they asked to
+  /// disappear flicker back because a query was slow. Anything that existed
+  /// to serve the removed tail goes with it - quick replies answered it, the
+  /// retry buffer held its text, the activity panel described its work. A
+  /// store that cannot follow is said out loud rather than swallowed: a
+  /// silent failure here is the old branch resurrecting on the next reload,
+  /// which is the exact bug this truncation exists to fix.
+  Future<void> _truncateFrom(int index, ChatMessage message) async {
+    if (index < 0 || index >= _messages.length) return;
+    final conversation = _conversation;
+    _cancelReveal();
+    setState(() {
+      _messages = _messages.sublist(0, index);
+      _quickReplies = const [];
+      _failedText = null;
+      _activity = const [];
+    });
+    final mem = _memory;
+    if (mem == null || !mem.ready) return;
+    try {
+      await mem.deleteChatFrom(
+        conversation,
+        fromId: message.id,
+        fromCreatedAt: message.createdAt,
+        fromRole: message.role,
+        fromText: message.text,
+      );
+    } catch (e) {
+      _appendSystem(
+        'The transcript could not be rewritten on this device ($e). The '
+        'removed turns may come back when this chat is reopened.',
+      );
+    }
+  }
+
+  /// "Edit and resend" supersedes the branch it edits: the turn and
+  /// everything after it are gone, the original words go back into the
+  /// composer, and sending them starts a fresh turn. Leaving the transcript
+  /// truncated when the user changes their mind and never sends is
+  /// deliberate - the old branch was superseded the moment they chose to
+  /// edit it, and growing it back on reload would undo the edit they asked
+  /// for.
+  Future<void> _editAndResend(int index, ChatMessage message) async {
+    if (_busy || !message.isUser) return;
+    if (index < 0 || index >= _messages.length) return;
+    await _truncateFrom(index, message);
+    if (!mounted) return;
+    setState(() {
+      _input.text = message.text;
+      _input.selection = TextSelection.collapsed(
+        offset: _input.text.length,
+      );
+    });
+    _composerFocus.requestFocus();
+  }
+
+  /// Stop an in-flight progressive reveal WITHOUT writing its answer down.
+  /// [settle] always persists - right when the answer survived (the screen
+  /// went away, the next turn arrived), wrong when the turn it belongs to
+  /// was just truncated: letting it finish would log the removed answer and
+  /// grow the deleted branch straight back into the store.
+  void _cancelReveal() {
+    _reveal?.cancel();
+    _reveal = null;
+    _revealFinish = null;
+    _revealPersist = null;
+  }
+
+  /// "Always use OSPF" typed plainly is a preference stated out loud: it
+  /// goes into the same rule store the "Remember as a rule" button writes,
+  /// so the planner applies it to every later parse. Gated by the
+  /// Learn-automatically setting, and quiet when off or already learned.
+  Future<void> _autoTeachPreference(String text) async {
+    final settings = _settings;
+    if (settings == null || !settings.autoTeach) return;
+    if (!PlannerMemoryService.isPreferenceStatement(text)) return;
+    final mem = _memory;
+    if (mem == null || !mem.ready) return;
+    try {
+      final trimmed = text.trim();
+      final already = (await mem.allRules()).any(
+        (r) => r.ruleText.trim().toLowerCase() == trimmed.toLowerCase(),
+      );
+      if (already) return;
+      await mem.addRule(trimmed);
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text('Learned as a rule: $trimmed'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (_) {
+      // A rule that fails to save must never cost the turn that stated it.
+    }
+  }
+
+  /// "This is for the office", "40 users", "I'm a beginner": environment
+  /// facts stated in passing, folded into ONE remembered profile instead of
+  /// being re-derived per message and forgotten. The advisor falls back to
+  /// it whenever a later message leaves a fact unsaid, and the Memory
+  /// screen shows and corrects it. Same gates as [_autoTeachPreference] -
+  /// Learn-automatically must be on, and a save failure never costs the
+  /// turn. Quiet unless something NEW was learned: re-stating a known fact
+  /// is not a notification.
+  Future<void> _updateEnvironmentProfile(String text) async {
+    final settings = _settings;
+    if (settings == null || !settings.autoTeach) return;
+    final mem = _memory;
+    if (mem == null || !mem.ready) return;
+    try {
+      final merged = EnvironmentProfileService.learnFrom(
+        text,
+        await mem.environmentProfile(),
+      );
+      if (merged == null) return;
+      await mem.setEnvironmentProfile(merged);
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text('Noted: ${merged.summaryLine}'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (_) {
+      // Learning the environment must never cost the turn that stated it.
+    }
+  }
+
+  // --- the brief conversation ----------------------------------------------
+
+  /// The remembered environment, or null when there is none (or memory is
+  /// down). Small, but called from three places that must agree.
+  Future<EnvironmentProfile?> _loadEnvironmentProfile() async {
+    final mem = _memory;
+    if (mem == null || !mem.ready) return null;
+    try {
+      return await mem.environmentProfile();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The questions to ask for the standing plan: critical gaps, minus the
+  /// ones this environment has already answered. A remembered answer is
+  /// APPLIED to the brief here - which can make the brief ready without
+  /// asking anything, at which point this returns an empty list.
+  Future<List<ClarificationQuestion>> _clarificationsFor(
+    NetworkIntent plan,
+    EnvironmentProfile? profile,
+  ) async {
+    final remembered = <String>{};
+    final mem = _memory;
+    if (mem != null && mem.ready) {
+      for (final id in DesignBrief.slotIds) {
+        final fact = await ClarificationService.rememberedAnswer(
+          questionId: id,
+          profile: profile,
+          mem: mem,
+        );
+        if (fact != null) {
+          remembered.add(id);
+          _brief = _brief.withFact(id, fact);
+          // A remembered answer steers the standing plan too - that is the
+          // whole point of remembering it.
+          final reconciled = _reconcilePlanWithFact(plan, id, fact);
+          if (reconciled != null) {
+            _lastIntent = reconciled;
+            _state.withIntentJson(
+              jsonEncode(reconciled.toJson(includeSecrets: false)),
+            );
+          }
+        }
+      }
+      _state.briefJson = jsonEncode(_brief.toJson());
+    }
+    return ClarificationService.neededFor(
+      brief: _brief,
+      plan: plan,
+      profile: profile,
+      rememberedQuestionIds: remembered,
+    );
+  }
+
+  /// Fold a brief answer into the standing plan where the plan can carry
+  /// it, so the brief and the lab never disagree at build time: a routing
+  /// choice becomes the plan's routing, and a scale answer grows the lab's
+  /// PCs to serve it (never shrinks - "25" does not delete devices the user
+  /// named). Returns the new plan, or null when nothing changed or the
+  /// merge failed (fail-open: the brief stays the source of truth either
+  /// way). Segmentation and security remain planner-level decisions in v1.
+  NetworkIntent? _reconcilePlanWithFact(
+    NetworkIntent? plan,
+    String slotId,
+    BriefFact fact,
+  ) {
+    if (plan == null || plan.nodes.isEmpty) return null;
+    try {
+      if (slotId == DesignBrief.routing &&
+          fact.value.isNotEmpty &&
+          plan.routing.toLowerCase() != fact.value) {
+        return PlannerMemoryService.apply(
+          plan,
+          rules: const [],
+          preferences: {'routing': fact.value},
+        );
+      }
+      if (slotId == DesignBrief.scale) {
+        final wanted = int.tryParse(fact.value) ?? 0;
+        final pcs = plan.nodes.where((n) => n.type == 'pc').length;
+        if (wanted <= 0 || wanted <= pcs) return null;
+        final briefText = 'add $wanted pcs';
+        final outcome = NetworkIntent.followUp(
+          previous: plan,
+          previousBrief: _lastBrief,
+          brief: briefText,
+          parsed: NetworkIntent.parseSimple('clarification', briefText),
+          project: plan.projectName,
+        );
+        return outcome.plan.nodes.length > plan.nodes.length
+            ? outcome.plan
+            : null;
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
+  }
+
+  /// Try to resolve the pending clarifications against this message. First
+  /// one that resolves wins; null when the message answers none of them.
+  Future<({ClarificationQuestion question, BriefFact fact, String raw})?>
+      _resolvePendingClarification(String text) async {
+    for (final id in _state.pendingQuestionIds) {
+      final q = ClarificationService.questionById(id);
+      if (q == null) continue;
+      final fact = ClarificationService.resolveAnswer(q, text);
+      if (fact == null) continue;
+      return (question: q, fact: fact, raw: text.trim());
+    }
+    return null;
+  }
+
+  /// Apply an answered clarification: into the brief as a user decision,
+  /// and into the clarification memory keyed to this environment - so the
+  /// same person is never asked the same question twice - then answer with
+  /// the ack (and the next question, or the ready note).
+  Future<void> _applyClarificationAnswer(
+    ({ClarificationQuestion question, BriefFact fact, String raw}) answered,
+  ) async {
+    final profile = await _loadEnvironmentProfile();
+    _brief = _brief.withFact(
+      answered.question.id,
+      BriefFact(
+        value: answered.fact.value,
+        display: answered.fact.display,
+        source: 'your answer',
+        origin: BriefSource.user,
+      ),
+    );
+    _state.briefJson = jsonEncode(_brief.toJson());
+    _state.pendingQuestionIds = const [];
+    // The answer is a plan decision where the plan can carry it, not just a
+    // card: "OSPF" changes the lab's routing; "40" grows its PC count.
+    final reconciled = _reconcilePlanWithFact(
+      _lastIntent,
+      answered.question.id,
+      answered.fact,
+    );
+    if (reconciled != null) {
+      _lastIntent = reconciled;
+      _state.withIntentJson(
+        jsonEncode(reconciled.toJson(includeSecrets: false)),
+      );
+    }
+    final mem = _memory;
+    if (mem != null && mem.ready) {
+      try {
+        await mem.rememberClarification(
+          answered.question.id,
+          answered.raw,
+          venue: profile?.venue ?? '',
+          scale: profile?.scale ?? 0,
+        );
+      } catch (_) {}
+    }
+    // What is still open after this answer - remembered answers may fill
+    // the rest, in which case the brief is simply ready.
+    final clarifying = await _clarificationsFor(
+      _lastIntent ?? NetworkIntent(projectName: 'offline-chat'),
+      profile,
+    );
+    _state.pendingQuestionIds = [for (final q in clarifying) q.id];
+    final ready = _brief.ready;
+    final b = StringBuffer()
+      ..writeln(
+        '**Got it** - ${DesignBriefService.labelFor(answered.question.id)}: '
+        '${answered.fact.display}.',
+      );
+    if (clarifying.isNotEmpty) {
+      b
+        ..writeln()
+        ..writeln(
+          'Still open: ${clarifying.map((q) => q.question).join(' ')}',
+        );
+    } else {
+      // Ready, or the gaps that remain have no question (the planner's safe
+      // defaults cover them, and the brief card shows which).
+      b
+        ..writeln()
+        ..writeln(
+          ready
+              ? 'That fills in everything I need to plan the network. Say '
+                    '"build the .pkt" when you want the file, or keep '
+                    'adjusting.'
+              : 'Nothing else I need to ask - the rest uses the planner\'s '
+                    'safe defaults, shown on the brief. Say "build the '
+                    '.pkt" when you want the file.',
+        );
+    }
+    final turn = ChatMessage(
+      role: 'model',
+      text: b.toString().trim(),
+      createdAt: DateTime.now().toIso8601String(),
+      source: _aiStatus.source,
+      actions: [if (_brief.isNotEmpty) _briefCardFor(_brief)],
+    );
+    if (!mounted) return;
+    setState(() {
+      _messages = [..._messages, turn];
+      _quickReplies = clarifying.isEmpty
+          ? ['Build the .pkt']
+          : [
+              for (final q in clarifying) ...q.quickReplies,
+              'Just build it with defaults',
+            ];
+    });
+    _jumpToEnd();
+    final store = _memory;
+    if (store != null && store.ready) {
+      try {
+        await store.logChat(turn, conversation: _conversation);
+        await store.setSessionState(_conversation, _state.encode());
+      } catch (_) {}
+    }
+    await _refreshConversations();
+  }
+
+  /// The user insisting on a build despite open brief slots: "just build
+  /// it", "build the .pkt", "go ahead". The planner's safe defaults apply
+  /// to what is still open - visible on the brief card - instead of the
+  /// app stalling on questions nobody asked for.
+  static final RegExp _forcedBuild = RegExp(
+    r'\bjust build\b|\bbuild it\b|\bgo ahead\b|\bjust do it\b'
+    r'|\bbuild\b[^.]{0,24}\bpkt\b|\bcompile\b|\bbuild now\b',
+  );
+
+  static bool _isForcedBuild(String text) =>
+      _forcedBuild.hasMatch(text.trim().toLowerCase());
+
+  /// The design brief, as a persisted card action (see `brief_card` in
+  /// [ChatAction.supported]).
+  ChatAction _briefCardFor(DesignBrief brief) => ChatAction(
+    kind: 'brief_card',
+    summary: 'Design brief',
+    payload: {'brief': brief.toJson()},
+  );
+
+  /// Decode a persisted brief card payload; a card that will not decode
+  /// renders as nothing rather than crashing the transcript.
+  static DesignBrief _briefFromPayload(Map<String, dynamic> payload) {
+    try {
+      final raw = payload['brief'];
+      if (raw is Map) {
+        return DesignBrief.fromJson(Map<String, dynamic>.from(raw));
+      }
+    } catch (_) {}
+    return const DesignBrief();
+  }
+
+  /// The structured advice answer, as a persisted card action.
+  ///
+  /// Riding [ChatAction] (allowlisted as `advice_card`) means the card
+  /// survives a conversation reopen exactly like a build card does, and the
+  /// payload - not a re-parse of the markdown - is what the widget draws.
+  ChatAction _adviceCardFor(AdviceAnswer advice) => ChatAction(
+    kind: 'advice_card',
+    summary: 'Design advice',
+    payload: {
+      'topic': advice.topic,
+      'kind': advice.kind.name,
+      'recommendation': advice.recommendation,
+      'options': [
+        for (final o in advice.options)
+          {'label': o.label, 'chooseWhen': o.chooseWhen, 'tradeOff': o.tradeOff},
+      ],
+      'reasons': advice.reasons,
+      'nextStep': advice.nextStep,
+      'planBrief': advice.planBrief ?? '',
+      'basis': advice.basis,
+    },
+  );
 
   /// Store the answer as a rule the planner reads. The value of a correction
   /// is that it changes the next plan, not just this conversation - which is
   /// what the memory already does, so this writes there.
-  Future<void> _rememberFromMessage(ChatMessage message) async {
-    final mem = _memory;
+  Future<void> _rememberFromMessage(ChatMessage message) async {    final mem = _memory;
     if (mem == null || !mem.ready) {
       _appendSystem(
         'Memory is not available in this session, so the rule was not saved.',
@@ -6043,6 +7566,49 @@ class _ChatScreenState extends State<ChatScreen> {
       style: const TextStyle(fontSize: 10),
     ),
   );
+
+  /// The advice card: an `advice_card` action draws as the structured card
+  /// (recommendation highlighted, options, "Plan this") instead of the
+  /// standard approve-gated card. "Plan this" sends the advisor's plan-able
+  /// sentence as a normal turn - the planner parses it, the validator gates
+  /// it - and marks the card done, the same record [_runAction] keeps.
+  Widget _adviceCard(
+    int messageIndex,
+    int actionIndex,
+    ChatAction action,
+    bool done,
+  ) {
+    return AdviceCardWidget(
+      key: ValueKey('advice-card-$messageIndex-$actionIndex'),
+      payload: action.payload,
+      onPlanThis: done
+          ? null
+          : () {
+              final brief = '${action.payload['planBrief'] ?? ''}'.trim();
+              if (brief.isEmpty) return;
+              _markActionExecuted(messageIndex, actionIndex);
+              _sendQuickReply(brief);
+            },
+    );
+  }
+
+  /// Record an action as done without an [_runAction] execution behind it -
+  /// "Plan this" runs by sending a turn, not by executing a payload.
+  void _markActionExecuted(int messageIndex, int actionIndex) {
+    final message = _messages[messageIndex];
+    final updated = message.copyWith(executed: [
+      ...message.executed,
+      actionIndex.toString(),
+    ]);
+    setState(() {
+      _messages = [..._messages];
+      _messages[messageIndex] = updated;
+    });
+    final mem = _memory;
+    if (mem != null && mem.ready && message.id != null) {
+      mem.updateChat(message.id!, updated).catchError((_) {});
+    }
+  }
 
   Widget _actionCard(
     int messageIndex,
@@ -6309,6 +7875,18 @@ class _ChatScreenState extends State<ChatScreen> {
         final name = (action.payload['name'] ?? '').toString().trim();
         if (name.isNotEmpty) lines.add('file: $name');
         break;
+      case 'pkt_open':
+        lines.add(
+          _ptInstalled == false
+              ? 'show the network in the built-in viewer '
+                    '(Packet Tracer was not found)'
+              : 'open the file in Packet Tracer via the operating system',
+        );
+        break;
+      case 'pkt_export':
+        final path = (action.payload['path'] ?? '').toString().trim();
+        if (path.isNotEmpty) lines.add('save a copy of $path');
+        break;
       case 'layout_preview':
         final style = (action.payload['style'] ?? '').toString().trim();
         lines.add(
@@ -6499,59 +8077,87 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final dir = await getApplicationDocumentsDirectory();
-      final seed = OnDevicePktBuilder.loadSeed(dir);
-      if (seed == null) {
+      // engineHealthy: false so every failure answers with guidance instead
+      // of silently deferring to an engine this screen is not about.
+      final result = await _compilePktOnDevice(
+        intent: intent,
+        drawing: _layout,
+        engineHealthy: false,
+      );
+      if (result == null) {
         _appendSystem(
-          'No seed save imported yet. Use "Import a seed .pkt" first - one '
-          'real Packet Tracer save teaches this device the device models it '
-          'can build.',
+          'This device has no bundled template library and no imported '
+          'seed. Use "Import a seed .pkt" first - one real Packet Tracer '
+          'save teaches this device the device models it can build.',
         );
         return;
       }
-      final stamp = DateTime.now()
-          .toIso8601String()
-          .replaceAll(RegExp(r'[^0-9]'), '')
-          .substring(0, 12);
-      final built = OnDevicePktBuilder.build(
-        intent: intent,
-        seed: seed,
-        outDir: OnDevicePktBuilder.outDirIn(dir),
-        filename: 'netbuilder-$stamp.pkt',
-      );
-      if (built == null) {
-        _appendSystem('That plan has no devices in it, so there is nothing to '
-            'build.');
-        return;
-      }
-      _capturePath = built.file.path;
-      _artifactPath = built.file.path;
-      _artifactName = built.file.uri.pathSegments.last;
-      _artifactUpdatedAt = DateTime.now().toIso8601String();
-      final audit = OnDevicePktBuilder.audit(built.file.readAsBytesSync());
-      final body = StringBuffer()
-        ..writeln('**Built on this device.**')
-        ..writeln()
-        ..writeln('- File: `${built.file.path}`')
-        ..writeln('- Devices: ${audit.devices} '
-            '(${audit.kinds.toList()..sort()}), links: ${audit.links}')
-        ..writeln('- Compiled on the phone: no Packet Tracer, no sidecar, '
-            'nothing left this device.');
-      if (built.warnings.isNotEmpty) {
-        body
-          ..writeln('- What I could not do:')
-          ..writeln(
-            '    - ${built.warnings.join('\n    - ')}',
-          );
-      }
-      if (!mounted) return;
-      _appendSystem(body.toString().trimRight());
-    } on OnDeviceBuildError catch (e) {
-      _appendSystem(e.message);
-    } catch (e) {
-      _appendSystem('The on-device build failed: $e');
+      _appendSystem(result.text);
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Send the last built .pkt out of the app - to a PC over WhatsApp,
+  /// Drive, email, whatever the share sheet offers. The build directory is
+  /// app-private on Android, so this is the way the file leaves the phone.
+  Future<void> _shareArtifact() async {
+    final path = _artifactPath.trim();
+    if (path.isEmpty) {
+      _appendSystem('Nothing to share yet - build a .pkt first.');
+      return;
+    }
+    final file = File(path);
+    if (!file.existsSync()) {
+      _appendSystem('That file is gone from this device: $path');
+      return;
+    }
+    try {
+      final files = <XFile>[XFile(path)];
+      // The manifest travels with the file when it exists: it is what
+      // tells a generated save apart from a hand-made one on the PC.
+      final manifest = File('$path.netbuilder.json');
+      if (manifest.existsSync()) files.add(XFile(manifest.path));
+      await SharePlus.instance.share(
+        ShareParams(
+          files: files,
+          text: _artifactName.isEmpty ? 'NetBuilder .pkt' : _artifactName,
+          title: _artifactName,
+        ),
+      );
+    } catch (e) {
+      _appendSystem('Could not open the share sheet: $e');
+    }
+  }
+
+  /// Share the conversation itself as a markdown document, through the same
+  /// system share sheet the .pkt leaves by. The transcript is the record of
+  /// what was asked and answered, and it travels as text so it can be pasted
+  /// into a ticket or a README exactly as it reads here: message text goes
+  /// out verbatim, so fenced code arrives still fenced and runnable.
+  ///
+  /// No file is written and no network is touched - the share sheet is the
+  /// only way out, which is the same boundary the .pkt share keeps.
+  Future<void> _shareTranscript() async {
+    if (_messages.isEmpty) {
+      _appendSystem('Nothing to share yet - this conversation is empty.');
+      return;
+    }
+    // The document itself is [ChatScreen.transcriptMarkdown] - kept pure so
+    // the format is pinned by tests, not by a run through the share sheet.
+    final text = ChatScreen.transcriptMarkdown(
+      _messages,
+      conversation: _conversation,
+    );
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: text,
+          title: 'NetBuilder chat - $_conversation',
+        ),
+      );
+    } catch (e) {
+      _appendSystem('Could not open the share sheet: $e');
     }
   }
 
@@ -6749,17 +8355,38 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
             // One unified composer capsule - field, attach and send inside a
-            // single rounded surface, the way a modern chat input reads.
-            Container(
-              key: const ValueKey('composer-capsule'),
-              padding: const EdgeInsets.fromLTRB(4, 4, 6, 4),
-              decoration: BoxDecoration(
-                color: AppPalette.raised(scheme),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: AppPalette.hairline(scheme)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+            // single rounded surface, the way a modern chat input reads. A
+            // focus ring (a tinted border plus a soft glow) says "I am
+            // listening" the moment the field takes the caret.
+            AnimatedBuilder(
+              animation: _composerFocus,
+              builder: (context, _) {
+                final focused = _composerFocus.hasFocus;
+                return AnimatedContainer(
+                  key: const ValueKey('composer-capsule'),
+                  duration: const Duration(milliseconds: 160),
+                  curve: Curves.easeOut,
+                  padding: const EdgeInsets.fromLTRB(4, 4, 6, 4),
+                  decoration: BoxDecoration(
+                    color: AppPalette.raised(scheme),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: focused
+                          ? scheme.primary.withValues(alpha: 0.55)
+                          : AppPalette.hairline(scheme),
+                      width: focused ? 1.4 : 1,
+                    ),
+                    boxShadow: focused
+                        ? [
+                            BoxShadow(
+                              color: scheme.primary.withValues(alpha: 0.12),
+                              blurRadius: 16,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   // One media picker, the way a chat app has one: every way
                   // of attaching something lives behind it, and the chat keeps
@@ -6860,36 +8487,61 @@ class _ChatScreenState extends State<ChatScreen> {
                     onPressed: _busy ? null : _openTools,
                   ),
                   const SizedBox(width: 2),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    curve: Curves.easeOut,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: scheme.primary,
-                      boxShadow: [
-                        BoxShadow(
-                          color: scheme.primary.withValues(alpha: 0.30),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                  // The send button answers the composer: an empty box gets
+                  // a quiet button, a written message gets the filled,
+                  // glowing one. Driven by the controller, so only the
+                  // button rebuilds on each keystroke - never the
+                  // transcript.
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _input,
+                    builder: (context, value, _) {
+                      final hasText = value.text.trim().isNotEmpty;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        curve: Curves.easeOut,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _busy || hasText
+                              ? scheme.primary
+                              : scheme.surfaceContainerHighest,
+                          boxShadow: _busy || hasText
+                              ? [
+                                  BoxShadow(
+                                    color: scheme.primary.withValues(
+                                      alpha: 0.30,
+                                    ),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
                         ),
-                      ],
-                    ),
-                    child: IconButton.filled(
-                      tooltip: _busy ? 'Stop generating' : 'Send',
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        foregroundColor: scheme.onPrimary,
-                        elevation: 0,
-                      ),
-                      icon: _busy
-                          ? const Icon(Icons.stop)
-                          : const Icon(Icons.send),
-                      onPressed: _busy ? _cancelGeneration : _send,
-                    ),
+                        child: IconButton.filled(
+                          tooltip: _busy ? 'Stop generating' : 'Send',
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            foregroundColor: _busy || hasText
+                                ? scheme.onPrimary
+                                : scheme.onSurfaceVariant,
+                            elevation: 0,
+                          ),
+                          icon: _busy
+                              ? const Icon(Icons.stop)
+                              : const Icon(Icons.send),
+                          onPressed: _busy
+                              ? _cancelGeneration
+                              : (_input.text.trim().isEmpty
+                                    ? null
+                                    : _send),
+                        ),
+                      );
+                    },
                   ),
-                ],
-              ),
-            ),
+                  ],
+                ),
+              );
+            },
+          ),
           ],
         ),
       ),
@@ -7149,6 +8801,140 @@ class _RuleDialogState extends State<_RuleDialog> {
   }
 }
 
+/// The in-conversation search sheet: a field, the hits, nothing else.
+///
+/// Hits match message text only - tool cards and attachments are not prose
+/// to search - and each hit shows the line it was found on, so picking the
+/// right one is a reading decision, not a guess between timestamps.
+class _ConversationSearch extends StatefulWidget {
+  final List<ChatMessage> messages;
+  final ValueChanged<ChatMessage> onOpen;
+
+  const _ConversationSearch({required this.messages, required this.onOpen});
+
+  @override
+  State<_ConversationSearch> createState() => _ConversationSearchState();
+}
+
+class _ConversationSearchState extends State<_ConversationSearch> {
+  final _field = TextEditingController();
+
+  @override
+  void dispose() {
+    _field.dispose();
+    super.dispose();
+  }
+
+  /// The turns whose text contains the query, oldest first. An empty query
+  /// matches nothing: an empty hit list is the honest answer to an empty box.
+  static List<ChatMessage> matches(
+    List<ChatMessage> messages,
+    String query,
+  ) {
+    final needle = query.trim().toLowerCase();
+    if (needle.isEmpty) return const [];
+    return [
+      for (final message in messages)
+        if (message.text.toLowerCase().contains(needle)) message,
+    ].take(50).toList();
+  }
+
+  /// A one-to-two-line window around the first hit, whitespace flattened so
+  /// a hit inside a wrapped paragraph reads as one line of context instead
+  /// of a mangled block.
+  static String snippet(String text, String query) {
+    final flat = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final needle = query.trim().toLowerCase();
+    final at = flat.toLowerCase().indexOf(needle);
+    if (at < 0) {
+      return flat.length <= 120 ? flat : '${flat.substring(0, 120)}...';
+    }
+    const window = 60;
+    // clamp answers a num; substring wants ints.
+    final start = (at - window / 3).floor().clamp(0, flat.length).toInt();
+    final end = (at + needle.length + window).clamp(0, flat.length).toInt();
+    return '${start > 0 ? '...' : ''}${flat.substring(start, end)}'
+        '${end < flat.length ? '...' : ''}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hits = matches(widget.messages, _field.text);
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 480),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: TextField(
+                  controller: _field,
+                  autofocus: true,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search, size: 20),
+                    hintText: 'Search this conversation',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
+              if (hits.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    _field.text.trim().isEmpty
+                        ? 'Type to search the messages in this conversation.'
+                        : 'No messages in this conversation match that.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              else
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final message in hits)
+                        ListTile(
+                          dense: true,
+                          leading: Icon(
+                            message.isUser
+                                ? Icons.person_outline
+                                : Icons.auto_awesome,
+                            size: 18,
+                          ),
+                          title: Text(
+                            snippet(message.text, _field.text),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            '${message.isUser ? 'You' : 'Assistant'}'
+                            '${_ChatScreenState._stamp(message.createdAt).isEmpty ? '' : ' - ${_ChatScreenState._stamp(message.createdAt)}'}',
+                            style: theme.textTheme.labelSmall,
+                          ),
+                          onTap: () => widget.onOpen(message),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// The pieces of one request, kept apart so the context builder can allocate
 /// and report them separately.
 class _ContextParts {
@@ -7189,4 +8975,64 @@ class _PendingChange {
     required this.field,
     required this.newValue,
   });
+}
+
+
+/// The prompt behind a tap-to-fix chip: one field carrying the value that is
+/// wrong, and the two ways out.
+///
+/// It owns its own controller rather than borrowing one from the caller:
+/// the dialog route keeps animating - and keeps listening to its field -
+/// after [showDialog] hands the result back, so a controller disposed by the
+/// caller is a controller used after dispose. The widget test caught that.
+class _SlotFixDialog extends StatefulWidget {
+  const _SlotFixDialog({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  State<_SlotFixDialog> createState() => _SlotFixDialogState();
+}
+
+class _SlotFixDialogState extends State<_SlotFixDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.value);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Fix the ${widget.label}'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: InputDecoration(
+          labelText: widget.label,
+          hintText: widget.value,
+        ),
+        onSubmitted: (v) => Navigator.of(context).pop(v),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: const Text('Fix it'),
+        ),
+      ],
+    );
+  }
 }

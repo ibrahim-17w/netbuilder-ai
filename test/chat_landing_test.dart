@@ -63,6 +63,10 @@ void main() {
 
     await tester.tap(find.byTooltip('Tools: run, capture, and integrations'));
     await tester.pumpAndSettle();
+    // The sheet grew a Share tile for built files, so the report may sit
+    // below the fold on a test window: scroll to it, then press it.
+    await tester.ensureVisible(find.text('Context report'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Context report'));
     await tester.pumpAndSettle();
 

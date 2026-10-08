@@ -206,4 +206,106 @@ void main() {
       expect(xml, contains('<DEVICE>'));
     });
   });
+
+  group('the audit reads every subnet size back', () {
+    // A minimal save document, built the way the builder writes configs: one
+    // <LINE> per config line inside <RUNNINGCONFIG>. Encrypted with the same
+    // codec the app writes, so the audit reads it exactly as it reads a real
+    // build's bytes.
+    String device(String name, List<String> addressLines) =>
+        '<DEVICE>\n'
+        ' <ENGINE>\n'
+        '  <TYPE customModel="" model="2811">Router</TYPE>\n'
+        '  <NAME translate="true">$name</NAME>\n'
+        '  <RUNNINGCONFIG>\n'
+        '${addressLines.map((l) => '   <LINE>$l</LINE>').join('\n')}\n'
+        '  </RUNNINGCONFIG>\n'
+        ' </ENGINE>\n'
+        '</DEVICE>';
+
+    Map<String, dynamic> auditOf(String xml) {
+      final bytes = encryptPkt(xml);
+      return OnDevicePktBuilder.auditReport(bytes);
+    }
+
+    test('a config with /25-/30 addresses records every one of them', () {
+      // Before this fix the mask table only knew /16, /24 and /32, so a lab
+      // subnetted the way labs actually are made its addressing vanish from
+      // the audit's ipcfg.
+      final r1 = device('R1', [
+        'interface FastEthernet0/0',
+        ' ip address 10.0.0.1 255.255.255.128',
+        'interface FastEthernet0/1',
+        ' ip address 10.0.1.1 255.255.255.192',
+        'interface Serial0/0/0',
+        ' ip address 10.0.2.1 255.255.255.224',
+        'interface Serial0/1/0',
+        ' ip address 10.0.3.1 255.255.255.240',
+        'interface Serial0/2/0',
+        ' ip address 10.0.4.1 255.255.255.248',
+        'interface Serial1/0',
+        ' ip address 10.0.5.1 255.255.255.252',
+        'interface Loopback0',
+        ' ip address 10.0.6.1 255.255.255.254',
+        ' ip address 10.0.7.1 255.255.255.255',
+        'interface Vlan10',
+        ' ip address 10.0.8.1 255.255.254.0',
+      ]);
+      final report = auditOf(
+        '<PACKETTRACER5><NETWORK>'
+        '<DEVICES>$r1</DEVICES>'
+        '</NETWORK></PACKETTRACER5>',
+      );
+      final devices = report['devices'] as List;
+      expect(devices, hasLength(1));
+      final ipcfg = (devices.first as Map)['ipcfg'] as Map;
+      expect(ipcfg['addresses'], [
+        '10.0.0.1/25',
+        '10.0.1.1/26',
+        '10.0.2.1/27',
+        '10.0.3.1/28',
+        '10.0.4.1/29',
+        '10.0.5.1/30',
+        '10.0.6.1/31',
+        '10.0.7.1/32',
+        '10.0.8.1/23',
+      ]);
+    });
+
+    test('two interfaces claiming one /25 address are caught', () {
+      // The whole point of reading the addresses back: the duplicate lives on
+      // a subnet the old table did not know, and the check reported clean.
+      final r1 = device('R1', ['ip address 10.9.9.9 255.255.255.128']);
+      final r2 = device('R2', ['ip address 10.9.9.9 255.255.255.128']);
+      final report = auditOf(
+        '<PACKETTRACER5><NETWORK>'
+        '<DEVICES>$r1$r2</DEVICES>'
+        '</NETWORK></PACKETTRACER5>',
+      );
+      final findings = (report['findings'] as List).cast<String>();
+      expect(
+        findings,
+        contains(
+          'duplicate_interface_address: 10.9.9.9 is claimed by both R1 and R2',
+        ),
+      );
+    });
+
+    test('a mask that is no prefix is left out, not invented into one', () {
+      // A discontiguous mask has no /n form. Skipping it is the honest
+      // outcome: the consumer sees fewer addresses, never a wrong one.
+      final r1 = device('R1', [
+        'ip address 10.0.0.1 255.255.255.0',
+        'ip address 10.0.1.1 255.0.255.0',
+      ]);
+      final report = auditOf(
+        '<PACKETTRACER5><NETWORK>'
+        '<DEVICES>$r1</DEVICES>'
+        '</NETWORK></PACKETTRACER5>',
+      );
+      final devices = report['devices'] as List;
+      final ipcfg = (devices.first as Map)['ipcfg'] as Map;
+      expect(ipcfg['addresses'], ['10.0.0.1/24']);
+    });
+  });
 }

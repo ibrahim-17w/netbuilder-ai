@@ -7,6 +7,12 @@ import 'package:net_builder/services/nlu/slots.dart';
 import 'package:net_builder/services/phrasing_memory_service.dart';
 import 'package:net_builder/services/scope_gate.dart';
 
+import 'fixtures/golden_cases.dart';
+
+/// Node count by device type. The assertion every exact case reduces to.
+int count(NetworkIntent intent, String type) =>
+    intent.nodes.where((n) => n.type == type).length;
+
 /// The golden set: real English phrasings and the parse they must produce.
 ///
 /// This is the measurement harness for the NLU front-end.
@@ -16,219 +22,16 @@ import 'package:net_builder/services/scope_gate.dart';
 /// * `knownGaps` characterize behavior that is WRONG but stable, so closing
 ///   a gap is a deliberate, noticed change (this test goes red the moment
 ///   someone fixes it, and the case then moves into `contract`).
+/// * `observed` are briefs from real use, held to the invariants that must
+///   hold for ANY brief - it parses, it is not empty, and a device kind the
+///   user named out loud survives into the plan. No count is asserted, so
+///   this tier scales to briefs nobody has read.
 /// * The drift guard proves [BriefSlotPipeline] and the offline parser
 ///   still read the same brief the same way - the whole point of wiring
 ///   one into the other.
 ///
 /// Before any learned or trained component is trusted to change a parse,
 /// it is measured against this file first.
-
-/// (brief, expected node counts by type, expected routing, run drift guard).
-typedef GoldenCase = (String, Map<String, int>, String?, bool);
-
-int count(NetworkIntent intent, String type) =>
-    intent.nodes.where((n) => n.type == type).length;
-
-final List<GoldenCase> contract = [
-  // --- quantity phrases -----------------------------------------------------
-  (
-    'Build a network with 3 routers, 2 switches and 10 PCs',
-    {'router': 3, 'switch': 2, 'pc': 10, 'server': 0},
-    null,
-    true,
-  ),
-  // Spelled-out numbers are bridged to digits before parsing.
-  (
-    '2 routers, 2 switches and four pcs',
-    {'router': 2, 'switch': 2, 'pc': 4},
-    null,
-    true,
-  ),
-  // --- bare mentions mean one ----------------------------------------------
-  (
-    'a router connected to a switch and a server for dhcp',
-    {'router': 1, 'switch': 1, 'pc': 0, 'server': 1},
-    null,
-    true,
-  ),
-  // --- model numbers are not quantities ------------------------------------
-  (
-    'Cisco 2911 routers for the office',
-    {'router': 1, 'switch': 0, 'server': 0},
-    null,
-    true,
-  ),
-  // --- explicit labels are authoritative -----------------------------------
-  (
-    'R1 and R2 connect to SW1 and SW2, one PC for testing',
-    {'router': 2, 'switch': 2, 'pc': 1, 'server': 0},
-    null,
-    true,
-  ),
-  (
-    'R1 serves SRV1 and SRV2',
-    {'router': 1, 'switch': 0, 'pc': 0, 'server': 2},
-    null,
-    true,
-  ),
-  // --- per-site clauses multiply --------------------------------------------
-  (
-    'two branch offices, each with a router, a switch and 3 pcs',
-    {'router': 2, 'switch': 2, 'pc': 6},
-    null,
-    true,
-  ),
-  // --- roles and AAA provision a server -------------------------------------
-  (
-    '1 router with dns and http',
-    {'router': 1, 'switch': 0, 'pc': 0, 'server': 1},
-    null,
-    true,
-  ),
-  (
-    'use tacacs+ for logins, 2 routers 2 switches 4 pcs',
-    {'router': 2, 'switch': 2, 'pc': 4, 'server': 1},
-    null,
-    true,
-  ),
-  // --- other catalog kinds ---------------------------------------------------
-  (
-    '2 routers 2 switches 4 pcs with wifi',
-    {'router': 2, 'switch': 2, 'pc': 4, 'wireless': 1},
-    null,
-    true,
-  ),
-  (
-    '2 firewalls and 2 pcs behind a router',
-    {'router': 1, 'switch': 0, 'pc': 2, 'firewall': 2, 'server': 0},
-    null,
-    true,
-  ),
-  (
-    '12 PCs, 1 switch',
-    {'pc': 12, 'switch': 1},
-    null,
-    true,
-  ),
-  // --- the tiny-office default ------------------------------------------------
-  (
-    'build me something for the office',
-    {'router': 1, 'switch': 1, 'pc': 0, 'server': 0},
-    null,
-    true,
-  ),
-  // --- routing ----------------------------------------------------------------
-  (
-    '2 routers 2 switches 4 pcs, run ospf between them',
-    {'router': 2, 'switch': 2, 'pc': 4},
-    'ospf',
-    true,
-  ),
-  // --- quantities stated across clauses ---------------------------------------
-  // Distinct sites add up: the second floor's six and the ground floor's
-  // four are ten access points, not six.
-  (
-    'the second floor needs 6 access points and the ground floor 4',
-    {'wireless': 10},
-    null,
-    true,
-  ),
-  // A total restated as exactly-distributed site counts is still the total.
-  (
-    '6 access points, 3 on the second floor and 3 on the ground floor',
-    {'wireless': 6},
-    null,
-    true,
-  ),
-  // The same site restating the same number adds nothing.
-  (
-    'the second floor needs 6 access points; the second floor needs 6',
-    {'wireless': 6},
-    null,
-    true,
-  ),
-  // A site's count can also arrive in the NEXT sentence, not just the next
-  // clause.
-  (
-    'The second floor needs 6 access points. The ground floor needs 4.',
-    {'wireless': 10},
-    null,
-    true,
-  ),
-  // A rejected protocol with nothing positive behind it is not a selection:
-  // routing stays the default rather than being read off the rejected word.
-  (
-    'no ospf for this lab, 2 routers',
-    {'router': 2},
-    'static',
-    false,
-  ),
-  // A correction replaces the number it corrects.
-  (
-    'the second floor needs 6 access points, actually 8',
-    {'wireless': 8},
-    null,
-    true,
-  ),
-  // An announced addition adds.
-  (
-    'the second floor needs 6 access points and 4 more',
-    {'wireless': 10},
-    null,
-    true,
-  ),
-  // --- multi-site completion -------------------------------------------
-  // Several sites with devices but no infrastructure of their own: each
-  // site is given a router and its share of access switches instead of
-  // leaving a link-less farm of endpoints.
-  (
-    'two physical sites and 20 PCs',
-    {'router': 2, 'switch': 2, 'pc': 20},
-    null,
-    true,
-  ),
-  // "more than N" is a floor: the plan uses N+1 minimums.
-  (
-    'more than 1 router and 1 switch and 1 server',
-    {'router': 2, 'switch': 1, 'server': 1},
-    null,
-    true,
-  ),
-  // --- routing negation, contrast and replacement ------------------------------
-  (
-    "Don't use OSPF; use EIGRP",
-    {},
-    'eigrp',
-    false,
-  ),
-  (
-    'use OSPF on the routers, not EIGRP',
-    {},
-    'ospf',
-    false,
-  ),
-  // --- the sizing pack (brief expands before the parser sees it, so the
-  //     drift guard is skipped: the pipeline reads the raw brief only).
-  (
-    '10 employees and two floors, build the network',
-    {
-      'router': 1,
-      'switch': 2,
-      'pc': 10,
-      'server': 1,
-      'wireless': 2,
-      'firewall': 1,
-      'cloud': 1,
-    },
-    null,
-    false,
-  ),
-];
-
-final List<GoldenCase> knownGaps = [
-  // (empty - the multi-clause quantity gap moved into `contract` when the
-  // slot pipeline learned to add quantities across distinct clauses/sites.)
-];
 
 void main() {
   setUpAll(() {
@@ -268,6 +71,35 @@ void main() {
             count(intent, type),
             slots.count(type),
             reason: '$type: parser vs pipeline for: $brief',
+          );
+        }
+      });
+    }
+  });
+
+  group('golden set: a real brief never loses a device it named', () {
+    // Breadth, not precision. These briefs came out of real use and nobody
+    // has written an exact expectation for them, so this tier asserts only
+    // the three things that must hold for every brief at all. That is enough
+    // to catch the failures that matter most - a plan that quietly dropped a
+    // kind the user asked for is wrong no matter what the counts are - and
+    // it does not pretend the app parses every phrasing exactly.
+    for (final (brief, mustSurvive) in observed) {
+      test('"$brief"', () {
+        final NetworkIntent intent;
+        try {
+          intent = NetworkIntent.parseSimple('golden', brief);
+        } catch (e, st) {
+          fail('a real brief must not throw the parser away: $brief\n$st');
+        }
+        expect(intent.nodes, isNotEmpty,
+            reason: 'a brief that names devices must produce a plan: $brief');
+        final kinds = intent.nodes.map((n) => n.type).toSet();
+        for (final kind in mustSurvive) {
+          expect(
+            kinds,
+            contains(kind),
+            reason: 'the brief named a $kind and the plan has none: $brief',
           );
         }
       });

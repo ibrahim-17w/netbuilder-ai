@@ -1,10 +1,11 @@
 // Universal intent model: target-agnostic network description.
 // Adapters compile this into GNS3 / Cisco / PT / Terraform.
+import '../services/nlu/lexicon.dart';
+import '../services/nlu/parser.dart' as brief_reader;
 import 'dart:convert';
 import 'dart:ui' show Offset;
 
 import '../services/nlu/slots.dart';
-import '../services/phrasing_memory_service.dart';
 import '../services/sizing_service.dart';
 
 class NetNode {
@@ -241,162 +242,8 @@ class DeviceKind {
 
 /// Every device kind the offline planner understands.  Packet Tracer 9.x
 /// names are used verbatim, because that is what the executor clicks.
-const List<DeviceKind> deviceKinds = [
-  DeviceKind(
-    type: 'router',
-    keywords: ['router'],
-    models: ['4331', '2911', '1941', '4321', '2901', '829'],
-    port: 'f0',
-    cli: true,
-  ),
-  DeviceKind(
-    type: 'wireless-router',
-    // Packet Tracer's Wireless Router-PT: a router with a wireless AP inside.
-    // Its own keyword, so 'wireless router' never reads as a plain AP (an AP
-    // has no routing or NAT) - and no CLI either, because PT drives it from
-    // the same GUI a home router has.
-    keywords: ['wireless router'],
-    models: ['Wireless Router-PT'],
-    port: 'ethernet1',
-  ),
-  DeviceKind(
-    type: 'switch',
-    keywords: ['multilayer switch', 'layer 3 switch', 'switch'],
-    models: ['2960', '2950', '3560'],
-    port: 'f0',
-    cli: true,
-  ),
-  DeviceKind(
-    type: 'pc',
-    keywords: ['pc', 'workstation', 'desktop computer'],
-    models: ['PC-PT'],
-    port: 'f0',
-    ipConfig: true,
-  ),
-  DeviceKind(
-    type: 'laptop',
-    keywords: ['laptop', 'notebook'],
-    models: ['Laptop-PT'],
-    port: 'f0',
-    ipConfig: true,
-  ),
-  DeviceKind(
-    type: 'server',
-    keywords: ['server'],
-    models: ['Server-PT'],
-    port: 'f0',
-    ipConfig: true,
-  ),
-  DeviceKind(
-    type: 'printer',
-    keywords: ['printer'],
-    models: ['Printer-PT'],
-    port: 'f0',
-    ipConfig: true,
-  ),
-  DeviceKind(
-    type: 'firewall',
-    // ASA-5506/5505 are Firewall-PT devices with ASA syntax, not IOS: they
-    // are placed and cabled, and their config is deliberately left to the
-    // user rather than filled with wrong `hostname`/`interface` lines.
-    keywords: ['firewall', 'asa'],
-    models: ['5506', '5505', 'ASA5505'],
-    port: 'g1/1',
-  ),
-  DeviceKind(
-    type: 'wireless',
-    keywords: ['wireless access point', 'access point', 'wireless ap', 'ap'],
-    models: ['AccessPoint-PT', 'AccessPoint-PT-A', 'AccessPoint-PT-N'],
-    port: 'port1',
-    wireless: true,
-  ),
-  DeviceKind(
-    type: 'wlc',
-    keywords: ['wireless controller', 'wireless lan controller', 'wlc'],
-    models: ['2504', 'WLC-PT'],
-    // Its PT port menu has no stable name across builds: placed, not wired.
-  ),
-  DeviceKind(
-    type: 'phone',
-    keywords: ['ip phone', 'voip phone', 'phone'],
-    models: ['7960', '7961', '7962'],
-    port: 'port1',
-  ),
-  DeviceKind(
-    type: 'tablet',
-    keywords: ['tablet'],
-    models: ['Tablet-PT'],
-    wireless: true,
-  ),
-  DeviceKind(
-    type: 'smartphone',
-    keywords: ['smartphone', 'smart phone', 'mobile phone'],
-    models: ['Smartphone-PT'],
-    wireless: true,
-  ),
-  DeviceKind(
-    type: 'tv',
-    keywords: ['smart tv', 'tv'],
-    models: ['TV-PT'],
-    wireless: true,
-  ),
-  DeviceKind(
-    type: 'cloud',
-    keywords: ['cloud', 'isp', 'internet'],
-    models: ['Cloud-PT'],
-    port: 'ethernet1',
-  ),
-  DeviceKind(
-    type: 'modem',
-    keywords: ['cable modem', 'dsl modem', 'modem'],
-    models: ['DSL Modem-PT', 'Cable Modem-PT', 'Modem-PT'],
-    port: 'port1',
-  ),
-  DeviceKind(
-    type: 'iot',
-    // The household things a home lab names instead of saying "IoT": a brief
-    // that asked for "4 smart bulbs" was counted as no devices at all (the
-    // word 'iot' never appeared), so the bulbs it asked for were never
-    // placed.
-    keywords: [
-      'iot',
-      'home gateway',
-      'mcu',
-      'iot server',
-      'smart bulb',
-      'bulb',
-      'smart plug',
-      'smart camera',
-      'smart lock',
-      'thermostat',
-      'doorbell',
-      'smart sensor',
-      'sensor',
-    ],
-    models: ['Home Gateway-PT', 'MCU-PT', 'IoT Server-PT'],
-    // IoT devices join through the gateway/registration server, and the PT
-    // port menu differs per model: placed with a wireless assumption instead
-    // of a guessed cable.
-    wireless: true,
-  ),
-];
 
 /// Canonical node-name prefixes per device kind (FW1, AP1, ISP1, ...).
-const Map<String, String> devicePrefixes = {
-  'firewall': 'FW',
-  'wireless': 'AP',
-  'wireless-router': 'WR',
-  'wlc': 'WLC',
-  'phone': 'PH',
-  'tablet': 'TAB',
-  'smartphone': 'SP',
-  'tv': 'TV',
-  'cloud': 'CLOUD',
-  'modem': 'MODEM',
-  'iot': 'IOT',
-  'laptop': 'LT',
-  'printer': 'PRN',
-};
 
 String devicePrefix(String type) =>
     devicePrefixes[type] ?? type.toUpperCase();
@@ -828,7 +675,15 @@ class AdviceIntentReader {
     r'cables?|cabling|fiber|fibre|copper|cat ?[568]e?|isp|internet|wan|vpn|'
     r'networks?|design|infrastructure|bandwidth|vlans?|ports?|devices?|'
     r'labs?|packet tracer|gns3|models?|port forwarding|ptz|cameras?|cctv|'
-    r'nvr|phones?|voip|servers?|rack|ups|guest)\b',
+    r'nvr|phones?|voip|servers?|rack|ups|guest|'
+    // Lab model numbers are topics too: "which is better, 2911 or 4331?"
+    // is a comparison, and without these the ask fell through to the
+    // missing-coverage reply because no noun it named was a topic word.
+    // The families are the ones the lab-models answer covers (the Packet
+    // Tracer routers/switches/APs and the ASA/ISA firewalls); keep this
+    // list in step with the model table in advisor_service.dart.
+    r'2950|2960|3560|1841|1941|2811|2901|2911|4321|4331|'
+    r'isr ?4321|isr ?4331|isr|catalyst|asa|isa-?3000)\b',
     caseSensitive: false,
   );
 
@@ -880,6 +735,38 @@ class AdviceIntentReader {
     return parts.where((p) => _topicWords.hasMatch(p)).length >= 2;
   }
 
+  /// The lab model numbers, for the one comparison shape a bare message can
+  /// carry: two models joined by "or" ("2911 or 4331"). Keep in step with
+  /// [_topicWords] and with the model table in advisor_service.dart.
+  static final RegExp _modelWords = RegExp(
+    r'\b(?:2950|2960|3560|1841|1941|2811|2901|2911|4321|4331|'
+    r'isr ?4321|isr ?4331|asa|isa-?3000)\b',
+    caseSensitive: false,
+  );
+
+  /// What turns a bare model pair into a REQUEST instead of a choice - the
+  /// build/change verb family, plus the "2 x 2911" counted-spec shape. A
+  /// counted build brief that happens to name models must never read as
+  /// advice.
+  static final RegExp _modelPairBuildGuard = RegExp(
+    r'\b(?:add|adding|build|create|design|make|set ?up|setup|connect|'
+    r'configure|use|deploy|install|remove|delete|replace|convert|include|'
+    r'attach)\b|\b\d{1,3}\s*x\s*\d',
+    caseSensitive: false,
+  );
+
+  /// "2911 or 4331", "2960 or 3560 for my lab" - two lab models joined by
+  /// "or" are a comparison even without a question mark or question word,
+  /// the same reading "fiber or copper?" gets. The guard keeps it from ever
+  /// reading a build as advice: with a build verb ("add a 2911 or a 4331")
+  /// or a counted spec ("2 x 2911") the message is a request, not a choice.
+  static bool _modelPair(String t) {
+    if (_modelPairBuildGuard.hasMatch(t)) return false;
+    final parts = t.split(RegExp(r'\bor\b'));
+    if (parts.length < 2) return false;
+    return parts.where(_modelWords.hasMatch).length >= 2;
+  }
+
   /// The advisory reading of [brief], or [AdviceKind.none].
   static AdviceKind read(String brief) {
     final t = brief.trim().toLowerCase();
@@ -888,6 +775,9 @@ class AdviceIntentReader {
     if ((_comparisonWords.hasMatch(t) || _orPair(t)) && topic) {
       return AdviceKind.comparison;
     }
+    // The bare model pair - the one "A or B" that needs no question shape,
+    // because a message made of two model numbers is never a build request.
+    if (_modelPair(t)) return AdviceKind.comparison;
     if (_sizingWords.hasMatch(t) && topic) return AdviceKind.sizing;
     if (_reviewWords.hasMatch(t) && topic) return AdviceKind.review;
     if (_adviceWords.hasMatch(t)) {
@@ -1680,431 +1570,6 @@ class NetworkIntent {
   /// Right-to-left marks, tashkeel, and the Arabic letters that have several
   /// spellings (أ/إ/آ -> ا, ى -> ي, ة -> ه), folded so one table entry
   /// matches every way a brief may be written.
-  static String _foldArabic(String s) => s
-      .replaceAll(RegExp(r'[\u200e\u200f\u202a-\u202e\u061c]'), ' ')
-      .replaceAll(RegExp(r'[\u064b-\u0652\u0670\u0640]'), '')
-      .replaceAll(RegExp(r'[\u0623\u0625\u0622\u0671]'), '\u0627')
-      .replaceAll('\u0649', '\u064a')
-      .replaceAll('\u0629', '\u0647')
-      .replaceAll('\u060c', ',');
-
-  /// ٢٣ (Arabic-Indic) and ۲۳ (Extended Arabic-Indic) are the same numbers.
-  static String _asciiDigits(String s) => s.replaceAllMapped(
-    RegExp(r'[\u0660-\u0669\u06f0-\u06f9]'),
-    (m) {
-      final c = m.group(0)!.codeUnitAt(0);
-      return '${c >= 0x06f0 ? c - 0x06f0 : c - 0x0660}';
-    },
-  );
-
-  /// The prefix length of a dotted mask, or null when it is not a mask.
-  static int? _maskToPrefix(String mask) {
-    final parts = mask.split('.').map(int.parse).toList();
-    if (parts.length != 4) return null;
-    var bits = 0;
-    var seenZero = false;
-    for (final p in parts) {
-      if (p > 255) return null;
-      for (var b = 7; b >= 0; b--) {
-        final one = (p >> b) & 1 == 1;
-        if (one && seenZero) return null;
-        if (one) {
-          bits++;
-        } else {
-          seenZero = true;
-        }
-      }
-    }
-    return bits;
-  }
-
-  /// "10.1.1.0 255.255.255.252", "10.1.1.0 subnet mask 255.255.255.252" and
-  /// their Arabic spellings become one CIDR, so a single regex serves every
-  /// brief - including the address tables course briefs are written as.
-  static String _bridgeMasks(String s) => s.replaceAllMapped(
-    RegExp(
-      r'(\d{1,3}(?:\.\d{1,3}){3})[\s,;:]*(?:/|subnet\s+mask|netmask|mask|prefix|qina3|قناع(?:\s+الشبكه)?)?[\s,;:]*(\d{1,3}(?:\.\d{1,3}){3})',
-    ),
-    (m) {
-      final prefix = _maskToPrefix(m.group(2)!);
-      if (prefix == null || prefix == 0) return m.group(0)!;
-      return '${m.group(1)!}/$prefix';
-    },
-  );
-
-  /// Arabic phrases -> the English words the rest of this parser already
-  /// keys on.  Keys are written in folded form (see [_foldArabic]) and the
-  /// table is applied longest-first, so 'جهاز التوجيه' (router) wins before
-  /// the bare 'جهاز' (pc) underneath it.
-  static const List<List<String>> _phraseBridge = [
-    // devices
-    ['اجهزه التوجيه', 'routers'],
-    ['جهاز التوجيه', 'router'],
-    ['الموجه الرئيسي', 'core router'],
-    ['الموجهات', 'routers'],
-    ['موجهات', 'routers'],
-    ['الموجه', 'router'],
-    ['موجه', 'router'],
-    ['الراوتر', 'router'],
-    ['راوتر', 'router'],
-    ['المبدلات', 'switches'],
-    ['مبدلات', 'switches'],
-    ['المبدله', 'switch'],
-    ['مبدله', 'switch'],
-    ['المبدل', 'switch'],
-    ['مبدل', 'switch'],
-    ['السويتش', 'switch'],
-    ['سويتش', 'switch'],
-    ['الخوادم', 'servers'],
-    ['خوادم', 'servers'],
-    ['الخادم', 'server'],
-    ['خادم', 'server'],
-    ['سيرفر', 'server'],
-    ['اجهزه الموظفين', 'pcs'],
-    ['الاجهزه', 'pcs'],
-    ['اجهزه', 'pcs'],
-    ['جهاز', 'pc'],
-    ['حاسوب محمول', 'laptop'],
-    ['لابتوب', 'laptop'],
-    ['حاسوب', 'pc'],
-    ['كمبيوتر', 'pc'],
-    ['جدار ناري', 'firewall'],
-    ['الفايروول', 'firewall'],
-    ['نقطه وصول', 'access point'],
-    ['اكسس بوينت', 'access point'],
-    ['هاتف ip', 'ip phone'],
-    ['هاتف', 'ip phone'],
-    ['طابعه', 'printer'],
-    ['سحابه', 'cloud'],
-    ['مودم', 'modem'],
-    ['واي فاي', 'wireless'],
-    ['لاسلكي', 'wireless'],
-    ['تابلت', 'tablet'],
-    ['جوال', 'smartphone'],
-    // security, services and the words that decide the security profile
-    ['خادم aaa', 'aaa server'],
-    ['خادم dhcp', 'dhcp server'],
-    ['خادم الويب', 'web server'],
-    ['خادم ويب', 'web server'],
-    ['خادم dns', 'dns server'],
-    ['خادم البريد', 'mail server'],
-    ['خادم ftp', 'ftp server'],
-    ['امن المنافذ', 'port security'],
-    ['تامين المنافذ', 'port security'],
-    ['امن الشبكه', 'network security'],
-    ['امن الشبكات', 'network security'],
-    ['حمايه الشبكه', 'network security'],
-    ['التنصت علي dhcp', 'dhcp snooping'],
-    ['تنصت dhcp', 'dhcp snooping'],
-    ['خوادم وهميه', 'rogue dhcp servers'],
-    ['خادم وهمي', 'rogue dhcp server'],
-    ['منفذ موثوق', 'trusted port'],
-    ['منافذ المستخدمين', 'user ports'],
-    ['قائمه التحكم بالوصول', 'access list'],
-    ['التحكم بالوصول', 'access control'],
-    ['تحكم بالوصول', 'access control'],
-    ['المصادقه المركزيه', 'centralized authentication'],
-    ['مصادقه مركزيه', 'centralized authentication'],
-    ['مصادقه', 'authentication'],
-    ['تاكاكس', 'tacacs'],
-    ['نفق ipsec', 'ipsec vpn'],
-    ['نفق', 'vpn tunnel'],
-    ['موقع الي موقع', 'site-to-site'],
-    ['بين الفرعين', 'site-to-site'],
-    ['مفتاح مشترك', 'pre-shared key'],
-    ['مفتاح اولي', 'pre-shared key'],
-    ['اسم المستخدم', 'username'],
-    ['كلمه المرور', 'password'],
-    ['كلمه السر', 'password'],
-    ['كلمه مرور', 'password'],
-    ['تشفير', 'encryption'],
-    ['اوقات الدوام', 'office hours'],
-    ['وقت الدوام', 'office hours'],
-    ['ساعات العمل', 'office hours'],
-    ['الدوام الرسمي', 'office hours'],
-    ['الفرع الرئيسي', 'headquarters'],
-    ['الفرع الفرعي', 'branch'],
-    ['فرع رئيسي', 'headquarters'],
-    ['فرع فرعي', 'branch'],
-    ['الشبكه العامه', 'wan'],
-    ['شبكه عامه', 'wan'],
-    ['وصله تسلسليه', 'serial link'],
-    ['تسلسليه', 'serial'],
-    ['تسلسلي', 'serial'],
-    ['قناع الشبكه', 'subnet mask'],
-    ['العنونه', 'addressing'],
-    ['بوابه افتراضيه', 'default gateway'],
-    ['بوابه', 'gateway'],
-    ['توجيه ديناميكي', 'dynamic routing'],
-    ['توجيه ثابت', 'static route'],
-    ['اوسبف', 'ospf'],
-    // English spellings the parser should accept as the same request
-    ['business hours', 'office hours'],
-    ['working hours', 'office hours'],
-    ['work hours', 'office hours'],
-    ['site to site', 'site-to-site'],
-    ['site2site', 'site-to-site'],
-    ['centralised authentication', 'centralized authentication'],
-    // Plain-English wordings that used to fall through the parser.
-    ['half a dozen', '6'],
-    ['half dozen', '6'],
-    ['a pair of', '2'],
-    ['a couple of', '2'],
-    ['point-to-point', 'serial link'],
-    ['point to point', 'serial link'],
-    // "guest" is kept in the bridge: the parser only needs the wireless
-    // keyword, while the sizing pack and the VLAN wording need to know the
-    // network is for guests (guest wifi → guest wireless).
-    ['guest wi-fi', 'guest wireless'],
-    ['guest wifi', 'guest wireless'],
-    ['guest wlan', 'guest wireless'],
-    ['trunk between the switches', 'switch trunk'],
-    ['trunk between switches', 'switch trunk'],
-    ['tacacs+', 'tacacs'],
-    // How people actually open a request. These are stripped rather than
-    // translated: what follows them is the lab, and the parser only ever read
-    // the numbers and device words.
-    ['can you make me', ''],
-    ['can you make', ''],
-    ['can you create', ''],
-    ['can you build me', ''],
-    ['can you build', ''],
-    ['could you make', ''],
-    ['could you build', ''],
-    ['please make', ''],
-    ['please build', ''],
-    ['please create', ''],
-    ['please set up', ''],
-    ['i want to make', ''],
-    ['i want to build', ''],
-    ['i want to create', ''],
-    ['i want a', ''],
-    ['i want', ''],
-    ['i need to make', ''],
-    ['i need to build', ''],
-    ['i need a', ''],
-    ['i need', ''],
-    ['i.d like to build', ''],
-    ['i.d like a', ''],
-    ['i would like to build', ''],
-    ['we need a', ''],
-    ['we need', ''],
-    ['give me a', ''],
-    ['give me', ''],
-    ['set me up', ''],
-    ['set up a', ''],
-    ['help me build', ''],
-    ['help me set up', ''],
-    ['make me a', ''],
-    ['build me a', ''],
-    ['create a', ''],
-    ['design a', ''],
-    ['plan a', ''],
-    ['plan me a', ''],
-    ['draw up a', ''],
-    ['i have a', ''],
-    ['we have a', ''],
-    ['there is a', ''],
-    ['there.s a', ''],
-    ['my lab', ''],
-    ['my network', ''],
-    ['the lab', ''],
-  ];
-
-  /// Numbers a brief may spell out instead of typing - English and Arabic.
-  static const Map<String, int> _numberWords = {
-    'one': 1,
-    'single': 1,
-    'two': 2,
-    'couple': 2,
-    'three': 3,
-    'four': 4,
-    'five': 5,
-    'six': 6,
-    'seven': 7,
-    'eight': 8,
-    'nine': 9,
-    'ten': 10,
-    'pair': 2,
-    'pairs': 2,
-    'dozen': 12,
-    'واحد': 1,
-    'اثنان': 2,
-    'اثنين': 2,
-    'اثنتين': 2,
-    'ثلاثه': 3,
-    'ثلاث': 3,
-    'اربعه': 4,
-    'اربع': 4,
-    'خمسه': 5,
-    'خمس': 5,
-    'سته': 6,
-    'ست': 6,
-    'سبعه': 7,
-    'سبع': 7,
-    'ثمانيه': 8,
-    'ثمان': 8,
-    'تسعه': 9,
-    'تسع': 9,
-    'عشره': 10,
-    'عشر': 10,
-  };
-
-  static bool _isAscii(String s) => s.codeUnits.every((c) => c < 128);
-
-  /// "two switches" -> "2 switches", "اثنين موجه" -> "2 router".
-  static String _bridgeNumberWords(String s) => s
-      .split(' ')
-      .map((token) {
-        final bare = token
-            .replaceAll(RegExp(r'[^A-Za-z0-9\u0600-\u06ff]'), '')
-            .toLowerCase();
-        final n = _numberWords[bare];
-        return n == null ? token : '$n';
-      })
-      .join(' ');
-
-  /// True when the brief ties this subnet to a site: "192.168.20.0/24 at the
-  /// branch", "... for HQ".
-  ///
-  /// Deliberately narrow: the site word has to follow the subnet within a
-  /// couple of words and sit in the same clause, so a subnet mentioned inside
-  /// a sentence about something else ("the 10.0.0.0/30 transit link between
-  /// the sites") is never claimed by a site it did not name.
-  static bool _subnetSitsAtASite(String text, String cidr) {
-    final at = text.indexOf(cidr);
-    if (at < 0) return false;
-    final from = at + cidr.length;
-    final tail = text
-        .substring(from, from + 40 > text.length ? text.length : from + 40)
-        .toLowerCase();
-    return RegExp(
-      r'^\s*(?:is\s+)?(?:at|for|in|on|to)\s+(?:the\s+|our\s+|its\s+)?'
-      r'(?:headquarters|hq|main|site|branch|office|building|floor|school|'
-      r'campus|department|location|store|shop)\b',
-    ).hasMatch(tail);
-  }
-
-  /// How many identical sites a brief describes - "2 branch offices",
-  /// "three floors", "2 sites" - or null when it describes one.  The digits
-  /// must sit directly on the site word ("2 offices", not "2 routers in the
-  /// office"), and a count of one is not an expansion.
-  static int? siteCount(String text) {
-    final m = RegExp(
-      r'(\d{1,3})\s*(?:separate\s+|identical\s+|different\s+|remote\s+|branch\s+|physical\s+)?'
-      r'(?:offices?|branches|sites?|floors?|buildings?|classrooms?|departments?|locations?)\b',
-      caseSensitive: false,
-    ).firstMatch(text);
-    if (m == null) return null;
-    final n = int.parse(m.group(1)!);
-    return (n < 2 || n > 25) ? null : n;
-  }
-
-  /// The device counts that belong to ONE site of a brief worded as
-  /// "... each with a router, a switch and 3 pcs".
-  ///
-  /// The clause runs from the cue to the end of the sentence or to a
-  /// 'plus/also' aside, so "plus one server at headquarters" keeps its own
-  /// global count instead of being multiplied with everything else.
-  /// Returns null when the brief has no per-site cue at all.
-  static Map<String, int>? perSiteCounts(String text) {
-    final cue = RegExp(
-      r'\b(?:each|per\s+(?:site|office|branch|floor|building|location|classroom|department))\b',
-      caseSensitive: false,
-    ).firstMatch(text);
-    if (cue == null) return null;
-    var clause = text.substring(cue.end);
-    final aside = RegExp(
-      r'[,;]?\s*(?:plus|as well as|in addition|additionally|also|and an additional)\b',
-      caseSensitive: false,
-    ).firstMatch(clause);
-    if (aside != null) clause = clause.substring(0, aside.start);
-    final stop = clause.indexOf(RegExp(r'[.;\n]'));
-    if (stop >= 0) clause = clause.substring(0, stop);
-    final lower = clause.toLowerCase();
-
-    /// "3 pcs" and a bare "a switch" both mean something per site.
-    int countOf(List<String> words) {
-      for (final w in words) {
-        final m = RegExp(
-          '(\\d{1,3})\\s*${RegExp.escape(w)}s?\\b',
-        ).firstMatch(lower);
-        if (m != null) return int.parse(m.group(1)!);
-      }
-      for (final w in words) {
-        if (RegExp('\\b${RegExp.escape(w)}\\b').hasMatch(lower)) return 1;
-      }
-      return 0;
-    }
-
-    final counts = <String, int>{'router': countOf(['router', 'gateway'])};
-    counts['switch'] = countOf(['switch']);
-    counts['pc'] = countOf(['pc', 'workstation', 'desktop']);
-    counts['server'] = countOf(['server']);
-    for (final kind in deviceKinds) {
-      if (const ['router', 'switch', 'pc', 'server'].contains(kind.type)) {
-        continue;
-      }
-      counts[kind.type] = countOf(kind.keywords);
-    }
-    return counts;
-  }
-
-  /// Rewrite a brief into the wording this parser understands.
-  static String bridgeBrief(String raw) {
-    var s = _bridgeMasks(_asciiDigits(_foldArabic(raw)));
-    final entries = [..._phraseBridge]
-      ..sort((a, b) => b[0].length.compareTo(a[0].length));
-    for (final e in entries) {
-      if (_isAscii(e[0])) {
-        // Whole words only. These keys are matched case-insensitively without
-        // boundaries, so a filler phrase for the standalone article "a" -
-        // 'set up a' - also matched the first eight characters of any word
-        // starting with a: "set up AAA" became "AA", and the AAA role word
-        // vanished from the brief before the roles were read. A key that
-        // starts and ends on a word character must not match inside one.
-        final key = e[0];
-        final pattern = RegExp(
-          '${RegExp.escape(key[0]) == key[0] ? r'\b' : ''}'
-          '${RegExp.escape(key)}'
-          '${RegExp.escape(key[key.length - 1]) == key[key.length - 1] ? r'\b' : ''}',
-          caseSensitive: false,
-        );
-        s = s.replaceAll(pattern, e[1]);
-      } else if (s.contains(e[0])) {
-        s = s.replaceAll(e[0], e[1]);
-      }
-    }
-    return _bridgeNumberWords(s).replaceAll(RegExp(r'[ \t]+'), ' ');
-  }
-
-  /// Does this brief name a device kind (or an explicit device label like
-  /// R1/PC3) anywhere? Derived from [deviceKinds] so it cannot drift from the
-  /// parser's own vocabulary.
-  ///
-  /// Used to tell "a new lab that names no devices" (where the parser's
-  /// router+switch fallback is right) apart from "a short follow-up like
-  /// 'ok build the packet tracer file'" - where inventing a default lab would
-  /// silently REPLACE the plan built from the user's real request.
-  static final RegExp namesAnyDevice = RegExp(
-    '(?:\\b(?:'
-        '${deviceKinds
-            .expand((k) => k.keywords)
-            // Plural-tolerant: "2 routers" must count, and \brouter\b alone
-            // would not match it.
-            .map((k) => '${RegExp.escape(k)}(?:es|s)?')
-            .join('|')}'
-        ')\\b)',
-  );
-
-  /// True when [lower] mentions a device kind or a label like R1 / SW2 /
-  /// PC3 / SRV1. Pure; see [namesAnyDevice].
-  static bool namesAnyDeviceIn(String lower) =>
-      namesAnyDevice.hasMatch(lower) ||
-      RegExp(r'\b(?:R|SW|PC|SRV)\d{1,2}\b').hasMatch(lower);
-
-  /// A server label whose name says which service it runs: DHCP1, DNS1,
-  /// WEB1, AAA1, FTP1, MAIL1, NTP1 ...
   static final RegExp roleServerLabel = RegExp(
     r'\b(?:DHCP|DNS|WEB|HTTP|HTTPS|AAA|TACACS|RADIUS|FTP|MAIL|EMAIL|SMTP|'
     r'POP3|NTP|TFTP|SNMP|SYSLOG|PRP|VM|IOT|PRINTER)\d{1,2}\b',
@@ -2252,6 +1717,10 @@ class NetworkIntent {
   ///   the same full brief re-plans it instead of doubling every count.
   /// * **a change that names no device** - "use OSPF instead" - is applied to
   ///   the standing plan (see [applyFollowUpChange]).
+  /// * **a count correction** - "actually 8 pcs", "no wait, 8" - replaces the
+  ///   corrected kinds' counts on the standing lab and keeps every device,
+  ///   site, service and rule the correction did not name (see
+  ///   [_mergeCountCorrection]).
   /// * **a new or extended request** that names devices - "make it 2 routers
   ///   and 4 PCs" - re-plans, because that is a new lab, not a nudge.
   /// * **anything else** - "ok build the file" - keeps the standing plan: the
@@ -2281,6 +1750,22 @@ class NetworkIntent {
     // FLOORS, not exact counts: the standing lab grows to meet them and is
     // never shrunk back to the stated minimums (a discussed 2-site network
     // once collapsed to "1 router, 1 switch, 1 server" this way).
+    // A count correction ("actually 8 pcs", "no wait, 8") restates a number
+    // the conversation already stated, so it is read against the standing
+    // lab rather than on its own. It goes BEFORE the growth reading: "no
+    // wait, actually more than 8 pcs" corrects an earlier floor instead of
+    // being absorbed by one that can only grow.
+    if (_readsAsCountCorrection(brief)) {
+      final corrected = _mergeCountCorrection(
+        previous: previous,
+        previousBrief: previousBrief,
+        brief: brief,
+        project: project,
+      );
+      if (corrected != null) return corrected;
+      // Not confidently a correction of this lab - fall through to the
+      // growth and naming readings below rather than guess.
+    }
     if (_readsAsGrowth(brief)) {
       final merged = _mergeFloor(
         previous: previous,
@@ -2645,6 +2130,205 @@ class NetworkIntent {
     // never make the lab smaller than it already was.
     if (merged.nodes.length < previous.nodes.length) return null;
     return (plan: merged, brief: combined);
+  }
+
+  /// Wording that marks a number as a CORRECTION of something the
+  /// conversation already counted: "actually 8 pcs", "no wait, 8", "rather
+  /// 12 PCs". "rather than" is left out on purpose - "8 PCs rather than 6"
+  /// is a comparison whose SECOND number is the rejected one, and reading
+  /// the cue there would correct the lab to the count the user just
+  /// withdrew.
+  static final RegExp _countCorrectionCue = RegExp(
+    r'\b(?:actually|rather(?!\s+than)|no\s+wait|i\s+mean|correction)\b',
+    caseSensitive: false,
+  );
+
+  /// A correction cue followed directly by a bare count - "actually 8",
+  /// "no wait, 8" - with no device word of its own. An address must not
+  /// read as one ("actually 192.168.1.0/24"), so a number that continues
+  /// into dotted or slashed form is refused.
+  static final RegExp _bareCountCorrection = RegExp(
+    r'\b(?:actually|rather(?!\s+than)|no\s+wait|i\s+mean|correction)'
+    r'\s*,?\s*(\d{1,3})\b(?!\s*[./]\d)',
+    caseSensitive: false,
+  );
+
+  /// "2 more PCs" is an addition, not a correction - but "more than 8 PCs"
+  /// restates a bound, and a cue in front of it ("no wait, actually more
+  /// than 8 pcs") makes the new bound a correction of the old one.
+  static final RegExp _additiveCountWording = RegExp(
+    r'\b(?:extra|additional|further)\b|\bmore\b(?!\s+than)',
+    caseSensitive: false,
+  );
+
+  /// True when [brief] is a count correction of the standing lab: a
+  /// correction cue plus either a bare count or a counted device kind, and
+  /// neither addition wording (which has its own reading) nor an additive
+  /// count ("2 more PCs", which adds rather than replaces).
+  ///
+  /// A counted kind is only corrected by a cue IN FRONT of it: "more than 8
+  /// pcs, actually" trails its count as an afterthought about the bound,
+  /// and correcting the lab down to the count the cue follows would shrink
+  /// the lab on a sentence that never asked for that.
+  static bool _readsAsCountCorrection(String brief) {
+    final lower = brief.toLowerCase();
+    final cue = _countCorrectionCue.firstMatch(lower);
+    if (cue == null) return false;
+    if (_readsAsAddition(brief)) return false;
+    if (_additiveCountWording.hasMatch(lower)) return false;
+    if (_bareCountCorrection.hasMatch(lower)) return true;
+    return _deviceCountWording
+        .allMatches(lower)
+        .any((m) => m.start > cue.start);
+  }
+
+  /// The original request and a CORRECTION of one of its counts ("actually
+  /// 8 pcs", "no wait, 8"), read as one brief whose corrected kinds land on
+  /// the new numbers while everything the correction did not name - devices,
+  /// sites, services, addressing, security - is re-read from the original
+  /// words exactly as it stands.
+  ///
+  /// Without this branch both natural correction shapes failed on a
+  /// standing lab. A bare count ("actually 8") named no device, so no
+  /// reading claimed it and the turn was dropped in silence while the
+  /// understood card still reported a correction. A count with a device
+  /// word ("actually 8 pcs") re-planned from the fragment alone, which
+  /// replaced the whole lab with the fragment's devices: a 13-device
+  /// network became eight orphan PCs with no router to hang them on.
+  ///
+  /// The correction is instead appended to the standing brief as a cued
+  /// tally ("..., actually 8 pcs"), the same trailing pin [_mergeAddition]
+  /// uses: the parser's own correction rule replaces what the corrected
+  /// kind counted before and touches no other kind, and the re-read keeps
+  /// the roles, sites, addressing, routing and security written in the
+  /// original words.
+  ///
+  /// The re-read is checked before it is returned: every kind must land on
+  /// its expected count - the corrected kinds on the new numbers, every
+  /// other kind on the count the standing lab already had - and the re-read
+  /// must invent no kind of its own. A re-read that loses or invents a
+  /// device (a site structure, a kind the tally cannot name) is discarded
+  /// and the historical reading is kept, so this branch can only change the
+  /// plan the user asked for, never silently reshape it.
+  static ({NetworkIntent plan, String brief})? _mergeCountCorrection({
+    required NetworkIntent previous,
+    required String previousBrief,
+    required String brief,
+    required String project,
+  }) {
+    final base = previousBrief.trim();
+    if (base.isEmpty) return null;
+    final lower = brief.toLowerCase();
+    final stated = BriefSlotPipeline.extractCounts(
+      lower,
+      brief,
+      // The tiny-office default would grow a router and a switch out of a
+      // correction that names none - the standing lab already has its own.
+      tinyOfficeDefault: false,
+    );
+    final corrected = <String, int>{
+      for (final entry in stated.entries)
+        if (entry.value > 0) entry.key: entry.value,
+    };
+    // A bare count ("actually 8") names no kind of its own: it corrects the
+    // kind the conversation counted last - the same recency rule the
+    // elliptical in-brief correction ("..., actually 8") resolves by.
+    if (corrected.isEmpty) {
+      final kind = BriefSlotPipeline.lastCountedKind(base.toLowerCase());
+      final bare = _bareCountCorrection.firstMatch(lower);
+      if (kind == null || bare == null) return null;
+      corrected[kind] = int.parse(bare.group(1)!);
+    }
+    final tally = <String>[];
+    final order = [
+      ..._correctionTallyKinds,
+      ...corrected.keys.where(
+        (kind) => !_correctionTallyKinds.contains(kind),
+      ),
+    ];
+    for (final kind in order) {
+      final n = corrected[kind];
+      if (n == null || n <= 0) continue;
+      tally.add('$n ${_correctionKindNoun(kind)}');
+    }
+    if (tally.isEmpty) return null;
+    // The fragment itself rides along (a correction may carry services or
+    // addressing of its own - "actually 8 pcs with a web server"), and the
+    // tally is written after it so the corrected counts are the LAST cued
+    // numbers the re-read sees. The tally joins its kinds without "and":
+    // "and" is a clause boundary, and a kind listed in a new clause would
+    // lose the correction cue sitting in front of the tally.
+    final stripTail = RegExp(r'[\s,.;:]+$');
+    final baseClean = base.replaceAll(stripTail, '');
+    final briefClean = brief.trim().replaceAll(stripTail, '');
+    final combined =
+        '$baseClean, $briefClean, actually ${tally.join(' ')}'.trim();
+    final NetworkIntent merged;
+    try {
+      merged = parseSimple(
+        project.trim().isEmpty ? previous.projectName : project,
+        combined,
+      );
+    } catch (_) {
+      return null;
+    }
+    final expected = <String, int>{};
+    for (final node in previous.nodes) {
+      expected[node.type] = (expected[node.type] ?? 0) + 1;
+    }
+    expected.addAll(corrected);
+    int countOf(NetworkIntent p, String type) =>
+        p.nodes.where((n) => n.type == type).length;
+    for (final entry in expected.entries) {
+      if (countOf(merged, entry.key) != entry.value) return null;
+    }
+    for (final node in merged.nodes) {
+      if (!expected.containsKey(node.type)) return null;
+    }
+    return (plan: merged, brief: combined);
+  }
+
+  /// The kind order the correction tally is written in, so the same
+  /// correction always produces the same brief.
+  static const List<String> _correctionTallyKinds = [
+    'router',
+    'switch',
+    'pc',
+    'server',
+    'laptop',
+    'phone',
+    'printer',
+    'tablet',
+    'firewall',
+    'wireless',
+    'wireless-router',
+    'cloud',
+    'modem',
+  ];
+
+  /// The plural noun a correction tally writes for a device kind, taken
+  /// from the kind's own keyword table where possible so the tally says a
+  /// phrase the parser counts back ("8 wireless access points" is eight
+  /// [DeviceKind]s of type `wireless`).
+  static String _correctionKindNoun(String type) {
+    const core = <String, String>{
+      'router': 'routers',
+      'switch': 'switches',
+      'pc': 'pcs',
+      'server': 'servers',
+    };
+    final known = core[type];
+    if (known != null) return known;
+    for (final kind in deviceKinds) {
+      if (kind.type != type || kind.keywords.isEmpty) continue;
+      final parts = kind.keywords.first.split(' ');
+      final last = parts.last;
+      const esEndings = ['ch', 'sh', 'ss', 's', 'x', 'z'];
+      parts[parts.length - 1] =
+          esEndings.any(last.endsWith) ? '${last}es' : '${last}s';
+      return parts.join(' ');
+    }
+    return type.endsWith('s') ? type : '${type}s';
   }
 
   /// What changed between two plans, in the user's own terms - "+1 switch,
@@ -3386,58 +3070,28 @@ class NetworkIntent {
     );
   }
 
-  static NetworkIntent parseSimple(String projectName, String rawText) {
-    final bridged = bridgeBrief(rawText);
-    // Learned phrasing: when this exact wording was clarified before, the
-    // resolved brief replays - the parser reads it as if the user had typed
-    // it. Exactly one hop: a replay is never looked up again, so the index
-    // can never loop. A brief that already states device counts is skipped
-    // inside lookupMatch() and stays as written.
-    final replay = PhrasingMemoryService.lookupMatch(bridged);
-    if (replay != null &&
-        replay.rewrite.trim().isNotEmpty &&
-        replay.rewrite != bridged) {
-      if (replay.exact) {
-        return _parseBridged(projectName, bridgeBrief(replay.rewrite), rawText);
-      }
-      // A NEAR TWIN is not the same request: the wording differs exactly
-      // where the user said something new. The remembered resolution is
-      // read FIRST (the parser reads the first count per kind), and the
-      // user's own words stay whole after it, so any device, service, site,
-      // address, model or constraint named in this message survives the
-      // match instead of being replaced by what was learned earlier.
-      final merged = '${replay.rewrite} $bridged';
-      final intent = _parseBridged(projectName, bridgeBrief(merged), rawText);
-      final assumptions = [
-        ...intent.assumptions,
-        'Matched the phrasing "${replay.key}" remembered from an earlier '
-            'conversation; it filled the details this message did not '
-            'name. Everything stated here is kept as written.',
-      ];
-      if (replay.score >= 0.85) {
-        return intent.copyWith(assumptions: assumptions);
-      }
-      // The match is close but not certain: say so and ask, rather than
-      // letting a fuzzy memory quietly decide the plan. The merged plan is
-      // still offered so the user is not left waiting.
-      return intent.copyWith(
-        assumptions: assumptions,
-        questions: [
-          ...intent.questions,
-          'I matched this to an earlier phrasing ("${replay.key}"), but not '
-              'with certainty - confirm it, or give the full wording once, '
-              'and I will re-plan it exactly.',
-        ],
-        confidence: (intent.confidence - 0.1).clamp(0.0, 1.0),
-      );
-    }
-    return _parseBridged(projectName, bridged, rawText);
-  }
+
+  // Thin delegates to the extracted reader. Every caller in the app says
+  // `NetworkIntent.bridgeBrief(...)`; Dart has no way to re-export a static
+  // member, so these one-liners are what keep the extraction invisible. They
+  // are the second half of the seam: the behaviour is in parser.dart.
+  static String bridgeBrief(String raw) => brief_reader.bridgeBrief(raw);
+  static int? siteCount(String text) => brief_reader.siteCount(text);
+  static Map<String, int>? perSiteCounts(String text) =>
+      brief_reader.perSiteCounts(text);
+  static bool namesAnyDeviceIn(String lower) =>
+      brief_reader.namesAnyDeviceIn(lower);
+
+  /// The brief reader lives in services/nlu/parser.dart. This stays as the
+  /// name every caller already uses, so the extraction moved code without
+  /// moving a single call site.
+  static NetworkIntent parseSimple(String projectName, String rawText) =>
+      brief_reader.parseBrief(projectName, rawText);
 
   /// Sizing pass + parse over an already-bridged brief. The phrasing index
   /// is consulted once, at the top of [parseSimple] - never here - so a
   /// replayed rewrite cannot replay itself.
-  static NetworkIntent _parseBridged(
+  static NetworkIntent parseBridged(
     String projectName,
     String bridged,
     String rawText,
@@ -4318,7 +3972,7 @@ class NetworkIntent {
     if (siteRouters.isNotEmpty) {
       final qualified = [
         for (final c in statedLan)
-          if (_subnetSitsAtASite(text, c)) c,
+          if (brief_reader.subnetSitsAtASite(text, c)) c,
       ];
       for (var i = 0; i < qualified.length && i < siteRouters.length; i++) {
         siteLanBlock[i] = qualified[i];
@@ -5764,18 +5418,6 @@ class NetworkIntent {
   ];
 
   /// The plural each device kind is spoken with in notes and questions.
-  static const Map<String, String> _kindPlurals = {
-    'router': 'routers',
-    'switch': 'switches',
-    'pc': 'PCs',
-    'server': 'servers',
-    'phone': 'phones',
-    'printer': 'printers',
-    'laptop': 'laptops',
-    'firewall': 'firewalls',
-    'access point': 'access points',
-    'ap': 'access points',
-  };
 
   /// The singular each device kind is spoken with when the count is one.
   static String _kindSingular(String kind) {
@@ -5792,7 +5434,7 @@ class NetworkIntent {
   /// The kind a word names ("switches" -> switch, "aps" -> ap), or null.
   static String? kindForWord(String word) {
     final w = word.trim().toLowerCase().replaceAll(RegExp(r'[.,;!?]+$'), '');
-    for (final e in _kindPlurals.entries) {
+    for (final e in kindPlurals.entries) {
       if (w == e.key || w == e.value.toLowerCase()) return e.key;
     }
     return w == 'aps' ? 'ap' : null;
@@ -5822,7 +5464,7 @@ class NetworkIntent {
     ).allMatches(lower)) {
       final kind = _kindAfterCueWord(lower, m.end, m.group(1)!);
       if (kind == null) continue;
-      final label = _kindPlurals[kind] ?? kind;
+      final label = kindPlurals[kind] ?? kind;
       final question = 'How many $label do you want? Give a number (or a '
           'count per site) and I will plan them in.';
       if (!out.contains(question)) out.add(question);
@@ -5870,7 +5512,7 @@ class NetworkIntent {
       final n = int.parse(m.group(1)!);
       final kind = _kindAfterCueWord(lower, m.end, m.group(2)!);
       if (kind == null) continue;
-      final label = n == 1 ? _kindSingular(kind) : (_kindPlurals[kind] ?? kind);
+      final label = n == 1 ? _kindSingular(kind) : (kindPlurals[kind] ?? kind);
       final note = 'You said "more than $n $label" - the plan uses '
           '${n + 1} as the minimum that satisfies it. Give the exact count '
           'to pin it.';

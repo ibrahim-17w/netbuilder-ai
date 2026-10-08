@@ -27,9 +27,18 @@ class MdBlock {
 }
 
 /// A small, deliberate subset of Markdown: the things a network answer is
-/// actually made of - headings, bullets, fenced code, pipe tables, **bold**
-/// and `inline code`. Anything else stays literal, which is better than
-/// mangling it.
+/// actually made of - headings, bullets, fenced code, pipe tables, **bold**,
+/// *italic*, `inline code` and [label](url) links. Anything else stays
+/// literal, which is better than mangling it.
+///
+/// Precedence is fenced code > inline code > bold > italic: the inline scan
+/// is positional and a code span that opens earlier consumes whatever
+/// markdown-looking text follows inside it. There is deliberately no
+/// `_underscore_` italic - between word characters (snake_case, device
+/// names like `_token_`) an underscore is just text, and a rule that needs
+/// boundary exceptions to stay literal is worse than no rule. Links do not
+/// open anything: tapping one copies the URL, because everything in a
+/// network answer ends up pasted somewhere.
 class ChatMarkdown {
   const ChatMarkdown._();
 
@@ -139,22 +148,113 @@ class ChatMarkdown {
     return blocks;
   }
 
-  /// Inline spans for `**bold**` and `` `code` ``.
-  static List<InlineSpan> inline(String text, TextStyle base) {
+  /// One positional scan over every inline construct. The alternatives are
+  /// ordered so that when two could start at the same character, the richer
+  /// one wins: a link consumes its own label and URL whole, bold is tried
+  /// before italic (so `**x**` is never read as an empty italic followed by
+  /// text), and a code span is matched even where bold would be, because a
+  /// backtick and an asterisk can never start at the same character.
+  static final _inlinePattern = RegExp(
+    r'\[([^\]]+)\]\(([^)\s]+)\)'
+    r'|\*\*(.+?)\*\*'
+    r'|\*([^*\s](?:[^*]*[^*\s])?)\*'
+    r'|`([^`]+)`',
+  );
+
+  /// A bare URL running right up to a match - `https://x.com/a*b*` - which
+  /// must stay literal: those asterisks are part of the address, not
+  /// emphasis. The link syntax protects its own URL by consuming it; this
+  /// catches the ones that are plain text, by asking whether the address
+  /// runs unbroken up to the match. Angle brackets are excluded from the
+  /// address run, so a `>` visibly closes it and what follows is free to be
+  /// emphasis.
+  static final _bareUrlTail = RegExp(r'(?:https?|ftp)://[^\s<>]*$');
+
+  /// Inline spans for `**bold**`, `*italic*`, `` `code` `` and
+  /// `[label](url)`. [linkColor] tints and underlines the link (the theme
+  /// primary, handed in by the caller). Matches inside an earlier code span,
+  /// inside a link's URL, or inside a bare URL are never rendered as
+  /// anything else - either the scan has already consumed them or the
+  /// bare-URL guard keeps them verbatim.
+  ///
+  /// [onFilePathTap], when given, makes an inline-code span that reads as a
+  /// `.pkt` file path tappable - the one place a chat answer is allowed to
+  /// open something, because the chat that built the file is the most direct
+  /// way to look at it.
+  static List<InlineSpan> inline(
+    String text,
+    TextStyle base, {
+    Color? linkColor,
+    void Function(String path)? onFilePathTap,
+  }) {
     final spans = <InlineSpan>[];
-    final pattern = RegExp(r'\*\*(.+?)\*\*|`([^`]+)`');
+    final linkStyle = base.copyWith(
+      color: linkColor,
+      decoration: TextDecoration.underline,
+      decorationColor: linkColor,
+    );
     var cursor = 0;
-    for (final match in pattern.allMatches(text)) {
+    for (final match in _inlinePattern.allMatches(text)) {
+      final label = match.group(1);
+      final url = match.group(2);
+      final bold = match.group(3);
+      final italic = match.group(4);
+      final code = match.group(5);
+      // Not a link, and the UNCONSUMED text before it still reads as a bare
+      // URL - `https://x.com/a*b*` - so the match sits inside the address.
+      // Checking only the run since the last accepted match is what lets a
+      // closed link protect its URL without smothering what comes after it:
+      // the URL was consumed whole, so the emphasis that abuts its closing
+      // paren is real emphasis again. Emitting nothing here keeps the match
+      // literal - the plain run between [cursor] and the next accepted match
+      // carries the characters through untouched.
+      if (url == null &&
+          _bareUrlTail.hasMatch(text.substring(cursor, match.start))) {
+        continue;
+      }
       if (match.start > cursor) {
         spans.add(TextSpan(text: text.substring(cursor, match.start)));
       }
-      final bold = match.group(1);
-      final code = match.group(2);
-      if (bold != null) {
+      if (label != null && url != null) {
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: ChatLinkSpan(label: label, url: url, style: linkStyle),
+          ),
+        );
+      } else if (bold != null) {
         spans.add(TextSpan(
           text: bold,
           style: const TextStyle(fontWeight: FontWeight.w700),
         ));
+      } else if (italic != null) {
+        spans.add(TextSpan(
+          text: italic,
+          style: const TextStyle(fontStyle: FontStyle.italic),
+        ));
+      } else if (code != null && onFilePathTap != null && isPktFilePath(code)) {
+        // A built file's path is a control, not just text: the chat that
+        // wrote it is the direct way to look at it. Rendered as a widget so
+        // the tap is owned (and disposed) here, like [ChatLinkSpan].
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: ChatFilePathSpan(
+              path: code,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                backgroundColor: base.color?.withValues(alpha: 0.10),
+                color: linkColor,
+                decoration: TextDecoration.underline,
+                decorationStyle: TextDecorationStyle.dotted,
+                decorationColor: linkColor,
+              ),
+              onTap: () => onFilePathTap(code),
+            ),
+          ),
+        );
       } else if (code != null) {
         spans.add(TextSpan(
           text: code,
@@ -171,6 +271,51 @@ class ChatMarkdown {
     }
     return spans;
   }
+
+  /// Whether an inline-code span reads as a `.pkt` file path worth tapping.
+  ///
+  /// Deliberately narrow: it needs a path separator, so a bare backup name
+  /// like `lab-20261007.pkt` inside prose stays inert text (the build card's
+  /// own buttons own those), and it needs to end in `.pkt` so subnet tables
+  /// in code style never become buttons.
+  static bool isPktFilePath(String code) {
+    final t = code.trim();
+    if (t.length < 6) return false;
+    if (!t.toLowerCase().endsWith('.pkt')) return false;
+    return t.contains('/') || t.contains('\\');
+  }
+}
+
+/// One tappable `` `C:\...\lab.pkt` `` inline-code span.
+///
+/// What the tap DOES is decided by the chat screen (open in Packet Tracer
+/// when it is installed, the built-in viewer when it is not); this widget
+/// only owns the gesture and says so to a screen reader. Public so tests can
+/// find it the way they find [ChatLinkSpan].
+class ChatFilePathSpan extends StatelessWidget {
+  final String path;
+  final TextStyle style;
+  final VoidCallback onTap;
+
+  const ChatFilePathSpan({
+    super.key,
+    required this.path,
+    required this.style,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Open $path',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Text(path, style: style),
+      ),
+    );
+  }
 }
 
 /// Renders a chat answer: headings, bullets, fenced code, pipe tables.
@@ -178,7 +323,16 @@ class ChatMarkdownView extends StatelessWidget {
   final String source;
   final TextStyle? style;
 
-  const ChatMarkdownView({super.key, required this.source, this.style});
+  /// Called when a `.pkt` file path in inline code is tapped (see
+  /// [ChatMarkdown.isPktFilePath]). Null leaves paths as inert styled text.
+  final void Function(String path)? onFilePathTap;
+
+  const ChatMarkdownView({
+    super.key,
+    required this.source,
+    this.style,
+    this.onFilePathTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -200,6 +354,10 @@ class ChatMarkdownView extends StatelessWidget {
   }
 
   Widget _block(BuildContext context, MdBlock block, TextStyle base) {
+    // Links take the theme primary and an underline, so a link is a link in
+    // a heading, a bullet, a table cell and a paragraph alike.
+    final linkColor = Theme.of(context).colorScheme.primary;
+    final onFilePathTap = this.onFilePathTap;
     switch (block.kind) {
       case MdKind.heading:
         final size = switch (block.level) {
@@ -210,7 +368,7 @@ class ChatMarkdownView extends StatelessWidget {
         };
         return Text.rich(
           TextSpan(
-            children: ChatMarkdown.inline(block.text, base),
+            children: ChatMarkdown.inline(block.text, base, linkColor: linkColor, onFilePathTap: onFilePathTap),
             style: base.copyWith(
               fontSize: (base.fontSize ?? 14) * size,
               fontWeight: FontWeight.w700,
@@ -225,7 +383,14 @@ class ChatMarkdownView extends StatelessWidget {
             Text('\u2022  ', style: base),
             Expanded(
               child: Text.rich(
-                TextSpan(children: ChatMarkdown.inline(block.text, base)),
+                TextSpan(
+                  children: ChatMarkdown.inline(
+                    block.text,
+                    base,
+                    linkColor: linkColor,
+                    onFilePathTap: onFilePathTap,
+                  ),
+                ),
                 style: base,
               ),
             ),
@@ -255,7 +420,12 @@ class ChatMarkdownView extends StatelessWidget {
                       padding: const EdgeInsets.all(6),
                       child: Text.rich(
                         TextSpan(
-                          children: ChatMarkdown.inline(cell, base),
+                          children: ChatMarkdown.inline(
+                            cell,
+                            base,
+                            linkColor: linkColor,
+                            onFilePathTap: onFilePathTap,
+                          ),
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         style: base,
@@ -270,7 +440,14 @@ class ChatMarkdownView extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.all(6),
                         child: Text.rich(
-                          TextSpan(children: ChatMarkdown.inline(cell, base)),
+                          TextSpan(
+                            children: ChatMarkdown.inline(
+                              cell,
+                              base,
+                              linkColor: linkColor,
+                              onFilePathTap: onFilePathTap,
+                            ),
+                          ),
                           style: base,
                         ),
                       ),
@@ -282,7 +459,14 @@ class ChatMarkdownView extends StatelessWidget {
 
       case MdKind.paragraph:
         return Text.rich(
-          TextSpan(children: ChatMarkdown.inline(block.text, base)),
+          TextSpan(
+            children: ChatMarkdown.inline(
+              block.text,
+              base,
+              linkColor: linkColor,
+              onFilePathTap: onFilePathTap,
+            ),
+          ),
           style: base,
         );
     }
@@ -369,6 +553,45 @@ class _CodeBlock extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// One `[label](url)`, as a real widget so the tap can be owned properly.
+///
+/// Tapping copies the URL and says so - it does not open anything. A chat
+/// about networks ends with commands pasted into devices, and this file
+/// already made that the contract for code blocks; a link that yanked the
+/// user out of the app mid-answer would be the one control here that
+/// leaves it. The GestureDetector lives with the widget it belongs to, so
+/// there is no recognizer created per build and left undisposed.
+///
+/// Public (rather than `_LinkSpan`) so tests can read [label] and [style]
+/// off the rendered span without digging into its widget tree.
+class ChatLinkSpan extends StatelessWidget {
+  final String label;
+  final String url;
+  final TextStyle style;
+
+  const ChatLinkSpan({
+    super.key,
+    required this.label,
+    required this.url,
+    required this.style,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    void copyUrl() => copyText(context, url, message: 'Link copied');
+    return Semantics(
+      link: true,
+      button: true,
+      label: '$label (copies the link address)',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: copyUrl,
+        child: Text(label, style: style),
       ),
     );
   }

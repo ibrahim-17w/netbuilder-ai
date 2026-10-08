@@ -39,6 +39,47 @@ def default_path() -> str:
                         "pkt_learning.json")
 
 
+# A finding's own words carry this network's names: "R1:g0/0 is shut down".
+# Learning from that verbatim would make every later network look different
+# from the first one, so the device, interface, address and model words are
+# replaced by placeholders and only the SHAPE of the finding survives.
+_NAMEY = re.compile(
+    r"\b\d{1,3}(?:\.\d{1,3}){3}(?:/\d+)?"
+    r"|\b[A-Za-z][A-Za-z\-]*\d[\w/\.\-]*"
+    r"|\b\d+(\.\d+)*/\d+\b")
+
+
+def finding_class(finding) -> str:
+    """A stable name for the KIND of finding, stripped of this network.
+
+    Two saves of the same lab that both report "the interface is shut down"
+    produce the same class, so a repair verified on one is recognised on the
+    other. Anything unrecognisable keeps its own text - a class is never
+    guessed into shape.
+    """
+    if not isinstance(finding, dict):
+        return ""
+    text = str(finding.get("title") or finding.get("text")
+               or finding.get("detail") or "").strip()
+    if not text:
+        return ""
+    shape = _NAMEY.sub("*", text)
+    shape = re.sub(r"\s+", " ", shape).strip().lower()
+    severity = str(finding.get("severity") or "").strip().lower()
+    return f"{severity}|{shape}" if severity else shape
+
+
+def _commands_of(fix) -> list:
+    if not isinstance(fix, dict):
+        return []
+    out = []
+    for line in (fix.get("fix_cli") or fix.get("commands") or []):
+        text = str(line).strip()
+        if text:
+            out.append(text[:160])
+    return out[:12]
+
+
 def parse_warnings(warnings):
     """Classify the builder's warnings WITHOUT guessing.
 
@@ -194,6 +235,8 @@ class PktLearningStore:
             projects = self._data.get("projects", {})
             total = sum(int(r.get("generations", 0))
                         for r in projects.values())
+            repairs = [row for r in projects.values()
+                       for row in (r.get("repairs") or {}).values()]
             return {
                 "schema": SCHEMA,
                 "generations": total,
@@ -203,9 +246,110 @@ class PktLearningStore:
                     for k in r.get("substitutions", {})}),
                 "remaps": sorted({
                     k for r in projects.values() for k in r.get("remaps", {})}),
+                "verifiedRepairs": len(repairs),
                 "detail": projects,
                 "path": self.path,
             }
+
+    def record_repair(self, project: str, verdict: dict, audit_before=None,
+                      fixes=None) -> dict:
+        """Remember a REPAIR THAT WAS PROVEN TO WORK, and nothing else.
+
+        The only evidence accepted is [verify_repair]'s own ``verified``
+        verdict, which means a re-audit of the repaired save no longer reports
+        the finding. Anything weaker - applied, approved, proposed, or a fix
+        whose finding survived the re-audit - is deliberately not learned from,
+        because a store that remembers failed repairs as if they were lessons
+        will, on its next confident reuse, repeat them.
+
+        What is kept is deliberately plain: the finding's CLASS (this
+        network's device and interface names removed), the commands that
+        cleared it, and how many times that class has been cleared here. That
+        is what lets the next audit of the same lab say "this exact class was
+        fixed successfully on this project before" without anyone having to
+        remember it.
+        """
+        key = (project or "default").strip() or "default"
+        if not isinstance(verdict, dict) or verdict.get("verified") is not True:
+            return {"recorded": 0, "reason": "repair was not verified",
+                    "verdict": (verdict or {}).get("verdict")}
+        wanted = {str(f.get("id") or f.get("findingId") or "")
+                  for f in (fixes or []) if isinstance(f, dict)}
+        wanted.discard("")
+        wanted.discard("None")
+        before = {}
+        if isinstance(audit_before, dict):
+            for device in audit_before.get("devices") or []:
+                for finding in (device.get("findings") or []):
+                    if isinstance(finding, dict) and finding.get("id"):
+                        before[str(finding["id"])] = {
+                            "device": device.get("name"),
+                            "severity": finding.get("severity"),
+                            "title": finding.get("title")
+                            or finding.get("text") or finding.get("detail"),
+                        }
+        entries = []
+        for row in verdict.get("resolved") or []:
+            fid = str(row.get("id") or "")
+            if wanted and fid not in wanted:
+                continue
+            entries.append(dict(row, **before.get(fid, {})))
+        if not entries:
+            return {"recorded": 0, "reason": "no resolved finding named",
+                    "verdict": verdict.get("verdict")}
+        commands: list[str] = []
+        for fix in fixes or []:
+            if isinstance(fix, dict):
+                commands.extend(_commands_of(fix))
+        if not commands:
+            return {"recorded": 0, "reason": "the fix named no commands",
+                    "verdict": verdict.get("verdict")}
+        with self._lock:
+            row = self._data["projects"].setdefault(key, {
+                "generations": 0, "substitutions": {}, "remaps": {},
+                "warnings": {}, "firstSeen": _now(), "last": {}, "repairs": {}})
+            bucket = row.setdefault("repairs", {})
+            learned = []
+            for entry in entries:
+                klass = finding_class(entry)
+                if not klass:
+                    continue
+                item = bucket.setdefault(klass, {
+                    "severity": entry.get("severity") or "",
+                    "example": str(entry.get("title") or "")[:160],
+                    "commands": [], "count": 0, "devices": [], "last": ""})
+                item["count"] = int(item.get("count", 0)) + 1
+                item["last"] = _now()
+                for command in commands:
+                    if command not in item["commands"]:
+                        item["commands"].append(command)
+                item["commands"] = item["commands"][:12]
+                device = str(entry.get("device") or "")
+                if device and device not in item["devices"]:
+                    item["devices"] = (item["devices"] + [device])[:8]
+                learned.append(klass)
+            if not learned:
+                return {"recorded": 0,
+                        "reason": "the finding named no class to learn",
+                        "verdict": verdict.get("verdict")}
+            # Keep the store about this project, not about every finding this
+            # project has ever had: the newest classes are the useful ones.
+            if len(bucket) > 40:
+                for stale in sorted(bucket, key=lambda k: bucket[k].get("last")
+                                    or "")[:-40]:
+                    bucket.pop(stale, None)
+            self._save_locked()
+        return {"recorded": len(learned), "classes": sorted(set(learned)),
+                "commands": commands[:12],
+                "note": "%d repair(s) verified on this project"
+                        % len(set(learned))}
+
+    def verified_repairs(self, project: str) -> dict:
+        """The verified repair classes for [project], keyed by class."""
+        key = (project or "default").strip() or "default"
+        with self._lock:
+            row = self._data.get("projects", {}).get(key) or {}
+            return dict(row.get("repairs") or {})
 
 
 _STORE = None
@@ -229,6 +373,17 @@ def reset(path: str = "") -> None:
 
 def record_generation(project: str, result: dict) -> dict:
     return _store().record(project, result)
+
+
+def record_repair(project: str, verdict: dict, audit_before=None,
+                  fixes=None) -> dict:
+    """Learn a repair the re-audit PROVED worked. Never a hopeful one."""
+    return _store().record_repair(project, verdict, audit_before, fixes)
+
+
+def verified_repairs(project: str) -> dict:
+    """The finding classes already proven fixed on [project]."""
+    return _store().verified_repairs(project)
 
 
 def summary() -> dict:

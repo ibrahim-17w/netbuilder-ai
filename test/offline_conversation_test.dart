@@ -86,15 +86,16 @@ void main() {
       expect(later.text, failed.text);
     });
 
-    test('private mode still says so, on the turn it is asked for', () {
+    test('private mode answers with content, never a mode label', () {
+      // The mode is the top bar's AI pill now: the transcript stays free of
+      // "Private mode is on" lines, on the first turn and every turn after.
       final reply = OfflineAssistantService.reply(
         rawText: 'hi',
         normalized: 'hi',
         target: 'pt',
         privateMode: true,
       );
-      expect(reply.text, contains('Private mode'));
-      // ...and only there: the next turn does not repeat it.
+      expect(reply.text, isNot(contains('Private mode')));
       final later = OfflineAssistantService.reply(
         rawText: 'hi',
         normalized: 'hi',

@@ -1,11 +1,18 @@
 import '../models/chat_message.dart';
+import '../models/environment_profile.dart';
 import '../models/network_intent.dart';
 import 'advisor_service.dart';
+import 'casual_english.dart';
 import 'chat_capabilities.dart';
+import 'clarification_service.dart';
 import 'conversation_memory.dart';
+import 'learned_answers_service.dart';
 import 'offline_knowledge.dart';
+import 'plan_config_composer.dart';
 import 'plan_repair_service.dart';
 import 'scope_gate.dart';
+import 'topology_reasoner.dart';
+import 'troubleshoot_flows.dart';
 import 'validator_service.dart';
 
 /// A conversational reply produced without any model.
@@ -21,8 +28,8 @@ class AssistantReply {
   /// path can actually act on, so a tap is never a dead end.
   final List<String> quickReplies;
 
-  /// build | advice | howto | change | fix | vague | greeting | recall | ack
-  /// | confirm | deny | offtopic
+  /// build | advice | howto | change | fix | vague | greeting | bye | recall
+  /// | ack | confirm | deny | identity | capability | missing | offtopic
   final String intent;
 
   /// The plan as it stands AFTER this answer, when the answer repaired it.
@@ -33,12 +40,38 @@ class AssistantReply {
   /// findings in place.
   final NetworkIntent? repairedPlan;
 
+  /// The troubleshooting-flow state to persist after this turn, or null to
+  /// leave the caller's state untouched. An EMPTY map ends (and clears) the
+  /// flow; a non-empty one is the live state to pass back as [reply]'s
+  /// `activeFlow` on the next turn. See [TroubleshootFlows] - the state is
+  /// JSON-serializable primitives, so it survives a conversation reopen.
+  final Map<String, dynamic>? flowState;
+
+  /// What the repair changed, in machine form (see [RepairFix]).
+  ///
+  /// The caller parks these against [repairedPlan] until a build of that plan
+  /// verifies; nothing reads them before then. Carrying them here is what lets
+  /// the learning loop key off the fix itself rather than off the sentence
+  /// written for the user, which names this plan's addresses and ports.
+  final List<RepairFix> repairedFixes;
+
+  /// The structured advice answer behind an `intent: 'advice'` reply.
+  ///
+  /// [text] already renders it (via [AdviceAnswer.toText]); this carries the
+  /// parts, so the chat can show a real advice card - recommendation
+  /// highlighted, options laid out, "Plan this" wired to [AdviceAnswer
+  /// .planBrief] - instead of asking a markdown table to be a button.
+  final AdviceAnswer? advice;
+
   const AssistantReply(
     this.text, {
     this.questions = const [],
     this.quickReplies = const [],
     this.intent = 'build',
     this.repairedPlan,
+    this.flowState,
+    this.repairedFixes = const [],
+    this.advice,
   });
 }
 
@@ -66,6 +99,23 @@ class OfflineAssistantService {
     // Files this conversation produced, for "show saved networks" - the
     // chat owns the artifact list; the answer only reports what is real.
     List<({String name, String note})> knownArtifacts = const [],
+    // A live troubleshooting flow ({'flow', 'step', 'data'}) from
+    // [SessionState.flowState]: when one is active, this turn is answered
+    // INSIDE the flow (the user is tapping diagnostic options), and the
+    // reply carries the next state back in AssistantReply.flowState.
+    Map<String, dynamic>? activeFlow,
+    // The answer this exact question earned from the keyed model before
+    // (see [LearnedAnswers]): replayed verbatim, offline, before any other
+    // branch - "same question, same answer" is the promise.
+    LearnedAnswer? learnedAnswer,
+    // The remembered environment (see [EnvironmentProfile]): fills in the
+    // venue/scale/budget the message leaves unsaid, so advice written for a
+    // remembered office does not fall back to generic.
+    EnvironmentProfile? environmentProfile,
+    // Critical gaps the chat wants clarified before a plan is committed
+    // (see [ClarificationService]). When non-empty and the turn is
+    // build-shaped, the answer asks these instead of describing a plan.
+    List<ClarificationQuestion> clarifyingQuestions = const [],
   }) {
     // MEMORY: the earlier turns of this conversation are the difference
     // between a useful answer and a generic one. The offline path has no
@@ -84,14 +134,10 @@ class OfflineAssistantService {
       r'[\u0600-\u06FF]',
     ).hasMatch(rawText.isEmpty ? normalized : rawText);
 
-    // The "answering offline" line belongs ONLY to private mode now - and
-    // only to the first turn it is asked about. The keyless/model-failure
-    // state is said where it can be checked (the header's AI sign) and where
-    // it is history (the turn's source line), so the answer itself can start
-    // with its content instead of an apology about how it was produced.
-    final firstPrivate = privateMode &&
-        !history.any((m) => m.role == 'model' && _mentionsOffline(m.text));
-    final opening = firstPrivate ? _openLine(modelError, privateMode) : '';
+    // The answer starts with its CONTENT. Which brain produced it - the
+    // planner, a model, a learned answer - is the app's state, shown once
+    // in the top bar's AI pill, not a line repeated under every message.
+    const opening = '';
 
     if (t.isEmpty) {
       return AssistantReply(
@@ -132,6 +178,33 @@ class OfflineAssistantService {
         intent: 'greeting',
       );
     }
+    // BYE: a farewell is a turn, not a request. Answered warmly and honestly
+    // - everything the conversation produced stays on this device - with the
+    // example briefs as the way back in. Read BEFORE the yes/no branch,
+    // because "later" is a goodbye here, not a "no".
+    if (_isBye(t)) {
+      return AssistantReply(
+        _join(
+          opening,
+          arabic
+              ? _pick(const [
+                  'مع السلامة! كل شيء محفوظ على جهازك - عُد في أي وقت وسنكمل '
+                      'من حيث توقفنا.',
+                  'إلى اللقاء! لا يخرج شيء مما بنيناه من جهازك - وأنا هنا '
+                      'عندما تعود.',
+                ], seed)
+              : _pick(const [
+                  'Take care! Everything stays on this device - come back any '
+                      'time and we will pick up right where we left off.',
+                  'See you! The plans and .pkt files are all saved on this '
+                      'device - nothing leaves it, and I am here when you '
+                      'are back.',
+                ], seed),
+        ),
+        quickReplies: _exampleReplies,
+        intent: 'bye',
+      );
+    }
     // A thank-you or an "ok" is a real turn in a conversation. Answering it
     // with a plan dump reads like a form; answering it like a person, with the
     // plan still in reach, is what makes the offline chat feel continuous.
@@ -159,6 +232,70 @@ class OfflineAssistantService {
         intent: 'deny',
       );
     }
+    // FLOW CONTINUATION: an active troubleshooting flow owns this turn. The
+    // user is answering a diagnostic question ("what does the port show?"),
+    // so the flow's next step - or its fix - IS the answer. An explicit
+    // exit ("never mind") drops the ladder instead of asking it a
+    // question. Anything the flow cannot match re-asks with a hint, which
+    // is the engine's own fail-closed behavior.
+    if (activeFlow != null && activeFlow.isNotEmpty) {
+      if (_flowExit.hasMatch(t)) {
+        return AssistantReply(
+          _join(
+            opening,
+            'Ladder dropped - say the symptom again any time (for example '
+            '"PC1 cannot ping PC2") and I will start it fresh.',
+          ),
+          quickReplies: _exampleReplies,
+          intent: 'troubleshoot',
+          flowState: const {},
+        );
+      }
+      final turn = TroubleshootFlowEngine.advance(activeFlow, t);
+      return AssistantReply(
+        _join(opening, (turn.fix ?? turn.prompt)),
+        quickReplies: turn.done
+            ? _nextStepsFor(plan)
+            : [for (final o in turn.options) o.label],
+        intent: 'troubleshoot',
+        flowState: turn.done ? const {} : turn.state,
+      );
+    }
+    // LEARNED ANSWER: this exact question was answered by the keyed model
+    // before and the answer passed the capture checks, so the same
+    // question asked offline gets the same answer - verbatim, with a
+    // provenance line. Exact-key only on purpose: the question the user
+    // actually asked gets the answer they were actually given, while
+    // paraphrases stay with the curated corpus, which is the better
+    // answer for wording it has never seen.
+    if (learnedAnswer != null && learnedAnswer.answer.trim().isNotEmpty) {
+      return AssistantReply(
+        _join(opening, learnedAnswer.answer),
+        quickReplies: _nextStepsFor(plan),
+        intent: 'learned',
+      );
+    }
+    // IDENTITY: "who are you", "what can you do", "how are you" - questions
+    // about the assistant itself. They used to fall through to the scope
+    // gate or, worse, to the missing-coverage line - an odd answer to "who
+    // are you" from an assistant that plans whole labs. The guard below is
+    // what keeps this from swallowing real work: a message that carries
+    // networking vocabulary is a network question wearing an identity
+    // opener ("what can you do about the OSPF adjacency"), the same way a
+    // greeting that names a lab is a build request wearing a hello.
+    final identity = _identityKind(t);
+    if (identity != null) {
+      return AssistantReply(
+        _join(
+          opening,
+          arabic
+              ? _identityAnswerAr(identity, seed)
+              : _identityAnswer(identity, seed),
+        ),
+        quickReplies: _identityReplies,
+        intent: 'identity',
+      );
+    }
     // SCOPE: this assistant is networking-only. A coding request, homework
     // or general chit-chat gets the one-line decline - never a plan, never a
     // guess. The gate is conservative: anything carrying networking
@@ -173,6 +310,49 @@ class OfflineAssistantService {
         intent: 'offtopic',
       );
     }
+    // REACHABILITY: "why can't PC1 ping PC2" is answered by WALKING THE
+    // PLAN - cabled path, addressing, subnet, gateway, duplicates, routing,
+    // cable sanity - and reporting the first blocking rung with its fix.
+    // This is the app reasoning over its own model, not matching text, so
+    // it runs before the advice reader and the knowledge table (whose
+    // generic "cannot ping" ladder would otherwise eat the question).
+    // Needs a plan: without one there is no topology to reason about, and
+    // the question falls through to the generic answers.
+    if (plan != null) {
+      final question = ReachabilityQuestion.parseQuestion(t, plan);
+      if (question.question != null) {
+        final verdict = TopologyReasoner.explain(
+          plan: plan,
+          from: question.question!.from,
+          to: question.question!.to,
+          target: target,
+        );
+        return AssistantReply(
+          _join(opening, verdict.toText()),
+          quickReplies: verdict.quickReplies,
+          intent: 'reachability',
+        );
+      }
+    }
+    // FLOW OPENER: an OPEN symptom ("PC cannot ping anything", "no
+    // internet") opens an interactive diagnostic ladder instead of a
+    // static answer - the assistant asks what the verification command
+    // shows and the user taps the reply. Deliberately AFTER the
+    // reachability reasoner (a named device pair is reasoned over the
+    // plan, not turned into a questionnaire) and after the named-target
+    // guard inside matchStart (a specific "cannot ping the gateway" gets
+    // the corpus ladder, which answers it directly). Runs before the
+    // knowledge table: the ladder IS the deeper version of that answer.
+    final flowId = TroubleshootFlows.matchStart(t);
+    if (flowId != null) {
+      final turn = TroubleshootFlows.open(flowId)!;
+      return AssistantReply(
+        _join(opening, turn.prompt),
+        quickReplies: [for (final o in turn.options) o.label],
+        intent: 'troubleshoot',
+        flowState: turn.state,
+      );
+    }
     // ADVICE: "what router should I use in this case?", "how many access
     // points for 50 users?", "fiber or copper?", "review my design".
     // These used to fall through to the plan dump (a router was named, so
@@ -185,9 +365,13 @@ class OfflineAssistantService {
     // while "review the plan" keeps routing to the plan-suggestions
     // capability (the advisor does not claim it).
     final advice = AdvisorService.advise(
-      rawText.trim().isEmpty ? t : rawText,
+      // The normalized text, not the raw one: a typo'd question ("what
+      // routr for 30 staff?") must reach the advisor's topic words, and
+      // CasualEnglish already fixed it on the planner path.
+      t.isEmpty ? rawText : t,
       plan: plan,
       target: target,
+      environmentProfile: environmentProfile,
     );
     if (advice != null) {
       return AssistantReply(
@@ -201,6 +385,7 @@ class OfflineAssistantService {
             ? advice.quickReplies
             : _nextStepsFor(plan),
         intent: 'advice',
+        advice: advice,
       );
     }
     // APP CAPABILITIES: "validate the plan", "any duplicate IPs", "what
@@ -234,13 +419,7 @@ class OfflineAssistantService {
     // A short message that names a real topic ("and vlans?", "why stp?") is
     // not an opener - it is a follow-up, and it gets an answer.
     final words = t.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
-    final hasDeviceWord = RegExp(
-      r'\b(router|routers|switch|switches|pc|pcs|server|servers|laptop|'
-      r'laptops|printer|printers|firewall|ap|wifi|wireless|vlan|vlans|ospf|'
-      r'eigrp|bgp|subnet|subnets|network|networks|lab|labs|office|site|'
-      r'sites|dhcp|dns|aaa|vpn|acl|tacacs|nat|rip|isis|bgp|phone|phones|'
-      r'camera|cameras|ip phone|wireless router|access point)\b',
-    ).hasMatch(t);
+    final hasDeviceWord = _deviceWords.hasMatch(t);
     final concept = _concept(t);
     if (words.length <= 2 &&
         !hasDeviceWord &&
@@ -328,13 +507,38 @@ class OfflineAssistantService {
         andBuild: asksToBuildAfterRepair(rawText),
       );
     }
+    // TWO INTENTS, ONE TURN: "2 routers and 4 switches, what is the best
+    // colour for the cable" describes a lab AND asks about something else.
+    // Answering only the question throws the brief away; answering only the
+    // brief answers something nobody asked. [mixed] marks that this turn
+    // carries both, and [briefNote] is the one line that carries the half of
+    // it no branch below would otherwise speak. It only ever APPENDS - the
+    // answer to the question is still the answer.
+    //
+    // A WH-question is read anywhere in the sentence, because that is where
+    // the second intent actually sits ("..., what is the best ..."), while a
+    // bare "..." is only a question when the user wrote a "?".
+    final wh = _whWord.hasMatch(t);
+    final mixed =
+        _deviceCount.hasMatch(t) &&
+        (wh || _howtoShaped(t) || rawText.trim().endsWith('?'));
+    final briefNote = mixed ? _briefNote(plan, clarifyingQuestions) : '';
     if (concept != null) {
+      // PLAN-AWARE: with a lab on the table the generic explainer is
+      // followed by the section composed from THIS plan - their routers,
+      // their subnets - and the "tell me the lab" tail is dropped, because
+      // the lab is known and the commands below are already specific.
+      final grounded =
+          _groundedSection(concept, plan, target);
       return AssistantReply(
         _join(
           opening,
-          '${arabic ? '$_arabicLead\n\n' : ''}${_continuity(plan, t, history)}${_conceptAnswer(concept)}\n\n'
-          'If you tell me the lab you are building I will turn this into a plan '
-          'and give you the exact steps.',
+          '${arabic ? '$_arabicLead\n\n' : ''}${_continuity(plan, t, history)}'
+          '${_conceptAnswer(concept)}'
+          '${grounded == null ? '\n\nIf you tell me the lab you are building '
+              'I will turn this into a plan and give you the exact steps.'
+              : '\n\n$grounded'}'
+          '${briefNote.isEmpty ? '' : '\n\n$briefNote'}',
         ),
         quickReplies: _nextStepsFor(plan),
         intent: 'howto',
@@ -347,37 +551,108 @@ class OfflineAssistantService {
     // routed to the planner, and build asks return nothing here).
     final knowledge = OfflineKnowledge.answerFor(t);
     if (knowledge != null) {
+      // PLAN-AWARE, knowledge path: the corpus entry answers the topic
+      // generically; when the text maps to a composable topic and a plan
+      // stands, the lab-specific section follows it.
+      final grounded = _groundedSection(
+        PlanConfigComposer.topicFor(t),
+        plan,
+        target,
+      );
       return AssistantReply(
         _join(
           opening,
-          '${arabic ? '$_arabicLead\n\n' : ''}${_continuity(plan, t, history)}$knowledge\n\n'
-          'If you tell me the lab you are building I will turn this into a '
-          'plan and give you the exact steps.',
+          '${arabic ? '$_arabicLead\n\n' : ''}${_continuity(plan, t, history)}$knowledge'
+          '${grounded == null ? '\n\nIf you tell me the lab you are building '
+              'I will turn this into a plan and give you the exact steps.'
+              : '\n\n$grounded'}'
+          '${briefNote.isEmpty ? '' : '\n\n$briefNote'}',
         ),
         quickReplies: _nextStepsFor(plan),
         intent: 'howto',
       );
     }
+    // BARE-TOPIC RESCUE: "how do I configure ospf" has no concept hook and
+    // no corpus entry, so without a plan it falls to missing coverage - but
+    // WITH a plan the composed lab-specific section IS the answer, and a
+    // better one than any generic text. Fail-closed both ways: no plan
+    // means the normal near-miss reply, and an unsupported topic means
+    // null here exactly as before.
+    final rescueTopic = PlanConfigComposer.topicFor(t);
+    if (rescueTopic != null &&
+        plan != null &&
+        // The same guard the concept reader applies: a device COUNT in a
+        // non-question ("...OSPF area 0, 15 PCs") is a build brief, not a
+        // config question - the build answer must keep it. A device count in
+        // a QUESTION is the other way round: the question is the ask, and
+        // [mixed] lets the composed lab answer it instead of being dropped
+        // back to the plan dump.
+        (!_deviceCount.hasMatch(t) || _howtoShaped(t) || mixed)) {
+      final grounded = _groundedSection(rescueTopic, plan, target);
+      if (grounded != null) {
+        return AssistantReply(
+          _join(
+            opening,
+            '${arabic ? '$_arabicLead\n\n' : ''}'
+            '${_continuity(plan, t, history)}$grounded'
+            '${briefNote.isEmpty ? '' : '\n\n$briefNote'}',
+          ),
+          quickReplies: _nextStepsFor(plan),
+          intent: 'howto',
+        );
+      }
+    }
     // NOT COVERED: a real question this material does not know. Say exactly
-    // that - a guess dressed as fact is worse than an honest gap. (A short
-    // opener still gets the "tell me what you want" reply below.)
+    // that - a guess dressed as fact is worse than an honest gap - but first
+    // offer the ground that IS covered and sits nearest to the question.
+    // (A short opener still gets the "tell me what you want" reply below.)
     if (_openQuestion(
       t,
       words.length,
       hasPlan: plan != null && plan.nodes.isNotEmpty,
     )) {
-      return AssistantReply(
-        _join(opening, arabic ? _arabicMissing : _missingCoverage),
-        quickReplies: _nextStepsFor(plan),
-        intent: 'missing',
+      return _missingReply(
+        t,
+        arabic: arabic,
+        opening: opening,
+        plan: plan,
       );
     }
     if (plan != null && plan.nodes.isNotEmpty) {
+      // ASK BEFORE PLAN: the brief has critical gaps and the chat supplied
+      // the questions to ask. The plan-shaped parse still stands (so the
+      // conversation keeps its context), but the answer asks instead of
+      // dumping a plan with a build button - the user said they want a
+      // network, not that they want THIS network yet.
+      if (clarifyingQuestions.isNotEmpty) {
+        return _clarifyReply(clarifyingQuestions, opening, arabic);
+      }
+      // TWO ASKS, ONE ANSWER, NEITHER ANSWERED: a counted WH-question whose
+      // topic has no offline coverage used to fall through to the plan dump,
+      // so the reply described the lab and never said a thing about what was
+      // asked. Answer the gap honestly and then name the brief, instead of
+      // putting a Build button under a question.
+      //
+      // A yes/no turn ("2 routers and 4 switches, is that enough?") stays on
+      // the build path deliberately: there the plan IS the answer, and
+      // trading it for "not in my offline material" would answer worse.
+      if (mixed && wh) {
+        final gap = _missingReply(t, arabic: arabic, opening: opening);
+        final chips = <String>[
+          ...gap.quickReplies,
+          ..._nextStepsFor(plan, blocked: _blocking(plan, target)),
+        ];
+        return AssistantReply(
+          _join(gap.text, briefNote),
+          questions: gap.questions,
+          quickReplies: [...{for (final c in chips) c}],
+          intent: gap.intent,
+        );
+      }
       return AssistantReply(
         _buildAnswer(
           plan,
           suggestions,
-          modelError,
           originalAsk,
           target: target,
           opening: opening,
@@ -403,6 +678,82 @@ class OfflineAssistantService {
   }
 
   // --- conversational moves -----------------------------------------------
+
+  /// The half of a two-intent turn that no answer branch speaks: the lab
+  /// the user described while asking their question.
+  ///
+  /// Two states, two different things to say. A brief that is still missing
+  /// critical scale is not a lab yet, so the note carries the questions and
+  /// says it is not planned; a brief that is ready says so and names the
+  /// words that build it. Either way it is ONE line at the end of a real
+  /// answer - the question stays the point of the reply.
+  ///
+  /// The lab is named with [_labLine], the same rendering the ack, change and
+  /// "nothing changed" replies use, so a lab reads one way wherever the chat
+  /// mentions it.
+  static String _briefNote(
+    NetworkIntent? plan,
+    List<ClarificationQuestion> clarifying,
+  ) {
+    if (plan == null || plan.nodes.isEmpty) return '';
+    final described = _labLine(plan);
+    if (described.isEmpty) return '';
+    if (clarifying.isNotEmpty) {
+      final asks = [
+        for (final q in clarifying)
+          if (q.question.trim().isNotEmpty) q.question.trim(),
+      ];
+      return asks.isEmpty
+          ? 'You are also describing a lab with $described. It is not '
+              'planned yet - tell me the rest and I will plan it.'
+          : 'You are also describing a lab with $described, which I have not '
+              'planned yet: ${asks.join(' ')}';
+    }
+    return 'You are also describing a lab with $described - say "build the '
+        '.pkt" and I will compile it offline.';
+  }
+
+  /// The ask-before-plan reply: the questions, the way out ("just build
+  /// it"), and quick replies that are the answers themselves. The plan
+  /// already parsed - it just is not being committed in this reply.
+  static AssistantReply _clarifyReply(
+    List<ClarificationQuestion> questions,
+    String opening,
+    bool arabic,
+  ) {
+    final b = StringBuffer();
+    if (opening.isNotEmpty) b.writeln('$opening\n\n');
+    b
+      ..writeln(
+        questions.length == 1
+            ? '**One quick thing before I plan this:**'
+            : '**Two quick things before I plan this:**',
+      )
+      ..writeln();
+    for (var i = 0; i < questions.length; i++) {
+      b.writeln('${i + 1}. ${questions[i].question}');
+    }
+    b
+      ..writeln()
+      ..writeln(
+        'Tap an answer, or say "just build it" and I will use safe '
+        'defaults for what is still open. Nothing is compiled until you '
+        'say so.',
+      );
+    return AssistantReply(
+      b.toString().trim(),
+      // Chip order serves the composer's 4-chip cap: the FIRST question's
+      // answers, then the way out, then the rest. The second question is
+      // fully readable in the text and becomes the next turn's chips once
+      // the first is answered - the ack loop carries the conversation.
+      quickReplies: [
+        if (questions.isNotEmpty) ...questions.first.quickReplies,
+        'Just build it with defaults',
+        for (final q in questions.skip(1)) ...q.quickReplies,
+      ],
+      intent: 'clarify',
+    );
+  }
 
   /// Openers that are answered rather than planned - a full plan dump in reply
   /// to "thanks" is how a conversation turns into a form.
@@ -706,6 +1057,7 @@ class OfflineAssistantService {
       quickReplies: _nextStepsFor(repair.plan, blocked: repair.remaining),
       intent: 'fix',
       repairedPlan: repair.plan,
+      repairedFixes: repair.fixes,
     );
   }
 
@@ -821,17 +1173,13 @@ class OfflineAssistantService {
   static String _pick(List<String> options, int seed) =>
       options[seed.abs() % options.length];
 
-  static bool _mentionsOffline(String text) {
-    final t = text.toLowerCase();
-    return t.contains('offline') || t.contains('no api key');
-  }
-
   // --- intent detection ---------------------------------------------------
 
   /// Greetings only. "thanks" and "ok" are acknowledgements ([_isAck]), and
   /// answering them as a hello is what made the chat feel deaf.
   static const Set<String> _greetings = {
     'hi', 'hello', 'hey', 'yo', 'sup', 'salam', 'salaam', 'hola',
+    'hiya', 'heyo', 'howdy', 'greetings', 'good day',
     'good morning', 'good evening', 'good afternoon',
     // Arabic greetings, so an Arabic opener gets the greeting branch (and
     // the Arabic greeting text) rather than the vague fallback.
@@ -844,9 +1192,234 @@ class OfflineAssistantService {
       t.startsWith('hi ') ||
       t.startsWith('hello ') ||
       t.startsWith('hey ') ||
+      t.startsWith('hiya ') ||
+      t.startsWith('heyo ') ||
+      t.startsWith('howdy ') ||
+      t.startsWith('greetings ') ||
+      t.startsWith('good day ') ||
       t.startsWith('مرحبا ') ||
       t.startsWith('اهلا ') ||
       t.startsWith('أهلا ');
+
+  /// Farewells. "later" is a goodbye here, not a "no", so this is read
+  /// before the yes/no branch; "cheers" stays an acknowledgement on purpose.
+  static final RegExp _byePattern = RegExp(
+    r'^(bye|bye bye|goodbye|good\s+bye|see\s+ya|see\s+you|see\s+you\s+later|'
+    r'later|catch\s+you\s+later|good\s+night|goodnight|farewell|'
+    r'مع السلامة|الى اللقاء|إلى اللقاء|وداعا|باي باي|باي|تصبح على خير)'
+    r'[.!؟]*$',
+  );
+
+  static bool _isBye(String t) => _byePattern.hasMatch(t);
+
+  // --- identity ------------------------------------------------------------
+
+  /// "who made you", "who created you" - answered without inventing a
+  /// maker: there is no company or person to name, and making one up is
+  /// exactly the kind of confidence the offline path exists to avoid.
+  static final RegExp _identityMadeBy = RegExp(
+    r'who\s+(made|created|built|designed|programmed)\s+you\b',
+  );
+
+  /// "are you an AI / a bot / a human?" - the honesty question.
+  static final RegExp _identityAi = RegExp(
+    r'are\s+you\s+((really|actually|just)\s+)?(an?\s+)?'
+    r'(ai|a\.i|bot|human|person|robot|real)\b|'
+    r'do\s+you\s+(use|run)\s+(a\s+)?(model|llm|gpt|gemini)\b',
+  );
+
+  /// "who are you", "what are you", "what's your name".
+  static final RegExp _identityWho = RegExp(
+    r'\b(who|what)\s+(are|r)\s+you\b|'
+    r"what(?:'?s|\s+is)\s+your\s+name\b|"
+    r'who\s+am\s+i\s+talking\s+to\b',
+  );
+
+  /// "what can you do", "what do you do", "what are you for", "what's new".
+  static final RegExp _identitySkills = RegExp(
+    r'\bwhat\s+(can|could)\s+you\s+do\b|'
+    r'\bwhat\s+(else\s+)?do\s+you\s+do\b|'
+    r'\bwhat\s+are\s+you\s+for\b|'
+    r'\bwhat\s+do\s+you\s+support\b|'
+    r'\bwhat\s+are\s+your\s+(features|skills|abilities|capabilities)\b|'
+    r"what(?:'?s|\s+is)\s+new\b",
+  );
+
+  /// "how are you", "how's it going" - small talk, but about the assistant.
+  static final RegExp _identityWellbeing = RegExp(
+    r'\bhow\s+(are|r)\s+you\b|'
+    r"how.?s\s+it\s+going\b|"
+    r'are\s+you\s+(ok|okay|alright|good)\s*[?.!]*$',
+  );
+
+  /// "are you offline", "do you need internet/wifi", "can you work
+  /// offline". Matched BEFORE the networking-vocabulary guard, because
+  /// these name the very words the guard looks for: "do you need wifi?" is
+  /// a question about the assistant even though it says wifi.
+  static final RegExp _identityOfflineNet = RegExp(
+    r'are\s+you\s+((really|fully|always|actually)\s+)?'
+    r'(offline|local|on(ne)?\s+this\s+device|on\s+device)\b|'
+    r'\b(can|do|does)\s+(you|it|this)\s+work\s+'
+    r'(offline|without\s+(the\s+)?internet|without\s+(the\s+)?wifi)\b|'
+    r'\bdo\s+you\s+need\s+(the\s+)?(internet|wifi|wi-fi|a\s+model|an\s+api)\b',
+  );
+
+  /// The key variants of the offline ask. These wait until AFTER the guard:
+  /// "do you need a key" can just as easily be an SSH or WPA question, and
+  /// the networking vocabulary in the sentence ('ssh', 'wpa') is what tells
+  /// those apart from a question about the assistant's own API key.
+  static final RegExp _identityOfflineKey = RegExp(
+    r'\bdo\s+you\s+need\s+(an?\s+)?(api\s+)?key\b|'
+    r'\bdo\s+you\s+work\s+without\s+(a\s+key|an\s+api\s+key)\b|'
+    r'\bwork(s|ing)?\s+(without|with\s+no)\s+(an?\s+)?(api\s+)?key\b|'
+    r'\bkey\s+(needed|required)\b',
+  );
+
+  /// Arabic identity questions, matched by substring: word-boundary regexes
+  /// do not behave on Arabic script (every Arabic letter is a non-word char
+  /// to \b), so contains() is the honest matcher here. The dialect forms
+  /// people actually type sit next to the MSA ones. Kept to question
+  /// shapes, so an Arabic build request that happens to mention them is
+  /// never swallowed.
+  static const List<String> _arabicIdentityWho = [
+    'من أنت', 'من انت', 'مين انت', 'ما اسمك', 'شو اسمك', 'من صنعك', 'من أنشأك',
+    'هل أنت ذكاء', 'هل انت ذكاء', 'هل أنت إنسان', 'هل انت انسان',
+    'هل أنت روبوت', 'هل أنت بوت', 'هل انت بوت',
+  ];
+  static const List<String> _arabicIdentitySkills = [
+    'ماذا تفعل', 'ماذا تستطيع', 'ما الذي تستطيع', 'وش تقدر', 'ايش تقدر',
+    'إيش تقدر', 'وش تقدم', 'ماذا تقدم', 'ما الجديد', 'وش الجديد',
+    'ايش الجديد', 'إيش الجديد',
+  ];
+  static const List<String> _arabicIdentityWellbeing = [
+    'كيف حالك', 'كيف الحال', 'كيفك', 'شخبارك', 'اخبارك', 'أخبارك',
+  ];
+  static const List<String> _arabicIdentityOffline = [
+    'هل تعمل دون اتصال', 'هل تعمل بدون انترنت', 'هل تعمل بدون إنترنت',
+    'هل تحتاج انترنت', 'هل تحتاج إنترنت', 'هل تحتاج مفتاح',
+    'هل يعمل بدون مفتاح', 'هل يعمل بدون انترنت',
+  ];
+
+  /// Which identity question [t] asks, or null when it is not one. The
+  /// guard comes first (except for the offline asks about the internet or
+  /// wifi, which name the very words the guard looks for): a message that
+  /// carries networking vocabulary keeps its route.
+  static String? _identityKind(String t) {
+    if (_identityOfflineNet.hasMatch(t)) return 'offline';
+    if (_deviceWords.hasMatch(t) || _networkWords.hasMatch(t)) return null;
+    if (_identityOfflineKey.hasMatch(t)) return 'offline';
+    if (_identityMadeBy.hasMatch(t)) return 'made';
+    if (_identityAi.hasMatch(t)) return 'ai';
+    if (_identitySkills.hasMatch(t)) return 'skills';
+    if (_identityWho.hasMatch(t)) return 'who';
+    if (_identityWellbeing.hasMatch(t)) return 'wellbeing';
+    return _arabicIdentityKind(t);
+  }
+
+  static String? _arabicIdentityKind(String t) {
+    if (_arabicIdentityOffline.any(t.contains)) return 'offline';
+    if (_arabicIdentityWellbeing.any(t.contains)) return 'wellbeing';
+    if (_arabicIdentitySkills.any(t.contains)) return 'skills';
+    if (_arabicIdentityWho.any(t.contains)) return 'who';
+    return null;
+  }
+
+  /// Example prompts for the identity replies - all three are things the
+  /// offline path answers for real, so a tap is never a dead end.
+  static const List<String> _identityReplies = [
+    '2 routers, 1 switch and 4 PCs with OSPF',
+    'What is better, OSPF or static routing?',
+    'How do I configure PAT overload?',
+  ];
+
+  /// What the assistant says about itself, by kind. Honest by design: it is
+  /// a rule-based local assistant, and every answer says where the line is.
+  static String _identityAnswer(String kind, int seed) {
+    switch (kind) {
+      case 'made':
+        return 'I am built into NetBuilder AI as its offline brain - rules '
+            'that run on this device, not a model in a cloud. There is no '
+            'company to call and no account to sign into; every answer is '
+            'computed right here.';
+      case 'ai':
+        return 'I am a local, rule-based assistant - no model, no cloud, no '
+            'API key. That is why the same question always gets the same '
+            'answer, and why nothing you type ever leaves this device. It '
+            'is also why I say so plainly when something is not in my '
+            'offline material.';
+      case 'skills':
+        return 'I can do a few concrete things, all on this device:\n\n'
+            '- Plan a lab from plain words: "2 routers, 1 switch and 4 PCs '
+            'with OSPF".\n'
+            '- Build the real .pkt file - no Packet Tracer needed.\n'
+            '- Answer config questions: "how do I configure SSH?", "what is '
+            'a wildcard mask?".\n'
+            '- Do subnet math: "what is the broadcast address of '
+            '192.168.10.5/26?".\n'
+            '- Give design advice: "which router should I get for a home?".\n'
+            '- Repair a plan: say "fix the plan" and I clear what can be '
+            'cleared.\n\n'
+            'Ask one of these, or just describe your network.';
+      case 'wellbeing':
+        return _pick(const [
+          'Running fast - everything is local, so there is no server to '
+              'wait on. What are we building?',
+          'All good - no key to check and no server to wait on. What are we '
+              'building?',
+        ], seed);
+      case 'offline':
+        return 'Yes - fully offline. Planning, building the .pkt, the '
+            'answers and the repairs all run on this device: no API key, no '
+            'cloud and no internet needed, and nothing you type leaves it.';
+      default: // 'who'
+        return 'I am the NetBuilder assistant - a fully offline networking '
+            'copilot. I plan labs from plain language, compile real Packet '
+            'Tracer .pkt files on this device, answer Cisco config and '
+            'subnet questions, and repair plans. No API key, and nothing '
+            'you type leaves this device.';
+    }
+  }
+
+  /// The Arabic companions of [_identityAnswer]: the same honesty, in the
+  /// user's language, with the technical examples kept in English (commands
+  /// ARE English).
+  static String _identityAnswerAr(String kind, int seed) {
+    switch (kind) {
+      case 'made':
+        return 'أني مدمج في NetBuilder AI كعقل يعمل دون اتصال - قواعد تعمل '
+            'على جهازك، لا نموذج في السحابة. لا شركة تُستدعى ولا حساب '
+            'يُسجَّل فيه؛ كل جواب يُحسب هنا.';
+      case 'ai':
+        return 'أنا مساعد محلي يعمل بالقواعد - لا نموذج ولا سحابة ولا مفتاح '
+            'API. لهذا يكون الجواب نفسه دائماً للسؤال نفسه، ولا يخرج شيء '
+            'مما تكتبه من جهازك. وأقول بصراحة عندما يكون السؤال خارج ما '
+            'أغطيه دون اتصال.';
+      case 'skills':
+        return 'أستطيع أشياء محددة، وكلها على جهازك:\n\n'
+            '- تخطيط معمل من وصف بسيط: "2 routers, 1 switch and 4 PCs with '
+            'OSPF".\n'
+            '- بناء ملف .pkt حقيقي دون Packet Tracer.\n'
+            '- الإجابة عن أسئلة الإعداد: "how do I configure SSH?".\n'
+            '- حسابات الشبكات الفرعية: "what is a wildcard mask?".\n'
+            '- نصائح التصميم: "which router should I get for a home?".\n'
+            '- إصلاح الخطة: قل "fix the plan".\n\n'
+            'جرّب أحدها، أو صِف شبكتك بكلماتك.';
+      case 'wellbeing':
+        return _pick(const [
+          'بخير - كل شيء محلي على جهازك، فلا انتظار لأي خادم. ماذا نبني؟',
+          'تمام - لا مفتاح ولا خادم ننتظره. ماذا نبني؟',
+        ], seed);
+      case 'offline':
+        return 'نعم - دون اتصال تماماً. التخطيط وبناء ملف .pkt والإجابات '
+            'والإصلاحات كلها تعمل على جهازك: لا مفتاح API ولا سحابة ولا '
+            'إنترنت، ولا شيء مما تكتبه يخرج منه.';
+      default: // 'who'
+        return 'أنا مساعد NetBuilder - يعمل بالكامل دون اتصال. أخطط المعامل '
+            'من وصف بسيط، وأبني ملفات Packet Tracer حقيقية على جهازك، وأجيب '
+            'عن أسئلة إعداد Cisco وحسابات الشبكات، وأصلح الخطط. بلا مفتاح '
+            'API، ولا شيء مما تكتبه يخرج من جهازك.';
+    }
+  }
 
   /// "what did I ask you to build?", "remind me", "as I said" - a
   /// question about the conversation itself, answered from memory.
@@ -908,22 +1481,67 @@ class OfflineAssistantService {
     r'\d+\s*(routers?|switches|switch|pcs?|servers?|laptops?|printers?|firewalls?)',
   );
 
+  /// A WH-word, anywhere in the sentence. [_howtoShaped] only looks at the
+  /// START of the message, which is why "2 routers and 4 switches, what is
+  /// the best colour for the cable" read as a build request and the question
+  /// in the middle of it went unanswered.
+  static final RegExp _whWord = RegExp(
+    r'\b(what|why|how|which|where|who|whose|when)\b',
+    caseSensitive: false,
+  );
+
+  /// Devices and protocols that make a short message a topic ("and vlans?")
+  /// rather than an opener ("hmm") - and that mark an identity opener
+  /// wearing a network question ("what can you do about the OSPF
+  /// adjacency") as a real question. One list, so both readers agree.
+  static final RegExp _deviceWords = RegExp(
+    r'\b(router|routers|switch|switches|pc|pcs|server|servers|laptop|'
+    r'laptops|printer|printers|firewall|ap|wifi|wireless|vlan|vlans|ospf|'
+    r'eigrp|bgp|subnet|subnets|network|networks|lab|labs|office|site|'
+    r'sites|dhcp|dns|aaa|vpn|acl|tacacs|nat|rip|isis|bgp|phone|phones|'
+    r'camera|cameras|ip phone|wireless router|access point)\b',
+  );
+
+  /// Networking words the device list above misses, but that still say
+  /// "this is a network question" to the identity guard: PAT, the internet
+  /// itself, interfaces, neighbours.
+  static final RegExp _networkWords = RegExp(
+    r'\b(internet|pat|interfaces?|gateways?|wans?|lans?|spanning|'
+    r'adjacency|adjacencies|neighbou?rs?|ethernet|packet tracer|ios|cli)\b',
+  );
+
   static bool _isChange(String t) {
     if (t.isEmpty) return false;
     // "add 2 routers" is a build request, not a change to an existing plan.
     if (_deviceCount.hasMatch(t)) return false;
     // "how do I change the hostname?" asks HOW it is done; it is not an
     // instruction to change the standing plan.
-    if (t.startsWith('how ') ||
-        t.startsWith('what ') ||
-        t.startsWith('where ') ||
-        t.startsWith('why ') ||
-        t.startsWith('which ') ||
-        t.endsWith('?')) {
+    if (_howtoShaped(t)) {
       return false;
     }
-    return _changeVerb.hasMatch(t);
+    // "use ospf" / "use a 4331" / "use 192.168.30.0/24" are instructions to
+    // change the standing plan - they are literally the phrasings the
+    // app's own suggestion chips and examples use. Without this clause
+    // they fell to the build answer, whose change-delta line happened to
+    // carry the news; with the plan-aware composer on that path, the
+    // change must be claimed here first.
+    final useChange = RegExp(
+      r'\buse\s+(?:ospf|eigrp|bgp|rip|static|a\s+\d|'
+      r'\d{1,3}(?:\.\d{1,3}){3})',
+    ).hasMatch(t);
+    return _changeVerb.hasMatch(t) || useChange;
   }
+
+  /// A question about HOW something is done rather than an instruction:
+  /// the shape check the concept reader and the plan-aware rescue both
+  /// apply before a device count can mean "build brief".
+  static bool _howtoShaped(String t) =>
+      t.startsWith('how ') ||
+      t.startsWith('what ') ||
+      t.startsWith('where ') ||
+      t.startsWith('which ') ||
+      t.startsWith('why ') ||
+      t.endsWith('?');
 
   static final RegExp _fixVerb = RegExp(
     r'^(fix|repair|solve|resolve|correct|mend|clear)\b',
@@ -1023,7 +1641,39 @@ class OfflineAssistantService {
     return 'Got it - I would ${bits.join(', and ')}.';
   }
 
-  static String? _concept(String t) {
+  /// A plan-composed "Your lab:" section for [topic], or null. Null when
+  /// there is no plan, the topic is not one the composer can ground, or the
+  /// plan cannot support the topic - in all three the generic answer stands
+  /// alone, which is exactly the fail-closed contract.
+  static String? _groundedSection(
+    String? topic,
+    NetworkIntent? plan,
+    String target,
+  ) {
+    if (topic == null || plan == null) return null;
+    if (!PlanConfigComposer.topics.contains(topic)) return null;
+    return PlanConfigComposer.compose(
+      plan: plan,
+      topic: topic,
+      target: target,
+    );
+  }
+
+  /// Explicit exits from an active troubleshooting flow. Anchored so a
+  /// real answer to the flow's question ("no, never mind that port") is
+  /// not mistaken for an exit - only a leading "stop/never mind/..." quits.
+  static final RegExp _flowExit = RegExp(
+    r"^\s*(stop|never\s?mind|forget\s+it|quit\s+this|cancel\s+(this|the)\s+"
+    r'(diagnos|flow|troubleshoot)|exit\s+this)\b',
+  );
+
+  static String? _concept(String rawText) {
+    // Full names and fault phrasings are canonicalized to the short forms
+    // this chain matches on ("border gateway protocol" reaches the bgp
+    // explainer, "network address translation" the NAT one). The knowledge
+    // table applies the same canonicalization to its own input, so a
+    // paraphrase that has no concept hook still reaches its corpus entry.
+    final t = CasualEnglish.canonical(rawText);
     // A device COUNT means a build request, not a concept question. A model
     // number inside a how-to ("...a 2960 switch") is not a count, so a
     // question still gets its answer. (The battery test caught the old
@@ -1054,6 +1704,12 @@ class OfflineAssistantService {
     }
     if (has('trunk') || t.contains('access port')) return 'trunk';
     if (has('dhcp') &&
+        // DHCPv6 is its own topic (RA flags, M/O bits), so a dhcpv6
+        // question - even a mixed "dhcpv6 vs dhcp" one, or phrased as
+        // "dhcp for ipv6" - falls through to the knowledge table instead
+        // of getting the DHCPv4 answer.
+        !t.contains('dhcpv6') &&
+        !t.contains('ipv6') &&
         !t.contains('snoop') &&
         !t.contains('relay') &&
         !t.contains('helper')) {
@@ -1088,7 +1744,10 @@ class OfflineAssistantService {
     }
     // The wider expert set: routing, switching, services, transport,
     // security, wireless and IPv6.
-    if (t.contains('stp') ||
+    // Whole-word 'stp' only: 'rstp' is rapid spanning tree - a different
+    // mode with its own commands - and the old substring test swallowed it
+    // into the classic STP answer.
+    if (RegExp(r'\bstp\b').hasMatch(t) ||
         t.contains('spanning') ||
         RegExp(r'\bloops?\b').hasMatch(t)) {
       return 'stp';
@@ -1114,8 +1773,11 @@ class OfflineAssistantService {
       return 'wireless';
     }
     // A concrete IPv6 address/prefix is computed by the knowledge table;
-    // the generic explainer answers the concept question.
+    // the generic explainer answers the concept question. An ask that is
+    // really about DHCP on IPv6 ("set up dhcp for ipv6") falls through to
+    // the DHCPv6 corpus entry - the address plan, not the concept.
     if ((t.contains('ipv6') || t.contains('slaac') || has('nd')) &&
+        !has('dhcp') &&
         !RegExp(r'[0-9a-f:]{3,}\s*/\s*\d{1,3}').hasMatch(t)) {
       return 'ipv6';
     }
@@ -1163,9 +1825,21 @@ class OfflineAssistantService {
             'link. Give each LAN its own subnet, then either add static routes '
             'or run OSPF.';
       case 'internet':
-        return 'For internet access put a Cloud-PT or a firewall at the edge, '
-            'give the router a default route toward it, and NAT the inside '
-            'traffic (overload on the WAN interface).';
+        return 'For internet access put a Cloud-PT or a firewall at the edge '
+            'and give the router a default route toward it. The NAT itself '
+            'is PAT overload on the WAN interface:\n'
+            '1. Name the two sides: `ip nat inside` on the LAN interface, '
+            '`ip nat outside` on the WAN one.\n'
+            '2. Define the inside addresses that may go out: `access-list '
+            '100 permit ip 192.168.1.0 0.0.0.255 any`.\n'
+            '3. Tie them together: `ip nat inside source list 100 interface '
+            'g0/1 overload`.\n'
+            'One inside server that must stay reachable from the outside '
+            'gets a static mapping instead: `ip nat inside source static '
+            'tcp 192.168.1.10 80 interface g0/1 80`.\n'
+            'Verify with `show ip nat translations` and `show ip nat '
+            'statistics` - translations piling up on the outside interface '
+            'means it is working.';
       case 'acl':
         return 'Standard ACLs filter by source only - place them near the '
             'destination. Extended ACLs filter by source, destination, protocol '
@@ -1222,15 +1896,31 @@ class OfflineAssistantService {
             'the router-id and interface priorities deliberately. `show ip ospf '
             'neighbor` shows the state, `show ip ospf database` the LSAs.';
       case 'eigrp':
-        return 'EIGRP picks routes by composite metric (bandwidth and delay by '
-            'default) and keeps a feasible successor for instant failover. '
-            'Classic EIGRP must match the AS number and K-values; named mode '
-            'lets you keep them in the address family.';
+        return 'EIGRP picks routes by composite metric (bandwidth and delay '
+            'by default) and keeps a feasible successor for instant '
+            'failover. Configuring it (classic mode - the AS number must '
+            'match on every router):\n'
+            '1. `router eigrp 100`.\n'
+            '2. `network 10.1.0.0 0.0.0.255` - the wildcard mask, not the '
+            'subnet mask.\n'
+            '3. `passive-interface g0/0` on interfaces with no EIGRP '
+            'neighbour (or `passive-interface default`, then `no '
+            'passive-interface s0/0/0` for the WAN link).\n'
+            'Verify with `show ip eigrp neighbors` and `show ip route '
+            'eigrp` - the neighbour must be up before any route appears.';
       case 'bgp':
         return 'BGP chooses by weight, then local preference, then AS-path '
-            'length, then origin, then MED. Between two eBGP peers everything is '
-            'typo-sensitive: the AS number, the neighbour address and the '
-            'advertised prefixes. Start with `show ip bgp summary`.';
+            'length, then origin, then MED. Basic eBGP between two '
+            'routers:\n'
+            '1. `router bgp 65001` - your AS number.\n'
+            '2. `neighbor 10.0.0.2 remote-as 65002` - the peer address and '
+            'its AS; the two routers must be able to ping each other '
+            'first.\n'
+            '3. `network 192.168.1.0 mask 255.255.255.0` - only prefixes '
+            'already in the routing table get advertised.\n'
+            'Verify with `show ip bgp summary`: State/PfxRcd should show a '
+            'prefix count, not Idle or Active. Packet Tracer supports this '
+            'basic eBGP session.';
       case 'default_route':
         return 'A default route (0.0.0.0/0) is the gateway of last resort. '
             'Static: `ip route 0.0.0.0 0.0.0.0 <next-hop>`. In OSPF inject it '
@@ -1251,7 +1941,6 @@ class OfflineAssistantService {
   static String _buildAnswer(
     NetworkIntent plan,
     List<String> suggestions,
-    String modelError,
     String originalAsk, {
     String opening = '',
     NetworkIntent? previousPlan,
@@ -1264,9 +1953,11 @@ class OfflineAssistantService {
     final others = plan.nodes.length - routers - switches - pcs - servers;
 
     final sb = StringBuffer();
-    final open = opening.trim().isEmpty ? _openLine(modelError) : opening;
-    sb.writeln(open);
-    sb.writeln();
+    if (opening.trim().isNotEmpty) {
+      sb
+        ..writeln(opening)
+        ..writeln();
+    }
     // What changed since the last turn, so a follow-up reads as a continuation
     // of one conversation rather than a fresh description of a lab.
     final delta = NetworkIntent.planChangeSummary(previousPlan, plan);
@@ -1437,6 +2128,181 @@ class OfflineAssistantService {
       'الجهاز أو البروتوكول (مثلاً "how do OSPF areas work")، أو أضف مفتاح '
       'مزود في الإعدادات للأسئلة المفتوحة.';
 
+  /// The reply to a real question the offline material does not cover.
+  ///
+  /// A flat "not covered" line wastes the one thing this assistant HAS: a
+  /// wide, honest corpus one topic away. Before falling back to it, the
+  /// user's words are matched against [_topicCatalog] - the areas the
+  /// offline path genuinely answers - and the nearest topics are named,
+  /// with their sample questions offered as quick replies. Every sample is
+  /// a question the offline path really answers, so a tap is never a dead
+  /// end. With nothing near, the honest line stays: a wrong suggestion is
+  /// worse than none.
+  static AssistantReply _missingReply(
+    String t, {
+    required bool arabic,
+    required String opening,
+    NetworkIntent? plan,
+  }) {
+    final near = _nearTopics(t);
+    if (near.isEmpty) {
+      return AssistantReply(
+        _join(opening, arabic ? _arabicMissing : _missingCoverage),
+        quickReplies: _nextStepsFor(plan),
+        intent: 'missing',
+      );
+    }
+    final b = StringBuffer()
+      ..writeln(
+        'That one is not in my offline material - but I can answer these '
+        'nearby questions:',
+      )
+      ..writeln();
+    for (final entry in near) {
+      b.writeln('- ${entry.topic}');
+    }
+    return AssistantReply(
+      _join(
+        opening,
+        '${arabic ? '$_arabicLead\n\n' : ''}${b.toString().trimRight()}',
+      ),
+      quickReplies: [for (final entry in near) entry.sample],
+      intent: 'missing',
+    );
+  }
+
+  /// The topics the offline material actually covers, for the near-miss
+  /// reply above. The sample question is what gets tapped, so each one is
+  /// traced to a real answer: the computed subnet/wildcard/summarization
+  /// entries, the concept explainers, the config battery, the advisor and
+  /// the planner itself (the .pkt build).
+  static const List<({String topic, String sample})> _topicCatalog = [
+    (topic: 'Subnet math and VLSM', sample: 'how many hosts does a /28 subnet support'),
+    (topic: 'Wildcard masks', sample: 'what is the wildcard mask for /27'),
+    (topic: 'Route summarization', sample: 'how does route summarization work'),
+    (topic: 'VLANs', sample: 'how do VLANs work'),
+    (topic: 'Inter-VLAN routing', sample: 'what is router-on-a-stick'),
+    (
+      topic: 'Trunk vs access ports',
+      sample: 'what is the difference between a trunk and an access port',
+    ),
+    (topic: 'Spanning tree (STP)', sample: 'how does spanning tree work'),
+    (topic: 'EtherChannel', sample: 'how does EtherChannel work'),
+    (topic: 'DHCP', sample: 'how does DHCP work'),
+    (topic: 'DNS', sample: 'how do I point the PCs at a DNS server'),
+    (topic: 'NAT and internet access', sample: 'how do I configure PAT overload'),
+    (topic: 'ACLs', sample: 'what is an ACL'),
+    (topic: 'OSPF', sample: 'how do I verify OSPF neighbors'),
+    (topic: 'EIGRP', sample: 'how does EIGRP work'),
+    (topic: 'BGP', sample: 'how does BGP work'),
+    (topic: 'Static and default routes', sample: 'static route syntax'),
+    (topic: 'HSRP', sample: 'how do I configure HSRP'),
+    (topic: 'SSH access', sample: 'how do I configure SSH on a switch'),
+    (topic: 'Port security', sample: 'how do I enable port security on a switch'),
+    (topic: 'VPN and IPsec', sample: 'how do I configure a site-to-site VPN'),
+    (topic: 'Wireless and wifi', sample: 'how to secure wifi with WPA2'),
+    (topic: 'IPv6', sample: 'how does IPv6 addressing work'),
+    (
+      topic: 'Ping and traceroute faults',
+      sample: 'request timed out when pinging across routers',
+    ),
+    (topic: 'Packet Tracer basics', sample: 'how do I add a device in Packet Tracer'),
+    (topic: 'Design and sizing advice', sample: 'which router should I get for a home?'),
+    (topic: 'Building the .pkt', sample: '2 routers, 1 switch and 4 PCs with OSPF'),
+  ];
+
+  /// Words that carry no topic meaning on either side of the comparison:
+  /// question scaffolding and verbs so generic that matching on them would
+  /// suggest topics at random.
+  static const Set<String> _topicStopwords = {
+    'what', 'how', 'why', 'when', 'where', 'which', 'who', 'is', 'are',
+    'was', 'were', 'am', 'be', 'been', 'do', 'does', 'did', 'i', 'you',
+    'your', 'me', 'my', 'we', 'us', 'it', 'its', 'this', 'that', 'these',
+    'those', 'there', 'here', 'a', 'an', 'the', 'to', 'for', 'of', 'in',
+    'on', 'at', 'by', 'with', 'without', 'from', 'into', 'and', 'or', 'if',
+    'can', 'could', 'should', 'would', 'will', 'shall', 'may', 'might',
+    'must', 'need', 'needs', 'want', 'use', 'used', 'using', 'work',
+    'works', 'working', 'set', 'setup', 'get', 'gets', 'got', 'make',
+    'making', 'configure', 'configuring', 'config', 'tell', 'show', 'see',
+    'look', 'about', 'up', 'out', 'off', 'many', 'much', 'right', 'best',
+    'good', 'instead', 'also', 'just',
+  };
+
+  /// The content words of [t]. Lowercased first: the token pattern only
+  /// accepts a-z, so an unlowercased 'VLSM' or 'OSPF' would be shredded
+  /// into separator characters and the topic would lose its best word.
+  static Set<String> _contentTokens(String t) {
+    final out = <String>{};
+    for (final w in t.toLowerCase().split(RegExp(r'[^a-z0-9+#]+'))) {
+      if (w.length < 2 || _topicStopwords.contains(w)) continue;
+      out.add(w);
+    }
+    return out;
+  }
+
+  /// A tolerant stem: plurals and -ing, so 'switches' meets 'switch' and
+  /// 'pinging' meets 'ping'. Deliberately crude - it only has to decide
+  /// whether two words are about the same thing, not parse English.
+  static String _topicStem(String w) {
+    for (final suffix in const ['ing', 'ies', 'es', 's']) {
+      if (w.length > suffix.length + 2 && w.endsWith(suffix)) {
+        return w.substring(0, w.length - suffix.length);
+      }
+    }
+    return w;
+  }
+
+  static bool _tokensMeet(String a, String b) {
+    final sa = _topicStem(a);
+    final sb = _topicStem(b);
+    if (sa == sb) return true;
+    // Short technical words ('nat', 'stp', 'acl') must match exactly - a
+    // prefix rule on three letters would tie unrelated acronyms together.
+    // Longer words may share a stem ('switch' / 'switchport').
+    if (sa.length >= 4 &&
+        sb.length >= 4 &&
+        (sa.startsWith(sb) || sb.startsWith(sa))) {
+      return true;
+    }
+    return false;
+  }
+
+  /// How near a catalog topic sits to what the user asked: the share of
+  /// the SMALLER side's content words the two have in common. At least one
+  /// shared word is required, so an unrelated question (an email campaign,
+  /// say) matches nothing at all, and the 0.3 floor keeps a single stray
+  /// word from dragging a topic in.
+  static double _topicScore(Set<String> asked, String topicText) {
+    final topicTokens = _contentTokens(topicText);
+    if (topicTokens.isEmpty || asked.isEmpty) return 0;
+    var shared = 0;
+    for (final w in topicTokens) {
+      if (asked.any((a) => _tokensMeet(a, w))) shared++;
+    }
+    if (shared == 0) return 0;
+    final smaller =
+        asked.length < topicTokens.length ? asked.length : topicTokens.length;
+    return shared / smaller;
+  }
+
+  /// Up to 3 catalog topics nearest to [t], best first; ties keep catalog
+  /// order so the offer is stable for the same question.
+  static List<({String topic, String sample})> _nearTopics(String t) {
+    final asked = _contentTokens(t);
+    if (asked.isEmpty) return const [];
+    final scored = <(int, double)>[];
+    for (var i = 0; i < _topicCatalog.length; i++) {
+      final entry = _topicCatalog[i];
+      final score = _topicScore(asked, '${entry.topic} ${entry.sample}');
+      if (score >= 0.3) scored.add((i, score));
+    }
+    scored.sort((a, b) {
+      final byScore = b.$2.compareTo(a.$2);
+      return byScore != 0 ? byScore : a.$1.compareTo(b.$1);
+    });
+    return [for (final (i, _) in scored.take(3)) _topicCatalog[i]];
+  }
+
   /// A real question the offline material did not match. Deliberately
   /// narrow: a two-word opener belongs to the vague path, and a stated
   /// device count belongs to the planner.
@@ -1467,17 +2333,5 @@ class OfflineAssistantService {
     'Should routing be static or OSPF?',
     'Do you need security (port security, an ACL, or a VPN)?',
   ];
-
-  /// Private mode is the only state whose line still opens an answer: it is
-  /// a promise about where the words go, made when the user turned it on.
-  /// The keyless / model-failure state is reported by the header sign and
-  /// the per-turn source line instead ([AiStatus]).
-  static String _openLine(String modelError, [bool privateMode = false]) {
-    if (privateMode) {
-      return 'Private mode is on, so I am answering on this device without '
-          'calling a model. Nothing you type leaves the app.';
-    }
-    return '';
-  }
 
 }

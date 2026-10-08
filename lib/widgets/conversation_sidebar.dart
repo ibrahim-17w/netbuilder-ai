@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/conversation_titles.dart';
 import '../theme/app_theme.dart';
 
 /// The conversations, as a real chat app lists them.
@@ -29,8 +30,6 @@ class ConversationSidebar extends StatefulWidget {
   final String query;
 
   final VoidCallback onSettings;
-  final String themeMode;
-  final ValueChanged<String> onThemeMode;
   final VoidCallback onCollapse;
 
   const ConversationSidebar({
@@ -43,12 +42,10 @@ class ConversationSidebar extends StatefulWidget {
     required this.onRename,
     required this.onSearch,
     required this.onSettings,
-    required this.onThemeMode,
     required this.onCollapse,
     this.query = '',
     this.busy = false,
     this.project = '',
-    this.themeMode = 'system',
   });
 
   static const double width = 268;
@@ -158,8 +155,12 @@ class _ConversationSidebarState extends State<ConversationSidebar> {
                     ),
                   ),
           ),
+          // The current network chip only names REAL projects: a raw
+          // storage id ("chat 15:2653") is not a network anyone knows, and
+          // the pane header already says "New conversation".
           if (widget.project.trim().isNotEmpty &&
-              widget.project.trim() != 'default')
+              widget.project.trim() != 'default' &&
+              !ConversationTitles.isRawId(widget.project))
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppTheme.s12,
@@ -196,65 +197,27 @@ class _ConversationSidebarState extends State<ConversationSidebar> {
                   ),
           ),
           const Divider(height: 1),
-          // Theme controls and Settings: the two things that belong to the
-          // app rather than to one conversation.
+          // Settings: the ONE app-level entry point. Theme and the rest live
+          // inside the drawer - a second row of app chrome here read as a
+          // second settings tab.
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppTheme.s8,
-              AppTheme.s6,
+              AppTheme.s4,
               AppTheme.s8,
               AppTheme.s10,
             ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: AppTheme.s6),
-                      child: Text(
-                        'Theme',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    _themeButton(theme, 'system', Icons.brightness_auto, 'Auto'),
-                    _themeButton(theme, 'light', Icons.light_mode_outlined, 'Light'),
-                    _themeButton(theme, 'dark', Icons.dark_mode_outlined, 'Dark'),
-                  ],
-                ),
-                const SizedBox(height: AppTheme.s4),
-                ListTile(
-                  dense: true,
-                  visualDensity: VisualDensity.compact,
-                  leading: const Icon(Icons.settings_outlined, size: 18),
-                  title: const Text('Settings'),
-                  onTap: widget.onSettings,
-                ),
-              ],
+            child: ListTile(
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              leading: const Icon(Icons.settings_outlined, size: 18),
+              title: const Text('Settings'),
+              onTap: widget.onSettings,
             ),
           ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _themeButton(
-    ThemeData theme,
-    String mode,
-    IconData icon,
-    String tooltip,
-  ) {
-    final selected = widget.themeMode == mode;
-    return IconButton(
-      tooltip: '$tooltip theme',
-      visualDensity: VisualDensity.compact,
-      iconSize: 17,
-      color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
-      icon: Icon(icon),
-      onPressed: () => widget.onThemeMode(mode),
     );
   }
 
@@ -425,7 +388,9 @@ class _ConversationTile extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        (chat['title'] ?? 'New chat').toString(),
+                        ConversationTitles.display(
+                          (chat['title'] ?? '').toString(),
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
@@ -544,7 +509,8 @@ class _NetworkChip extends StatelessWidget {
           const SizedBox(width: AppTheme.s6),
           Expanded(
             child: Text(
-              project,
+              // A raw storage id is not a name a person reads.
+              ConversationTitles.display(project),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.labelSmall?.copyWith(
@@ -599,10 +565,55 @@ class ChatWelcome extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // THE MARK. An opening screen that starts with bare text reads as
+          // a placeholder; a small brand anchor with a soft glow gives the
+          // eye somewhere to land and says "this is the app talking to you"
+          // before a word is read.
+          Container(
+            width: 128,
+            height: 96,
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                colors: [
+                  scheme.primary.withValues(alpha: 0.16),
+                  scheme.primary.withValues(alpha: 0.0),
+                ],
+              ),
+            ),
+            child: Center(
+              child: Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppTheme.rLg),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [scheme.primary, scheme.tertiary],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: scheme.primary.withValues(alpha: 0.35),
+                      blurRadius: 18,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.lan_outlined,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppTheme.s4),
           Text(
-            'How can I help?',
+            'What are we building today?',
             textAlign: TextAlign.center,
-            style: theme.textTheme.headlineSmall,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: AppTheme.s8),
           ConstrainedBox(

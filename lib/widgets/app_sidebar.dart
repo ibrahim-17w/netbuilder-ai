@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app/destinations.dart';
 import '../services/engine_status.dart';
+import '../services/settings_service.dart';
 import '../theme/app_kit.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
@@ -440,9 +441,18 @@ class _EngineDot extends StatelessWidget {
       animation: EngineStatus.instance,
       builder: (context, _) {
         final phase = EngineStatus.instance.phase;
+        // On a phone the engine is optional - the bundled template library
+        // builds the .pkt on the device - so a down engine is a status worth
+        // knowing, not an error to fix.
+        final engineOptional = SettingsService.isMobile;
         final (color, label) = switch (phase) {
           EngineState.up => (AppPalette.success(scheme), 'Engine up'),
-          EngineState.down => (scheme.error, 'Engine down'),
+          EngineState.down => engineOptional
+              ? (
+                  AppPalette.warning(scheme),
+                  'Engine down - .pkt builds run on this device',
+                )
+              : (scheme.error, 'Engine down'),
           EngineState.checking ||
           EngineState.starting => (AppPalette.warning(scheme), 'Engine starting'),
           EngineState.unknown => (scheme.onSurfaceVariant, 'Engine not checked'),

@@ -1,12 +1,15 @@
 import 'package:flutter/foundation.dart';
+import 'dart:async' show TimeoutException;
 import 'dart:convert';
-import 'dart:io' show File, Platform;
+import 'dart:io' show File, Platform, SocketException;
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ai_provider.dart';
 import 'context_budget.dart';
+import 'runtime_window.dart';
 
 /// App settings. Gemini API key lives ONLY in secure storage, never in prefs/db/logs.
 class SettingsService extends ChangeNotifier {
@@ -34,6 +37,7 @@ class SettingsService extends ChangeNotifier {
   static const _kEngineBase = 'engine_base';
   static const _kOutputDir = 'output_dir';
   static const _kLiveContext = 'live_context';
+  static const _kPreferOnDevicePkt = 'prefer_on_device_pkt';
   static const _kThemeMode = 'theme_mode';
   static const _kTourDone = 'first_run_tour_done';
   static const _kSeenChangelog = 'seen_changelog_version';
@@ -62,6 +66,11 @@ class SettingsService extends ChangeNotifier {
   /// Whether the live run summary is included in the prompt. It used to be a
   /// chip on the chat screen; it is a preference, so it lives here.
   bool _liveContext = true;
+  /// Build .pkt files on this device (bundled template library) instead of
+  /// waiting for the PC engine. A phone has no engine and usually no
+  /// reachable PC, so this is ON by default there; a desktop keeps the
+  /// engine first, because its builds also drive the Packet Tracer window.
+  bool _preferOnDevicePkt = SettingsService.isMobile;
   /// 'system' | 'light' | 'dark'. A preference rather than a constant: the
   /// app is read for hours, and which theme is comfortable is not something
   /// the operating system should decide for everyone.
@@ -349,6 +358,12 @@ class SettingsService extends ChangeNotifier {
     await _prefs?.setBool(_kLiveContext, value);
     notifyListeners();
   }
+  bool get preferOnDevicePkt => _preferOnDevicePkt;
+  Future<void> setPreferOnDevicePkt(bool value) async {
+    _preferOnDevicePkt = value;
+    await _prefs?.setBool(_kPreferOnDevicePkt, value);
+    notifyListeners();
+  }
   String get themeMode => _themeMode;
   Future<void> setThemeMode(String value) async {
     _themeMode = const ['system', 'light', 'dark'].contains(value)
@@ -460,6 +475,8 @@ class SettingsService extends ChangeNotifier {
     _autoSuggest = _prefs!.getBool(_kAutoSuggest) ?? true;
     _autoTeach = _prefs!.getBool(_kAutoTeach) ?? true;
     _liveContext = _prefs!.getBool(_kLiveContext) ?? true;
+    _preferOnDevicePkt =
+        _prefs!.getBool(_kPreferOnDevicePkt) ?? SettingsService.isMobile;
     _themeMode = _prefs!.getString(_kThemeMode) ?? _themeMode;
     _gns3Endpoint = _prefs!.getString(_kGns3) ?? _gns3Endpoint;
     // Migrate older plaintext GNS3 credentials into secure storage.
@@ -514,6 +531,35 @@ class SettingsService extends ChangeNotifier {
     }
     _loaded = true;
     notifyListeners();
+    // The top-bar pill reads key presence synchronously; secure storage is
+    // async, so the presence is cached here once per load (and on key
+    // changes in the setters below).
+    await refreshKeyPresence();
+  }
+
+  /// Whether an API key is present (Gemini or OpenAI-compatible), cached
+  /// for synchronous readers like the top-bar AI pill - secure storage is
+  /// async and a build method cannot await it.
+  bool aiKeyPresent = false;
+
+  /// Re-read both keys from secure storage and update [aiKeyPresence].
+  /// Deliberately a raw read, not [getApiKey]: that getter carries the
+  /// [_keyUnreadable] side effect, and a presence refresh must not flip
+  /// what a failed round-trip just reported.
+  Future<void> refreshKeyPresence() async {
+    String? gemini;
+    String? openAi;
+    try {
+      gemini = await _secure.read(key: _kKey);
+    } catch (_) {}
+    try {
+      openAi = await _secure.read(key: _kOpenAiKey);
+    } catch (_) {}
+    final present = (gemini ?? '').trim().isNotEmpty ||
+        (openAi ?? '').trim().isNotEmpty;
+    final changed = present != aiKeyPresent;
+    aiKeyPresent = present;
+    if (changed) notifyListeners();
   }
 
   /// A secure read that reports rather than throws.
@@ -579,6 +625,7 @@ class SettingsService extends ChangeNotifier {
       if (t.isEmpty) {
         await _secure.delete(key: _kKey);
         _keyUnreadable = false;
+        await refreshKeyPresence();
         notifyListeners();
         return true;
       }
@@ -588,6 +635,7 @@ class SettingsService extends ChangeNotifier {
       // A write that cannot be read back is not a saved key, whatever the
       // write call reported.
       _keyUnreadable = !ok;
+      await refreshKeyPresence();
       notifyListeners();
       return ok;
     } catch (_) {
@@ -763,6 +811,7 @@ class SettingsService extends ChangeNotifier {
   Future<void> setOpenAiKey(String value) async {
     try {
       await _secure.write(key: _kOpenAiKey, value: value.trim());
+      await refreshKeyPresence();
       notifyListeners();
     } catch (_) {}
   }
@@ -779,5 +828,270 @@ class SettingsService extends ChangeNotifier {
     _defaultTarget = v;
     await _prefs?.setString(_kTarget, v);
     notifyListeners();
+  }
+}
+
+/// The answer to one "is there actually a model server on this address?"
+/// probe.
+///
+/// [message] is written to be shown verbatim in the settings: on failure it
+/// names the server and how to start it, because "connection refused" tells
+/// a user nothing they can act on.
+class LocalModelProbe {
+  /// True when the address answered with a model list.
+  final bool reachable;
+
+  /// True when the address names this machine (loopback or an emulator's
+  /// host alias). A remote address is tested the same way, but the message
+  /// says so, so a cloud gateway is never mistaken for a local server.
+  final bool local;
+
+  /// Up to three model ids the server listed, so the UI can offer them as
+  /// one-tap choices instead of making the user retype an exact id.
+  final List<String> models;
+
+  /// How many models the server listed in total (the preview above is 3).
+  final int modelCount;
+
+  final String message;
+
+  const LocalModelProbe({
+    required this.reachable,
+    required this.local,
+    this.models = const [],
+    this.modelCount = 0,
+    required this.message,
+  });
+}
+
+/// Asks an OpenAI-compatible base URL whether it really serves models.
+///
+/// This exists because a saved address is silent until a chat fails
+/// mid-sentence: nothing validates it when it is typed. One GET with a short
+/// timeout turns that silence into a sentence with a next step.
+///
+/// Deliberately separate from [RuntimeWindowProbe], which asks a local
+/// runtime HOW MUCH context it allocates, at the runtime's native endpoints.
+/// A different question at different URLs; the only thing shared is the
+/// definition of "local", which is reused from it rather than restated here.
+class LocalModelProber {
+  LocalModelProber._();
+
+  /// The runtimes the drawer's presets point at, by their well-known port:
+  /// the name a failure message should use, and how to start the server.
+  /// Anything else gets a generic sentence - the app bundles no server and
+  /// pretends to know none beyond these three.
+  static const Map<String, List<String>> _knownPorts = {
+    '11434': ['Ollama', 'ollama serve'],
+    '1234': ['LM Studio', 'the Developer tab > Start Server'],
+    '8080': ['the llama.cpp server', 'llama-server -m <model.gguf>'],
+  };
+
+  /// One source of truth for "does this address mean this machine": the same
+  /// rule the runtime-window probe and the chat path use.
+  static bool isLocal(String baseUrl) => RuntimeWindowProbe.isLocal(baseUrl);
+
+  /// GET {baseUrl}/models. [client] is injectable for tests; when it is not
+  /// given, a throwaway client is used and closed here.
+  static Future<LocalModelProbe> probe({
+    required String baseUrl,
+    http.Client? client,
+    Duration timeout = const Duration(milliseconds: 3000),
+  }) async {
+    final base = baseUrl.trim();
+    final local = isLocal(base);
+    if (base.isEmpty) {
+      return const LocalModelProbe(
+        reachable: false,
+        local: true,
+        message: 'Enter a base URL first - a preset above fills in a '
+            'working one.',
+      );
+    }
+    final uri = _modelsUrl(base);
+    if (uri == null) {
+      return LocalModelProbe(
+        reachable: false,
+        local: local,
+        message: '"$base" is not an address the app can call.',
+      );
+    }
+    final http.Client c = client ?? http.Client();
+    try {
+      final http.Response r;
+      try {
+        r = await c.get(uri).timeout(timeout);
+      } on TimeoutException {
+        return _nothingAnswered(uri, local);
+      } on SocketException {
+        // Connection refused is the normal shape of "server not started";
+        // a local address that refuses is the expected way to be wrong.
+        return _nothingAnswered(uri, local);
+      } catch (_) {
+        // Any other transport failure (bad scheme, DNS) also means nothing
+        // usable answered, so it gets the same actionable treatment.
+        return _nothingAnswered(uri, local);
+      }
+      if (r.statusCode == 404) {
+        return LocalModelProbe(
+          reachable: false,
+          local: local,
+          message: '$uri answered 404 - there is no model list there. The '
+              'base URL has to be the OpenAI-compatible one; for Ollama it '
+              'is http://127.0.0.1:11434/v1.',
+        );
+      }
+      if (r.statusCode == 401 || r.statusCode == 403) {
+        return LocalModelProbe(
+          reachable: false,
+          local: local,
+          message: '$uri answered ${r.statusCode} - that address wants an '
+              'API key. A local server normally needs none; for a cloud '
+              'gateway, save the key and use the main Test connection, '
+              'which sends it.',
+        );
+      }
+      if (r.statusCode != 200) {
+        return LocalModelProbe(
+          reachable: false,
+          local: local,
+          message: '$uri answered HTTP ${r.statusCode} instead of a model '
+              'list.',
+        );
+      }
+      return parse(r.body, baseUrl: base, local: local);
+    } finally {
+      if (client == null) c.close();
+    }
+  }
+
+  /// The message for a transport-level failure, split by whether the address
+  /// was supposed to be this machine (a server to start) or not (an address
+  /// to re-check) - and by whether the port names a runtime we know.
+  static LocalModelProbe _nothingAnswered(Uri uri, bool local) {
+    final authority = uri.authority.isEmpty ? uri.toString() : uri.authority;
+    final known = _knownPorts['${uri.port}'];
+    if (!local) {
+      return LocalModelProbe(
+        reachable: false,
+        local: false,
+        message: 'Nothing answered at $authority. Check the address, and '
+            'that the server is reachable from this device.',
+      );
+    }
+    if (known != null) {
+      return LocalModelProbe(
+        reachable: false,
+        local: true,
+        message: 'Nothing answered on $authority - is ${known[0]} running? '
+            'Start it with: ${known[1]}',
+      );
+    }
+    return LocalModelProbe(
+      reachable: false,
+      local: true,
+      message: 'Nothing answered on $authority - is a server running there? '
+          'The app bundles none; you start one yourself (Ollama, LM Studio '
+          'or llama.cpp).',
+    );
+  }
+
+  /// `{base}` -> `{base}/models`, tolerating a missing scheme. A path that
+  /// is already there is kept, so the message can quote the URL actually
+  /// probed when it fails.
+  static Uri? _modelsUrl(String base) {
+    var b = base.trim();
+    if (b.isEmpty) return null;
+    if (!b.contains('://')) b = 'http://$b';
+    final uri = Uri.tryParse(b);
+    if (uri == null || uri.host.isEmpty) return null;
+    final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList()
+      ..add('models');
+    return Uri(
+      scheme: uri.scheme.isEmpty ? 'http' : uri.scheme,
+      host: uri.host,
+      port: uri.hasPort ? uri.port : null,
+      path: '/${segments.join('/')}',
+    );
+  }
+
+  /// Turn a /models response body into the answer.
+  ///
+  /// Public and pure so the shapes real servers return are unit-tested
+  /// against the real code rather than against a stand-in that could drift.
+  static LocalModelProbe parse(
+    String body, {
+    required String baseUrl,
+    required bool local,
+  }) {
+    Object? decoded;
+    try {
+      decoded = jsonDecode(body);
+    } catch (_) {
+      return _unreadable(baseUrl, local);
+    }
+    // The OpenAI shape every /v1 facade serves (`data[].id`), with
+    // `models[].name` as a fallback (Ollama's native /api/tags shape, for a
+    // base URL saved without /v1 that reached the native API instead).
+    final ids = <String>[];
+    if (decoded is Map) {
+      for (final key in const ['data', 'models']) {
+        final list = decoded[key];
+        if (list is! List) continue;
+        for (final item in list) {
+          if (item is! Map) continue;
+          final id = (item['id'] ?? item['name'] ?? '').toString().trim();
+          if (id.isNotEmpty) ids.add(id);
+        }
+        if (ids.isNotEmpty) break;
+      }
+    } else {
+      return _unreadable(baseUrl, local);
+    }
+    if (ids.isEmpty) {
+      return LocalModelProbe(
+        reachable: true,
+        local: local,
+        message: 'The server answered, but lists no models yet. Pull or '
+            'load one first (for Ollama: `ollama pull llama3.2`), then '
+            'test again.',
+      );
+    }
+    final count = ids.length;
+    final preview = ids.take(3).join(', ');
+    final shown = count > 3
+        ? '$count models, e.g. $preview'
+        : '$count model${count == 1 ? '' : 's'}: $preview';
+    var message = 'Reachable - ${_serverName(baseUrl)} answered with $shown.';
+    if (!local) {
+      message += ' That is a remote address, not a server on this machine.';
+    }
+    return LocalModelProbe(
+      reachable: true,
+      local: local,
+      models: ids.take(3).toList(),
+      modelCount: count,
+      message: message,
+    );
+  }
+
+  static LocalModelProbe _unreadable(String baseUrl, bool local) {
+    return LocalModelProbe(
+      reachable: false,
+      local: local,
+      message: '${_modelsUrl(baseUrl) ?? baseUrl} answered, but not with a '
+          'model list the app could read.',
+    );
+  }
+
+  /// The friendliest name available: the runtime the port belongs to when it
+  /// is one of the presets, otherwise the address itself.
+  static String _serverName(String baseUrl) {
+    final b = baseUrl.trim();
+    final uri = Uri.tryParse(b.contains('://') ? b : 'http://$b');
+    final known = uri == null ? null : _knownPorts['${uri.port}'];
+    if (known != null) return known[0];
+    final authority = uri?.authority ?? '';
+    return authority.isEmpty ? b : 'the server at $authority';
   }
 }

@@ -70,4 +70,44 @@ void main() {
     await tester.pumpAndSettle();
     expect(settings.contextDebug, isTrue);
   });
+
+  testWidgets('the local-model presets are one tap to a working address',
+      (tester) async {
+    final settings = SettingsService();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsService>.value(value: settings),
+          ChangeNotifierProvider<MemoryService>(create: (_) => MemoryService()),
+        ],
+        child: MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: const TextScaler.linear(0.5)),
+            child: child!,
+          ),
+          home: const Scaffold(drawer: SettingsDrawer(), body: SizedBox()),
+        ),
+      ),
+    );
+    tester.view.physicalSize = const Size(900, 2600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    tester.state<ScaffoldState>(find.byType(Scaffold)).openDrawer();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Local model (fully offline)'), findsOneWidget);
+
+    // The presets exist because local runtimes were supported but buried:
+    // one tap has to land on a usable address, not open a form.
+    await tester.tap(find.text('Ollama'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(settings.providerName, 'openai',
+        reason: 'the chip switches the provider itself');
+    expect(settings.openAiBaseUrl, 'http://127.0.0.1:11434/v1');
+  });
 }

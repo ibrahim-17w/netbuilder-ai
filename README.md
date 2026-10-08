@@ -29,9 +29,24 @@ only adds model-written chat answers on top.
   lab answer next to the real-world one. It never edits the plan, never
   invents prices, and every answer states what it is based on (the lab on
   the table, or "the gear is named as examples - check current prices").
+  The answer renders as an advice card: the recommendation highlighted,
+  and a **Plan this** button that sends the advisor's plan-able sentence
+  through the normal pipeline (parse, validate, build card) when there is
+  a plan to make.
+- **It remembers your environment.** "This is for the office, 40 users,
+  I'm a beginner" is folded into one remembered profile - venue, scale,
+  budget, skill - that the advisor falls back to whenever a later message
+  leaves a fact unsaid (a stated fact always wins). Review and edit it on
+  the Memory screen's **Environment** tab; forget it with one tap.
 - **Offline `.pkt` compilation.** "Build the .pkt" writes a real, openable
   file - no Packet Tracer window needed - and then audits it back and reports
   whether the file matches the plan.
+- **Tap the file, see the network.** The `.pkt` path in a build answer is
+  tappable. With Packet Tracer installed, the OS hands the file over and the
+  real application opens it; where Packet Tracer was not found, the same tap
+  opens the built-in viewer - the network drawn Packet Tracer-style from the
+  plan the conversation built, at the positions the engine wrote into the
+  file. No shell dialog asking how to open an unknown file type.
 - **Skills at `/`.** Type `/` in the composer and the skill menu opens:
   read and write .pkt files, switch targets (GNS3, the real Packet Tracer
   window, Cisco over SSH, AWS VPC), design advice, subnet facts,

@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../services/autopilot_service.dart';
+import '../services/conversation_titles.dart';
 import '../services/context_budget.dart';
 import '../services/memory_service.dart';
+import '../services/pkt/pkt_export_service.dart';
 import '../services/provider_chat_service.dart';
 import '../services/settings_service.dart';
 import '../theme/app_palette.dart';
 import '../widgets/gemini_model_picker.dart';
+import 'local_model_section.dart';
 
 /// The app's whole settings surface, on a sidebar: nothing else to visit.
 class SettingsDrawer extends StatefulWidget {
@@ -110,15 +113,37 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
     super.dispose();
   }
 
+  /// Pick the folder .pkt files go to, and keep it only if it really works.
+  ///
+  /// Android's folder picker goes through the Storage Access Framework and
+  /// converts the returned tree back into a filesystem path. That conversion
+  /// fails outright on some devices ("unknown path") and, worse, sometimes
+  /// yields a path that exists and cannot be written - so a setting saved
+  /// there looks fine and then quietly stops receiving files. Both outcomes
+  /// are reported honestly rather than stored as if they had worked.
   Future<void> _chooseFolder(SettingsService s) async {
-    final picked = await FilePicker.platform.getDirectoryPath(
-      dialogTitle: 'Folder for generated and fixed .pkt files',
-    );
-    if (picked == null || picked.isEmpty) return;
-    await s.setOutputDir(picked);
+    String picked;
+    try {
+      picked = await FilePicker.platform.getDirectoryPath(
+            dialogTitle: 'Folder for generated and fixed .pkt files',
+          ) ??
+          '';
+    } catch (e) {
+      _toast('This device would not return a folder ($e). '
+          'Built .pkt files will ask where to put each one instead.');
+      return;
+    }
+    if (picked.isEmpty) return;
+    final folder = await PktExportService.resolveFolder(picked);
+    if (folder.dir == null) {
+      _toast('Cannot use that folder: ${folder.why}. Pick another, or let '
+          'the app ask where to put each file.');
+      return;
+    }
+    await s.setOutputDir(folder.dir!.path);
     if (!mounted) return;
-    setState(() => _output.text = picked);
-    _toast('Fixed and generated .pkt files now go to $picked');
+    setState(() => _output.text = folder.dir!.path);
+    _toast('Fixed and generated .pkt files now go to ${folder.dir!.path}');
   }
 
   /// A real round trip whose only job is to say whether the settings work.
@@ -239,7 +264,7 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
                 selected: '${chat['id']}' == s.lastProject,
                 leading: const Icon(Icons.forum_outlined, size: 18),
                 title: Text(
-                  '${chat['title']}',
+                  ConversationTitles.display('${chat['title']}'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -476,6 +501,35 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
             _chatList(s),
             const Divider(height: 24),
 
+            // ---- APPEARANCE ------------------------------------------
+            // Theme used to be a row of three icon buttons at the foot of
+            // the conversation sidebar - app chrome living in the middle of
+            // a list of chats, and a second settings surface beside the
+            // drawer. One home: here, with everything else app-wide.
+            Text('Appearance', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 6),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(
+                  value: 'system',
+                  icon: Icon(Icons.brightness_auto, size: 16),
+                  label: Text('Auto'),
+                ),
+                ButtonSegment(
+                  value: 'light',
+                  icon: Icon(Icons.light_mode_outlined, size: 16),
+                  label: Text('Light'),
+                ),
+                ButtonSegment(
+                  value: 'dark',
+                  icon: Icon(Icons.dark_mode_outlined, size: 16),
+                  label: Text('Dark'),
+                ),
+              ],
+              selected: {s.themeMode},
+              onSelectionChanged: (selection) => s.setThemeMode(selection.first),
+              showSelectedIcon: false,
+            ),
             const Divider(height: 24),
 
             // ---- THE RUN AND ITS RECORD --------------------------
@@ -563,8 +617,23 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
                 isDense: true,
               ),
             ),
+            // ---- LOCAL MODEL (FULLY OFFLINE) ---------------------
+            // Ollama, LM Studio and llama.cpp always worked - they speak
+            // the OpenAI-compatible dialect - but the only mention lived
+            // in the Base URL helper text below, which is how supported
+            // local runtimes end up buried. This subsection is the
+            // first-class path: one-tap presets, a reachability test, and
+            // model ids that can be tapped instead of retyped. It stays
+            // outside the openai-only fields so a Gemini user can see the
+            // path in; tapping a preset switches the provider itself.
+            const SizedBox(height: 8),
+            LocalModelSection(
+              settings: s,
+              baseUrl: _base,
+              modelId: _oaModel,
+              onNote: _toast,
+            ),
             if (s.usesOpenAi) ...[
-              const SizedBox(height: 8),
               TextField(
                 controller: _base,
                 decoration: const InputDecoration(

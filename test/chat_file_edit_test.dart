@@ -5,7 +5,16 @@ import 'package:net_builder/screens/chat_screen.dart';
 import 'package:net_builder/services/memory_service.dart';
 import 'package:net_builder/services/session_state.dart';
 import 'package:net_builder/services/settings_service.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:path_provider_platform_interface/src/method_channel_path_provider.dart';
 import 'package:provider/provider.dart';
+
+/// An on-device build writes into the app's documents directory, which no
+/// test platform provides: answer the plugin with a scratch path.
+class _FakePathProvider extends PathProviderPlatform {
+  @override
+  Future<String?> getApplicationDocumentsPath() async => 'build/test-docs';
+}
 
 /// The conversation-level half of "edit it": once a .pkt exists, saying
 /// "edit it" must offer a choice instead of quietly building a second file.
@@ -120,13 +129,29 @@ Widget _chat(MemoryService mem) => MultiProvider(
   child: const MaterialApp(home: Scaffold(body: ChatScreen())),
 );
 
+/// A turn that ends in an on-device build loads bundled assets through the
+/// platform asset channel, which inside a fake-async test only progresses
+/// when real time is given back between pumps. Pumps with drains reach the
+/// same settled state pumpAndSettle would, while letting that channel run.
 Future<void> _send(WidgetTester tester, String text) async {
   await tester.enterText(_composer(), text);
   await tester.testTextInput.receiveAction(TextInputAction.send);
-  await tester.pumpAndSettle();
+  for (var i = 0; i < 90; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 1)),
+    );
+  }
 }
 
 void main() {
+  setUp(() {
+    // An in-place edit on this device rebuilds the file with the bundled
+    // template library, which writes into the documents directory.
+    PathProviderPlatform.instance = _FakePathProvider();
+  });
+  tearDown(() => PathProviderPlatform.instance = MethodChannelPathProvider());
+
   testWidgets('"edit it" edits the one file instead of asking or rebuilding', (
     tester,
   ) async {

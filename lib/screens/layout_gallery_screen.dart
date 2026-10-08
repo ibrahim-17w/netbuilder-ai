@@ -214,6 +214,9 @@ class _LayoutGalleryScreenState extends State<LayoutGalleryScreen> {
 
   /// A copy of [base] whose layout field carries [snapshot]'s positions, so
   /// the interactive canvas draws the gallery's picture rather than its own.
+  /// Every other field travels unchanged - a preview that silently dropped
+  /// part of the plan (notes, prompts) would be a different plan from the
+  /// one the build compiles.
   NetworkIntent _intentWithSnapshot(
     NetworkIntent base,
     LayoutSnapshot snapshot,
@@ -231,6 +234,7 @@ class _LayoutGalleryScreenState extends State<LayoutGalleryScreen> {
       confidence: base.confidence,
       planningSource: base.planningSource,
       security: base.security,
+      prompts: base.prompts,
       layout: {for (final s in snapshot.spots) s.name: Offset(s.x, s.y)},
     );
   }

@@ -246,6 +246,21 @@ class PlannerMemoryService {
   static bool _isKnownProtocol(String s) =>
       const ['static', 'ospf', 'eigrp', 'bgp', 'none'].contains(s);
 
+  /// True when [text] STATES a preference rather than asking for one lab:
+  /// "always use OSPF", "from now on use a 4331", "I prefer /31 transit".
+  /// These are the statements worth remembering as rules - a one-off
+  /// "use ospf" changes one lab, an "always" changes every plan after it.
+  /// A question is never a preference, whatever words it carries.
+  static bool isPreferenceStatement(String text) {
+    final t = text.trim().toLowerCase();
+    if (t.isEmpty || t.endsWith('?')) return false;
+    if (t.startsWith('/')) return false;
+    return RegExp(
+      r'\b(always|from now on|every time|each time|prefer|preference|'
+      r'default to|stick to)\b',
+    ).hasMatch(t);
+  }
+
   static String? _protocolIn(String lower) {
     for (final p in const ['ospf', 'eigrp', 'bgp']) {
       if (RegExp('\\b$p\\b').hasMatch(lower)) return p;

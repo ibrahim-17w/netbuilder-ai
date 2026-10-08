@@ -19,13 +19,27 @@ dependencies:
   path: ^1.9.0
   path_provider: ^2.1.4
   file_picker: ^8.3.7
+  crypto: ^3.0.7
+  xml: ^7.0.1
+  share_plus: ^12.0.2
+  uuid: ^4.6.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  path_provider_platform_interface: ^2.1.3
 
 flutter:
   uses-material-design: true
   assets:
     - assets/rule_packs/
+    # The offline .pkt template library, extracted by sidecar/pkt_template_build.py
+    # from real Packet Tracer saves. This is what lets a phone build a real save
+    # with no sidecar: every device model's <DEVICE> block, its port inventory
+    # (names Packet Tracer derives from the module layout), one <LINK> block per
+    # cable kind, and the global skeleton the topology is written into.
+    - assets/pkt_templates/manifest.json
+    - assets/pkt_templates/skeleton.xml
+    - assets/pkt_templates/devices/
+    - assets/pkt_templates/links/

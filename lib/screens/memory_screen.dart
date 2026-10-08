@@ -5,8 +5,10 @@ import 'package:provider/provider.dart';
 
 import '../models/build_attempt.dart';
 import '../models/build_record.dart';
+import '../models/environment_profile.dart';
 import '../services/autopilot_service.dart';
 import '../services/memory_service.dart';
+import '../services/misparse_ledger.dart';
 import '../theme/app_kit.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
@@ -27,15 +29,44 @@ class MemoryScreen extends StatefulWidget {
   State<MemoryScreen> createState() => _MemoryScreenState();
 }
 
-enum _MemoryTab { rules, phrasings, learning, attempts, tools }
+enum _MemoryTab { rules, phrasings, learned, environment, learning, attempts, tools }
 
 class _MemoryScreenState extends State<MemoryScreen> {
   List<LearnedRule> _rules = [];
   List<BuildAttempt> _attempts = [];
   Map<String, String> _prefs = {};
+  /// Learned answers from keyed-model replies (question -> answer),
+  /// newest-seen first. Each row replays offline when the same question is
+  /// asked with no key - and can be dropped here.
+  List<Map<String, dynamic>> _learnedAnswers = [];
   /// Learned phrasings (words -> resolved brief), newest first. The app's
   /// own replay index: each row is a lesson the user can review and drop.
   List<Map<String, dynamic>> _phrasings = [];
+  /// The misparse ledger: corrections the user made to a parse, newest
+  /// first. Counted by [MemoryService], not by the sidecar - so the review
+  /// list and the rate below still read when the sidecar is offline.
+  List<MisparseEntry> _misparse = [];
+  /// The rate's own numbers (turns, corrections, and what became of each
+  /// row), kept apart from the sidecar health so a missing sidecar never
+  /// blanks the strip.
+  ({
+    int turns,
+    int corrections,
+    int proposed,
+    int taught,
+    int dismissed,
+  })? _misparseStats;
+  /// One decision at a time: teach/dismiss are writes to the same blob, and
+  /// a double tap would file the same lesson twice.
+  bool _misparseBusy = false;
+  /// The remembered environment (venue, scale, budget, skill), with its
+  /// editor's working values. Learned automatically when the user states a
+  /// fact in chat; edited here by hand.
+  EnvironmentProfile? _envProfile;
+  String _envVenue = '';
+  final _envScaleCtl = TextEditingController();
+  bool _envBudget = false;
+  String _envSkill = '';
   final _ruleCtl = TextEditingController();
   final _kCtl = TextEditingController();
   final _vCtl = TextEditingController();
@@ -66,6 +97,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
     _refreshLearning();
     _refreshCorrections();
     _refreshMemoryHealth();
+    _refreshMisparse();
     _learningTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (mounted) {
         _refreshLearning(quiet: true);
@@ -117,6 +149,27 @@ class _MemoryScreenState extends State<MemoryScreen> {
       setState(() => _memoryHealth = health);
     } catch (_) {
       // Sidecar offline: keep the last value rather than flapping to empty.
+    }
+  }
+
+  /// Read the misparse ledger: the rate for the health strip, the rows for
+  /// the review above the phrasings. It lives in a pref, not in the sidecar
+  /// journal, so it reads with the sidecar offline - and a store that is not
+  /// there leaves the metric at n/a rather than opening an error banner on
+  /// the strip.
+  Future<void> _refreshMisparse() async {
+    final mem = context.read<MemoryService>();
+    if (!mem.ready) return;
+    try {
+      final stats = await mem.misparseStats();
+      final entries = await mem.misparseLedger();
+      if (!mounted) return;
+      setState(() {
+        _misparseStats = stats;
+        _misparse = entries;
+      });
+    } catch (_) {
+      // Nothing measured is a number the strip can show; a failure is not.
     }
   }
 
@@ -194,6 +247,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
     _ruleCtl.dispose();
     _kCtl.dispose();
     _vCtl.dispose();
+    _envScaleCtl.dispose();
     _learningTimer?.cancel();
     super.dispose();
   }
@@ -205,7 +259,85 @@ class _MemoryScreenState extends State<MemoryScreen> {
     _attempts = await mem.recentAttempts(limit: 12);
     _prefs = await mem.allPrefs();
     _phrasings = await mem.allPhrasings();
+    _learnedAnswers = await mem.allLearnedAnswers();
+    _envProfile = await mem.environmentProfile();
+    _loadEnvEditor();
     if (mounted) setState(() {});
+  }
+
+  /// Fill the environment editor's fields from the stored profile. Called
+  /// by [_refresh] and after a save/forget, so user edits are never
+  /// clobbered mid-typing by anything but an explicit reload.
+  void _loadEnvEditor() {
+    final p = _envProfile ?? const EnvironmentProfile();
+    setStateSafe(() {
+      _envVenue = p.venue;
+      _envScaleCtl.text = p.scale > 0 ? '${p.scale}' : '';
+      _envBudget = p.budget == true;
+      _envSkill = p.skill;
+    });
+  }
+
+  void setStateSafe(VoidCallback fn) {
+    if (mounted) setState(fn);
+  }
+
+  /// Save the edited environment. Writes the whole profile: the editor is
+  /// the authority once the user has touched it, and the source line says
+  /// so.
+  Future<void> _saveEnvironment() async {
+    final mem = context.read<MemoryService>();
+    final scale = int.tryParse(_envScaleCtl.text.trim()) ?? 0;
+    final profile = EnvironmentProfile(
+      venue: _envVenue,
+      scale: scale.clamp(0, 5000),
+      budget: _envBudget ? true : null,
+      skill: _envSkill,
+      source: 'edited on the Memory screen',
+    );
+    try {
+      await mem.setEnvironmentProfile(profile);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            profile.isEmpty
+                ? 'Environment cleared'
+                : 'Environment saved: ${profile.summaryLine}',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save: $e')),
+      );
+    }
+    await _refresh();
+  }
+
+  /// Forget the environment: the advisor goes back to deriving everything
+  /// from each message.
+  Future<void> _forgetEnvironment() async {
+    final mem = context.read<MemoryService>();
+    await mem.forgetEnvironmentProfile();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Environment forgotten')),
+    );
+    await _refresh();
+  }
+
+  /// Drop one learned answer. The offline assistant stops replaying it for
+  /// that question immediately - the lookup reads the store live.
+  Future<void> _forgetLearnedAnswer(int id) async {
+    final mem = context.read<MemoryService>();
+    await mem.forgetLearnedAnswer(id);
+    if (!mounted) return;
+    setState(() => _learnedAnswers.removeWhere((a) => a['id'] == id));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Learned answer forgotten')),
+    );
   }
 
   /// Drop one learned phrasing. The store also refreshes the live index,
@@ -220,9 +352,11 @@ class _MemoryScreenState extends State<MemoryScreen> {
     );
   }
 
-  /// AUTO-LEARN: recurring failure patterns are saved as rules
-  /// automatically - no manual click. Training phase: the more runs,
-  /// the more rules accumulate (deduped by exact text).
+  /// AUTO-LEARN: recurring failure patterns are filed automatically - no
+  /// manual click. They carry an `autopilot` target so they stay review-only
+  /// (MemoryService.plannerRuleTexts excludes them): a troubleshooting
+  /// sentence must never rewrite a plan on its own. The more runs, the more
+  /// advice accumulates (deduped by exact text).
   Future<int> _autoSaveSuggestions(List<String> suggestions) async {
     final mem = context.read<MemoryService>();
     if (!mem.ready || suggestions.isEmpty) return 0;
@@ -320,6 +454,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
               _refreshLearning();
               _refreshCorrections();
               _refreshMemoryHealth();
+              _refreshMisparse();
             },
             icon: const Icon(Icons.refresh, size: 18),
             label: const Text('Refresh'),
@@ -342,7 +477,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
               'saved automatically. Risky network changes still require '
               'approval.',
         ),
-        _healthStrip(health),
+        _healthStrip(health, _misparseStats),
         const SizedBox(height: AppTheme.s14),
         SegmentedButton<_MemoryTab>(
           showSelectedIcon: false,
@@ -358,6 +493,18 @@ class _MemoryScreenState extends State<MemoryScreen> {
               Icons.replay,
               'Phrasings',
               _phrasings.length,
+            ),
+            _tabSegment(
+              _MemoryTab.learned,
+              Icons.lightbulb_outline,
+              'Q&A',
+              _learnedAnswers.length,
+            ),
+            _tabSegment(
+              _MemoryTab.environment,
+              Icons.home_work_outlined,
+              'Environment',
+              _envProfile == null ? 0 : 1,
             ),
             _tabSegment(
               _MemoryTab.learning,
@@ -394,6 +541,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
         switch (_tab) {
           _MemoryTab.rules => _rulesTab(mem),
           _MemoryTab.phrasings => _phrasingsTab(),
+          _MemoryTab.learned => _learnedAnswersTab(),
+          _MemoryTab.environment => _environmentTab(mem),
           _MemoryTab.learning => _learningTab(),
           _MemoryTab.attempts => _attemptsTab(),
           _MemoryTab.tools => _toolsTab(),
@@ -417,7 +566,24 @@ class _MemoryScreenState extends State<MemoryScreen> {
 
   /// The health strip: the numbers that answer "is my memory intact?", which
   /// is the one question this screen must never make the user hunt for.
-  Widget _healthStrip(({int stores, int rows, List<String> failed, String autoLearn}) health) {
+  ///
+  /// [misparse] comes from the ledger rather than the sidecar health, so the
+  /// rate is still there when the sidecar is not.
+  Widget _healthStrip(
+    ({int stores, int rows, List<String> failed, String autoLearn}) health,
+    ({
+      int turns,
+      int corrections,
+      int proposed,
+      int taught,
+      int dismissed,
+    })? misparse,
+  ) {
+    // The rate is a measurement, not an alarm: it counts what the user had
+    // to fix, so red would punish the one number meant to show progress.
+    final turns = misparse?.turns ?? 0;
+    final corrections = misparse?.corrections ?? 0;
+    final measured = turns > 0;
     return AppMetricGrid(
       metrics: [
         AppMetric(
@@ -450,6 +616,20 @@ class _MemoryScreenState extends State<MemoryScreen> {
           tone: health.autoLearn.contains('on')
               ? AppTone.success
               : AppTone.neutral,
+        ),
+        AppMetric(
+          label: 'Misparse rate',
+          value: measured
+              ? '${(corrections / turns * 100).toStringAsFixed(1)}%'
+              : 'n/a',
+          icon: Icons.fact_check_outlined,
+          tone: measured && corrections == 0
+              ? AppTone.success
+              : AppTone.neutral,
+          hint: measured
+              ? 'Your corrections per parsed turn - falling means the '
+                  'learned phrasings are landing.'
+              : 'Nothing measured yet - one parsed turn starts the count.',
         ),
       ],
     );
@@ -636,8 +816,22 @@ class _MemoryScreenState extends State<MemoryScreen> {
 
   // --- phrasings -----------------------------------------------------------
 
+  /// The phrasings tab: corrections waiting for a decision first, then the
+  /// lessons already in the replay index. Review comes first because it is
+  /// the same question - "is this lesson right?" - asked before the lesson
+  /// is allowed to replay.
   Widget _phrasingsTab() {
     final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _misparseReview(theme),
+        _phrasingsPanel(theme),
+      ],
+    );
+  }
+
+  Widget _phrasingsPanel(ThemeData theme) {
     return AppPanel(
       icon: Icons.replay,
       title: 'Learned phrasings',
@@ -720,7 +914,431 @@ class _MemoryScreenState extends State<MemoryScreen> {
     );
   }
 
+  // --- misparse review -----------------------------------------------------
+
+  /// The corrections the user made to a parse, waiting for a decision.
+  ///
+  /// Nothing here reaches the parser until Teach is tapped: the ledger only
+  /// counts, review decides - the same fail-closed rule the autopilot
+  /// teaching loop follows, because an unreviewed guess must not rewrite how
+  /// a sentence is read.
+  Widget _misparseReview(ThemeData theme) {
+    final scheme = theme.colorScheme;
+    final proposed = <MisparseEntry>[];
+    final history = <MisparseEntry>[];
+    for (final e in _misparse) {
+      if (e.status == 'proposed') {
+        proposed.add(e);
+      } else if (e.status == 'taught' || e.status == 'dismissed') {
+        history.add(e);
+      }
+    }
+    return AppPanel(
+      icon: Icons.fact_check_outlined,
+      title: 'Misparse review',
+      subtitle:
+          'What the app understood, what you meant, and how many times it '
+          'took you to fix it. Teach replays your fix on the next parse; '
+          'dismiss keeps it out of the parser for good.',
+      children: [
+        if (proposed.isEmpty)
+          Text(
+            'No corrections yet. When the same words needed the same fix '
+            'three times, the correction is proposed here - and taught only '
+            'after you approve it.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          )
+        else
+          for (final e in proposed) _misparseRow(theme, e),
+        if (history.isNotEmpty) ...[
+          const SizedBox(height: AppTheme.s4),
+          Text(
+            'Reviewed (${history.length})',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+              letterSpacing: 0.8,
+            ),
+          ),
+          for (final e in history)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppTheme.s4),
+              child: Text(
+                '${e.original}  ->  ${e.corrected}  ·  ${e.status}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  /// One proposed correction: the three lines the decision needs (the words,
+  /// what the app made of them, what they meant) plus how often and how it
+  /// arrived, with the two decisions beside them.
+  Widget _misparseRow(ThemeData theme, MisparseEntry e) {
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppTheme.s8),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(
+          AppTheme.s12,
+          AppTheme.s8,
+          AppTheme.s8,
+          AppTheme.s8,
+        ),
+        decoration: BoxDecoration(
+          color: AppPalette.panelAlt(scheme),
+          borderRadius: BorderRadius.circular(AppTheme.rMd),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    e.original,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.arrow_forward,
+                        size: 13,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: AppTheme.s6),
+                      Expanded(
+                        child: Text(
+                          '${e.understood}  ->  ${e.corrected}',
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppTheme.s4),
+                  Wrap(
+                    spacing: AppTheme.s6,
+                    runSpacing: AppTheme.s4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      AppTag(label: '${e.count}x', tone: AppTone.warning),
+                      AppTag(label: e.source, tone: AppTone.neutral),
+                      if (e.slot != 'free')
+                        AppTag(label: e.slot, tone: AppTone.info, mono: true),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppTheme.s8),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FilledButton(
+                  onPressed: _misparseBusy ? null : () => _teachMisparse(e),
+                  child: const Text('Teach'),
+                ),
+                const SizedBox(width: AppTheme.s4),
+                TextButton(
+                  onPressed: _misparseBusy ? null : () => _dismissMisparse(e),
+                  child: const Text('Dismiss'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Teach one proposed correction. This is the only way a misparse lesson
+  /// becomes a lesson: the row is marked taught, the fix enters the live
+  /// phrasing index, and the phrasing list is re-read so the new lesson is
+  /// visible under the very row it came from.
+  Future<void> _teachMisparse(MisparseEntry e) async {
+    final mem = context.read<MemoryService>();
+    setState(() => _misparseBusy = true);
+    try {
+      final ok = await mem.teachMisparse(e.key, e.corrected);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ok ? 'Taught: ${e.corrected}' : 'Could not teach this correction',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _misparseBusy = false);
+    }
+    await _refreshMisparse();
+    await _refresh();
+  }
+
+  /// Reject one proposed correction. It stays in the ledger - the rate still
+  /// counts it as a fix you had to make - but it never reaches the parser.
+  Future<void> _dismissMisparse(MisparseEntry e) async {
+    final mem = context.read<MemoryService>();
+    setState(() => _misparseBusy = true);
+    try {
+      await mem.dismissMisparse(e.key, e.corrected);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Dismissed - counted, never taught'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _misparseBusy = false);
+    }
+    await _refreshMisparse();
+  }
+
   // --- learning ------------------------------------------------------------
+
+  /// Answers the app learned from keyed-model replies and replays offline.
+  /// Review is the point: a wrong lesson is dropped here and the offline
+  /// assistant stops giving it immediately.
+  Widget _learnedAnswersTab() {
+    final theme = Theme.of(context);
+    return AppPanel(
+      icon: Icons.lightbulb_outline,
+      title: 'Learned answers',
+      subtitle:
+          'When an API key was active and the model answered a question, '
+          'the answer is kept and replayed offline for the same question. '
+          'An answer seen twice is confirmed. Drop any lesson you do not '
+          'trust. On this device only.',
+      children: [
+        if (_learnedAnswers.isEmpty)
+          Text(
+            'Nothing learned yet. Ask a question while your API key is '
+            'active and the answer is kept here for offline replay.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          )
+        else
+          for (final a in _learnedAnswers)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppTheme.s8),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.s12,
+                  AppTheme.s8,
+                  AppTheme.s4,
+                  AppTheme.s8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppPalette.panelAlt(theme.colorScheme),
+                  borderRadius: BorderRadius.circular(AppTheme.rMd),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  (a['question'] ?? '').toString(),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleSmall,
+                                ),
+                              ),
+                              const SizedBox(width: AppTheme.s8),
+                              Text(
+                                '${a['seenCount'] ?? 1}x'
+                                '${(a['confirmed'] ?? 0) == 1 ? ' · confirmed' : ''}',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: (a['confirmed'] ?? 0) == 1
+                                      ? AppPalette.success(theme.colorScheme)
+                                      : theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            (a['answer'] ?? '').toString(),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Forget this answer',
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: () => _forgetLearnedAnswer(
+                        (a['id'] as num?)?.toInt() ?? 0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+      ],
+    );
+  }
+
+  // --- environment ---------------------------------------------------------
+
+  /// The remembered environment: what the advisor knows about the user's
+  /// site, learned automatically from stated facts ("this is for the
+  /// office, 40 users") and editable here. One profile, not a history -
+  /// the newest merge wins, so this screen is where "it remembered wrong"
+  /// gets fixed.
+  Widget _environmentTab(MemoryService mem) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final p = _envProfile;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppPanel(
+          icon: Icons.home_work_outlined,
+          title: 'Environment',
+          subtitle:
+              'What the advisor remembers about your site. Facts you state '
+              'in chat ("this is for the office, 40 users", "I\'m a '
+              'beginner") are learned automatically while Learn '
+              'automatically is on; anything you edit here is the '
+              'authority until you change it.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (p == null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppTheme.s12),
+                  child: Text(
+                    'Nothing learned yet. The advisor currently derives '
+                    'everything from each message, exactly as it always has.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              else ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppTheme.s12),
+                  child: Text(
+                    'Remembered now: ${p.summaryLine.isEmpty ? '(empty)' : p.summaryLine}',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (p.updatedAt.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppTheme.s12),
+                    child: Text(
+                      'Last changed ${p.updatedAt}'
+                      '${p.source.isNotEmpty ? ' - ${p.source}' : ''}',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+              ],
+              DropdownButtonFormField<String>(
+                key: const ValueKey('env-venue'),
+                initialValue: _envVenue,
+                decoration: const InputDecoration(
+                  labelText: 'Where the network lives',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: '', child: Text('(not set)')),
+                  DropdownMenuItem(value: 'home', child: Text('Home')),
+                  DropdownMenuItem(value: 'office', child: Text('Office')),
+                  DropdownMenuItem(value: 'school', child: Text('School / campus')),
+                  DropdownMenuItem(value: 'clinic', child: Text('Clinic / hospital')),
+                  DropdownMenuItem(value: 'hospitality', child: Text('Cafe / hotel / shop')),
+                  DropdownMenuItem(value: 'industrial', child: Text('Industrial / warehouse')),
+                ],
+                onChanged: (v) => setStateSafe(() => _envVenue = v ?? ''),
+              ),
+              const SizedBox(height: AppTheme.s12),
+              TextField(
+                key: const ValueKey('env-scale'),
+                controller: _envScaleCtl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'How many people or devices it serves',
+                  border: OutlineInputBorder(),
+                  hintText: 'e.g. 40',
+                ),
+              ),
+              const SizedBox(height: AppTheme.s12),
+              DropdownButtonFormField<String>(
+                key: const ValueKey('env-skill'),
+                initialValue: _envSkill,
+                decoration: const InputDecoration(
+                  labelText: 'Networking experience',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: '', child: Text('(not set)')),
+                  DropdownMenuItem(value: 'beginner', child: Text('Beginner')),
+                  DropdownMenuItem(value: 'intermediate', child: Text('Intermediate')),
+                  DropdownMenuItem(value: 'advanced', child: Text('Advanced')),
+                ],
+                onChanged: (v) => setStateSafe(() => _envSkill = v ?? ''),
+              ),
+              const SizedBox(height: AppTheme.s8),
+              SwitchListTile(
+                key: const ValueKey('env-budget'),
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Budget-conscious'),
+                subtitle: const Text(
+                  'Advice then prefers the affordable option first',
+                ),
+                value: _envBudget,
+                onChanged: (v) => setStateSafe(() => _envBudget = v),
+              ),
+              const SizedBox(height: AppTheme.s8),
+              Row(
+                children: [
+                  FilledButton(
+                    key: const ValueKey('env-save'),
+                    onPressed: _saveEnvironment,
+                    child: const Text('Save'),
+                  ),
+                  const SizedBox(width: AppTheme.s12),
+                  if (_envProfile != null)
+                    TextButton(
+                      onPressed: _forgetEnvironment,
+                      child: const Text('Forget environment'),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _learningTab() {
     final theme = Theme.of(context);
@@ -805,8 +1423,9 @@ class _MemoryScreenState extends State<MemoryScreen> {
                 tone: AppTone.success,
                 dense: true,
                 message:
-                    'AUTO-LEARNED: $_autoSaved recurring pattern(s) saved as '
-                    'rules - future builds use them automatically.',
+                    'RECORDED: $_autoSaved recurring pattern(s) filed below '
+                    'for review - they do not change plans until you teach a '
+                    'rule that says so.',
               ),
             ],
             const SizedBox(height: AppTheme.s8),
@@ -858,7 +1477,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
           AppBanner(
             tone: AppTone.warning,
             title: s,
-            message: 'Automatically recorded as a rule',
+            message: 'Recorded for review - not applied to plans',
           ),
         if (_experiences.isNotEmpty)
           AppPanel(

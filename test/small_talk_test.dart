@@ -34,6 +34,17 @@ void main() {
       expect(ScopeGate.isSmallTalk('who are you'), isTrue);
       expect(ScopeGate.isSmallTalk('what can you do'), isTrue);
       expect(ScopeGate.isSmallTalk('help me'), isTrue);
+      expect(ScopeGate.isSmallTalk('how are you'), isTrue);
+      expect(ScopeGate.isSmallTalk("how's it going"), isTrue);
+    });
+
+    test('an identity question about networking is still a brief', () {
+      // The identity wording must not swallow a real question that carries
+      // networking vocabulary.
+      expect(
+        ScopeGate.isSmallTalk('how are you verifying the OSPF neighbors'),
+        isFalse,
+      );
     });
 
     test('a greeting carrying a real request is NOT small talk', () {

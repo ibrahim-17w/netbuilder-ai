@@ -2,6 +2,8 @@
 // preview the user picks from would be a lie. These pin the geometry constants
 // and the shape of each style, and the end-to-end test below feeds the same
 // plan through the sidecar's own `layout_positions` to prove the two agree.
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:net_builder/models/network_intent.dart';
 import 'package:net_builder/services/adapters/packet_tracer_adapter.dart';
@@ -421,7 +423,13 @@ void main() {
       },
     };
 
-    for (final style in kLayoutStyles) {
+    // The four engineer drawings (`backbone`, `campus`, `star`, `ring`) have
+    // no byte-parity reference here yet: the sidecar's `layout_positions`
+    // mirror does not implement them, so there is no second implementation to
+    // copy from. They are pinned by the property group below and by the
+    // payload round-trip in preview_parity_test, which covers every style in
+    // kLayoutStyles.
+    for (final style in reference.keys) {
       test(style, () {
         final snap = computeLayoutSnapshot(
           intent,
@@ -439,6 +447,363 @@ void main() {
         expect(got, reference[style]);
       });
     }
+  });
+
+  // The four engineer drawings. Places-every-device and no-pile-ups are
+  // already asserted for every style in kLayoutStyles above; these pin what
+  // makes each silhouette THE silhouette an engineer asked for.
+  group('the engineer drawings: backbone, campus, star, ring', () {
+    final intent = NetworkIntent(
+      projectName: 'engineer',
+      nodes: const [
+        NetNode(name: 'R1', type: 'router'),
+        NetNode(name: 'R2', type: 'router'),
+        NetNode(name: 'FW1', type: 'firewall'),
+        NetNode(name: 'SW1', type: 'switch'),
+        NetNode(name: 'SW2', type: 'switch'),
+        NetNode(name: 'PC1', type: 'pc'),
+        NetNode(name: 'PC2', type: 'pc'),
+        NetNode(name: 'PC3', type: 'pc'),
+        NetNode(name: 'SRV1', type: 'server'),
+        NetNode(name: 'SRV2', type: 'server'),
+      ],
+      links: const [
+        NetLink(a: 'FW1', aIf: 'g0/0', b: 'R1', bIf: 'g0/0'),
+        NetLink(
+          a: 'R1',
+          aIf: 'g0/1',
+          b: 'R2',
+          bIf: 'g0/0',
+          cable: 'serial',
+        ),
+        NetLink(a: 'R1', aIf: 'g0/2', b: 'SW1', bIf: 'g0/1'),
+        NetLink(a: 'SW1', aIf: 'f0/1', b: 'PC1', bIf: 'f0'),
+        NetLink(a: 'SW1', aIf: 'f0/2', b: 'PC2', bIf: 'f0'),
+        NetLink(a: 'SW2', aIf: 'f0/3', b: 'PC3', bIf: 'f0'),
+        NetLink(a: 'R2', aIf: 'g0/2', b: 'SW2', bIf: 'g0/1'),
+        NetLink(a: 'SW1', aIf: 'f0/3', b: 'SRV1', bIf: 'f0'),
+        NetLink(a: 'SW2', aIf: 'f0/4', b: 'SRV2', bIf: 'f0'),
+      ],
+    );
+
+    double xOf(LayoutSnapshot snap, String name) =>
+        snap.spots.firstWhere((s) => s.name == name).x;
+    double yOf(LayoutSnapshot snap, String name) =>
+        snap.spots.firstWhere((s) => s.name == name).y;
+
+    test('backbone: one line, servers above it, PCs below it', () {
+      final snap = computeLayoutSnapshot(intent, style: 'backbone');
+      expect(
+        snap.spots.length,
+        intent.nodes.length,
+        reason: 'backbone dropped a device',
+      );
+      // Routers and switches share the backbone row, in core-first order.
+      final lineY = yOf(snap, 'R1');
+      for (final name in ['R2', 'FW1', 'SW1', 'SW2']) {
+        expect(yOf(snap, name), lineY, reason: '$name is not on the line');
+      }
+      // Left to right the line reads core then access.
+      expect(xOf(snap, 'R1'), lessThan(xOf(snap, 'SW1')));
+      expect(xOf(snap, 'SW1'), lessThan(xOf(snap, 'SW2')));
+      // Servers sit above the line, PCs below - the riser look.
+      expect(yOf(snap, 'SRV1'), lessThan(lineY));
+      expect(yOf(snap, 'SRV2'), lessThan(lineY));
+      for (final name in ['PC1', 'PC2', 'PC3']) {
+        expect(yOf(snap, name), greaterThan(lineY), reason: name);
+      }
+      // Drops stay under the device they hang off: SW1's block holds
+      // PC1, PC2 and SRV1; PC3 and SRV2 hang off SW2.
+      final sw1x = xOf(snap, 'SW1');
+      expect((xOf(snap, 'PC1') - sw1x).abs(), lessThanOrEqualTo(240));
+      expect((xOf(snap, 'PC2') - sw1x).abs(), lessThanOrEqualTo(240));
+      expect(xOf(snap, 'SRV1'), xOf(snap, 'SW1'));
+      expect(xOf(snap, 'PC3'), xOf(snap, 'SW2'));
+      expect(xOf(snap, 'SRV2'), xOf(snap, 'SW2'));
+    });
+
+    test('backbone: pinned coordinates for the riser plan', () {
+      final snap = computeLayoutSnapshot(intent, style: 'backbone');
+      final got = <String, List<int>>{
+        for (final s in snap.spots) s.name: [s.x.toInt(), s.y.toInt()],
+      };
+      // Drift here changes the riser a user was shown; fail loudly.
+      expect(got, {
+        'R1': [200, 190],
+        'R2': [470, 190],
+        'FW1': [740, 190],
+        'SW1': [1070, 190],
+        'SW2': [1400, 190],
+        'SRV1': [1070, 60],
+        'SRV2': [1400, 60],
+        'PC1': [1010, 320],
+        'PC2': [1130, 320],
+        'PC3': [1400, 320],
+      });
+    });
+
+    test('campus: three tiers, endpoints aligned under their switch', () {
+      final snap = computeLayoutSnapshot(intent, style: 'campus');
+      expect(
+        snap.spots.length,
+        intent.nodes.length,
+        reason: 'campus dropped a device',
+      );
+      final coreY = yOf(snap, 'R1');
+      for (final name in ['R2', 'FW1']) {
+        expect(yOf(snap, name), coreY, reason: '$name is not on the top tier');
+      }
+      final midY = yOf(snap, 'SW1');
+      expect(yOf(snap, 'SW2'), midY, reason: 'switches share the middle tier');
+      expect(midY, greaterThan(coreY));
+      for (final name in ['PC1', 'PC2', 'PC3', 'SRV1', 'SRV2']) {
+        expect(yOf(snap, name), greaterThan(midY), reason: name);
+      }
+      // Columns aligned per switch: each endpoint sits inside its own
+      // switch's column block, and no endpoint drifts to another column.
+      // (The fan order is the cabling order, so the exact slot varies -
+      // staying inside the switch's block is the promise.)
+      expect(
+        (xOf(snap, 'SRV1') - xOf(snap, 'SW1')).abs(),
+        lessThanOrEqualTo(180),
+        reason: 'SRV1 left SW1 column',
+      );
+      expect(
+        (xOf(snap, 'PC1') - xOf(snap, 'SW1')).abs(),
+        lessThanOrEqualTo(180),
+        reason: 'PC1 left SW1 column',
+      );
+      expect(
+        (xOf(snap, 'PC2') - xOf(snap, 'SW1')).abs(),
+        lessThanOrEqualTo(180),
+        reason: 'PC2 left SW1 column',
+      );
+      expect(xOf(snap, 'PC3'), lessThan(xOf(snap, 'SW2')));
+      expect(xOf(snap, 'SRV2'), greaterThan(xOf(snap, 'SW2')));
+    });
+
+    test('campus: pinned coordinates for the tiered plan', () {
+      final snap = computeLayoutSnapshot(intent, style: 'campus');
+      final got = <String, List<int>>{
+        for (final s in snap.spots) s.name: [s.x.toInt(), s.y.toInt()],
+      };
+      expect(got, {
+        'R1': [580, 60],
+        'R2': [700, 60],
+        'FW1': [820, 60],
+        'SW1': [505, 250],
+        'SW2': [955, 250],
+        'PC1': [385, 440],
+        'PC2': [505, 440],
+        'SRV1': [625, 440],
+        'PC3': [895, 440],
+        'SRV2': [1015, 440],
+      });
+    });
+
+    test('star: switches radiate, their own PCs fan outward', () {
+      final snap = computeLayoutSnapshot(intent, style: 'star');
+      expect(
+        snap.spots.length,
+        intent.nodes.length,
+        reason: 'star dropped a device',
+      );
+      // Two switches sit at even angles (here: straight up and straight
+      // down) on a ring of radius 1.8 pitches round the centre at
+      // (700, 60 + 216 + 120).
+      const cx = 700.0;
+      const cy = 396.0;
+      expect(xOf(snap, 'SW1'), closeTo(cx, 1));
+      expect(yOf(snap, 'SW1'), closeTo(cy - 216, 1));
+      expect(xOf(snap, 'SW2'), closeTo(cx, 1));
+      expect(yOf(snap, 'SW2'), closeTo(cy + 216, 1));
+      // Every endpoint sits further out than the switch it hangs off.
+      double radius2(String name) {
+        final dx = xOf(snap, name) - cx;
+        final dy = yOf(snap, name) - cy;
+        return dx * dx + dy * dy;
+      }
+
+      for (final pair in [
+        ['SW1', 'PC1'],
+        ['SW1', 'PC2'],
+        ['SW1', 'SRV1'],
+        ['SW2', 'PC3'],
+        ['SW2', 'SRV2'],
+      ]) {
+        expect(
+          radius2(pair[1]),
+          greaterThan(radius2(pair[0])),
+          reason: '${pair[1]} is not outside its switch ${pair[0]}',
+        );
+      }
+      // The middle endpoint of SW1's fan lies exactly on its spoke, one
+      // pitch beyond the switch ring - outward, which for the top switch is
+      // straight up.
+      expect(xOf(snap, 'PC2'), closeTo(cx, 1));
+      expect(yOf(snap, 'PC2'), closeTo(cy - 336, 1));
+    });
+
+    test('ring: core inside, ring devices equidistant, kinds alternating', () {
+      final snap = computeLayoutSnapshot(intent, style: 'ring');
+      expect(
+        snap.spots.length,
+        intent.nodes.length,
+        reason: 'ring dropped a device',
+      );
+      const cx = 700.0;
+      final sw1 = snap.spots.firstWhere((s) => s.name == 'SW1');
+      // The first ring slot is straight up from the centre.
+      expect(sw1.x, closeTo(cx, 1));
+      expect(sw1.y, closeTo(60, 1));
+      final centreY = 60 + 253.6902;
+      double dist2(LayoutSpot s) =>
+          (s.x - cx) * (s.x - cx) + (s.y - centreY) * (s.y - centreY);
+      // Ring devices all sit on the ring; routers sit well inside it.
+      final ringNames = ['SW1', 'PC1', 'SW2', 'PC2', 'PC3', 'SRV1', 'SRV2'];
+      final ringDist = dist2(
+        snap.spots.firstWhere((s) => s.name == ringNames.first),
+      );
+      for (final name in ringNames) {
+        final d = dist2(snap.spots.firstWhere((s) => s.name == name));
+        expect(d, closeTo(ringDist, 2 * 253 * 1 + 2), reason: name);
+      }
+      for (final name in ['R1', 'R2', 'FW1']) {
+        final d = dist2(snap.spots.firstWhere((s) => s.name == name));
+        expect(d, lessThan(ringDist / 4), reason: '$name is not inside');
+      }
+      // Walking the ring by angle, no two switches stand side by side: the
+      // interleave separates them with the machines they serve. (Perfect
+      // alternation is impossible when one side outnumbers the other - two
+      // switches, five endpoints here - so the remainder may bunch, the
+      // switches may not.)
+      final byAngle = [
+        for (final name in ringNames)
+          (
+            name,
+            math.atan2(
+              yOf(snap, name) - centreY,
+              xOf(snap, name) - cx,
+            ),
+          ),
+      ]..sort((a, b) => a.$2.compareTo(b.$2));
+      const switches = {'SW1', 'SW2'};
+      for (var i = 0; i < byAngle.length; i++) {
+        final name = byAngle[i].$1;
+        final prev = byAngle[(i - 1) % byAngle.length].$1;
+        expect(
+          switches.contains(name) && switches.contains(prev),
+          isFalse,
+          reason: '$name and $prev stand together on the ring',
+        );
+      }
+    });
+
+    test('edge cases: one router, no switches, no crash and no fallback', () {
+      final lone = NetworkIntent(
+        projectName: 'lone',
+        nodes: const [NetNode(name: 'R1', type: 'router')],
+      );
+      final islands = NetworkIntent(
+        projectName: 'islands',
+        nodes: const [
+          NetNode(name: 'R1', type: 'router'),
+          NetNode(name: 'PC1', type: 'pc'),
+          NetNode(name: 'PC2', type: 'pc'),
+          NetNode(name: 'PC3', type: 'pc'),
+        ],
+      );
+      for (final style in const ['ring', 'star', 'backbone', 'campus']) {
+        final one = computeLayoutSnapshot(lone, style: style);
+        expect(one.spots.length, 1, reason: style);
+        final many = computeLayoutSnapshot(islands, style: style);
+        expect(many.spots.length, islands.nodes.length, reason: style);
+        expect(
+          {for (final s in many.spots) '${s.x},${s.y}'}.length,
+          islands.nodes.length,
+          reason: '$style piled devices up with no switches present',
+        );
+      }
+      // A star with no switches is still a star: the core sits at the
+      // centre and the endpoints spread on one ring round it - one-device
+      // spokes - not some other drawing.
+      final star = computeLayoutSnapshot(islands, style: 'star');
+      final r1 = star.spots.firstWhere((s) => s.name == 'R1');
+      double dist2(LayoutSpot s) =>
+          (s.x - r1.x) * (s.x - r1.x) + (s.y - r1.y) * (s.y - r1.y);
+      final pc1 = star.spots.firstWhere((s) => s.name == 'PC1');
+      final pc2 = star.spots.firstWhere((s) => s.name == 'PC2');
+      final pc3 = star.spots.firstWhere((s) => s.name == 'PC3');
+      final ring2 = dist2(pc1);
+      expect(dist2(pc2), closeTo(ring2, 2 * 300 + 2), reason: 'PC2');
+      expect(dist2(pc3), closeTo(ring2, 2 * 300 + 2), reason: 'PC3');
+      expect(ring2, greaterThan(0), reason: 'PCs do not sit on the core');
+    });
+
+    test('a large lab (36 devices) still places every device, once', () {
+      final big = _plan('2 routers, 4 switches and 30 PCs with OSPF');
+      for (final style in const ['ring', 'star', 'backbone', 'campus']) {
+        final snap = computeLayoutSnapshot(big, style: style);
+        expect(
+          snap.spots.length,
+          big.nodes.length,
+          reason: '$style dropped a device on a large lab',
+        );
+        expect(
+          {for (final s in snap.spots) '${s.x},${s.y}'}.length,
+          big.nodes.length,
+          reason: '$style piled devices up on a large lab',
+        );
+        expect(
+          snap.spots.every((s) => s.x >= 0),
+          isTrue,
+          reason: '$style placed a device off the canvas on a large lab',
+        );
+      }
+    });
+
+    test('the new drawings are not silent fallbacks of the old ones', () {
+      for (final style in const ['ring', 'star', 'backbone', 'campus']) {
+        final snap = computeLayoutSnapshot(intent, style: style);
+        final drawing = snap.spots
+            .map((s) => '${s.name}@${s.x.toInt()},${s.y.toInt()}')
+            .join('|');
+        for (final other in const ['tree', 'radial', 'circle', 'rows']) {
+          final otherSnap = computeLayoutSnapshot(intent, style: other);
+          final otherPrint = otherSnap.spots
+              .map((s) => '${s.name}@${s.x.toInt()},${s.y.toInt()}')
+              .join('|');
+          expect(
+            drawing,
+            isNot(otherPrint),
+            reason: '$style drew exactly what $other draws',
+          );
+        }
+      }
+    });
+
+    test('the chosen style reaches the build payload with its positions', () {
+      // The gallery pick travels as a bare style string; the payload must
+      // carry the style through AND the exact spots the gallery drew, so the
+      // file is parked on the picture the user agreed to.
+      for (final style in const ['ring', 'star', 'backbone', 'campus']) {
+        final snapshot = computeLayoutSnapshot(intent, style: style);
+        final payload = PacketTracerAdapter.autopilotPlan(
+          intent,
+          layout: {'style': style},
+        );
+        final layout = payload['layout'] as Map;
+        expect(layout['style'], style, reason: style);
+        final positions = (layout['positions'] as Map).cast<String, List>();
+        for (final spot in snapshot.spots) {
+          expect(
+            positions[spot.name],
+            <int>[spot.x.toInt(), spot.y.toInt()],
+            reason: '$style moved ${spot.name} between preview and payload',
+          );
+        }
+      }
+    });
   });
 
   group('the drawings are genuinely different from each other', () {

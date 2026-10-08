@@ -1,3 +1,4 @@
+import '../models/environment_profile.dart';
 import '../models/network_intent.dart';
 
 /// A deterministic advisor for the questions the builder never answers:
@@ -35,6 +36,12 @@ class AdvisorService {
     String text, {
     NetworkIntent? plan,
     String target = 'packet-tracer',
+    // The remembered environment (see [EnvironmentProfile]). The message is
+    // still the authority: a fact it states wins, and the profile only fills
+    // in what the message leaves unsaid - so "how many APs for 40 users?"
+    // answered in the office the profile remembers sizes for 40, not for the
+    // profile's stale number.
+    EnvironmentProfile? environmentProfile,
   }) {
     final t = text.trim().toLowerCase();
     if (t.isEmpty) return null;
@@ -52,6 +59,7 @@ class AdvisorService {
       plan: plan,
       target: target,
       kind: kind,
+      profile: environmentProfile,
     );
     for (final topic in _topics) {
       if (topic.match(ctx)) {
@@ -77,6 +85,14 @@ class AdvisorService {
     if (c.hasPlan) {
       return 'the lab on the table (${c.labLine()}) and how those Packet '
           'Tracer/GNS3 devices behave.';
+    }
+    // A model-number ask is about the simulators' own catalogs, not about a
+    // purchase: the honest provenance is the device list those tools ship
+    // with, plus the datasheet caveat for anything a real buy hangs on.
+    if (_namedModels(c.t).isNotEmpty) {
+      return 'the device catalogs Packet Tracer/GNS3 ship with; the model '
+          "details here are the simulator's, so check current datasheets "
+          'before a real purchase.';
     }
     if (c.lab) {
       return 'the way Packet Tracer/GNS3 behave; the models named are the '
@@ -131,6 +147,16 @@ class AdvisorService {
           (c.mentionsAny(const ['slow', 'dead spot', 'dropping', 'buffering']) &&
               c.mentionsAny(const ['wifi', 'wi-fi', 'wireless', 'internet'])),
       answer: _slowWifi,
+    ),
+    (
+      // Two or more named lab models are the most specific signal a message
+      // can carry - a model number beats every topic noun below - so the
+      // model comparison outranks them all (except troubleshooting above).
+      // "which is better, 2911 or 4331?" used to reach the lab topic and
+      // get the generic answer that never compared the two.
+      match: (c) =>
+          c.kind != AdviceKind.review && _namedModels(c.t).length >= 2,
+      answer: _modelComparison,
     ),
     (
       // Power and the cabinet come first: a UPS question that mentions the
@@ -342,6 +368,16 @@ class AdvisorService {
           ]) &&
           (c.kind == AdviceKind.recommendation || c.kind == AdviceKind.review),
       answer: _serverPlacement,
+    ),
+    (
+      // One named model with no other topic claiming the question ("is a
+      // 2911 enough for my lab?") routes to the same comparison machinery,
+      // with the model's siblings as the other options. Topic-specific
+      // asks - VLANs, PoE, VPN, cabling - matched above keep their own
+      // answers, and a review still reviews.
+      match: (c) =>
+          c.kind != AdviceKind.review && _namedModels(c.t).length == 1,
+      answer: _modelComparison,
     ),
     // Lab-model questions: which Cisco device to place in Packet Tracer or
     // GNS3. Guarded to the tools/lab/Cisco-model vocabulary, and never a
@@ -1416,6 +1452,298 @@ class AdvisorService {
     );
   }
 
+  // --- lab model comparison -------------------------------------------------
+
+  /// Every model the comparison can answer about, one row per model
+  /// ("isr4331", "isr 4331" and "4331" all land on the 4331 row). Keep the
+  /// token set in step with AdviceIntentReader._topicWords in
+  /// network_intent.dart - that reader is what lets a model-number message
+  /// classify as advice at all. The facts are grounded: the roles and
+  /// trade-offs are the lab-models topic's, and the port counts and device
+  /// kinds are what the app's own device catalog ships
+  /// (assets/pkt_templates/manifest.json) - nothing is invented.
+  static final List<_LabModel> _modelTable = [
+    _LabModel(
+      token: RegExp(r'\b1841\b'),
+      key: '1841',
+      name: '1841',
+      family: 'router',
+      rank: 1,
+      tagline: 'the small classic ISR router, two FastEthernet ports plus '
+          'WIC slots for serial links',
+      chooseWhen: 'the course or the template names it, or the lab is '
+          'serial-WAN practice on WIC cards',
+      tradeOff: 'it is the oldest and smallest of the router set - routing, '
+          'NAT and ACL practice runs fine, but a lab graded on throughput '
+          'needs a bigger ISR',
+    ),
+    _LabModel(
+      token: RegExp(r'\b2811\b'),
+      key: '2811',
+      name: '2811',
+      family: 'router',
+      rank: 2,
+      tagline: 'the older ISR router, two FastEthernet ports and NM/WIC '
+          'module slots',
+      chooseWhen: 'the exercise is about modules and slots, or the template '
+          'names it',
+      tradeOff: 'it is FastEthernet-only and superseded - the 2901/2911 do '
+          'the same jobs on newer hardware',
+    ),
+    _LabModel(
+      token: RegExp(r'\b1941\b'),
+      key: '1941',
+      name: '1941',
+      family: 'router',
+      rank: 3,
+      tagline: 'the small ISR G2 router, two GigabitEthernet ports',
+      chooseWhen: 'the lab is small routing/NAT/ACL work, or the course '
+          'ships 1941 images',
+      tradeOff: 'it cannot stand in for a 4331 when the lab grades '
+          'throughput or licensing',
+    ),
+    _LabModel(
+      token: RegExp(r'\b2901\b'),
+      key: '2901',
+      name: '2901',
+      family: 'router',
+      rank: 4,
+      tagline: 'the ISR G2 router with two GigabitEthernet ports',
+      chooseWhen: 'the lab wants gigabit routing inside the G2 family the '
+          'course uses',
+      tradeOff: 'two ports is the whole box - the 2911 adds one more '
+          'GigabitEthernet and nothing else changes',
+    ),
+    _LabModel(
+      token: RegExp(r'\b2911\b'),
+      key: '2911',
+      name: '2911',
+      family: 'router',
+      rank: 5,
+      tagline: 'the Packet Tracer workhorse ISR G2 router, three '
+          'GigabitEthernet ports',
+      chooseWhen: 'it is the standard router lab: routing, WAN, NAT, ACL, '
+          'OSPF, VPN-style labs',
+      tradeOff: 'there are no switching ports, so VLAN work still needs a '
+          'switch model',
+    ),
+    _LabModel(
+      token: RegExp(r'\b(?:isr ?)?4321\b'),
+      key: '4321',
+      name: 'ISR 4321',
+      family: 'router',
+      rank: 6,
+      tagline: 'the ISR 4000 router with two GigabitEthernet ports',
+      chooseWhen: 'the lab or its image set names the ISR 4000 generation',
+      tradeOff: 'in the simulator its feature set sits close to the 2911 - '
+          'capacity is the real difference',
+    ),
+    _LabModel(
+      token: RegExp(r'\b(?:isr ?)?4331\b'),
+      key: '4331',
+      name: 'ISR 4331',
+      family: 'router',
+      rank: 7,
+      tagline: 'the big ISR 4000 router with three GigabitEthernet ports',
+      chooseWhen: 'the lab grades the big-platform things - throughput, '
+          'licensing, headroom',
+      tradeOff: 'few labs grade the capacity - if none does, the 2911 '
+          'builds the identical topology',
+    ),
+    _LabModel(
+      token: RegExp(r'\b2950\b'),
+      key: '2950',
+      name: '2950-24',
+      family: 'switch',
+      rank: 1,
+      tagline: 'the older layer-2 switch with 24 FastEthernet ports',
+      chooseWhen: 'the course names it - the access/VLAN/STP jobs are the '
+          "2960's otherwise",
+      tradeOff: 'it is superseded by the 2960-24TT in every Packet Tracer '
+          'catalog that ships both',
+    ),
+    _LabModel(
+      token: RegExp(r'\b2960\b'),
+      key: '2960',
+      name: '2960-24TT',
+      family: 'switch',
+      rank: 2,
+      tagline: 'the layer-2 access switch with 24 FastEthernet ports',
+      chooseWhen: 'the lab is access-layer work: VLANs, STP, port security',
+      tradeOff: 'it is layer 2 only - inter-VLAN routing on a 2960 alone '
+          'cannot work',
+    ),
+    _LabModel(
+      token: RegExp(r'\b3560\b'),
+      key: '3560',
+      name: '3560-24PS',
+      family: 'switch',
+      rank: 3,
+      tagline: 'the layer-3 PoE switch with 24 FastEthernet ports',
+      chooseWhen: 'the lab needs SVIs, inter-VLAN routing, or powered ports',
+      tradeOff: 'it is the heavier model, and not every Packet Tracer build '
+          'ships the same device catalog',
+    ),
+    _LabModel(
+      token: RegExp(r'\b(?:access ?point|accesspoint|ap)-?pt\b'),
+      key: 'ap-pt',
+      name: 'Access Point-PT',
+      family: 'wireless',
+      rank: 1,
+      tagline: 'the Packet Tracer access point, one wired port and a '
+          '2.4 GHz radio',
+      chooseWhen: 'wireless clients must associate with no cable drawn',
+      tradeOff: 'it covers 2.4 GHz and simple WPA, not full enterprise WLAN '
+          'features',
+    ),
+    _LabModel(
+      token: RegExp(r'\b(?:wireless )?router-?pt\b'),
+      key: 'router-pt',
+      name: '(Wireless) Router-PT',
+      family: 'wireless',
+      rank: 2,
+      tagline: 'the generic PT boxes - Wireless Router-PT is the all-in-one '
+          'shape',
+      chooseWhen: 'a quick all-in-one shape matters more than the '
+          "box's name",
+      tradeOff: 'it is generic sim hardware - the named models carry the '
+          'feature depth',
+    ),
+    _LabModel(
+      token: RegExp(r'\bisa-?3000\b'),
+      key: 'isa-3000',
+      name: 'ISA-3000',
+      family: 'firewall',
+      rank: 1,
+      tagline: 'the industrial security appliance, cataloged ASA-kind by '
+          'this app',
+      chooseWhen: 'an industrial-security lab names it',
+      tradeOff: 'the same rule as the ASA applies: firewall configuration '
+          'is by hand, never auto-configured',
+    ),
+    _LabModel(
+      token: RegExp(r'\basa\b'),
+      key: 'asa',
+      name: 'ASA 5505/5506',
+      family: 'firewall',
+      rank: 2,
+      tagline: 'the ASA firewall appliance',
+      chooseWhen: 'the firewall lab is about the ASA CLI itself',
+      tradeOff: 'ASA is not IOS, so this app will not auto-configure it - '
+          'plan the policy on the router or configure the ASA by hand',
+    ),
+  ];
+
+  /// The lab models [t] names, in table order, deduped by construction:
+  /// one row per model, so "isr4331" and "4331" both land on one entry.
+  static List<_LabModel> _namedModels(String t) =>
+      [for (final m in _modelTable) if (m.token.hasMatch(t)) m];
+
+  /// The answer when the ask names known lab models: a recommendation
+  /// first, then one row per model - what it is, when to choose it, what it
+  /// costs - grounded in the same lab context the lab-models topic uses. A
+  /// single-model ask ("is a 2911 enough for my lab?") gets the same table
+  /// with the model's nearest siblings as the other options, so the answer
+  /// is still a choice and never a dead end.
+  static AdviceAnswer _modelComparison(_AdvisorContext c) {
+    final named = _namedModels(c.t);
+    final shown = named.take(4).toList();
+    final options = <AdviceOption>[
+      for (final m in shown)
+        AdviceOption(
+          label: '${m.name} - ${m.tagline}',
+          chooseWhen: m.chooseWhen,
+          tradeOff: m.tradeOff,
+        ),
+    ];
+    const familyJob = {
+      'router': 'the box that routes, NATs and holds the ACLs',
+      'switch': 'the box the wired devices plug into',
+      'wireless': 'the radio the wireless clients associate to',
+      'firewall': 'the policy box - the one this app leaves to hand config',
+    };
+    final sameFamily =
+        shown.map((m) => m.family).toSet().length == 1;
+    final String recommendation;
+    if (shown.length >= 2 && sameFamily) {
+      final best = shown.reduce((a, b) => a.rank >= b.rank ? a : b);
+      final others = shown
+          .where((m) => m.key != best.key)
+          .map((m) => m.name)
+          .join(' or ');
+      recommendation = 'Take the ${best.name} unless your course or template '
+          'names the $others: ${best.chooseWhen}. The trade-off: '
+          '${best.tradeOff}. The honest caveat either way - these models '
+          'build the same Packet Tracer topology, so matching the model the '
+          'course materials use keeps the configs and screenshots '
+          'consistent.';
+    } else if (shown.length >= 2) {
+      final jobs = shown
+          .map((m) => 'the ${m.name} is ${familyJob[m.family]!}')
+          .join(' and ');
+      recommendation = 'These are not rivals - $jobs. A working lab needs '
+          'one of each, so choose by the job the lab grades, not one model '
+          'against the other.';
+    } else {
+      final m = shown.first;
+      recommendation = '${m.name} - ${m.tagline}. For a Packet Tracer lab: '
+          'enough for its own jobs (${m.chooseWhen}); it is the wrong box '
+          'only when the lab grades what it lacks - ${m.tradeOff}.';
+      final siblings = _modelTable
+          .where((s) => s.family == m.family && s.key != m.key)
+          .toList()
+        ..sort(
+          (a, b) =>
+              (a.rank - m.rank).abs().compareTo((b.rank - m.rank).abs()),
+        );
+      for (final s in siblings.take(2)) {
+        options.add(
+          AdviceOption(
+            label: '${s.name} - ${s.tagline}',
+            chooseWhen: s.chooseWhen,
+            tradeOff: s.tradeOff,
+          ),
+        );
+      }
+    }
+    return AdviceAnswer(
+      topic: 'lab_model_comparison',
+      kind: c.kind,
+      recommendation: recommendation,
+      options: options,
+      reasons: [
+        if (shown.length >= 2 && sameFamily)
+          'The one trap: a smaller ISR cannot stand in for a bigger one when '
+              'the lab grades throughput or licensing - the 1941-for-4331 '
+              'swap is the classic example.'
+        else if (shown.length >= 2)
+          'A router has no switching ports and a 2960 cannot route between '
+              'VLANs, so "which is better" across families is really "which '
+              'job is first": inter-VLAN routing needs a 3560, or '
+              'router-on-a-stick on the router.',
+        'Keep one model family across the lab: mixing is technically fine, '
+            'but the configs and the screenshots stop matching.',
+        if (c.hasPlan)
+          'The plan on the table reads ${c.labLine()} - nothing here '
+              're-plans it; swap a model only when a graded feature says so.',
+        'Model catalogs differ a little between Packet Tracer versions - if '
+            'a name is missing in your install, the closest sibling builds '
+            'the same lab.',
+      ],
+      questions: const [
+        'What does the lab need to grade: routing, VLANs, wireless, or '
+            'security?',
+      ],
+      quickReplies: const [
+        'Which switch should I get for a packet tracer lab?',
+        'What is the difference between a router and a switch?',
+      ],
+      nextStep: 'Name the feature the lab grades and the model follows from '
+          'it - or say "plan it" with the device counts and I will plan the '
+          'matching models.',
+    );
+  }
+
   static AdviceAnswer _sizing(_AdvisorContext c) {
     final n = c.scale;
     final browse = n == null ? null : (n * 7.5).round();
@@ -1733,6 +2061,32 @@ class AdviceAnswer {
 
 // --- context ----------------------------------------------------------------
 
+/// One row of the advisor's lab-model table ([AdvisorService._modelTable]):
+/// the token that names it (the way a user types it) and the facts a
+/// comparison row shows. [rank] is the capacity/generation order inside a
+/// family; it only ever picks a default between two models, never a spec.
+class _LabModel {
+  final RegExp token;
+  final String key;
+  final String name;
+  final String family;
+  final int rank;
+  final String tagline;
+  final String chooseWhen;
+  final String tradeOff;
+
+  _LabModel({
+    required this.token,
+    required this.key,
+    required this.name,
+    required this.family,
+    required this.rank,
+    required this.tagline,
+    required this.chooseWhen,
+    required this.tradeOff,
+  });
+}
+
 enum _Venue { home, office, school, clinic, hospitality, industrial, unknown }
 
 /// What the message and the standing plan say, read once and used by every
@@ -1746,14 +2100,42 @@ class _AdvisorContext {
   final int? scale;
   final bool budget;
 
+  /// The remembered skill level, when the profile states one ("beginner").
+  /// The message never states it mid-answer, so unlike venue/scale there is
+  /// no per-turn override to consider - it is purely the stored fact.
+  final String skill;
+
   _AdvisorContext({
     required this.t,
     required this.plan,
     required this.target,
     required this.kind,
-  }) : venue = _venueOf(t),
-       scale = _scaleOf(t),
-       budget = _budget.hasMatch(t);
+    EnvironmentProfile? profile,
+  }) : venue = _venueFor(t, profile),
+       scale = _scaleFor(t, profile),
+       budget = _budget.hasMatch(t) || (profile?.budget ?? false),
+       skill = (profile == null || profile.skill.isEmpty) ? '' : profile.skill;
+
+  /// The message's venue when it states one; the remembered venue otherwise.
+  static _Venue _venueFor(String t, EnvironmentProfile? profile) {
+    final stated = _venueOf(t);
+    if (stated != _Venue.unknown) return stated;
+    final remembered = profile?.venue ?? '';
+    if (remembered.isEmpty) return _Venue.unknown;
+    for (final v in _Venue.values) {
+      if (v.name == remembered) return v;
+    }
+    return _Venue.unknown;
+  }
+
+  /// The message's count of people/devices when it states one; the
+  /// remembered scale otherwise.
+  static int? _scaleFor(String t, EnvironmentProfile? profile) {
+    final stated = _scaleOf(t);
+    if (stated != null) return stated;
+    final remembered = profile?.scale ?? 0;
+    return remembered > 0 ? remembered : null;
+  }
 
   bool get hasPlan => plan != null && plan!.nodes.isNotEmpty;
 

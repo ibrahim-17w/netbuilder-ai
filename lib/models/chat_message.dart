@@ -68,13 +68,27 @@ class ChatAction {
     'check_plan',
     // Offline capture work: no Packet Tracer, no window, no clicks.
     'pkt_scan',
+    // Put a file the app already built into a folder the user can browse.
+    'pkt_export',
     'pkt_fix',
     'pkt_undo',
     'pkt_generate',
     // Rewriting the file this conversation already produced, with a backup.
     'pkt_edit',
+    // Hand a built file to the operating system (Packet Tracer takes it via
+    // the .pkt association). Attached to every build answer on desktops.
+    'pkt_open',
     // Show the drawing this plan would be built with, before Packet Tracer.
     'layout_preview',
+    // A structured design-advice answer: recommendation highlighted, options
+    // with their trade-offs, and a "Plan this" button when the advisor has a
+    // plan-able sentence. Read-only - "Plan this" sends a normal chat turn
+    // through the planner, so the advice itself still never edits the plan.
+    'advice_card',
+    // The conversation's design brief ("what I know so far / what's still
+    // open"). Read-only: it shows the state the readiness gate uses, and it
+    // persists so a reopened conversation still shows what was settled.
+    'brief_card',
     'ledger',
   };
 
@@ -149,6 +163,8 @@ class ChatAction {
       case 'pkt_scan':
         return 'Re-read ${payload['name'] ?? payload['path'] ?? 'the capture'} '
             '(read-only)';
+      case 'pkt_export':
+        return 'Save ${payload['name'] ?? 'the file'} to a folder you choose';
       case 'pkt_fix':
         return 'Apply the proposed repair to '
             '${payload['device'] ?? payload['path'] ?? 'the capture'}';
@@ -159,6 +175,12 @@ class ChatAction {
       case 'pkt_edit':
         return 'Edit ${payload['name'] ?? payload['path'] ?? 'the file'} in '
             'place (a backup is kept)';
+      case 'pkt_open':
+        return 'Open ${payload['name'] ?? 'the file'} in Packet Tracer';
+      case 'advice_card':
+        return 'Design advice: ${payload['topic'] ?? 'recommendation'}';
+      case 'brief_card':
+        return 'Design brief: what I know so far';
       case 'layout_preview':
         return 'Preview the drawing this plan would be built with';
       case 'ledger':

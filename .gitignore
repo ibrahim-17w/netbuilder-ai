@@ -61,6 +61,10 @@ sidecar/pkt_output/
 # files (machine-local by design - nothing Cisco-authored is committed) and
 # the generated demo artifacts.
 sidecar/pkt_templates/
+# The same library, copied into assets/ so the phone can bundle it. Declared
+# in pubspec.yaml, so a fresh CLONE does not build without it - rebuild it
+# locally with sidecar/pkt_template_build.py instead of fetching it here.
+assets/pkt_templates/
 sidecar/*.pkt
 
 # Debug scratch: throwaway probes, dumps and one-off patch scripts that a

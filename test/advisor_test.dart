@@ -191,4 +191,96 @@ void main() {
       expect(r.text, contains('router'));
     });
   });
+
+  group('model-number comparisons are answered as advice', () {
+    test('a two-model comparison names both and picks one', () {
+      final a = AdvisorService.advise('which is better, 2911 or 4331?')!;
+      expect(a.topic, 'lab_model_comparison');
+      expect(a.recommendation, isNotEmpty);
+      expect(a.options.map((o) => o.label).join(' '), contains('2911'));
+      expect(a.options.map((o) => o.label).join(' '), contains('4331'));
+      for (final o in a.options) {
+        expect(o.chooseWhen, isNotEmpty);
+        expect(o.tradeOff, isNotEmpty);
+      }
+      expect(a.questions.length, lessThanOrEqualTo(2));
+      expect(a.basis, isNotEmpty, reason: 'provenance');
+    });
+
+    test('the bare "vs" form works', () {
+      final a = AdvisorService.advise('2911 vs 4331')!;
+      expect(a.topic, 'lab_model_comparison');
+      expect(a.options.map((o) => o.label).join(' '), contains('2911'));
+      expect(a.options.map((o) => o.label).join(' '), contains('4331'));
+    });
+
+    test('the bare "or" form works', () {
+      final a = AdvisorService.advise('2960 or 3560')!;
+      expect(a.topic, 'lab_model_comparison');
+      expect(a.options.map((o) => o.label).join(' '), contains('2960'));
+      expect(a.options.map((o) => o.label).join(' '), contains('3560'));
+    });
+
+    test('a single model gets its own verdict plus sibling options', () {
+      final a = AdvisorService.advise('is the 1841 enough for my lab?')!;
+      expect(a.topic, 'lab_model_comparison');
+      expect(a.recommendation, contains('1841'));
+      expect(a.options.length, greaterThanOrEqualTo(2));
+      expect(a.options.first.label, contains('1841'));
+    });
+
+    test('through the assistant, a model ask is advice with both models', () {
+      final r = ask('which is better, 2911 or 4331?');
+      expect(r.intent, 'advice');
+      expect(r.text, contains('What I would do'));
+      expect(r.text, contains('2911'));
+      expect(r.text, contains('4331'));
+      expect(r.quickReplies, isNotEmpty);
+      final single = ask('is the 1841 enough for my lab?');
+      expect(single.intent, 'advice');
+      expect(single.text, contains('1841'));
+    });
+
+    test('the reader classifies the model asks, old kinds unchanged', () {
+      expect(
+        AdviceIntentReader.read('which is better, 2911 or 4331?'),
+        AdviceKind.comparison,
+      );
+      expect(AdviceIntentReader.read('2911 vs 4331'), AdviceKind.comparison);
+      expect(AdviceIntentReader.read('2960 or 3560'), AdviceKind.comparison);
+      expect(
+        AdviceIntentReader.read('is the 1841 enough for my lab?'),
+        AdviceKind.sizing,
+      );
+      // The regression: the plain router question still reads as it did.
+      expect(
+        AdviceIntentReader.read('what router should I use in this case?'),
+        AdviceKind.recommendation,
+      );
+      final a = AdvisorService.advise('what router should I use in this case?');
+      expect(a, isNotNull);
+      expect(a!.topic, 'router_selection');
+    });
+
+    test('a counted build brief that names models is NOT advice', () {
+      const build = '2 x 2911 routers with ospf';
+      expect(
+        AdviceIntentReader.read(build),
+        AdviceKind.none,
+        reason: 'a counted brief is a specification, not an advice turn',
+      );
+      expect(AdvisorService.advise(build), isNull);
+      expect(
+        NetworkIntent.classifyBrief(build),
+        isNot('advice'),
+        reason: 'the parse must stay a build, not become advice',
+      );
+      expect(
+        NetworkIntent.classifyBrief('add a 2911 or a 4331 to the lab'),
+        isNot('advice'),
+        reason: '"add" makes the model pair a request, not a choice',
+      );
+      expect(AdvisorService.advise('add a 2911 or a 4331 to the lab'), isNull);
+    });
+  });
 }

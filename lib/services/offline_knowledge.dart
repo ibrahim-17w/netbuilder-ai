@@ -1,3 +1,4 @@
+import 'casual_english.dart';
 import 'network_math.dart';
 import 'network_tools.dart';
 
@@ -25,11 +26,25 @@ class OfflineKnowledge {
 
   /// The answer for a question, or null when this table does not know it.
   static String? answerFor(String text) {
-    final t = text.trim().toLowerCase();
+    // Canonicalized before anything reads the text: the triggers below are
+    // short forms and fixed phrases ("bgp", "dhcp relay", "red link"), while
+    // people type "border gateway protocol" and "my pc never gets an ip".
+    // canonical only rewrites onto tokens an entry already matches, and its
+    // outputs carry no device count and no build verb, so the two guards
+    // keep their exact shape - and an already-short ask ("dhcp for ipv6")
+    // is not a key, so it passes through byte for byte and the
+    // question-shaped bypass below still reaches the DHCPv6 entry.
+    final t = CasualEnglish.canonical(text.trim().toLowerCase());
     if (t.isEmpty) return null;
     // A build request is the planner's job, not a knowledge answer.
     if (_deviceCount.hasMatch(t)) return null;
-    if (_buildAsk.hasMatch(t)) return null;
+    // Same for an imperative setup ask ("build a network with a dhcp
+    // server"). A how-to question that merely uses the words ("how do I
+    // set up dhcp for ipv6") is a knowledge ask and must reach the table.
+    final questionShaped = t.contains('?') ||
+        RegExp(r'^(how|what|why|when|which|where)\b').hasMatch(t) ||
+        RegExp(r'\bhow\s+(do|to|can|should|i)\b').hasMatch(t);
+    if (!questionShaped && _buildAsk.hasMatch(t)) return null;
     for (final topic in _topics) {
       if (topic.match(t)) {
         final answer = topic.answer(t);
@@ -320,6 +335,76 @@ class OfflineKnowledge {
           '`clear arp-cache`. A MAC that keeps flapping is a loop or a '
           'duplicate address; check with `show mac address-table`.',
     ),
+    // CDP / LLDP neighbor discovery.
+    (
+      match: (t) =>
+          _anyw(t, const ['cdp', 'lldp']) ||
+          _has(t, 'discover neighbors') ||
+          _has(t, 'discover neighbours'),
+      answer: (t) => 'CDP and LLDP tell a device what is plugged into each '
+          'port - layer-2 neighbor discovery:\n'
+          '- CDP (Cisco-only) is on by default: `cdp run` globally, and `no '
+          'cdp enable` on any port facing an untrusted network so it stops '
+          'advertising your platform and addresses.\n'
+          '- LLDP is the standards-based equivalent: `lldp run`.\n'
+          'Verify with `show cdp neighbors` (add `detail` for the IP and '
+          'platform) or `show lldp neighbors`.',
+    ),
+    // SNMP.
+    (
+      match: (t) => _w(t, 'snmp'),
+      answer: (t) => 'SNMP lets a management station (NMS) poll the device:\n'
+          '1. `snmp-server community <community> ro` - read-only access\n'
+          '2. Optional traps to the NMS: `snmp-server host <nms-ip> '
+          '<community>`\n'
+          'Verify with `show snmp`. v2c is what Packet Tracer models; on '
+          'real gear SNMPv3 is the secure choice because it authenticates '
+          'and encrypts instead of sending the community string in clear.',
+    ),
+    // RSTP / rapid PVST+.
+    (
+      match: (t) =>
+          _anyw(t, const ['rstp']) ||
+          _any(t, const ['rapid pvst', 'rapid-pvst', 'rapid spanning tree']),
+      answer: (t) => 'RSTP (rapid PVST+) is classic STP with much faster '
+          'convergence: instead of waiting on timers, ports get roles - '
+          'root, designated and alternate (the backup path that unblocks in '
+          'seconds) - and an edge port to a host behaves like PortFast. '
+          'Enable it with `spanning-tree mode rapid-pvst` and put '
+          '`spanning-tree portfast` on access ports. Verify with `show '
+          'spanning-tree` - the mode line reads "Rapid PVST+" and edge '
+          'ports show "P2p Edge".',
+    ),
+    // DHCPv6 (stateless + stateful).
+    (
+      match: (t) =>
+          _any(t, const ['dhcpv6', 'dhcp for ipv6', 'ipv6 dhcp']) &&
+          !_has(t, 'relay'),
+      answer: (t) => 'Three ways IPv6 hosts get addressing: SLAAC (the '
+          'router advertisement alone gives prefix + gateway), stateless '
+          'DHCPv6 (SLAAC for the address, DHCPv6 only for the extras: DNS, '
+          'domain) and stateful DHCPv6 (the server hands out addresses like '
+          'DHCPv4).\n'
+          '1. `ipv6 dhcp pool <name>` > `dns-server <address>` > '
+          '`domain-name <name>`\n'
+          '2. Stateless: on the interface `ipv6 nd other-config-flag` + '
+          '`ipv6 dhcp server <pool>`\n'
+          '3. Stateful: `ipv6 nd managed-config-flag` instead\n'
+          'Verify with `show ipv6 dhcp binding`.',
+    ),
+    // PPP + CHAP/PAP on serial links.
+    (
+      match: (t) => _anyw(t, const ['ppp', 'chap', 'pap']),
+      answer: (t) => 'PPP on a serial link, both ends:\n'
+          '1. `interface s0/0/0` > `encapsulation ppp` (must match on both '
+          'routers or the link stays down)\n'
+          '2. `ppp authentication chap`\n'
+          '3. `username <other-router-hostname> password <same-on-both>` - '
+          'each router needs the OTHER one\'s name, case-sensitive\n'
+          'CHAP never sends the password over the link (it answers a '
+          'challenge); PAP sends it in clear text - avoid it. Verify with '
+          '`show interfaces serial0/0/0`: line protocol up and `LCP Open`.',
+    ),
     // Serial / clocking.
     (
       match: (t) => _any(t, const [
@@ -603,8 +688,123 @@ class OfflineKnowledge {
           'server as both SMTP and POP3.\n'
           '- NTP/TFTP/Syslog: enable, then point clients/devices at this '
           'server\'s address.\n'
-          'Remember to give the server a static address on the right VLAN '
-          'first - services with a 0.0.0.0 address never answer.',
+        'Remember to give the server a static address on the right VLAN '
+        'first - services with a 0.0.0.0 address never answer.',
+    ),
+    // NTP client on a router. Placed AFTER the server-panels entry on
+    // purpose: "enable ntp on the server" must keep hitting the panels
+    // answer, and this one catches the router-side asks it leaves behind
+    // ("configure ntp on my router" names no server).
+    (
+      match: (t) => _w(t, 'ntp') || _has(t, 'network time'),
+      answer: (t) => 'Make the router sync its clock - correct timestamps '
+          'are what make logs and certificates trustworthy:\n'
+          '1. `ntp server <server-ip>` - the time source (a server-PT box '
+          'with its NTP service on, or an upstream router).\n'
+          '2. `clock timezone <name> <offset>` - so displayed times match '
+          'your wall clock.\n'
+          '3. `clock set` is a stopgap only - it drifts, NTP does not.\n'
+          'Verify with `show ntp status` and `show ntp associations` - the '
+          'source should show a reach count climbing and a sync.',
+    ),
+    // Syslog on a router/switch.
+    (
+      match: (t) =>
+          _w(t, 'syslog') ||
+          _has(t, 'logging host') ||
+          _w(t, 'logging'),
+      answer: (t) => 'Ship the device\'s logs to one place so you can see '
+          'events across devices:\n'
+          '1. `logging host <server-ip>` - the syslog server (a Server-PT '
+          'with the Syslog service on).\n'
+          '2. `logging trap informational` - how much detail to send '
+          '(debugging floods, informational is a sane default).\n'
+          '3. `service timestamps log datetime msec` - readable, '
+          'correlatable times (needs NTP to mean anything).\n'
+          'Verify with `show logging` on the device - and the Syslog panel '
+          'on the server fills up as events fire.',
+    ),
+    // Banner + local line passwords (enable secret has its own entry).
+    (
+      match: (t) =>
+          _w(t, 'banner') ||
+          _has(t, 'motd') ||
+          _has(t, 'console password') ||
+          _has(t, 'line password') ||
+          _has(t, 'vty password') ||
+          _has(t, 'password encryption'),
+      answer: (t) => 'Local access hardening, in the order a config '
+          'usually gets it:\n'
+          '1. `banner motd #Authorized access only#` - the legal/notices '
+          'banner shown before login.\n'
+          '2. Console: `line console 0` > `password <pw>` > `login`.\n'
+          '3. Remote: `line vty 0 4` > `password <pw>` > `login` (until '
+          'SSH replaces it).\n'
+          '4. `service password-encryption` - scrambles the line passwords '
+          'in the config. It is weak (type 7, reversible) - use it, but do '
+          'not call it security; `enable secret` (hashed) stays the real '
+          'gate.\n'
+          'Verify with `show run` - the passwords read as encrypted strings, '
+          'and a new console session asks for one.',
+    ),
+    // PortFast / BPDUGuard.
+    (
+      match: (t) =>
+          _w(t, 'portfast') ||
+          _w(t, 'bpduguard') ||
+          _has(t, 'edge port'),
+      answer: (t) => 'Access ports waiting through STP\'s listening/'
+          'learning states is why a PC "takes 30 seconds" to get network - '
+          'and why DHCP sometimes times out on boot:\n'
+          '1. On each ACCESS port: `spanning-tree portfast` - the port '
+          'goes straight to forwarding (edge devices only, never on trunks '
+          'or switch-to-switch links).\n'
+          '2. Guard it: `spanning-tree bpduguard enable` - if someone '
+          'plugs a switch in and it starts sending BPDUs, the port shuts '
+          'instead of looping the network.\n'
+          '3. Globally, `spanning-tree portfast default` covers every '
+          'access port - the explicit per-port line is clearer for labs.\n'
+          'Verify with `show spanning-tree` - edge ports show "P2p Edge".',
+    ),
+    // Login block-for (brute-force lockout).
+    (
+      match: (t) =>
+          _has(t, 'block-for') ||
+          _has(t, 'login block') ||
+          _has(t, 'lock out') ||
+          _has(t, 'lockout') ||
+          _has(t, 'failed logins') ||
+          _has(t, 'brute force'),
+      answer: (t) => 'Lock out repeated failed logins (brute-force '
+          'protection on vty/line access):\n'
+          '1. `login block-for 120 attempts 3 within 60` - 3 failures in '
+          '60s silences login for 120s.\n'
+          '2. Keep yourself out of the lockout: `login quiet-mode '
+          'access-class <acl>` - an ACL of management addresses that can '
+          'always reach the login prompt.\n'
+          '3. `show login` - the current state and failures seen.\n'
+          'Verify with `show login failures` after a deliberate wrong '
+          'password. (Real IOS behaviour - Packet Tracer support varies by '
+          'version, so prove it in your PT build before relying on it.)',
+    ),
+    // Protected port (host isolation on one switch).
+    (
+      match: (t) =>
+          _has(t, 'switchport protected') ||
+          _has(t, 'protected port') ||
+          _has(t, 'seeing each other') ||
+          _has(t, 'from each other') ||
+          _has(t, 'isolate hosts'),
+      answer: (t) => 'Keep hosts on the SAME switch from talking to each '
+          'other while they all still reach the router:\n'
+          '1. On each isolated port: `switchport protected`.\n'
+          '2. Protected-to-protected traffic is dropped at layer 2; '
+          'protected to unprotected flows normally - so guests reach the '
+          'internet but not each other.\n'
+          '3. It is per-switch only: isolation does not cross a trunk to '
+          'another switch (that is a private-VLAN job).\n'
+          'Verify with `show interfaces <port> switchport` - "Protected: '
+          'true" - then a ping between two protected PCs that must fail.',
     ),
     // Packet Tracer basics.
     (

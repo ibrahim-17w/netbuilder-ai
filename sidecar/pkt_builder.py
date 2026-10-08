@@ -158,10 +158,12 @@ RADIAL_RING_STEP = 1.6
 # three sizes, which is why offering them side by side read as three near
 # identical pictures.
 LAYOUT_STYLES = ("tree", "wide", "compact", "rows", "grouped", "layered",
-                 "radial", "circle", "grid", "split")
+                 "backbone", "campus", "star", "radial", "ring", "circle",
+                 "grid", "split")
 # Drawings that place every device from the plan's shape alone, without
 # nesting anything under an uplink.
-LAYOUT_FLAT_STYLES = ("radial", "circle", "grid", "split")
+LAYOUT_FLAT_STYLES = ("radial", "ring", "star", "circle", "grid", "split",
+                      "backbone", "campus")
 # How many devices a band holds before it wraps in the `rows` style.
 ROWS_PER_ROW = 8
 # What each style changes about the geometry.  `spacing` from the plan scales
@@ -174,7 +176,11 @@ LAYOUT_STYLE_SHAPES = {
     "rows": {"spacing": 1.0, "columns": GRID_COLUMNS},
     "grouped": {"spacing": 1.0, "columns": GRID_COLUMNS},
     "layered": {"spacing": 1.0, "columns": GRID_COLUMNS},
+    "backbone": {"spacing": 1.0, "columns": GRID_COLUMNS},
+    "campus": {"spacing": 1.0, "columns": GRID_COLUMNS},
+    "star": {"spacing": 1.0, "columns": GRID_COLUMNS},
     "radial": {"spacing": 1.0, "columns": GRID_COLUMNS},
+    "ring": {"spacing": 1.0, "columns": GRID_COLUMNS},
     "circle": {"spacing": 1.0, "columns": GRID_COLUMNS},
     "grid": {"spacing": 1.0, "columns": GRID_COLUMNS},
     "split": {"spacing": 1.0, "columns": GRID_COLUMNS},
@@ -1001,6 +1007,120 @@ def _flat_positions(style: str, entries: list[tuple[str, str]], tier: dict,
                                centre_y + ring * math.sin(angle))
 
     if style in ("circle", "radial"):
+        return _keep_on_canvas(spots)
+
+    if style == "ring":
+        # Switches and endpoints interleaved around one circle; the core
+        # parks in the middle. The fallback recompute of the app's ring -
+        # the carried positions from the gallery are used verbatim when the
+        # plan has them, so this only draws when nothing was carried.
+        core = by_role.get(TIER_CORE, [])
+        switches = by_role.get(TIER_ACCESS, []) + by_role.get(
+            TIER_AGGREGATION, [])
+        hosts = by_role.get(TIER_HOSTS, []) + by_role.get(TIER_SERVICES, [])
+        ring_order: list[str] = []
+        for i in range(max(len(switches), len(hosts), 1)):
+            if i < len(switches):
+                ring_order.append(switches[i])
+            if i < len(hosts):
+                ring_order.append(hosts[i])
+        if not ring_order:
+            ring_order = core
+        count = len(ring_order)
+        radius = max(float(pitch) * (count / (2 * math.pi)) + pitch,
+                     float(pitch) * 1.8)
+        centre_x = CANVAS_WIDTH / 2
+        centre_y = ROW_TOP + radius
+        for index, name in enumerate(ring_order):
+            angle = -math.pi / 2 + 2 * math.pi * index / count
+            spots[name] = (centre_x + radius * math.cos(angle),
+                           centre_y + radius * math.sin(angle))
+        for index, name in enumerate(core):
+            spots[name] = (centre_x + (index - (len(core) - 1) / 2) * pitch,
+                           centre_y)
+        return _keep_on_canvas(spots)
+
+    if style == "star":
+        # Routers in the middle, every other tier on rays: switches at even
+        # angles, each switch's hosts fanned beside its own spoke.
+        core = by_role.get(TIER_CORE, [])
+        switches = (by_role.get(TIER_AGGREGATION, [])
+                    + by_role.get(TIER_ACCESS, []))
+        hosts = by_role.get(TIER_HOSTS, []) + by_role.get(TIER_SERVICES, [])
+        centre_x = CANVAS_WIDTH / 2
+        centre_y = ROW_TOP + float(pitch) * 2
+        per_switch = max(1, math.ceil(len(hosts) / max(1, len(switches))))
+        rays = len(switches) if switches else max(1, len(hosts))
+        spots.update(
+            _keep_on_canvas({
+                name: (centre_x + (index - (len(core) - 1) / 2) * pitch,
+                       centre_y)
+                for index, name in enumerate(core)
+            })
+        )
+        for ray in range(rays):
+            angle = -math.pi / 2 + 2 * math.pi * ray / rays
+            if ray < len(switches):
+                sx = centre_x + pitch * 1.6 * math.cos(angle)
+                sy = centre_y + pitch * 1.6 * math.sin(angle)
+                spots[switches[ray]] = (sx, sy)
+            for offset in range(per_switch):
+                host_index = ray * per_switch + offset
+                if host_index >= len(hosts):
+                    break
+                distance = pitch * (2.6 + 0.9 * offset)
+                spots[hosts[host_index]] = (
+                    centre_x + distance * math.cos(angle),
+                    centre_y + distance * math.sin(angle),
+                )
+        return _keep_on_canvas(spots)
+
+    if style == "backbone":
+        # One horizontal line of routers and switches; servers ride above
+        # the line on drops, PCs below - the campus riser drawing.
+        line = (by_role.get(TIER_CORE, []) + by_role.get(TIER_ACCESS, [])
+                + by_role.get(TIER_AGGREGATION, []))
+        above = by_role.get(TIER_SERVICES, [])
+        below = by_role.get(TIER_HOSTS, [])
+        pitch_count = max(1, len(line))
+        line_y = ROW_TOP + float(pitch) * 1.5
+        for index, name in enumerate(line):
+            spots[name] = (CANVAS_WIDTH / 2
+                           + (index - (pitch_count - 1) / 2) * float(pitch),
+                           line_y)
+        for index, name in enumerate(above):
+            column = index % max(1, pitch_count)
+            spots[name] = (
+                CANVAS_WIDTH / 2
+                + (column - (pitch_count - 1) / 2) * float(pitch),
+                line_y - float(pitch) * (1 + index // max(1, pitch_count)),
+            )
+        for index, name in enumerate(below):
+            column = index % max(1, pitch_count)
+            spots[name] = (
+                CANVAS_WIDTH / 2
+                + (column - (pitch_count - 1) / 2) * float(pitch),
+                line_y + float(pitch) * (1 + index // max(1, pitch_count)),
+            )
+        return _keep_on_canvas(spots)
+
+    if style == "campus":
+        # Three tiers: core on top, access in the middle, hosts at the
+        # bottom, hosts column-aligned under the access switch above them.
+        tiers = [
+            (ROW_TOP, by_role.get(TIER_CORE, [])),
+            (ROW_TOP + float(pitch) * 2,
+             by_role.get(TIER_ACCESS, []) + by_role.get(TIER_AGGREGATION, [])),
+            (ROW_TOP + float(pitch) * 4,
+             by_role.get(TIER_HOSTS, []) + by_role.get(TIER_SERVICES, [])),
+        ]
+        for y, group in tiers:
+            for index, name in enumerate(group):
+                spots[name] = (
+                    CANVAS_WIDTH / 2
+                    + (index - (len(group) - 1) / 2) * float(pitch),
+                    y,
+                )
         return _keep_on_canvas(spots)
 
     raise ValueError(f"{style} is not a flat drawing")

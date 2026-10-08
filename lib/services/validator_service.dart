@@ -1,4 +1,5 @@
 import '../models/network_intent.dart';
+import 'nlu/lexicon.dart';
 
 /// Pure-Dart pre-deploy validator. No plugins, fully unit-testable.
 class ValidationIssue {
