@@ -1,0 +1,485 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="AC" model="Air Conditioner">MCUComponent</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeNetworkModule</TYPE>
+        <MODEL>PT-IOT-NM-1CFE</MODEL>
+        <PORT>
+         <TYPE>eCopperFastEthernet</TYPE>
+         <POWER>true</POWER>
+         <MEDIATYPE>0</MEDIATYPE>
+         <PINS>false</PINS>
+         <BANDWIDTH>100000</BANDWIDTH>
+         <FULLDUPLEX>false</FULLDUPLEX>
+         <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+         <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+         <MACADDRESS>0000.0000.0000</MACADDRESS>
+         <BIA>0000.0000.0000</BIA>
+         <CLOCKRATE>2000000</CLOCKRATE>
+         <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+         <DESCRIPTION/>
+         <CHANNEL>0</CHANNEL>
+         <CHANNEL5GHZ>0</CHANNEL5GHZ>
+         <COVERAGERANGE>0</COVERAGERANGE>
+         <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+         <UP_METHOD>5</UP_METHOD>
+         <IP/>
+         <SUBNET/>
+         <PORT_GATEWAY/>
+         <PORT_DNS/>
+         <PORT_DHCP_ENABLE>false</PORT_DHCP_ENABLE>
+         <ND_SUPPRESSED>false</ND_SUPPRESSED>
+         <TIMEOUT>14400000</TIMEOUT>
+         <PC_FIREWALL>false</PC_FIREWALL>
+         <PC_IPV6_FIREWALL>false</PC_IPV6_FIREWALL>
+         <IPV6_ENABLED>false</IPV6_ENABLED>
+         <IPV6_ADDRESS_AUTOCONFIG>false</IPV6_ADDRESS_AUTOCONFIG>
+         <IPV6_PORT_GATEWAY/>
+         <IPV6_PORT_DNS/>
+         <IPV6_LINK_LOCAL>FE80::201:63FF:FE01:94BC</IPV6_LINK_LOCAL>
+         <IPV6_DEFAULT_LINK_LOCAL>FE80::201:63FF:FE01:94BC</IPV6_DEFAULT_LINK_LOCAL>
+         <IPV6_PORT_DHCP_ENABLED>false</IPV6_PORT_DHCP_ENABLED>
+         <IPV6_ADDRESSES/>
+         <IP_UNNUMBERED/>
+        </PORT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+        <MODEL>PT-UNV-PWR-ADAPTER</MODEL>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAAAQAAABwAVgBPAEwAVQBNAEUAXwBBAFQAXwBSAEEAVABFAAAACgAAAAAMADEAMAAwADAAMAAw</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1236.47</X_COORD>
+      <Y_COORD>1236.86</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT0810Q9XU</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:300000;cost:2250;power source:1;rack units:2;wattage:5;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>1497662479533</TEMPLATE_CREATION_TIME>
+     <STARTTIME>730972800000</STARTTIME>
+     <STARTSIMTIME>0</STARTSIMTIME>
+     <USER_APPS>
+      <RUNNING_APPS>
+       <USER_APP>AC (JavaScript)</USER_APP>
+      </RUNNING_APPS>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SAVE_REF_ID>save-ref-id:0</SAVE_REF_ID>
+     <SYS_NAME></SYS_NAME>
+     <GATEWAY/>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP/>
+     </DHCP_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+       <STANDARD_CHANNEL5G>112</STANDARD_CHANNEL5G>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <GATEWAYV6/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>61-E1-A0-88-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>7</FILE_NUMBER>
+           <NAME>AC (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT/>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>8</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>var HUMIDITY_RATE = -2/3600; // -2% per hour
+var TEMPERATURE_RATE = -10/3600; // -10C per hour
+var VOLUME_AT_RATE = 100000;
+
+var input;
+function setup() {
+	IoEClient.setup({
+		type: "AC",
+		states: [{
+			name: "On",
+			type: "bool",
+			controllable: true
+		}]
+	});
+	
+	IoEClient.onInputReceive = function(data) {
+		if ( data.length &lt;= 0  )
+			return;
+		data = data.split(",");
+		processData(parseInt(data[0]));
+	};
+
+	attachInterrupt(0, function() {
+		processData(digitalRead(0)/1023);
+	});
+
+	processData(digitalRead(0)/1023);
+	
+	var VAR = getDeviceProperty(getName(), "VOLUME_AT_RATE");
+	if(!VAR)
+		setDeviceProperty(getName(), "VOLUME_AT_RATE", VOLUME_AT_RATE);
+}
+
+function processData(data) {
+	input = data;
+	if ( input > 0 )
+		digitalWrite(5, HIGH);
+	else
+		digitalWrite(5, LOW);
+	IoEClient.reportStates(input);
+}
+
+function loop()
+{
+	updateEnvironment();
+	delay(1000);
+}
+
+
+function updateEnvironment()
+{
+	var VAR = parseFloat(getDeviceProperty(getName(), "VOLUME_AT_RATE"));
+	if( VAR &lt; 0 )
+		VAR = VOLUME_AT_RATE;
+	//Serial.println("VAR: " + VAR);
+	//Serial.println("input: " + input);
+
+	var humidity_rate = input*HUMIDITY_RATE * VAR / Environment.getVolume();
+	var temperature_rate = input*TEMPERATURE_RATE * VAR / Environment.getVolume();
+	Environment.setContribution("Humidity", humidity_rate);
+	Environment.setContribution("Ambient Temperature", temperature_rate);
+	
+	//Serial.println("T rate: " + temperature_rate);
+}
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>5</FILE_NUMBER>
+           <NAME>AC (Python)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT/>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>6</FILE_NUMBER>
+             <NAME>main.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>from gpio import *
+from time import *
+from ioeclient import *
+from environment import *
+from physical import *
+
+HUMIDITY_RATE = -2./3600; # -2% per hour
+TEMPERATURE_RATE = -10./3600; # -10C per hour
+VOLUME_AT_RATE = 100000.
+
+myInput = 0
+
+
+    
+def onInputReceiveDone(data):
+    if  len(data) &lt;= 0:
+        return
+    data = data.split(",")
+    processData(int(data[0]))
+        
+
+def detect():
+    processData(digitalRead(0)/1023)
+  
+def setup():
+    IoEClient.setup({
+        "type": "AC",
+        "states": [{
+            "name": "On",
+            "type": "bool",
+            "controllable": True
+        }]
+    })
+    IoEClient.onInputReceive(onInputReceiveDone)
+    add_event_detect(0, detect)
+    detect()
+    
+    VAR = getDeviceProperty(getName(), "VOLUME_AT_RATE")
+    if not VAR:
+    	setDeviceProperty(getName(), "VOLUME_AT_RATE", VOLUME_AT_RATE)
+
+
+
+def processData(data):
+    global myInput
+    myInput = data
+    if  myInput > 0 :
+        digitalWrite(5, HIGH)
+    else :
+        digitalWrite(5, LOW)
+    IoEClient.reportStates(myInput)
+
+
+def updateEnvironment():
+    VAR = float(getDeviceProperty(getName(), "VOLUME_AT_RATE"))
+    if VAR &lt; 0:
+    	VAR = 0
+
+    humidity_rate = float(myInput*HUMIDITY_RATE*VAR) / Environment.getVolume()
+    temperature_rate = float(myInput*TEMPERATURE_RATE*VAR) / Environment.getVolume()
+    Environment.setContribution("Humidity", humidity_rate, 0, True) 
+    Environment.setContribution("Ambient Temperature", temperature_rate, -1000, True)
+    #print temperature_rate, VAR
+
+def main():
+    setup()
+    while True:
+        updateEnvironment()
+        delay(1000)
+        
+if __name__ == "__main__":
+    main()</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>8</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>User:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>0</FILE_COUNTER>
+         <CAPACITY>10000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <THING_MODEL>
+      <NAME></NAME>
+      <WIDTH>169.5</WIDTH>
+      <HEIGHT>113.5</HEIGHT>
+      <ANALOG_SLOTS_COUNT>4</ANALOG_SLOTS_COUNT>
+      <DIGITAL_SLOTS_COUNT>6</DIGITAL_SLOTS_COUNT>
+      <SPECIFICATIONS>&lt;html>&lt;head>&lt;/head>&lt;body style="word-wrap: break-word; -webkit-nbsp-mode: space; -webkit-line-break: after-white-space; ">&lt;font class="Apple-style-span" face="'Arial Black'" size="5">Air Conditioner (AC)&lt;/font>&lt;div>&lt;div>&lt;div>&lt;/div>&lt;/div>&lt;/div>&lt;h1>&lt;span class="Apple-style-span" style="font-family: Arial; font-weight: normal; font-size: x-large; ">&lt;u>Features:&lt;/u>&lt;/span>&lt;/h1>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Registration Server Compatible&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Cools the temperature of a typical office space at -10C per hour.&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Reduces the humidity by 2% per hour.&lt;/font>&lt;/li>&lt;/ul>&lt;div style="font-family: 'Courier New'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Usage:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Connect D0 to the Thermostat's D2 slot.&lt;/font>&lt;/li>&lt;/ul>&lt;div style="font-family: 'Courier New'; font-size: medium; ">&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Direct Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Local Control:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">DigitalWrite HIGH on D0 for ON, LOW for OFF.&amp;nbsp;&lt;/font>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Remote Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Connect device to Registration Server using Config Tab&lt;/font>&lt;/li>&lt;/ul>&lt;/div>&lt;div style="font-family: 'Courier New'; font-size: medium; ">&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Data Specifications:&lt;/u>&lt;/span>&lt;/div>&lt;div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Message Format: [state]&lt;br>&lt;/span>&lt;font class="Apple-style-span" face="Arial" size="5">state: 0 = AC off, 1 = AC on&lt;/font>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;br>&lt;/font>&lt;/li>&lt;/ul>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Input: D0 HIGH or LOW.&lt;/font>&lt;/li>&lt;/ul>&lt;/div>&lt;div style="font-family: 'Courier New'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Example:&lt;/u>&lt;/font>&lt;/div>&lt;div style="font-family: 'Courier New'; font-size: medium; ">&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">It's also possible to attach this device to a Switch to turn it on and off manually.&lt;/span>&lt;/div>&lt;/div>&lt;div style="font-family: 'Courier New'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;br>&lt;/font>&lt;/div>&lt;div style="font-family: 'Courier New'; font-size: medium; ">&lt;font class="Apple-style-span" face="'Courier New'">&lt;div>&lt;font class="Apple-style-span" size="5">&lt;br>&lt;/font>&lt;/div>&lt;/font>&lt;/div>&lt;/body>&lt;/html></SPECIFICATIONS>
+      <ROTATION>0</ROTATION>
+      <SCALE>1</SCALE>
+      <IS_END_DEVICE>TRUE</IS_END_DEVICE>
+      <IS_DESKTOP_AVAILABLE>FALSE</IS_DESKTOP_AVAILABLE>
+      <SUBCOMPONENTS>
+       <SUBCOMPONENT>
+        <NAME>component 1</NAME>
+        <X>0</X>
+        <Y>0</Y>
+        <Z_ORDER>1</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>0</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>5</SLOT_NUM>
+        <SLOT_TYPE>1</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/SmartDevices/ac_off.png]]></IMAGE>
+         <IMAGE><![CDATA[../art/IoE/SmartDevices/ac_on.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+      </SUBCOMPONENTS>
+      <RULES>
+       <RULE>
+        <SUBCOMPONENT>component 1</SUBCOMPONENT>
+        <IMAGE_INDEX>0</IMAGE_INDEX>
+        <DIGITAL_VALUE>0</DIGITAL_VALUE>
+        <ANALOG_LOW>0</ANALOG_LOW>
+        <ANALOG_HIGH>0</ANALOG_HIGH>
+       </RULE>
+       <RULE>
+        <SUBCOMPONENT>component 1</SUBCOMPONENT>
+        <IMAGE_INDEX>1</IMAGE_INDEX>
+        <DIGITAL_VALUE>1000</DIGITAL_VALUE>
+        <ANALOG_LOW>0</ANALOG_LOW>
+        <ANALOG_HIGH>0</ANALOG_HIGH>
+       </RULE>
+      </RULES>
+     </THING_MODEL>
+     <IOE_CLIENT>
+      <CLIENT_MODE>NO_SERVER</CLIENT_MODE>
+      <SERVER_ADDRESS></SERVER_ADDRESS>
+      <USERNAME></USERNAME>
+      <PASSWORD></PASSWORD>
+     </IOE_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME></NAME>
+      <MAIL_ID></MAIL_ID>
+      <POP3_SERVER></POP3_SERVER>
+      <SMTP_SERVER></SMTP_SERVER>
+      <USER></USER>
+      <PASSWORD></PASSWORD>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL translate="true">{64dabe8c-acf5-433e-b49c-1b8173e7e934},{24bb05ae-a055-4d29-8306-bff9819ae31a},{777b3223-9c00-4461-a815-0cb2a280f8dd},{fa301531-2514-46ae-b298-a89e0451495b}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.0847851</X_PN>
+      <Y_PN>0.138915</Y_PN>
+      <X>292</X>
+      <Y>297</Y>
+      <PARENT_PATH>{64dabe8c-acf5-433e-b49c-1b8173e7e934},{24bb05ae-a055-4d29-8306-bff9819ae31a},{777b3223-9c00-4461-a815-0cb2a280f8dd}</PARENT_PATH>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

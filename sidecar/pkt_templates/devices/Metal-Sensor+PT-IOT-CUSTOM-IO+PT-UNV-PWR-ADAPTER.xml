@@ -1,0 +1,1094 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="Metal Sensor" model="Metal Sensor">MCUComponent</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+        <MODEL>PT-UNV-PWR-ADAPTER</MODEL>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAAAwAAAAoAcwB0AGEAdABlAAAACgAAAAACADAAAAAwAFAAUgBPAEcAUgBBAE0ATQBJAE4ARwBfAEMAVQBSAFIARQBOAFQAXwBGAEkATABFAAAACgAAAAAOAG0AYQBpAG4ALgBwAHkAAAAuAFAAUgBPAEcAUgBBAE0ATQBJAE4ARwBfAEMAVQBSAFIARQBOAFQAXwBEAEkAUgAAAAoAAAAAKgBNAGUAdABhAGwAIABTAGUAbgBzAG8AcgAgACgAUAB5AHQAaABvAG4AKQ==</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1229.5</X_COORD>
+      <Y_COORD>1232.1</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT0810JJ9X</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:300000;cost:2750;power source:1;rack units:2;wattage:5;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>1499886002844</TEMPLATE_CREATION_TIME>
+     <USER_APPS>
+      <RUNNING_APPS>
+       <USER_APP>Metal Sensor (JavaScript)</USER_APP>
+      </RUNNING_APPS>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SYS_NAME></SYS_NAME>
+     <GATEWAY/>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP/>
+     </DHCP_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <GATEWAYV6/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>40-52-DA-1C-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>Metal Sensor (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT/>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>3</FILE_NUMBER>
+             <NAME>library.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>// This will contain an object that specifies how the sensor should work.
+var g_sensorData = null;
+
+// Used to determine mouse clicks.
+var g_wasMousePressed = false;
+var g_wasMouseClicked = false;
+
+// Internal types for differentiating the search types.
+function environmentType()
+{
+	return 'ENVIRONMENT';
+}
+function propertyType()
+{
+	return 'PROPERTY';
+}
+
+// Internal type to differentiate the slot write types.
+function analogType()
+{
+	return 'ANALOG';
+}
+function customType()
+{
+	return 'CUSTOM';
+}
+function digitalType()
+{
+	return 'DIGITAL';
+}
+
+// Purpose:
+// Update the sensor.  Send value as specified.
+function updateSensor()
+{
+	updateMouseClick();	
+	
+	if(null !== g_sensorData)
+	{
+		var unprocessedValue;
+		var value;
+		var deviceIDS = [];
+		
+		// Handle an environment value sensor.
+		if(environmentType() === g_sensorData.type)
+		{
+			unprocessedValue = Environment.get(g_sensorData.propertyName);
+		}
+		else if(propertyType() == g_sensorData.type)
+		{
+			if(null !== g_sensorData.searchData)
+			{
+				if((undefined !== g_sensorData.searchData.w) &amp;&amp; (undefined !== g_sensorData.searchData.h))				
+				{
+					unprocessedValue = [];
+					
+					// Search an area.   
+					var x = getX();
+					var y = getY();
+
+					if('CENTER' === g_sensorData.searchData.offset)
+					{
+						x = getCenterX();
+						y = getCenterY();
+						
+						x -= (g_sensorData.searchData.w/2);
+						y -= (g_sensorData.searchData.h/2);
+					}
+					else if('WORKSPACE' === g_sensorData.searchData.offset)
+					{
+						x = 0;
+						y = 0;
+					}
+		
+					// Search in a range around it.
+					var objects = devicesAt(x, y, g_sensorData.searchData.w,  g_sensorData.searchData.h);
+					
+					
+					var deviceProperty;
+					
+					unprocessedValue = [];
+					for(var ind = 0; ind &lt; objects.length; ++ind)
+					{
+						if(g_sensorData.searchData.deviceIDs.length > 0)
+						{
+							for(var name = 0; name &lt; g_sensorData.searchData.deviceIDs.length; ++name)
+							{
+								if((objects[ind] === g_sensorData.searchData.deviceIDs[name]) &amp;&amp; 
+								   (null !== (deviceProperty = getDeviceProperty(objects[ind], g_sensorData.propertyName))))
+								{
+			
+									unprocessedValue.push(deviceProperty);
+		
+									deviceIDS.push(objects[ind]);
+									break;
+								}
+							}
+						}
+						else
+						{
+							deviceProperty = getDeviceProperty(objects[ind], g_sensorData.propertyName);
+							if(0 !== deviceProperty.length)
+							{
+								unprocessedValue.push(deviceProperty);
+								deviceIDS.push(objects[ind]);
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// If there was a value then handle it.
+		if(undefined !== unprocessedValue)
+		{
+			value = processValue(unprocessedValue, deviceIDS);
+			
+			// Send the signal.
+			if(g_sensorData.signalData)
+			{
+				if(analogType() === g_sensorData.signalData.type)
+				{
+					analogWrite(g_sensorData.signalData.slot, value);
+				}
+				else if(customType() === g_sensorData.signalData.type)
+				{
+					customWrite(g_sensorData.signalData.slot, value);
+				}
+				else if(digitalType() === g_sensorData.signalData.type)
+				{
+					digitalWrite(g_sensorData.signalData.slot, (value > 0) ? HIGH : LOW);
+				}				
+			}
+		}
+		
+		g_sensorData.lastKnownValue = unprocessedValue;
+		g_sensorData.lastProcessedValue = value;
+	}
+	
+	// If set to handle the registration server, update it.	
+	if(g_sensorData.updateRegistrationServer)	
+		IoEClient.reportStates(g_sensorData.lastProcessedValue);
+	
+	// If set to handle the registration server, update it.	
+	if(g_sensorData.updateRegistrationServer)	
+		IoEClient.reportStates(g_sensorData.lastProcessedValue);	
+		
+	setDeviceProperty(getName(), "state", g_sensorData.lastProcessedValue);
+	
+	// Wait if specified.
+	if(g_delayTime > 0)
+		delay(g_delayTime);
+}
+
+// Purpose:
+// Update mouse click detection and sets the internal flag to show if a click happened in the current update.
+function updateMouseClick()
+{
+	g_wasMouseClicked = false;
+	if(!g_wasMousePressed)
+	{
+		if(bMouseDown) // Global variable for when the button state is pressed (Alt+LeftClick).
+			g_wasMouseClicked = true;
+	}
+
+	g_wasMousePressed = bMouseDown;	
+}
+
+// Purpose:
+// Return if the mouse was last in a click state.  Value is true for click, false for not.
+// This is only true for the first press, it counts as the click.
+function getMouseClicked()
+{
+	return g_wasMouseClicked;
+}
+
+// Purpose:
+// Sets the object up to detect and environment variable. 
+// propertyName - The environment variable to get.
+// signalData - Object that contains data for how to send a signal. Is it digital, analog, the slot.
+function setupDetectEnvironment(propertyName, signalData)
+{
+	g_sensorData = {type: environmentType(), 
+	                propertyName: propertyName,	
+					signalData: signalData,
+					lastProcessedValue: null,	// Store the last processed sensor value.
+					lastKnownValue: null,		// Stores the last unprocessed sensor value.
+					updateRegistrationServer: false // True to auto handle registration server updating.
+	};
+}
+
+// Purpose:
+// Sets the object up to detect a property in an script object. 
+// propertyName - The property name to find.
+// searchRange - Object that contains information on how the search should be conducted.  Just things in a range, specific names, etc.
+// signalData - Object that contains data for how to send a signal. Is it digital, analog, the slot.
+function setupDetectProperty(propertyName, searchData, signalData)
+{
+	g_sensorData = {type: propertyType(),
+	                propertyName: propertyName,
+	                searchData: searchData,
+					signalData: signalData,
+					lastProcessedValue: null,	// Store the last processed sensor value.
+					lastKnownValue: null,		// Stores the last unprocessed sensor value.
+					updateRegistrationServer: false // True to auto handle registration server updating.
+	};
+}
+
+// Purpose:
+// Creates and returns an object with information on how to search for device properties.
+// deviceID - A single string.  The string would be a device name that should have it's property checked.
+//         	   If you don't want it restriced to specific devices, just pass null.
+// w, h      - Search area dimensions.  If you only want in a specific range around the sensor you would set the width and height.  Don't pass 
+//         	   anything if the entire workspace should be searched.
+// offset    - null or  'TOP_LEFT' if the top left corner is the starting point, 
+//             'CENTER' if the search area should be around the center of the device.
+//			   'WORKSPACE' if the entire workspace should be checked.  w and h will be ignored.
+function createPropertySearch(deviceID, w, h, offset)
+{
+	if((undefined === w || undefined === h))
+	{
+		w = 4000;
+		h = 4000;
+		offset = 'WORKSPACE';
+	}
+	
+	var search = {deviceIDs: [], w: w, h: h, offset: offset};
+	if((null !== deviceID) &amp;&amp; (undefined !== deviceID))
+		search.deviceIDs[0] = deviceID;
+
+	return search;
+}
+
+// Purpose:
+// Creates and returns an object with information on how to search for device properties.
+// deviceIDs - An array of strings.  Each string would be a device name that should have it's property checked.
+//         	   If you don't want it restriced to specific devices, just pass null.
+// w, h      - Search area dimensions.  If you only want in a specific range around the sensor you would set the width and height.  Don't pass 
+//         	   anything if the entire workspace should be searched.
+// offset    - null or  'TOP_LEFT' if the top left corner is the starting point, 
+//             'CENTER' if the search area should be around the center of the device.
+//			   'WORKSPACE' if the entire workspace should be checked.  w and h will be ignored.
+function createPropertySearchDevices(deviceIDs, w, h, offset)
+{
+	if((undefined === w || undefined === h))
+	{
+		w = 4000;
+		h = 4000;
+		offset= 'WORKSPACE';
+	}
+	
+	var search = {deviceIDs: [], w: w, h: h, offset: offset};
+	if(null !== deviceIDs)
+		 search.deviceIDs = deviceIDs;
+	
+	return search;
+}
+
+
+// Purpose:
+// Creats and object that defines writting to an analog slot.
+function createAnalogWrite(slot)
+{
+	return {type: analogType(), slot: slot};
+}
+
+// Purpose:
+// Creats and object that defines writting to an analog slot.
+function createCustomWrite(slot)
+{
+	return {type: customType(), slot: slot};
+}
+
+// Purpose:
+// Creats and object that defines writting to an digital slot.
+function createDigitalWrite(slot)
+{
+	return {type: digitalType(), slot: slot};
+}
+
+// Purpose:
+// Returns the last update value before it was processed.
+function getLastKnownValue()
+{
+	return g_sensorData.lastKnownValue;
+}
+
+// Purpose:
+// Returns the last update value after it was processed.
+function getLastProcessedValue()
+{
+	return g_sensorData.lastProcessedValue;
+}
+
+// Purpose:
+// Setup a generic registration server entry for the sensor based on the slot write type the sensor is setup to use.
+// If it is digital it will be true, false.
+// Analog would be strings.
+// Custom is not supported.
+// The property will be marked as not-controllable and will only output values.
+// sensorName, sensorProperty - The text that will be displayed in the registration server.
+function setupRegistrationServer(sensorName, propertyName)
+{
+	if(g_sensorData)
+	{
+		g_sensorData.updateRegistrationServer = true;
+		
+		var sensorType;
+		if(analogType() === g_sensorData.signalData.type)
+			sensorType = 'number';
+		else if(digitalType() === g_sensorData.signalData.type)
+			sensorType = 'bool';
+		else
+		{
+			g_sensorData.updateRegistrationServer = false;
+			Serial.println('Slot type not applicable for registration');
+		}
+			
+		if(g_sensorData.updateRegistrationServer)
+		{
+			IoEClient.setup({
+			type: sensorName,
+			states: [{
+				name: propertyName,
+				type: sensorType,
+				controllable: false
+			}]
+			});
+		}
+	}
+	else
+	{
+		Serial.println('Slot type not specified, cannot setup registration server');
+	}
+}</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+            <FILE class="CFile">
+             <FILE_NUMBER>2</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>// Purpose:
+// This is a generic single slot output sensor.
+// It can check environment variables, objects properties in range, and send a signal.
+// It is designed to have setup functions called that determine how it behaves.
+// The setup functions are defined in the library.
+
+// A delay will run each update.  It will be for this amount of time.
+// Setting to 0 means there is no delay.
+// If making a custom write, you can't have a delay.  customWrite requires the value to be set each loop.
+// The custom write thing seems to be a bug in the engine, it should get fixed sometime.
+var g_delayTime = 1000;
+
+// Purpose:
+// Create your sensor here.
+// Call the setup function for the type of sensor you are making.
+// That would be an environment, device property in range, etc.
+function setup() 
+{
+	setupDetectProperty('ALLOY', createPropertySearchDevices(null, 36, 70, 'TOP_LEFT'), createAnalogWrite(A0));
+	//setupRegistrationServer('Metal Sensor', 'Metal Detection');
+}
+
+// Purpose:
+// Update function.  Calls the library updateSensor which reads environment values, etc 
+// and sends the value to the slot.
+function loop() 
+{
+	// Update the sensor.
+	updateSensor();
+}
+
+// Purpose:
+// Handle the sensor reading..
+// value     - The value of the sensor read before it gets sent to a slot. This can be a single value when reading an environment property, or an array if reading a property from devices.
+// deviceIDs - the value is an array of device IDs that met the user defined specifications(when requested).  These values match up with the value when finding groups of data (devices).  It is ignored for 
+//             finding environment variables.
+function processValue(value, deviceIDs)
+{
+	if(value.length > 0)
+		value = value[0];
+	else
+		value = 0;
+
+	return value;
+}</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>4</FILE_NUMBER>
+           <NAME>Metal Sensor (Python)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT/>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>6</FILE_NUMBER>
+             <NAME>library.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>
+from time import *
+from physical import *
+from environment import Environment
+from ioeclient import IoEClient
+from gpio import *
+from pyjs import JsObject 
+
+# This will contain an object that specifies how the sensor should work.
+g_sensorData = None
+
+# Callback for processing values
+g_processValue = lambda  unprocessedValue, deviceIDS: None 
+
+# Callback for mouse events
+g_processMouse = lambda  pressed, x, y, firstPress: None 
+
+# Used to determine mouse clicks.
+g_wasMouseClicked = False
+
+# Checks for environment sound and sound in devices and combines the decibels.
+# A delay will run each update.  It will be for this amount of time.
+# Setting to 0 means there is no delay.
+g_delayTime = -1 
+
+# Internal types for differentiating the search types.
+def environmentType():
+    return 'ENVIRONMENT'
+
+def propertyType():
+    return 'PROPERTY'
+
+
+# Internal type to differentiate the slot write types.
+def analogType():
+    return 'ANALOG'
+
+def customType():
+    return 'CUSTOM'
+
+def digitalType():
+    return 'DIGITAL'
+
+# Purpose:
+# Set the wait time to check the environment again
+# timeMSec: >0 - wait in millisec, -1 - no wait, 0 - idle wait
+def setWaitTimeMSec(timeMSec):
+    global g_delayTime
+    g_delayTime = timeMSec
+
+# Purpose:
+# Set the callback to process mouse events 
+def setCallbackOnProcessMouse(callback):
+    global g_processMouse
+    g_processMouse = callback
+
+# Purpose:
+# Set the callback to processe value 
+def setCallbackOnProcessValue(callback):
+    global g_processValue
+    g_processValue = callback
+
+# Purpose:
+# Set the callback to processed value access
+def setCallbackOnProcessValue(callback):
+    global g_processValue
+    g_processValue = callback
+
+# Purpose:
+# Update the sensor.  Send value as specified.
+def updateSensor():
+    if None is not g_sensorData:
+        unprocessedValue = None
+        value = None
+        deviceIDS = []
+
+        # Handle an environment value sensor.
+        if environmentType() is g_sensorData.type:
+            unprocessedValue = Environment.get(g_sensorData.propertyName)
+        elif propertyType() == g_sensorData.type:
+            if None is not g_sensorData.searchData:
+                if getattr(g_sensorData.searchData, "w", None) and getattr(g_sensorData.searchData, "h", None):
+                    # Search an area.
+                    x = getX()
+                    y = getY()
+
+                    if 'CENTER' is g_sensorData.searchData.offset:
+                        x = getCenterX()
+                        y = getCenterY()
+
+                        x -= (g_sensorData.searchData.w/2)
+                        y -= (g_sensorData.searchData.h/2)
+                    elif 'WORKSPACE' is g_sensorData.searchData.offset:
+                        x = 0
+                        y = 0
+
+
+                    # Search in a range around it.
+                    devices = devicesAt(x, y, g_sensorData.searchData.w,  g_sensorData.searchData.h)
+
+                    deviceProperty = None
+
+                    unprocessedValue = []
+                    for dev in devices:
+                        if g_sensorData.searchData.deviceIDs:
+                            for dev_id in g_sensorData.searchData.deviceIDs:
+                                deviceProperty = getDeviceProperty(dev, g_sensorData.propertyName)
+                                if (dev is dev_id) and deviceProperty:
+                                    unprocessedValue.append(deviceProperty)
+
+                                    deviceIDS.append(dev)
+                                    break
+                        else:
+                            deviceProperty = getDeviceProperty(dev, g_sensorData.propertyName)
+                            if deviceProperty:
+                                unprocessedValue.append(deviceProperty)
+                                deviceIDS.append(dev)
+
+        # If there was a value then handle it.
+        if None is not unprocessedValue:
+            value = g_processValue(unprocessedValue, deviceIDS)
+
+            # Send the signal.
+            if g_sensorData.signalData:
+                if analogType() is g_sensorData.signalData.type:
+                    analogWrite(g_sensorData.signalData.slot, value)
+                elif customType() is g_sensorData.signalData.type:
+                    customWrite(g_sensorData.signalData.slot, value)
+                elif digitalType() is g_sensorData.signalData.type:
+                    digitalWrite(g_sensorData.signalData.slot, HIGH if value > 0 else LOW)
+
+        g_sensorData.lastKnownValue = unprocessedValue
+        g_sensorData.lastProcessedValue = value
+
+    # If set to handle the registration server, update it.
+    if g_sensorData.updateRegistrationServer:
+        IoEClient.reportStates(g_sensorData.lastProcessedValue)
+
+
+    # If set to handle the registration server, update it.
+    if g_sensorData.updateRegistrationServer:
+        IoEClient.reportStates(g_sensorData.lastProcessedValue)
+
+    updateMouseClick()
+
+    setDeviceProperty(getName(), "state", g_sensorData.lastProcessedValue);
+    
+    # Wait if specified.
+    if g_delayTime > 0:
+        delay(g_delayTime)
+    elif g_delayTime == 0:
+        sleep(0)
+
+# Purpose:
+# Update mouse clicked state so the main loop would know whether the mouse was pressed at least once
+def mouseEvent(pressed, x, y, firstPress):
+    global g_wasMouseClicked
+    if firstPress: # we don't need the False branch for this if
+        g_wasMouseClicked = firstPress
+    if g_processMouse:
+        g_processMouse(pressed, x, y, firstPress)
+
+
+# Purpose:
+# Update mouse click detection and sets the internal flag to show if a click happened in the current update.
+def updateMouseClick():
+    global g_wasMouseClicked
+    g_wasMouseClicked = False
+
+
+# Purpose:
+# Return if the mouse was last in a click state.  Value is true for click, false for not.
+# This is only true for the first press, it counts as the click.
+def getMouseClicked():
+    return g_wasMouseClicked
+
+
+# Purpose:
+# Sets the object up to detect and environment variable.
+# propertyName - The environment variable to get.
+# signalData - Object that contains data for how to send a signal. Is it digital, analog, the slot.
+def setupDetectEnvironment(propertyName, signalData):
+    global g_sensorData
+    g_sensorData = JsObject({
+        "type": environmentType(),
+        "propertyName": propertyName,
+        "signalData": JsObject(signalData),
+        "lastProcessedValue": None,    # Store the last processed sensor value.
+        "lastKnownValue": None,        # Stores the last unprocessed sensor value.
+        "updateRegistrationServer": False # True to auto handle registration server updating.
+    })
+
+
+# Purpose:
+# Sets the object up to detect a property in an script object.
+# propertyName - The property name to find.
+# searchRange - Object that contains information on how the search should be conducted.  Just things in a range, specific names, etc.
+# signalData - Object that contains data for how to send a signal. Is it digital, analog, the slot.
+def setupDetectProperty(propertyName, searchData, signalData):
+    global g_sensorData
+    g_sensorData = JsObject({
+        "type": propertyType(),
+        "propertyName": propertyName,
+        "searchData": JsObject(searchData),
+        "signalData": JsObject(signalData),
+        "lastProcessedValue": None,    # Store the last processed sensor value.
+        "lastKnownValue": None,        # Stores the last unprocessed sensor value.
+        "updateRegistrationServer": False # True to auto handle registration server updating.
+    })
+
+
+# Purpose:
+# Creates and returns an object with information on how to search for device properties.
+# deviceID - A single string.  The string would be a device name that should have it's property checked.
+#                If you don't want it restriced to specific devices, just pass null.
+# w, h      - Search area dimensions.  If you only want in a specific range around the sensor you would set the width and height.  Don't pass
+#                anything if the entire workspace should be searched.
+# offset    - null or  'TOP_LEFT' if the top left corner is the starting point,
+#             'CENTER' if the search area should be around the center of the device.
+#               'WORKSPACE' if the entire workspace should be checked.  w and h will be ignored.
+def createPropertySearch (deviceID, w, h, offset):
+    if (None is w or None is h):
+        w = 4000
+        h = 4000
+        offset = 'WORKSPACE'
+
+    search = JsObject({"deviceIDs": [], "w": w, "h": h, "offset": offset})
+    if (None is not deviceID):
+        search.deviceIDs[0] = deviceID
+
+    return search
+
+
+# Purpose:
+# Creates and returns an object with information on how to search for device properties.
+# deviceIDs - An array of strings.  Each string would be a device name that should have it's property checked.
+#                If you don't want it restriced to specific devices, just pass null.
+# w, h      - Search area dimensions.  If you only want in a specific range around the sensor you would set the width and height.  Don't pass
+#                anything if the entire workspace should be searched.
+# offset    - null or  'TOP_LEFT' if the top left corner is the starting point,
+#             'CENTER' if the search area should be around the center of the device.
+#               'WORKSPACE' if the entire workspace should be checked.  w and h will be ignored.
+def createPropertySearchDevices(deviceIDs, w, h, offset):
+    if (w is None or h is None):
+        w = 4000
+        h = 4000
+        offset= 'WORKSPACE'
+
+    search = JsObject({"deviceIDs": [], "w": w, "h": h, "offset": offset})
+    if None is not deviceIDs:
+         search.deviceIDs = deviceIDs
+
+    return search
+
+
+# Purpose:
+# Creats and object that defines writting to an analog slot.
+def createAnalogWrite (slot):
+    return {"type": analogType(), "slot": slot}
+
+
+# Purpose:
+# Creats and object that defines writting to an analog slot.
+def createCustomWrite(slot):
+    return {"type": customType(), "slot": slot}
+
+
+# Purpose:
+# Creats and object that defines writting to an digital slot.
+def createDigitalWrite(slot):
+    return {"type": digitalType(), "slot": slot}
+
+
+# Purpose:
+# Returns the last update value before it was processed.
+def getLastKnownValue():
+    return g_sensorData.lastKnownValue
+
+
+# Purpose:
+# Returns the last update value after it was processed.
+def getLastProcessedValue():
+    return g_sensorData.lastProcessedValue
+
+
+# Purpose:
+# Setup a generic registration server entry for the sensor based on the slot write type the sensor is setup to use.
+# If it is digital it will be true, false.
+# Analog would be strings.
+# Custom is not supported.
+# The property will be marked as not-controllable and will only output values.
+# sensorName, sensorProperty - The text that will be displayed in the registration server.
+def setupRegistrationServer(sensorName, propertyName):
+    if g_sensorData:
+        g_sensorData.updateRegistrationServer = True
+
+        sensorType = None
+        if analogType() is g_sensorData.signalData.type:
+            sensorType = 'number'
+        elif digitalType() is g_sensorData.signalData.type:
+            sensorType = 'bool'
+        else:
+            g_sensorData.updateRegistrationServer = False
+            print 'Slot type not applicable for registration'
+
+        if g_sensorData.updateRegistrationServer:
+            IoEClient.setup({
+            'type': sensorName,
+            'states': [{
+                'name': propertyName,
+                'type': sensorType,
+                'controllable': False
+                }]
+            })
+    else:
+        print 'Slot type not specified, cannot setup registration server'
+
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+            <FILE class="CFile">
+             <FILE_NUMBER>5</FILE_NUMBER>
+             <NAME>main.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>from time import *
+import math
+from pyjs import *
+from library import * 
+
+
+# Purpose:
+# This is a generic single slot output sensor.
+# It can check environment variables, objects properties in range, and send a signal.
+# It is designed to have setup functions called that determine how it behaves.
+# The setup functions are defined in the library.
+
+# A delay will run each update.  It will be for this amount of time.
+# Setting to 0 means there is no delay.
+# If making a custom write, you can't have a delay.  customWrite requires the value to be set each loop.
+# The custom write thing seems to be a bug in the engine, it should get fixed sometime.
+g_delayTime = 1000        # var g_delayTime
+
+# Purpose):
+# Create your sensor here.
+# Call the setup function for the type of sensor you are making.
+# That would be an environment, device property in range, etc.
+
+def setup ():
+    setupDetectProperty('ALLOY', createPropertySearchDevices(None, 36, 70, 'TOP_LEFT'), createAnalogWrite(A0))
+    # setupRegistrationServer('Metal Sensor', 'Metal Detection')
+    setWaitTimeMSec(g_delayTime)
+    setCallbackOnProcessValue(processValue)
+
+
+# Purpose:
+# Update function.  Calls the library updateSensor which reads environment values, etc
+# and sends the value to the slot.
+
+def loop ():
+    # Update the sensor.
+    updateSensor()
+
+
+# Purpose:
+# Handle the sensor reading..
+# value     - The value of the sensor read before it gets sent to a slot. This can be a single value when reading an environment property, or an array if reading a property from devices.
+# deviceIDs - the value is an array of device IDs that met the user defined specifications(when requested).  These values match up with the value when finding groups of data (devices).  It is ignored for
+#             finding environment variables.
+
+def processValue (value, deviceIDs):
+    if len(value) > 0:
+        value = value[0]
+    else:
+        value = 0
+
+    return value
+
+
+
+if __name__ == "__main__":
+    setup()
+    while True:
+        loop()
+        sleep(0)
+
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+            <FILE class="CFile">
+             <FILE_NUMBER>7</FILE_NUMBER>
+             <NAME>pyjs.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>############################################################## &#xd;
+# Helper class to help porting code using JS object notation:&#xd;
+#&#xd;
+#   JS: var obj = {type: "unknown"}&#xd;
+#   JS: obj.type = "analog"&#xd;
+#&#xd;
+#   PY: obj = JsObject({"type" : "unknown"})&#xd;
+#   PY: obj.type = "analog"&#xd;
+#&#xd;
+class JsObject(dict):&#xd;
+    def __init__(self, d):&#xd;
+        for k in d.keys():&#xd;
+            setattr(self, k, d[k])&#xd;
+  &#xd;
+&#xd;
+&#xd;
+############################################################## &#xd;
+# Map value from one range to another&#xd;
+#&#xd;
+def js_map(x, inMin, inMax, outMin, outMax):&#xd;
+    return (x - inMin) * (outMax - outMin) / (inMax - inMin) + outMin&#xd;
+&#xd;
+&#xd;
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>7</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>User:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>0</FILE_COUNTER>
+         <CAPACITY>10000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <THING_MODEL>
+      <NAME></NAME>
+      <WIDTH>37.5</WIDTH>
+      <HEIGHT>70.5</HEIGHT>
+      <ANALOG_SLOTS_COUNT>4</ANALOG_SLOTS_COUNT>
+      <DIGITAL_SLOTS_COUNT>6</DIGITAL_SLOTS_COUNT>
+      <SPECIFICATIONS>&lt;html>&lt;head>&lt;/head>&lt;body style="word-wrap: break-word; -webkit-nbsp-mode: space; -webkit-line-break: after-white-space; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;span class="Apple-style-span" style="font-family: 'Arial Black'; font-size: x-large; ">Metal Sensor&lt;/span>&lt;/font>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>&lt;br>&lt;/u>&lt;/span>&lt;/div>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Features:&lt;/u>&lt;/span>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;ul>&lt;li style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">Detects metal by checking for an alloy property.&lt;/font>&lt;/li>&lt;li style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">Outputs the reading.&lt;/font>&lt;/li>&lt;/ul>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;div style="font-size: x-large; font-family: 'Courier New'; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Usage:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;/font>&lt;div>&lt;ul>&lt;li style="font-family: 'Times New Roman'; font-size: medium; ">&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Objects near the sensor area with the alloy property will be detected.&lt;/span>&lt;/li>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">The detector sends and analog signal based on the alloy content.&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div>&lt;div>&lt;u>Direct Control:&lt;/u>&lt;/div>&lt;/div>&lt;/font>&lt;/div>&lt;/font>&lt;div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Local Control:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Remote Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Data Specifications:&lt;/u>&lt;/span>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Output slot: A0&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Output value: analog output in range 0 to 1023, representing the alloy property detected.&lt;/font>&lt;/li>&lt;/ul>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Example:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">See metal_sensor.pkt for an example.&lt;/font>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;br>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/body>&lt;/html></SPECIFICATIONS>
+      <ROTATION>0</ROTATION>
+      <SCALE>1</SCALE>
+      <IS_END_DEVICE>FALSE</IS_END_DEVICE>
+      <IS_DESKTOP_AVAILABLE>FALSE</IS_DESKTOP_AVAILABLE>
+      <SUBCOMPONENTS>
+       <SUBCOMPONENT>
+        <NAME>Metal Sensor</NAME>
+        <X>0</X>
+        <Y>0</Y>
+        <Z_ORDER>1</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>0</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>-1</SLOT_NUM>
+        <SLOT_TYPE>0</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/Components/MetalSensor.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+      </SUBCOMPONENTS>
+      <RULES/>
+     </THING_MODEL>
+     <IOE_CLIENT>
+      <CLIENT_MODE>NO_SERVER</CLIENT_MODE>
+      <SERVER_ADDRESS></SERVER_ADDRESS>
+      <USERNAME></USERNAME>
+      <PASSWORD></PASSWORD>
+     </IOE_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME></NAME>
+      <MAIL_ID></MAIL_ID>
+      <POP3_SERVER></POP3_SERVER>
+      <SMTP_SERVER></SMTP_SERVER>
+      <USER></USER>
+      <PASSWORD></PASSWORD>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL translate="true">{9a95a5d9-b5a4-407c-92cc-e8bafbf01c6c},{8737c60b-6d91-40de-8297-2ec6cbb7a0a9},{bb76c77f-a304-4f56-97a2-9eac8301f4b2},{08428b51-87dd-4edb-bcd7-b89f16b61fa6}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.0499419</X_PN>
+      <Y_PN>0.100561</Y_PN>
+      <X>172</X>
+      <Y>215</Y>
+      <PARENT_PATH>{9a95a5d9-b5a4-407c-92cc-e8bafbf01c6c},{8737c60b-6d91-40de-8297-2ec6cbb7a0a9},{bb76c77f-a304-4f56-97a2-9eac8301f4b2}</PARENT_PATH>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

@@ -1,0 +1,775 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="" model="DataHistorianServer">DataHistorian</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>eNonRemovableInterfaceCard</TYPE>
+         <MODULE>
+          <TYPE>eNonRemovableInterfaceCard</TYPE>
+          <MODEL>PT-CONTROLLER-BUILTIN</MODEL>
+          <PORT>
+           <TYPE>eCopperGigabitEthernet</TYPE>
+           <POWER>true</POWER>
+           <MEDIATYPE>0</MEDIATYPE>
+           <PINS>false</PINS>
+           <FIBERMULTIMODE>true</FIBERMULTIMODE>
+           <BANDWIDTH>1000000</BANDWIDTH>
+           <SPEED>100</SPEED>
+           <FULLDUPLEX>true</FULLDUPLEX>
+           <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+           <AUTONEGOTIATESPEED>true</AUTONEGOTIATESPEED>
+           <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+           <MACADDRESS>0000.0000.0000</MACADDRESS>
+           <BIA>0000.0000.0000</BIA>
+           <CLOCKRATE>2000000</CLOCKRATE>
+           <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+           <DESCRIPTION/>
+           <CHANNEL>0</CHANNEL>
+           <CHANNEL5GHZ>0</CHANNEL5GHZ>
+           <COVERAGERANGE>0</COVERAGERANGE>
+           <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+           <UP_METHOD>5</UP_METHOD>
+           <IP/>
+           <SUBNET/>
+           <PORT_GATEWAY/>
+           <PORT_DNS/>
+           <PORT_DHCP_ENABLE>false</PORT_DHCP_ENABLE>
+           <ND_SUPPRESSED>false</ND_SUPPRESSED>
+           <ND_IPV6_DNS_ADDRESSES/>
+           <TIMEOUT>14400000</TIMEOUT>
+           <PC_FIREWALL>false</PC_FIREWALL>
+           <PC_IPV6_FIREWALL>false</PC_IPV6_FIREWALL>
+           <IPV6_ENABLED>false</IPV6_ENABLED>
+           <IPV6_ADDRESS_AUTOCONFIG>false</IPV6_ADDRESS_AUTOCONFIG>
+           <IPV6_PORT_GATEWAY/>
+           <IPV6_PORT_DNS/>
+           <IPV6_LINK_LOCAL>FE80::2D0:BCFF:FE4B:C480</IPV6_LINK_LOCAL>
+           <IPV6_DEFAULT_LINK_LOCAL>FE80::2D0:BCFF:FE4B:C480</IPV6_DEFAULT_LINK_LOCAL>
+           <IPV6_PORT_DHCP_ENABLED>false</IPV6_PORT_DHCP_ENABLED>
+           <IPV6_ADDRESSES/>
+           <IP_UNNUMBERED/>
+           <DHCP_SERVER_IP>0.0.0.0</DHCP_SERVER_IP>
+           <MANAGEMENT_INTERFACE>false</MANAGEMENT_INTERFACE>
+          </PORT>
+          <PORT>
+           <TYPE>eCopperGigabitEthernet</TYPE>
+           <POWER>true</POWER>
+           <MEDIATYPE>0</MEDIATYPE>
+           <PINS>false</PINS>
+           <FIBERMULTIMODE>true</FIBERMULTIMODE>
+           <BANDWIDTH>1000000</BANDWIDTH>
+           <SPEED>100</SPEED>
+           <FULLDUPLEX>false</FULLDUPLEX>
+           <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+           <AUTONEGOTIATESPEED>true</AUTONEGOTIATESPEED>
+           <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+           <MACADDRESS>0000.0000.0000</MACADDRESS>
+           <BIA>0000.0000.0000</BIA>
+           <CLOCKRATE>2000000</CLOCKRATE>
+           <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+           <DESCRIPTION/>
+           <CHANNEL>0</CHANNEL>
+           <CHANNEL5GHZ>0</CHANNEL5GHZ>
+           <COVERAGERANGE>0</COVERAGERANGE>
+           <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+           <UP_METHOD>5</UP_METHOD>
+           <IP/>
+           <SUBNET/>
+           <PORT_GATEWAY/>
+           <PORT_DNS/>
+           <PORT_DHCP_ENABLE>false</PORT_DHCP_ENABLE>
+           <ND_SUPPRESSED>false</ND_SUPPRESSED>
+           <ND_IPV6_DNS_ADDRESSES/>
+           <TIMEOUT>14400000</TIMEOUT>
+           <PC_FIREWALL>false</PC_FIREWALL>
+           <PC_IPV6_FIREWALL>false</PC_IPV6_FIREWALL>
+           <IPV6_ENABLED>false</IPV6_ENABLED>
+           <IPV6_ADDRESS_AUTOCONFIG>false</IPV6_ADDRESS_AUTOCONFIG>
+           <IPV6_PORT_GATEWAY/>
+           <IPV6_PORT_DNS/>
+           <IPV6_LINK_LOCAL>FE80::206:2AFF:FEC5:7633</IPV6_LINK_LOCAL>
+           <IPV6_DEFAULT_LINK_LOCAL>FE80::206:2AFF:FEC5:7633</IPV6_DEFAULT_LINK_LOCAL>
+           <IPV6_PORT_DHCP_ENABLED>false</IPV6_PORT_DHCP_ENABLED>
+           <IPV6_ADDRESSES/>
+           <IP_UNNUMBERED/>
+           <DHCP_SERVER_IP>0.0.0.0</DHCP_SERVER_IP>
+           <MANAGEMENT_INTERFACE>false</MANAGEMENT_INTERFACE>
+          </PORT>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>eInterfaceCard</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>eInterfaceCard</TYPE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAABQAAAC4AUABSAE8ARwBSAEEATQBNAEkATgBHAF8AQwBVAFIAUgBFAE4AVABfAEQASQBSAAAACgAAAAA0AGQAYQB0AGEAaABpAHMAdABvAHIAaQBhAG4AIAAoAEoAYQB2AGEAUwBjAHIAaQBwAHQAKQAAADAAUABSAE8ARwBSAEEATQBNAEkATgBHAF8AQwBVAFIAUgBFAE4AVABfAEYASQBMAEUAAAAKAAAAAA4AbQBhAGkAbgAuAGoAcwAAAC4AUABSAE8ARwBSAEEATQBNAEkATgBHAF8ARQBEAEkAVABJAE4ARwBfAEQASQBSAAAACgAAAAA0AGQAYQB0AGEAaABpAHMAdABvAHIAaQBhAG4AIAAoAEoAYQB2AGEAUwBjAHIAaQBwAHQAKQAAABAAUABUAF8ATQBPAEQARQBMAAAACgAAAAAmAEQAYQB0AGEASABpAHMAdABvAHIAaQBhAG4AUwBlAHIAdgBlAHIAAAAUAFAAVABfAFYARQBSAFMASQBPAE4AAAAKAAAAAAoAMQAuADAALgAw</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1269.51</X_COORD>
+      <Y_COORD>1236.93</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT08106400</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:300000;cost:250;power source:1;rack units:2;wattage:5;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>0</TEMPLATE_CREATION_TIME>
+     <STARTTIME>1708142066145</STARTTIME>
+     <STARTSIMTIME>0</STARTSIMTIME>
+     <USER_APPS>
+      <RUNNING_APPS/>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SAVE_REF_ID>save-ref-id:0</SAVE_REF_ID>
+     <SYS_NAME></SYS_NAME>
+     <PTP_ENALBED>0</PTP_ENALBED>
+     <GATEWAY/>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME></NAME>
+      <MAIL_ID></MAIL_ID>
+      <POP3_SERVER></POP3_SERVER>
+      <SMTP_SERVER></SMTP_SERVER>
+      <USER></USER>
+      <PASSWORD></PASSWORD>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>Default</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+       <STANDARD_CHANNEL5G>112</STANDARD_CHANNEL5G>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>Default</NAME>
+        <SSID>Default</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>Default</NAME>
+        <SSID>Default</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <CELLULAR_CLIENT>
+      <WIRELESS_CLIENT>
+       <WIRELESS_COMMON>
+        <NETWORK_MODE>7</NETWORK_MODE>
+        <SSID>ptcellular</SSID>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <WIDE_CHANNEL>0</WIDE_CHANNEL>
+        <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+        <STANDARD_CHANNEL5G>112</STANDARD_CHANNEL5G>
+       </WIRELESS_COMMON>
+       <PROFILES>
+        <WIRELESS_PROFILE>
+         <NAME>ptcellular</NAME>
+         <SSID>ptcellular</SSID>
+         <NETWORK_TYPE>7</NETWORK_TYPE>
+         <RADIO_BAND>0</RADIO_BAND>
+         <AUTHEN_TYPE>0</AUTHEN_TYPE>
+         <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+         <WEP_KEY></WEP_KEY>
+         <WPA_EAP_USERID></WPA_EAP_USERID>
+         <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+         <DHCP_ENABLED>1</DHCP_ENABLED>
+         <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+         <IP_ADDRESS/>
+         <SUBNET_MASK/>
+         <DEFAULT_GATEWAY/>
+         <DNS/>
+         <CHANNEL>1</CHANNEL>
+         <VLAN>1</VLAN>
+        </WIRELESS_PROFILE>
+       </PROFILES>
+       <CURRENT_PROFILE>
+        <WIRELESS_PROFILE>
+         <NAME>ptcellular</NAME>
+         <SSID>ptcellular</SSID>
+         <NETWORK_TYPE>7</NETWORK_TYPE>
+         <RADIO_BAND>0</RADIO_BAND>
+         <AUTHEN_TYPE>0</AUTHEN_TYPE>
+         <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+         <WEP_KEY></WEP_KEY>
+         <WPA_EAP_USERID></WPA_EAP_USERID>
+         <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+         <DHCP_ENABLED>1</DHCP_ENABLED>
+         <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+         <IP_ADDRESS/>
+         <SUBNET_MASK/>
+         <DEFAULT_GATEWAY/>
+         <DNS/>
+         <CHANNEL>1</CHANNEL>
+         <VLAN>1</VLAN>
+        </WIRELESS_PROFILE>
+       </CURRENT_PROFILE>
+      </WIRELESS_CLIENT>
+      <PROFILES/>
+      <CURRENT_PROFILE_NUM>0</CURRENT_PROFILE_NUM>
+      <CO_USERNAME>CentralOffice</CO_USERNAME>
+      <CO_PASSWORD>cisco</CO_PASSWORD>
+      <ACTIVATED>0</ACTIVATED>
+     </CELLULAR_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP/>
+     </DHCP_CLIENT>
+     <ACL_PROCESS>
+      <ACLS/>
+     </ACL_PROCESS>
+     <ACL_V6_PROCESS>
+      <ACLS/>
+     </ACL_V6_PROCESS>
+     <GATEWAYV6/>
+     <ISATAP_ENABLED>false</ISATAP_ENABLED>
+     <ISATAP_ROUTER/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>CD-D2-0A-A1-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>1</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD>
+       <PORT_DATA_PAIR>
+        <PORT_NAME>GigabitEthernet1</PORT_NAME>
+        <SERVER_ROUTER_PORT_DATA>
+         <ADV_SEND_ADVERTISEMENT>1</ADV_SEND_ADVERTISEMENT>
+         <MAX_RTR_ADV_INTERVAL>600</MAX_RTR_ADV_INTERVAL>
+         <MIN_RTR_ADV_INTERVAL>198</MIN_RTR_ADV_INTERVAL>
+         <ADV_MANAGED_FLAG>0</ADV_MANAGED_FLAG>
+         <ADV_OTHER_CONFIG_FLAG>0</ADV_OTHER_CONFIG_FLAG>
+         <ADV_LINK_MTU>1500</ADV_LINK_MTU>
+         <ADV_REACHABLE_TIME>0</ADV_REACHABLE_TIME>
+         <ADV_RESTRANS_TIMER>0</ADV_RESTRANS_TIMER>
+         <ADV_CUR_HOP_LIMIT>64</ADV_CUR_HOP_LIMIT>
+         <ADV_DEFAULT_LIFETIME>1800</ADV_DEFAULT_LIFETIME>
+         <ENABLED_ROUTER>1</ENABLED_ROUTER>
+        </SERVER_ROUTER_PORT_DATA>
+       </PORT_DATA_PAIR>
+       <PORT_DATA_PAIR>
+        <PORT_NAME>GigabitEthernet0</PORT_NAME>
+        <SERVER_ROUTER_PORT_DATA>
+         <ADV_SEND_ADVERTISEMENT>1</ADV_SEND_ADVERTISEMENT>
+         <MAX_RTR_ADV_INTERVAL>600</MAX_RTR_ADV_INTERVAL>
+         <MIN_RTR_ADV_INTERVAL>198</MIN_RTR_ADV_INTERVAL>
+         <ADV_MANAGED_FLAG>0</ADV_MANAGED_FLAG>
+         <ADV_OTHER_CONFIG_FLAG>0</ADV_OTHER_CONFIG_FLAG>
+         <ADV_LINK_MTU>1500</ADV_LINK_MTU>
+         <ADV_REACHABLE_TIME>0</ADV_REACHABLE_TIME>
+         <ADV_RESTRANS_TIMER>0</ADV_RESTRANS_TIMER>
+         <ADV_CUR_HOP_LIMIT>64</ADV_CUR_HOP_LIMIT>
+         <ADV_DEFAULT_LIFETIME>1800</ADV_DEFAULT_LIFETIME>
+         <ENABLED_ROUTER>1</ENABLED_ROUTER>
+        </SERVER_ROUTER_PORT_DATA>
+       </PORT_DATA_PAIR>
+      </SERVER_ROUTER_PORT_DATA_HEAD>
+     </NDV6>
+     <NF_COLLECTOR>
+      <ENABLED>0</ENABLED>
+     </NF_COLLECTOR>
+     <VOIP_TFTP_IP>
+      <TFTP_IP>0.0.0.0</TFTP_IP>
+      <IS_DEFAULT_TFTP>1</IS_DEFAULT_TFTP>
+     </VOIP_TFTP_IP>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT class="CHttpPage">
+        <TEXT>&lt;html>
+&lt;head>
+&lt;script>
+function validateLogin(form)
+{
+  var userid = document.forms["login"]["userid"].value;
+  var password = document.forms["login"]["pw"].value;
+  if (userid.length == 0)
+  {
+    alert("Please enter the userid.");
+  }
+  else if (password.length == 0)
+  {
+    alert("Please enter the password.");
+  }
+  else
+  {
+    CHttpFormExtractor.submitHistorianLogin(userid, password, function(rtn) { form.submit();});
+  }
+  return false;
+}
+&lt;/script>
+&lt;/head>
+&lt;body>
+&lt;center>
+&lt;h3>Data Historian Server Login&lt;/h3>
+&lt;table>
+&lt;tr>&lt;td>
+&lt;form name="login" method="post" action="login_historian_action.php" onsubmit="return validateLogin(this)">
+Username: &lt;input type="text" name="userid" id="userid" value="" size="20">&lt;br>
+Password: &lt;input type="password" name="pw" id="pw" value="" size="20">&lt;br>
+&lt;br>
+&lt;center>
+&lt;input type="submit" value="Sign In">
+&lt;/center>
+&lt;/form>
+&lt;/td>&lt;/tr>
+&lt;/table>
+&lt;/center>
+&lt;span>Don't have a Data Historian account?&lt;/span> &lt;a id="idA_SignUp" class="TextSemiBold" href="create_historian_account.html">Sign up now&lt;/a>
+&lt;/body>
+&lt;/html></TEXT>
+       </FILE_CONTENT>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Desktop:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT class="CLinksysFirmwareUpgPage">
+          <TEXT></TEXT>
+          <Firmware_Version>v1.1_1.51.2</Firmware_Version>
+         </FILE_CONTENT>
+         <FILES>
+          <FILE class="CFile">
+           <FILE_NUMBER>3</FILE_NUMBER>
+           <NAME>HomeRouter-PT-AC_v1.04.16_fw,0.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CLinksysFirmwareUpgPage">
+            <TEXT></TEXT>
+            <Firmware_Version>v1.04.16</Firmware_Version>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>4</FILE_NUMBER>
+           <NAME>HomeRouter-PT-AC_v2.0_10.1.17_fw,0.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CLinksysFirmwareUpgPage">
+            <TEXT></TEXT>
+            <Firmware_Version>v2.0_10.1.17</Firmware_Version>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>WRT300N-v1.03.6_fw,0.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CLinksysFirmwareUpgPage">
+            <TEXT></TEXT>
+            <Firmware_Version>v1.03.6</Firmware_Version>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>2</FILE_NUMBER>
+           <NAME>WRT300N-v1.1_1.51.2_fw,0.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CLinksysFirmwareUpgPage">
+            <TEXT></TEXT>
+            <Firmware_Version>v1.1_1.51.2</Firmware_Version>
+           </FILE_CONTENT>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>4</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT class="CTextFileContent">
+          <TEXT>
+function setup()
+{
+	CIP.setup();
+	HistorianProcess.setup();
+	HistorianProcess.resetDatabase();
+}
+CIP.onDataReceive = function(ip, data) {
+	Serial.println("onDataReceive="+ data);
+	var dataIp = data.split("::");
+	HistorianProcess.insertReceivedDataIntoDb(dataIp[0], dataIp[1]);
+}</TEXT>
+         </FILE_CONTENT>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>datahistorian (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>
+function setup()
+{
+	CIP.setup();
+	HistorianProcess.setup();
+	HistorianProcess.resetDatabase();
+}
+CIP.onDataReceive = function(ip, data) {
+	Serial.println("onDataReceive="+ data);
+	var dataIp = data.split("::");
+	HistorianProcess.insertReceivedDataIntoDb(dataIp[0], dataIp[1]);
+}</TEXT>
+           </FILE_CONTENT>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>2</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>
+function setup()
+{
+	CIP.setup();
+	HistorianProcess.setup();
+	HistorianProcess.resetDatabase();
+}
+CIP.onDataReceive = function(ip, data) {
+	Serial.println("onDataReceive="+ data);
+	var dataIp = data.split("::");
+	HistorianProcess.insertReceivedDataIntoDb(dataIp[0], dataIp[1]);
+}</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>2</FILE_COUNTER>
+         <CAPACITY>1000000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>c:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT class="CTextFileContent">
+          <TEXT>This is a sample text file</TEXT>
+         </FILE_CONTENT>
+         <FILES>
+          <FILE class="CFile">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>sampleFile.txt</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>This is a sample text file</TEXT>
+           </FILE_CONTENT>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>1</FILE_COUNTER>
+         <CAPACITY>1000000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>historian:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT class="CHttpPage">
+          <TEXT>&lt;html>
+&lt;head>
+&lt;script>
+function validateLogin(form)
+{
+  var userid = document.forms["login"]["userid"].value;
+  var password = document.forms["login"]["pw"].value;
+  if (userid.length == 0)
+  {
+    alert("Please enter the userid.");
+  }
+  else if (password.length == 0)
+  {
+    alert("Please enter the password.");
+  }
+  else
+  {
+    CHttpFormExtractor.submitHistorianLogin(userid, password, function(rtn) { form.submit();});
+  }
+  return false;
+}
+&lt;/script>
+&lt;/head>
+&lt;body>
+&lt;center>
+&lt;h3>Data Historian Server Login&lt;/h3>
+&lt;table>
+&lt;tr>&lt;td>
+&lt;form name="login" method="post" action="login_historian_action.php" onsubmit="return validateLogin(this)">
+Username: &lt;input type="text" name="userid" id="userid" value="" size="20">&lt;br>
+Password: &lt;input type="password" name="pw" id="pw" value="" size="20">&lt;br>
+&lt;br>
+&lt;center>
+&lt;input type="submit" value="Sign In">
+&lt;/center>
+&lt;/form>
+&lt;/td>&lt;/tr>
+&lt;/table>
+&lt;/center>
+&lt;span>Don't have a Data Historian account?&lt;/span> &lt;a id="idA_SignUp" class="TextSemiBold" href="create_historian_account.html">Sign up now&lt;/a>
+&lt;/body>
+&lt;/html></TEXT>
+         </FILE_CONTENT>
+         <FILES>
+          <FILE class="CFile">
+           <FILE_NUMBER>2</FILE_NUMBER>
+           <NAME>create_historian_account.html</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>14</PERMISSION>
+           <FILE_CONTENT class="CHttpPage">
+            <TEXT>&lt;html>
+&lt;head>
+&lt;script>
+function validateAccount(form)
+{
+  var userid = document.forms["createAccount"]["userid"].value;
+  var password = document.forms["createAccount"]["pw"].value;
+  if (userid.length == 0)
+  {
+    alert("Please enter the userid.");
+  }
+  else if (password.length == 0)
+  {
+    alert("Please enter the password.");
+  }
+  else
+  {
+    CHttpFormExtractor.submitHistorianLogin(userid, password, function(rtn) { form.submit();});
+  }
+  return false;
+}
+&lt;/script>
+&lt;/head>
+&lt;body>
+&lt;center>
+&lt;h3>Data Historian Server Account Creation&lt;/h3>
+&lt;table>
+&lt;tr>&lt;td>
+&lt;form name="createAccount" method="post" action="account_historian_action.php" onsubmit="return validateAccount(this)">
+Username: &lt;input type="text" name="userid" id="userid" value="" size="20">&lt;br>
+Password: &lt;input type="password" name="pw" id="pw" value="" size="20">&lt;br>
+&lt;br>
+&lt;center>
+&lt;input type="submit" value="Create">
+&lt;/center>
+&lt;/form>
+&lt;/td>&lt;/tr>
+&lt;/table>
+&lt;/center>
+&lt;/body>
+&lt;/html></TEXT>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>historianIndex.php</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CHttpPage">
+            <TEXT>&lt;html>
+&lt;head>
+&lt;script>
+function validateLogin(form)
+{
+  var userid = document.forms["login"]["userid"].value;
+  var password = document.forms["login"]["pw"].value;
+  if (userid.length == 0)
+  {
+    alert("Please enter the userid.");
+  }
+  else if (password.length == 0)
+  {
+    alert("Please enter the password.");
+  }
+  else
+  {
+    CHttpFormExtractor.submitHistorianLogin(userid, password, function(rtn) { form.submit();});
+  }
+  return false;
+}
+&lt;/script>
+&lt;/head>
+&lt;body>
+&lt;center>
+&lt;h3>Data Historian Server Login&lt;/h3>
+&lt;table>
+&lt;tr>&lt;td>
+&lt;form name="login" method="post" action="login_historian_action.php" onsubmit="return validateLogin(this)">
+Username: &lt;input type="text" name="userid" id="userid" value="" size="20">&lt;br>
+Password: &lt;input type="password" name="pw" id="pw" value="" size="20">&lt;br>
+&lt;br>
+&lt;center>
+&lt;input type="submit" value="Sign In">
+&lt;/center>
+&lt;/form>
+&lt;/td>&lt;/tr>
+&lt;/table>
+&lt;/center>
+&lt;span>Don't have a Data Historian account?&lt;/span> &lt;a id="idA_SignUp" class="TextSemiBold" href="create_historian_account.html">Sign up now&lt;/a>
+&lt;/body>
+&lt;/html></TEXT>
+           </FILE_CONTENT>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>2</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <ALGORITHM_SETTINGS>
+      <USE_GLOBAL>true</USE_GLOBAL>
+      <CBAC_HALF_OPEN_SESSION_MULTIPLIER>1</CBAC_HALF_OPEN_SESSION_MULTIPLIER>
+      <TCP_MAX_CONNECTING_SESSIONS>100</TCP_MAX_CONNECTING_SESSIONS>
+      <TCP_MAX_OPENED_SESSIONS>1000</TCP_MAX_OPENED_SESSIONS>
+      <INTERFACE_QUEUE_SIZE>10</INTERFACE_QUEUE_SIZE>
+      <STORM_CONTROL_MULTIPLIER>10</STORM_CONTROL_MULTIPLIER>
+      <TCP_MAX_RETRANSMISSION_TIMEOUT>1000</TCP_MAX_RETRANSMISSION_TIMEOUT>
+     </ALGORITHM_SETTINGS>
+     <TRAFFICGEN_USER_TRAFFIC/>
+     <TERMINAL_SETTINGS>
+      <BITS>9600</BITS>
+      <DATA_BITS>8</DATA_BITS>
+      <PARITY>2</PARITY>
+      <STOP_BITS>1</STOP_BITS>
+      <FLOW_CONTROL>0</FLOW_CONTROL>
+     </TERMINAL_SETTINGS>
+     <PPPOE_SETTINGS>
+      <AUTHEN_TYPE>1/2/</AUTHEN_TYPE>
+     </PPPOE_SETTINGS>
+     <LOCK_SETTINGS>
+      <DLOCK>1</DLOCK>
+      <LOCK>0</LOCK>
+      <PASSWD></PASSWD>
+     </LOCK_SETTINGS>
+     <HTML_TAB>
+      <HTML_CODE></HTML_CODE>
+     </HTML_TAB>
+     <GUI_TAB>
+      <GUI_CODE></GUI_CODE>
+     </GUI_TAB>
+     <IMAGE_SETTINGS>
+      <CUSTOM_PHYSICAL></CUSTOM_PHYSICAL>
+     </IMAGE_SETTINGS>
+     <DOT1X_SETTINGS>
+      <PORTS/>
+     </DOT1X_SETTINGS>
+     <SNMP_MANAGER>
+      <AGENT_IP>0.0.0.0</AGENT_IP>
+      <AGENT_PORT>161</AGENT_PORT>
+      <MANAGER_PORT>161</MANAGER_PORT>
+      <READ_COMMUNITY></READ_COMMUNITY>
+      <WRITE_COMMUNITY></WRITE_COMMUNITY>
+      <SNMP_VERSION>1</SNMP_VERSION>
+     </SNMP_MANAGER>
+     <PTP_PROCESS>
+      <PTP_CLOCK_ID>0x00:06:2A:FF:FE:C5:76:30</PTP_CLOCK_ID>
+      <PTP_CLOCK_TIME>1301454935380</PTP_CLOCK_TIME>
+     </PTP_PROCESS>
+     <NTP_SERVER>
+      <ENABLED>0</ENABLED>
+      <ENABLED_SERVER_AUTHENTICATE>0</ENABLED_SERVER_AUTHENTICATE>
+      <KEY>0</KEY>
+      <MD5PASSWORD></MD5PASSWORD>
+      <SERVER_IP_LIST/>
+     </NTP_SERVER>
+     <HISTORIAN_ENABLED>true</HISTORIAN_ENABLED>
+     <DB_SIZE>100</DB_SIZE>
+     <USERS>
+      <USER1>
+       <NAME>admin</NAME>
+       <PASS>admin</PASS>
+      </USER1>
+     </USERS>
+     <HISTORIAN_PROCESS>
+      <ENABLED>1</ENABLED>
+      <DB></DB>
+     </HISTORIAN_PROCESS>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL>{02d6162e-22fa-4f31-afcc-ff8fcc859e7d},{92480a3b-fd68-4f1d-a9f2-0994e8987541},{20be622c-7d40-437e-827c-101a72f41214},{8d950bf0-d8d6-45e2-8216-1e6770e407e9},{02f66eda-7666-4692-9a5e-e1b44679bdd9},{a8ff9ea6-7976-4118-b928-27e7b6c7233e}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.19825</X_PN>
+      <Y_PN>0.09275</Y_PN>
+      <X>4</X>
+      <Y>0</Y>
+      <SLOT>0</SLOT>
+      <SUBSLOT>0</SUBSLOT>
+      <PARENT_PATH>{02d6162e-22fa-4f31-afcc-ff8fcc859e7d},{92480a3b-fd68-4f1d-a9f2-0994e8987541},{20be622c-7d40-437e-827c-101a72f41214},{8d950bf0-d8d6-45e2-8216-1e6770e407e9}</PARENT_PATH>
+      <CONTAINER_ID>{02f66eda-7666-4692-9a5e-e1b44679bdd9}</CONTAINER_ID>
+      <ICP_CONTAINER_SCENE_X>0</ICP_CONTAINER_SCENE_X>
+      <ICP_CONTAINER_SCENE_Y>0</ICP_CONTAINER_SCENE_Y>
+      <ORIGINAL_DEVICE_UUID>{fb894d3d-b406-17b9-5f3f-726ae6b044f7}</ORIGINAL_DEVICE_UUID>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

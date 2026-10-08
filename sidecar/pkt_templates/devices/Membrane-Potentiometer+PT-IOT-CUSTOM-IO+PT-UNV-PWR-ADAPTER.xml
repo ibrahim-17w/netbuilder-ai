@@ -1,0 +1,397 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="Membrane Potentiometer" model="Membrane Potentiometer">MCUComponent</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+        <MODEL>PT-UNV-PWR-ADAPTER</MODEL>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAAAwAAAAoAbABlAHYAZQBsAAAACgAAAAACADAAAAAwAFAAUgBPAEcAUgBBAE0ATQBJAE4ARwBfAEMAVQBSAFIARQBOAFQAXwBGAEkATABFAAAACgAAAAAOAG0AYQBpAG4ALgBwAHkAAAAuAFAAUgBPAEcAUgBBAE0ATQBJAE4ARwBfAEMAVQBSAFIARQBOAFQAXwBEAEkAUgAAAAoAAAAAPgBNAGUAbQBiAHIAYQBuAGUAIABQAG8AdABlAG4AdABpAG8AbQBlAHQAZQByACAAKABQAHkAdABoAG8AbgAp</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1239.49</X_COORD>
+      <Y_COORD>1232.1</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT08108BYJ</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:26280;cost:3000;power source:0;rack units:1;wattage:10;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>1499882974269</TEMPLATE_CREATION_TIME>
+     <USER_APPS>
+      <RUNNING_APPS>
+       <USER_APP>Membrane Potentiometer (JavaScript)</USER_APP>
+      </RUNNING_APPS>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SYS_NAME></SYS_NAME>
+     <GATEWAY/>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP/>
+     </DHCP_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <GATEWAYV6/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>28-8A-2E-2E-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>Membrane Potentiometer (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT/>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>2</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>function setup() 
+{
+	analogWrite(A0, 0);
+	setDeviceProperty(getName(), "level", 0);
+}
+
+// X region that makes up the softweb potentiometer.
+// xMin is close to the plug and xMax is the end of the strip.
+// The further from the plug, the higher the analog output will be.
+var region = {xMin: 27, xMax: 115};
+var maxAnalog = 255;
+
+// Purpose:
+// Device update function.  Detect the touch position on potentiometer and convert it to an analog signal.
+function mouseEvent(pressed, x, y, firstPress) {
+
+	var output = 0;
+	if(pressed)
+	{
+		// Terminate if the touch goes out of range.
+		if((x >= region.xMin) &amp;&amp; (x &lt;= region.xMax))
+		{
+			var percent = ((x - region.xMin) / (region.xMax-region.xMin));
+			output = percent * maxAnalog;
+		}
+	}
+	
+	analogWrite(A0, output);
+	setDeviceProperty(getName(), "level", output);
+}
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>3</FILE_NUMBER>
+           <NAME>Membrane Potentiometer (Python)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT/>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>4</FILE_NUMBER>
+             <NAME>main.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>from time import *
+from physical import *
+from gpio import *
+from pyjs import *
+
+
+
+def setup ():
+    analogWrite(A0, 0)
+    setDeviceProperty(getName(), "level", 0)
+
+
+# X region that makes up the softweb potentiometer.
+# xMin is close to the plug and xMax is the end of the strip.
+# The further from the plug, the higher the analog output will be.
+
+region = JsObject({        # var region
+    "xMin": 27,
+    "xMax": 115
+})
+
+maxAnalog = 255        # var maxAnalog
+
+# Purpose:
+# Device update function.  Detect the touch position on potentiometer and convert it to an analog signal.
+
+def mouseEvent (pressed, x, y, firstPress):
+
+    output = 0        # var output
+    if pressed:
+        # Terminate if the touch goes out of range.
+        if (x >= region.xMin) and (x &lt;= region.xMax):
+            percent = ((x - region.xMin) / float(region.xMax - region.xMin))        # var percent
+            output = percent * maxAnalog
+
+
+
+    analogWrite(A0, output)
+    setDeviceProperty(getName(), "level", output)
+
+
+if __name__ == "__main__":
+    setup()
+    while True:
+        #loop()
+        sleep(3600)
+
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+            <FILE class="CFile">
+             <FILE_NUMBER>5</FILE_NUMBER>
+             <NAME>pyjs.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>############################################################## &#xd;
+# Helper class to help porting code using JS object notation:&#xd;
+#&#xd;
+#   JS: var obj = {type: "unknown"}&#xd;
+#   JS: obj.type = "analog"&#xd;
+#&#xd;
+#   PY: obj = JsObject({"type" : "unknown"})&#xd;
+#   PY: obj.type = "analog"&#xd;
+#&#xd;
+class JsObject(dict):&#xd;
+    def __init__(self, d):&#xd;
+        for k in d.keys():&#xd;
+            setattr(self, k, d[k])&#xd;
+  &#xd;
+&#xd;
+&#xd;
+############################################################## &#xd;
+# Map value from one range to another&#xd;
+#&#xd;
+def js_map(x, inMin, inMax, outMin, outMax):&#xd;
+    return (x - inMin) * (outMax - outMin) / (inMax - inMin) + outMin&#xd;
+&#xd;
+&#xd;
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>5</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>User:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>0</FILE_COUNTER>
+         <CAPACITY>10000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <THING_MODEL>
+      <NAME></NAME>
+      <WIDTH>115.5</WIDTH>
+      <HEIGHT>28.5</HEIGHT>
+      <ANALOG_SLOTS_COUNT>4</ANALOG_SLOTS_COUNT>
+      <DIGITAL_SLOTS_COUNT>6</DIGITAL_SLOTS_COUNT>
+      <SPECIFICATIONS>&lt;html>&lt;head>&lt;/head>&lt;body style="word-wrap: break-word; -webkit-nbsp-mode: space; -webkit-line-break: after-white-space; ">&lt;div>&lt;font class="Apple-style-span" size="5">&lt;span class="Apple-style-span" style="font-family: 'Arial Black'; font-size: x-large; ">Membrane Potentiometer&lt;/span>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div>&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">Pressure detecting strip.&lt;/font>&lt;/div>&lt;/div>&lt;/font>&lt;/div>&lt;/font>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>&lt;br>&lt;/u>&lt;/span>&lt;/div>&lt;/u>&lt;/span>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Features:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Analog, value increases the further the touch gets from the connector.&lt;/font>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;span class="Apple-style-span" style="font-family: 'Times New Roman'; font-size: medium; ">&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Usage:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A.&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;/span>&lt;/font>&lt;/div>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Direct Control:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Alt-Click.&lt;/span>&lt;/li>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Alt-Click + mouse drag.&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Local Control:&lt;/u>&lt;/span>&lt;font class="Apple-style-span" size="5">&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div>&lt;div>&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;ul style="font-family: 'Times New Roman'; font-size: medium; ">&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;/div>&lt;/div>&lt;/font>&lt;/div>&lt;/font>&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Remote Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;/span>&lt;font class="Apple-style-span" size="5">&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Data Specifications:&lt;/u>&lt;/font>&lt;/div>&lt;/font>&lt;/div>&lt;div>&lt;ul style="font-family: 'Times New Roman'; font-size: medium; ">&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Output Slot: A0&lt;/span>&lt;/li>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Message Format: analog output from 0 to 255&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;br>&lt;/font>&lt;/div>&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Example:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul style="font-family: 'Times New Roman'; font-size: medium; ">&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Connect to an LCD that has been setup to read analog and watch the value changes as you Alt+Click different areas of the potentiometer.&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;/font>&lt;/div>&lt;/body>&lt;/html></SPECIFICATIONS>
+      <ROTATION>0</ROTATION>
+      <SCALE>1</SCALE>
+      <IS_END_DEVICE>FALSE</IS_END_DEVICE>
+      <IS_DESKTOP_AVAILABLE>FALSE</IS_DESKTOP_AVAILABLE>
+      <SUBCOMPONENTS>
+       <SUBCOMPONENT>
+        <NAME>Membrane Potentiometer</NAME>
+        <X>0</X>
+        <Y>0</Y>
+        <Z_ORDER>1</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>0</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>-1</SLOT_NUM>
+        <SLOT_TYPE>0</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/Components/softweb1.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+      </SUBCOMPONENTS>
+      <RULES/>
+     </THING_MODEL>
+     <IOE_CLIENT>
+      <CLIENT_MODE>NO_SERVER</CLIENT_MODE>
+      <SERVER_ADDRESS></SERVER_ADDRESS>
+      <USERNAME></USERNAME>
+      <PASSWORD></PASSWORD>
+     </IOE_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME></NAME>
+      <MAIL_ID></MAIL_ID>
+      <POP3_SERVER></POP3_SERVER>
+      <SMTP_SERVER></SMTP_SERVER>
+      <USER></USER>
+      <PASSWORD></PASSWORD>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL translate="true">{350c8437-a3ab-46ab-820b-c96dbcebb298},{1185ab85-ced8-45c5-8431-e519bcd0c4c3},{2aafd33b-a9f1-4e47-b05b-8c8225896af4},{4ca53018-9b9a-4a57-afe2-63bd5ea392d8}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.0998839</X_PN>
+      <Y_PN>0.100561</Y_PN>
+      <X>344</X>
+      <Y>215</Y>
+      <PARENT_PATH>{350c8437-a3ab-46ab-820b-c96dbcebb298},{1185ab85-ced8-45c5-8431-e519bcd0c4c3},{2aafd33b-a9f1-4e47-b05b-8c8225896af4}</PARENT_PATH>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

@@ -1461,7 +1461,7 @@ class AdvisorService {
   /// classify as advice at all. The facts are grounded: the roles and
   /// trade-offs are the lab-models topic's, and the port counts and device
   /// kinds are what the app's own device catalog ships
-  /// (assets/pkt_templates/manifest.json) - nothing is invented.
+  /// (sidecar/pkt_templates/manifest.json) - nothing is invented.
   static final List<_LabModel> _modelTable = [
     _LabModel(
       token: RegExp(r'\b1841\b'),

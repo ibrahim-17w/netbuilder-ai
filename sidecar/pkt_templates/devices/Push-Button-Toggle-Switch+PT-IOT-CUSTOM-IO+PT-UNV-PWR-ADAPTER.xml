@@ -1,0 +1,425 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="Push Button Toggle Switch" model="Push Button Toggle Switch">MCUComponent</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+        <MODEL>PT-UNV-PWR-ADAPTER</MODEL>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAAAQAAAAoAcwB0AGEAdABlAAAACgAAAAAKAGYAYQBsAHMAZQ==</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1269.45</X_COORD>
+      <Y_COORD>1232.1</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT081097AK</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:17520;cost:10500;power source:0;rack units:1;wattage:10;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>1499971362385</TEMPLATE_CREATION_TIME>
+     <USER_APPS>
+      <RUNNING_APPS>
+       <USER_APP>Push Button Toggle Switch (JavaScript)</USER_APP>
+      </RUNNING_APPS>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SYS_NAME></SYS_NAME>
+     <GATEWAY/>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP/>
+     </DHCP_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <GATEWAYV6/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>C6-B8-1A-E7-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>Push Button Toggle Switch (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT/>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>2</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>var is_open = false; 
+var P1 = 0;
+var P2 = 1;
+var P3 = 2;
+var P4 = 3;
+var PImage = 5;
+
+function setup() {
+	attachInterrupt(P1, update);
+	attachInterrupt(A0, update);
+	
+	update();
+}
+
+function mouseEvent(pressed, x, y, firstPress) {
+	if (firstPress) {
+		is_open = !is_open;
+		update();
+	}
+}
+
+function update() {
+
+	digitalWrite(PImage, is_open ? HIGH : LOW);
+	
+	var p1 = is_open ? digitalRead(P1) : 0;
+	var a0 = is_open ? (255.0*analogRead(A0)/1023.0) : 0;
+
+    digitalWrite(P2, p1);
+    digitalWrite(P3, p1);
+    digitalWrite(P4, p1);
+        
+    analogWrite(A1, a0);
+    analogWrite(A2, a0);
+    analogWrite(A3, a0);
+    
+    setDeviceProperty(getName(), "state", is_open);
+
+}
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>3</FILE_NUMBER>
+           <NAME>Push Button Toggle Switch (Python)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT/>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>4</FILE_NUMBER>
+             <NAME>main.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>from time import *
+import math
+from physical import *
+from gpio import *
+
+is_open = False        # var is_open
+P1 = 0        # var P1
+P2 = 1        # var P2
+P3 = 2        # var P3
+P4 = 3        # var P4
+PImage = 5        # var PImage
+
+
+def setup ():
+    add_event_detect(P1, update)
+    add_event_detect(A0, update)
+
+    update()
+
+
+
+def mouseEvent (pressed, x, y, firstPress):
+    global is_open
+    if firstPress:
+        is_open = not is_open
+        update()
+
+
+
+
+def update ():
+
+    digitalWrite(PImage, (HIGH if is_open else LOW) )
+
+    p1 = ( digitalRead(P1)  if is_open  else 0. )        # var p1
+    a0 = ( (255.0 * analogRead(A0) / 1023.0)  if is_open  else 0. )        # var a0
+
+    digitalWrite(P2, p1)
+    digitalWrite(P3, p1)
+    digitalWrite(P4, p1)
+
+    analogWrite(A1, a0)
+    analogWrite(A2, a0)
+    analogWrite(A3, a0)
+
+    setDeviceProperty(getName(), "state", is_open)
+
+
+if __name__ == "__main__":
+    setup()
+    while True:
+#        loop()
+        sleep(3600)
+
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>4</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>User:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>0</FILE_COUNTER>
+         <CAPACITY>10000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <THING_MODEL>
+      <NAME></NAME>
+      <WIDTH>100.5</WIDTH>
+      <HEIGHT>64.5</HEIGHT>
+      <ANALOG_SLOTS_COUNT>4</ANALOG_SLOTS_COUNT>
+      <DIGITAL_SLOTS_COUNT>6</DIGITAL_SLOTS_COUNT>
+      <SPECIFICATIONS>&lt;html>&lt;head>&lt;/head>&lt;body style="word-wrap: break-word; -webkit-nbsp-mode: space; -webkit-line-break: after-white-space; ">&lt;font class="Apple-style-span" face="'Arial Black'" size="5">Push Button&amp;nbsp;&lt;/font>&lt;span class="Apple-style-span" style="font-family: 'Arial Black'; font-size: x-large; ">Toggle&amp;nbsp;Switch&lt;/span>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">Sets its slots 1, 2, 3 to the same value of LOW or HIGH that its slot 0 is set to.&amp;nbsp;&lt;/font>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Sets its slots A1, A2, A3 to the same value that its slot A0 is set to.&lt;/span>&lt;/div>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;br>&lt;/span>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;span class="Apple-style-span" style="font-size: medium; font-family: 'Times New Roman'; ">&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Features:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Default switch state is Off.&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Push the switch button to toggle it between On and Off states.&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">In either state the switch will propagate the value of its input slot 0 (A0) to its output slots 1, 2, 3 (A1, A2, A3).&lt;/font>&lt;/li>&lt;/ul>&lt;div>&lt;/div>&lt;/div>&lt;/span>&lt;/font>&lt;/div>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Usage:&lt;/u>&lt;/span>&lt;/div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Can be used between any digital output and digital output devices to reduce number of cable connections and add toggle signal On/Off behavior.&lt;/font>&lt;/li>&lt;/ul>&lt;/div>&lt;/div>&lt;/div>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Direct Control:&lt;/u>&lt;/span>&lt;/div>&lt;/div>&lt;div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Use Alt-Click to interact.&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5" style="font-family: 'Times New Roman'; font-size: medium; ">&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div>&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;div>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Local Control:&lt;/u>&lt;/span>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;/div>&lt;/div>&lt;/font>&lt;/div>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/font>&lt;div>&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Remote Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Data Specification:&lt;/u>&lt;/font>&lt;/div>&lt;/font>&lt;/div>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/font>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">INPUT SLOT: 0&lt;/span>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">OUTPUT SLOTS: 1, 2, 3&lt;/font>&lt;/div>&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;br>&lt;/font>&lt;/div>&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div>&lt;div>&lt;div>&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">INPUT SLOT: A0&lt;/font>&lt;/div>&lt;/font>&lt;/div>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/font>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">OUTPUT SLOTS: A1, A2, A3&lt;/font>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;br>&lt;/font>&lt;/div>&lt;/span>&lt;/font>&lt;/div>&lt;div>&lt;u>Example:&lt;/u>&lt;/div>&lt;/span>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Connect a Push Button to slot 0 and 3 LEDs to slots 1, 2, and 3 of this toggle switch. Play with both Push Button and this switch to observe the behavior. Similar function can be achieved for the use of analog interface.&lt;/span>&lt;/div>&lt;/body>&lt;/html></SPECIFICATIONS>
+      <ROTATION>0</ROTATION>
+      <SCALE>1</SCALE>
+      <IS_END_DEVICE>FALSE</IS_END_DEVICE>
+      <IS_DESKTOP_AVAILABLE>FALSE</IS_DESKTOP_AVAILABLE>
+      <SUBCOMPONENTS>
+       <SUBCOMPONENT>
+        <NAME>button-image</NAME>
+        <X>0</X>
+        <Y>0</Y>
+        <Z_ORDER>-9</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>1</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>5</SLOT_NUM>
+        <SLOT_TYPE>1</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/Components/pbts-closed.png]]></IMAGE>
+         <IMAGE><![CDATA[../art/IoE/Components/pbts-open.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+      </SUBCOMPONENTS>
+      <RULES>
+       <RULE>
+        <SUBCOMPONENT>button-image</SUBCOMPONENT>
+        <IMAGE_INDEX>1</IMAGE_INDEX>
+        <DIGITAL_VALUE>0</DIGITAL_VALUE>
+        <ANALOG_LOW>0</ANALOG_LOW>
+        <ANALOG_HIGH>0</ANALOG_HIGH>
+       </RULE>
+       <RULE>
+        <SUBCOMPONENT>button-image</SUBCOMPONENT>
+        <IMAGE_INDEX>0</IMAGE_INDEX>
+        <DIGITAL_VALUE>1000</DIGITAL_VALUE>
+        <ANALOG_LOW>0</ANALOG_LOW>
+        <ANALOG_HIGH>0</ANALOG_HIGH>
+       </RULE>
+      </RULES>
+     </THING_MODEL>
+     <IOE_CLIENT>
+      <CLIENT_MODE>NO_SERVER</CLIENT_MODE>
+      <SERVER_ADDRESS></SERVER_ADDRESS>
+      <USERNAME></USERNAME>
+      <PASSWORD></PASSWORD>
+     </IOE_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME></NAME>
+      <MAIL_ID></MAIL_ID>
+      <POP3_SERVER></POP3_SERVER>
+      <SMTP_SERVER></SMTP_SERVER>
+      <USER></USER>
+      <PASSWORD></PASSWORD>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL translate="true">{90be46ae-371f-4caa-8f0a-c46a04602e8e},{d0ea0443-a1ba-46bc-bebb-d10503e2a270},{566894d9-00f5-4ff8-b698-9ba55d3441f0},{a376f307-5282-4027-89ac-b2e01f3541c7}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.24971</X_PN>
+      <Y_PN>0.100561</Y_PN>
+      <X>860</X>
+      <Y>215</Y>
+      <PARENT_PATH>{90be46ae-371f-4caa-8f0a-c46a04602e8e},{d0ea0443-a1ba-46bc-bebb-d10503e2a270},{566894d9-00f5-4ff8-b698-9ba55d3441f0}</PARENT_PATH>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

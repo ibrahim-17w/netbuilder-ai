@@ -57,19 +57,17 @@ sidecar/*.png
 sidecar/shots/
 sidecar/pkt_backups/
 sidecar/pkt_output/
-# Offline generator: template library extracted from the user's own .pkt
-# files (machine-local by design - nothing Cisco-authored is committed) and
-# the generated demo artifacts.
-sidecar/pkt_templates/
-# The same library, copied into assets/ so the phone can bundle it. Declared
-# in pubspec.yaml, so a fresh CLONE does not build without it - rebuild it
-# locally with sidecar/pkt_template_build.py instead of fetching it here.
-assets/pkt_templates/
+# Generated saves are scratch, except the one a test fixture reads.
 sidecar/*.pkt
+# demo-lab.pkt is a hand-kept fixture, not a generated save:
+# test/on_device_pkt_builder_test.dart, test/pkt_builder_test.dart and
+# test/seed_library_test.dart all open it, so a fresh clone needs it too.
+!sidecar/demo-lab.pkt
 
 # Debug scratch: throwaway probes, dumps and one-off patch scripts that a
 # session leaves behind. None is source - the one file a test reads
-# (`_offline_plan_brief.json`) is checked in on purpose and NOT matched here.
+# (`_offline_plan_brief.json`) is blanket-ignored by the generic pattern
+# below, so it is explicitly un-ignored there to keep a fresh clone whole.
 _tmp_*
 _verify_*
 _analyze_*
@@ -102,6 +100,9 @@ sidecar/pytest_out.txt
 **/htmlcov/
 sidecar/_tmp_*.json
 sidecar/_offline_plan_*.json
+# ...except the hand-authored learning brief the Python tests read; the
+# blanket rule above would happily eat it.
+!sidecar/_offline_plan_brief.json
 sidecar/pkt_learning.json
 sidecar/run_ledger.json
 # Aggregated learning-loop counters: regenerated from the journal on this

@@ -1,0 +1,571 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="" model="DLC100">HomeGateway</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION/>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <PORT>
+         <TYPE>eCopperFastEthernet</TYPE>
+         <POWER>true</POWER>
+         <MEDIATYPE>0</MEDIATYPE>
+         <PINS>false</PINS>
+         <BANDWIDTH>100000</BANDWIDTH>
+         <FULLDUPLEX>false</FULLDUPLEX>
+         <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+         <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+         <MACADDRESS>0000.0000.0000</MACADDRESS>
+         <BIA>0000.0000.0000</BIA>
+         <CLOCKRATE>2000000</CLOCKRATE>
+         <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+         <DESCRIPTION/>
+         <CHANNEL>0</CHANNEL>
+         <CHANNEL5GHZ>0</CHANNEL5GHZ>
+         <COVERAGERANGE>0</COVERAGERANGE>
+         <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+         <UP_METHOD>5</UP_METHOD>
+         <IP/>
+         <SUBNET/>
+         <PORT_GATEWAY/>
+         <PORT_DNS/>
+         <PORT_DHCP_ENABLE>false</PORT_DHCP_ENABLE>
+         <ND_SUPPRESSED>false</ND_SUPPRESSED>
+         <ND_IPV6_DNS_ADDRESSES/>
+         <TIMEOUT>14400000</TIMEOUT>
+         <PC_FIREWALL>false</PC_FIREWALL>
+         <PC_IPV6_FIREWALL>false</PC_IPV6_FIREWALL>
+         <IPV6_ENABLED>false</IPV6_ENABLED>
+         <IPV6_ADDRESS_AUTOCONFIG>false</IPV6_ADDRESS_AUTOCONFIG>
+         <IPV6_PORT_GATEWAY/>
+         <IPV6_PORT_DNS/>
+         <IPV6_LINK_LOCAL/>
+         <IPV6_DEFAULT_LINK_LOCAL>FE80::2E0:B0FF:FEB3:BC01</IPV6_DEFAULT_LINK_LOCAL>
+         <IPV6_PORT_DHCP_ENABLED>false</IPV6_PORT_DHCP_ENABLED>
+         <IPV6_ADDRESSES/>
+         <IP_UNNUMBERED/>
+         <DHCP_SERVER_IP>0.0.0.0</DHCP_SERVER_IP>
+         <MANAGEMENT_INTERFACE>false</MANAGEMENT_INTERFACE>
+        </PORT>
+        <PORT>
+         <TYPE>eCopperFastEthernet</TYPE>
+         <POWER>true</POWER>
+         <MEDIATYPE>0</MEDIATYPE>
+         <PINS>true</PINS>
+         <BANDWIDTH>100000</BANDWIDTH>
+         <FULLDUPLEX>true</FULLDUPLEX>
+         <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+         <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+         <MACADDRESS>0000.0000.0000</MACADDRESS>
+         <BIA>0000.0000.0000</BIA>
+         <CLOCKRATE>2000000</CLOCKRATE>
+         <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+         <DESCRIPTION/>
+         <CHANNEL>0</CHANNEL>
+         <CHANNEL5GHZ>0</CHANNEL5GHZ>
+         <COVERAGERANGE>0</COVERAGERANGE>
+         <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+         <UP_METHOD>5</UP_METHOD>
+        </PORT>
+        <PORT>
+         <TYPE>eCopperFastEthernet</TYPE>
+         <POWER>true</POWER>
+         <MEDIATYPE>0</MEDIATYPE>
+         <PINS>true</PINS>
+         <BANDWIDTH>100000</BANDWIDTH>
+         <FULLDUPLEX>true</FULLDUPLEX>
+         <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+         <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+         <MACADDRESS>0000.0000.0000</MACADDRESS>
+         <BIA>0000.0000.0000</BIA>
+         <CLOCKRATE>2000000</CLOCKRATE>
+         <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+         <DESCRIPTION/>
+         <CHANNEL>0</CHANNEL>
+         <CHANNEL5GHZ>0</CHANNEL5GHZ>
+         <COVERAGERANGE>0</COVERAGERANGE>
+         <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+         <UP_METHOD>5</UP_METHOD>
+        </PORT>
+        <PORT>
+         <TYPE>eCopperFastEthernet</TYPE>
+         <POWER>true</POWER>
+         <MEDIATYPE>0</MEDIATYPE>
+         <PINS>true</PINS>
+         <BANDWIDTH>100000</BANDWIDTH>
+         <FULLDUPLEX>true</FULLDUPLEX>
+         <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+         <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+         <MACADDRESS>0000.0000.0000</MACADDRESS>
+         <BIA>0000.0000.0000</BIA>
+         <CLOCKRATE>2000000</CLOCKRATE>
+         <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+         <DESCRIPTION/>
+         <CHANNEL>0</CHANNEL>
+         <CHANNEL5GHZ>0</CHANNEL5GHZ>
+         <COVERAGERANGE>0</COVERAGERANGE>
+         <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+         <UP_METHOD>5</UP_METHOD>
+        </PORT>
+        <PORT>
+         <TYPE>eCopperFastEthernet</TYPE>
+         <POWER>true</POWER>
+         <MEDIATYPE>0</MEDIATYPE>
+         <PINS>true</PINS>
+         <BANDWIDTH>100000</BANDWIDTH>
+         <FULLDUPLEX>false</FULLDUPLEX>
+         <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+         <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+         <MACADDRESS>0000.0000.0000</MACADDRESS>
+         <BIA>0000.0000.0000</BIA>
+         <CLOCKRATE>2000000</CLOCKRATE>
+         <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+         <DESCRIPTION/>
+         <CHANNEL>0</CHANNEL>
+         <CHANNEL5GHZ>0</CHANNEL5GHZ>
+         <COVERAGERANGE>0</COVERAGERANGE>
+         <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+         <UP_METHOD>5</UP_METHOD>
+        </PORT>
+        <PORT>
+         <TYPE>eAccessPointWirelessN</TYPE>
+         <POWER>true</POWER>
+         <MEDIATYPE>0</MEDIATYPE>
+         <PINS>true</PINS>
+         <BANDWIDTH>11000</BANDWIDTH>
+         <FULLDUPLEX>false</FULLDUPLEX>
+         <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+         <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+         <MACADDRESS>0000.0000.0000</MACADDRESS>
+         <BIA>0000.0000.0000</BIA>
+         <CLOCKRATE>2000000</CLOCKRATE>
+         <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+         <DESCRIPTION/>
+         <CHANNEL>6</CHANNEL>
+         <CHANNEL5GHZ>0</CHANNEL5GHZ>
+         <COVERAGERANGE>250</COVERAGERANGE>
+         <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+         <UP_METHOD>5</UP_METHOD>
+        </PORT>
+       </MODULE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAAAA==</CUSTOM_VARS>
+     <CUSTOM_INTERFACE/>
+     <SYS_CONTACT/>
+     <SYS_LOCATION/>
+     <COORD_SETTINGS>
+      <X_COORD>1229.5</X_COORD>
+      <Y_COORD>1231.99</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER/>
+     <EXT_ATTRIBUTES>MTBF:300000;cost:8000;power source:0;rack units:1;wattage:10;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>0</TEMPLATE_CREATION_TIME>
+     <STARTTIME>730972800000</STARTTIME>
+     <STARTSIMTIME>0</STARTSIMTIME>
+     <USER_APPS>
+      <RUNNING_APPS/>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SAVE_REF_ID>save-ref-id:0</SAVE_REF_ID>
+     <SYS_NAME/>
+     <RUNNINGCONFIG/>
+     <STARTUPCONFIG/>
+     <BUILD_IN_ADDR>00D0.D315.03D0</BUILD_IN_ADDR>
+     <BIOS_VERSION/>
+     <SECURITY>
+      <KEY_NAME/>
+      <TEMP_KEY_NAME/>
+      <RSA_KEY/>
+      <TEMP_RSA_KEY/>
+      <TIME_DATE/>
+      <ENABLED>0</ENABLED>
+      <MODULUS_BITS>0</MODULUS_BITS>
+     </SECURITY>
+     <ALGORITHM_SETTINGS>
+      <USE_GLOBAL>true</USE_GLOBAL>
+      <CBAC_HALF_OPEN_SESSION_MULTIPLIER>1</CBAC_HALF_OPEN_SESSION_MULTIPLIER>
+      <TCP_MAX_CONNECTING_SESSIONS>100</TCP_MAX_CONNECTING_SESSIONS>
+      <TCP_MAX_OPENED_SESSIONS>1000</TCP_MAX_OPENED_SESSIONS>
+      <INTERFACE_QUEUE_SIZE>10</INTERFACE_QUEUE_SIZE>
+      <STORM_CONTROL_MULTIPLIER>10</STORM_CONTROL_MULTIPLIER>
+      <TCP_MAX_RETRANSMISSION_TIMEOUT>1000</TCP_MAX_RETRANSMISSION_TIMEOUT>
+     </ALGORITHM_SETTINGS>
+     <SCP_SERVER_ENABLED>false</SCP_SERVER_ENABLED>
+     <VLANS>
+      <VLAN number="1" rspan="0" name="default"/>
+      <VLAN number="1002" rspan="0" name="fddi-default"/>
+      <VLAN number="1003" rspan="0" name="token-ring-default"/>
+      <VLAN number="1004" rspan="0" name="fddinet-default"/>
+      <VLAN number="1005" rspan="0" name="trnet-default"/>
+     </VLANS>
+     <VTP>
+      <DOMAIN_NAME/>
+      <MODE>0</MODE>
+      <VERSION>1</VERSION>
+      <PASSWORD/>
+      <CONFIG_REVISION>0</CONFIG_REVISION>
+      <UPDATER_IP>0.0.0.0</UPDATER_IP>
+      <UPDATE_TIMESTAMP>0-0-00 00:00:00</UPDATE_TIMESTAMP>
+     </VTP>
+     <SIG_IPSPROCESS>
+      <SIGNATURE>
+       <SIG_ID>2004</SIG_ID>
+       <SUB_ID>0</SUB_ID>
+       <RETIRED>0</RETIRED>
+       <ENABLED>0</ENABLED>
+       <EVENT_ACTION>0</EVENT_ACTION>
+      </SIGNATURE>
+     </SIG_IPSPROCESS>
+     <CELLULAR_CLIENT_MANAGER>
+      <PORT_TO_CLIENT_MAP/>
+     </CELLULAR_CLIENT_MANAGER>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <WIRELESS_SERVER>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+       <STANDARD_CHANNEL5G>112</STANDARD_CHANNEL5G>
+      </WIRELESS_COMMON>
+      <SSID_BROADCAST_ENABLED>1</SSID_BROADCAST_ENABLED>
+      <MAC_FILTER_ENABLED>0</MAC_FILTER_ENABLED>
+      <ALLOW_ACCESS>0</ALLOW_ACCESS>
+      <CONTROL_FLAGS>0</CONTROL_FLAGS>
+     </WIRELESS_SERVER>
+     <FIRMWARE_VERSION>v0.93.3</FIRMWARE_VERSION>
+     <INTERNET_CONNECTION_TYPE>0</INTERNET_CONNECTION_TYPE>
+     <DEFAULT_GATEWAY>0.0.0.0</DEFAULT_GATEWAY>
+     <START_IP/>
+     <MAX_USERS/>
+     <LAN_IP_ADDRESS>192.168.25.1</LAN_IP_ADDRESS>
+     <LAN_SUBNET_MASK>255.255.255.0</LAN_SUBNET_MASK>
+     <INTERNET_IP_ADDRESS>0.0.0.0</INTERNET_IP_ADDRESS>
+     <INTERNET_SUBNET_MASK>0.0.0.0</INTERNET_SUBNET_MASK>
+     <REMOTE_MANAGEMENT>0</REMOTE_MANAGEMENT>
+     <DHCP_SERVER>
+      <ENABLED>1</ENABLED>
+      <POOLS>
+       <POOL>
+        <NAME>linksysPool</NAME>
+        <NETWORK>192.168.25.0</NETWORK>
+        <MASK>255.255.255.0</MASK>
+        <DEFAULT_ROUTER>192.168.25.1</DEFAULT_ROUTER>
+        <TFTP_ADDRESS>0.0.0.0</TFTP_ADDRESS>
+        <START_IP>192.168.25.100</START_IP>
+        <END_IP>192.168.25.149</END_IP>
+        <DNS_SERVER>0.0.0.0</DNS_SERVER>
+        <MAX_USERS>50</MAX_USERS>
+        <DOMAIN_NAME/>
+        <DHCP_POOL_LEASES>
+         <DHCP_POOL_LEASE>
+          <IP_ADDRESS>192.168.25.100</IP_ADDRESS>
+          <MAC_ADDRESS>0060.2FCC.0720</MAC_ADDRESS>
+          <HOST_PORT>Vlan1</HOST_PORT>
+          <LEASE_TIME>86400000</LEASE_TIME>
+          <CLIENT_ID>0060.2FCC.0720</CLIENT_ID>
+         </DHCP_POOL_LEASE>
+         <DHCP_POOL_LEASE>
+          <IP_ADDRESS>192.168.25.101</IP_ADDRESS>
+          <MAC_ADDRESS>00D0.BA14.B4E3</MAC_ADDRESS>
+          <HOST_PORT>Vlan1</HOST_PORT>
+          <LEASE_TIME>86400000</LEASE_TIME>
+          <CLIENT_ID>00D0.BA14.B4E3</CLIENT_ID>
+         </DHCP_POOL_LEASE>
+         <DHCP_POOL_LEASE>
+          <IP_ADDRESS>192.168.25.102</IP_ADDRESS>
+          <MAC_ADDRESS>0060.5C93.A92B</MAC_ADDRESS>
+          <HOST_PORT>Vlan1</HOST_PORT>
+          <LEASE_TIME>86400000</LEASE_TIME>
+          <CLIENT_ID>0060.5C93.A92B</CLIENT_ID>
+         </DHCP_POOL_LEASE>
+        </DHCP_POOL_LEASES>
+        <LEASE_TIME>86400000</LEASE_TIME>
+        <WLC_ADDRESS>0.0.0.0</WLC_ADDRESS>
+       </POOL>
+      </POOLS>
+      <DHCP_RESERVATIONS/>
+      <AUTOCONFIG/>
+     </DHCP_SERVER>
+     <PPPOE_CLIENT>
+      <USERNAME/>
+      <PASSWORD/>
+      <SERVICE_NAME/>
+     </PPPOE_CLIENT>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <HTTP_SERVER>
+      <ENABLED>1</ENABLED>
+      <USERNAME>admin</USERNAME>
+      <PASSWORD>admin</PASSWORD>
+     </HTTP_SERVER>
+     <SINGLE_PORT_FORWARDING/>
+     <ACCESS_POLICIES/>
+     <DMZ_SETTINGS>
+      <STATUS>false</STATUS>
+      <DESTINATION_IP_ADDR>0.0.0.0</DESTINATION_IP_ADDR>
+     </DMZ_SETTINGS>
+     <QOS>
+      <QOS_PROTOCOLS/>
+      <QOS_ENABLED>0</QOS_ENABLED>
+      <QOS_QUEUE_SIZES>5000^10000^15000^20000</QOS_QUEUE_SIZES>
+     </QOS>
+     <IOE_CONDITIONS/>
+     <DEVICE_ALIASES/>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME/>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>flash:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT class="CIpsDatFileContent">
+          <ICMP_SIGNATURE/>
+         </FILE_CONTENT>
+         <FILES>
+          <FILE class="CFile">
+           <FILE_NUMBER>2</FILE_NUMBER>
+           <NAME>sigdef-category.xml</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIpsCategoryFileContent">
+            <SIG_CAT/>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>sigdef-default.xml</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIpsDatFileContent">
+            <ICMP_SIGNATURE>
+             <SIGNATURE>
+              <SIG_ID>2004</SIG_ID>
+              <SUB_ID>0</SUB_ID>
+              <RETIRED>0</RETIRED>
+              <ENABLED>0</ENABLED>
+              <EVENT_ACTION>0</EVENT_ACTION>
+             </SIGNATURE>
+            </ICMP_SIGNATURE>
+           </FILE_CONTENT>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>2</FILE_COUNTER>
+         <CAPACITY>64016384</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>http:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>19</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>ioe:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT class="CHttpPage">
+          <TEXT>&lt;html>
+&lt;head>
+&lt;script>
+function validateLogin(form)
+{
+  var userid = document.forms["login"]["userid"].value;
+  var password = document.forms["login"]["pw"].value;
+  if (userid.length == 0)
+  {
+    alert("Please enter the userid.");
+  }
+  else if (password.length == 0)
+  {
+    alert("Please enter the password.");
+  }
+  else
+  {
+    CHttpFormExtractor.submitIoeLogin(userid, password, function(rtn) {form.submit();});
+  }
+  return false;
+}
+&lt;/script>
+&lt;/head>
+&lt;body>
+&lt;center>
+&lt;h3>Home Gateway Login&lt;/h3>
+&lt;table>
+&lt;tr>&lt;td>
+&lt;form name="login" method="post" action="login_action.php" onsubmit="return validateLogin(this)">
+Username: &lt;input type="text" name="userid" id="userid" value="" size="20">&lt;br>
+Password: &lt;input type="password" name="pw" id="pw" value="" size="20">&lt;br>
+&lt;br>
+&lt;center>
+&lt;input type="submit" value="Submit">
+&lt;/center>
+&lt;/form>
+&lt;/td>&lt;/tr>
+&lt;/table>
+&lt;/center>
+&lt;/body>
+&lt;/html></TEXT>
+         </FILE_CONTENT>
+         <FILES>
+          <FILE class="CFile">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>index.php</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CHttpPage">
+            <TEXT>&lt;html>
+&lt;head>
+&lt;script>
+function validateLogin(form)
+{
+  var userid = document.forms["login"]["userid"].value;
+  var password = document.forms["login"]["pw"].value;
+  if (userid.length == 0)
+  {
+    alert("Please enter the userid.");
+  }
+  else if (password.length == 0)
+  {
+    alert("Please enter the password.");
+  }
+  else
+  {
+    CHttpFormExtractor.submitIoeLogin(userid, password, function(rtn) {form.submit();});
+  }
+  return false;
+}
+&lt;/script>
+&lt;/head>
+&lt;body>
+&lt;center>
+&lt;h3>Home Gateway Login&lt;/h3>
+&lt;table>
+&lt;tr>&lt;td>
+&lt;form name="login" method="post" action="login_action.php" onsubmit="return validateLogin(this)">
+Username: &lt;input type="text" name="userid" id="userid" value="" size="20">&lt;br>
+Password: &lt;input type="password" name="pw" id="pw" value="" size="20">&lt;br>
+&lt;br>
+&lt;center>
+&lt;input type="submit" value="Submit">
+&lt;/center>
+&lt;/form>
+&lt;/td>&lt;/tr>
+&lt;/table>
+&lt;/center>
+&lt;/body>
+&lt;/html></TEXT>
+           </FILE_CONTENT>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>1</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>ioeusers:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>0</FILE_COUNTER>
+         <CAPACITY>1000000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <IOE_USER_MANAGER>
+      <USERS>
+       <USER>
+        <NAME>admin</NAME>
+        <PASSWORD>admin</PASSWORD>
+        <DEVICES>
+         <IOE_DEVICE>
+          <NAME/>
+          <SERIAL>PTT08103HU6</SERIAL>
+          <ALIAS>door0</ALIAS>
+          <TYPE>Door</TYPE>
+         </IOE_DEVICE>
+         <IOE_DEVICE>
+          <NAME/>
+          <SERIAL>PTT0810X708</SERIAL>
+          <ALIAS>door1</ALIAS>
+          <TYPE>Door</TYPE>
+         </IOE_DEVICE>
+         <IOE_DEVICE>
+          <NAME/>
+          <SERIAL>PTT08105G4R</SERIAL>
+          <ALIAS>door0</ALIAS>
+          <TYPE>Door</TYPE>
+         </IOE_DEVICE>
+         <IOE_DEVICE>
+          <NAME/>
+          <SERIAL>PTT0810MA80</SERIAL>
+          <ALIAS>door1</ALIAS>
+          <TYPE>Door</TYPE>
+         </IOE_DEVICE>
+        </DEVICES>
+        <IOE_CONDITIONS/>
+        <IOE_RULES>
+         <IOE_RULE>
+          <JSON>{ "actions" : [ { "serialNum" : "PTT0810MA80", "stateName" : "Lock", "stateValue" : "0", "type" : "deviceState" } ], "condition" : { "conditions" : [ { "serialNum" : "PTT08105G4R", "stateName" : "Open", "type" : "deviceBoolState", "value" : "1" } ], "operator" : "and", "type" : "logicalGroup" }, "enabled" : true, "lastError" : "", "name" : "unlock door1" }</JSON>
+         </IOE_RULE>
+         <IOE_RULE>
+          <JSON>{ "actions" : [ { "serialNum" : "PTT0810MA80", "stateName" : "Lock", "stateValue" : "1", "type" : "deviceState" } ], "condition" : { "conditions" : [ { "serialNum" : "PTT08105G4R", "stateName" : "Open", "type" : "deviceBoolState", "value" : "0" } ], "operator" : "and", "type" : "logicalGroup" }, "enabled" : true, "lastError" : "", "name" : "lock door1" }</JSON>
+         </IOE_RULE>
+        </IOE_RULES>
+       </USER>
+      </USERS>
+     </IOE_USER_MANAGER>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL/>
+      <CUSTOM_IMAGE_PHYSICAL/>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL>{009c1166-fb7b-44e3-8ee6-51fdfea52062},{f27161f8-2999-40d1-957f-f653c98eee41},{fd88914b-907e-4f23-a30e-bfe4e7f34b3e},{e4fc993a-1d81-4121-8c18-4065ef78c07f}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.0499419</X_PN>
+      <Y_PN>0.100561</Y_PN>
+      <X>172</X>
+      <Y>215</Y>
+      <SLOT>0</SLOT>
+      <SUBSLOT>0</SUBSLOT>
+      <PARENT_PATH>{009c1166-fb7b-44e3-8ee6-51fdfea52062},{f27161f8-2999-40d1-957f-f653c98eee41},{fd88914b-907e-4f23-a30e-bfe4e7f34b3e}</PARENT_PATH>
+      <CONTAINER_ID>{fd88914b-907e-4f23-a30e-bfe4e7f34b3e}</CONTAINER_ID>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

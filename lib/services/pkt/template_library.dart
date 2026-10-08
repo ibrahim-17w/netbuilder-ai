@@ -159,7 +159,7 @@ class PktTemplateLibrary {
     required this.assetRoot,
   });
 
-  static const _bundledRoot = 'assets/pkt_templates';
+  static const _bundledRoot = 'sidecar/pkt_templates';
   static PktTemplateLibrary? _bundled;
 
   /// Load the bundled library. Throws [PktBuildFailure] when the assets are

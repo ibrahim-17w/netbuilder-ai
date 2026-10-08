@@ -1,0 +1,965 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="Solar Panel" model="Solar Panel">MCUComponent</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeNetworkModule</TYPE>
+        <MODEL>PT-IOT-NM-1CGE</MODEL>
+        <PORT>
+         <TYPE>eCopperGigabitEthernet</TYPE>
+         <POWER>true</POWER>
+         <MEDIATYPE>0</MEDIATYPE>
+         <PINS>false</PINS>
+         <BANDWIDTH>100000</BANDWIDTH>
+         <SPEED>100</SPEED>
+         <FULLDUPLEX>true</FULLDUPLEX>
+         <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+         <AUTONEGOTIATESPEED>true</AUTONEGOTIATESPEED>
+         <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+         <MACADDRESS>0000.0000.0000</MACADDRESS>
+         <BIA>0000.0000.0000</BIA>
+         <CLOCKRATE>2000000</CLOCKRATE>
+         <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+         <DESCRIPTION/>
+         <CHANNEL>0</CHANNEL>
+         <CHANNEL5GHZ>0</CHANNEL5GHZ>
+         <COVERAGERANGE>0</COVERAGERANGE>
+         <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+         <UP_METHOD>5</UP_METHOD>
+         <IP/>
+         <SUBNET/>
+         <PORT_GATEWAY/>
+         <PORT_DNS/>
+         <PORT_DHCP_ENABLE>false</PORT_DHCP_ENABLE>
+         <ND_SUPPRESSED>false</ND_SUPPRESSED>
+         <ND_IPV6_DNS_ADDRESSES/>
+         <TIMEOUT>14400000</TIMEOUT>
+         <PC_FIREWALL>false</PC_FIREWALL>
+         <PC_IPV6_FIREWALL>false</PC_IPV6_FIREWALL>
+         <IPV6_ENABLED>true</IPV6_ENABLED>
+         <IPV6_ADDRESS_AUTOCONFIG>false</IPV6_ADDRESS_AUTOCONFIG>
+         <IPV6_PORT_GATEWAY/>
+         <IPV6_PORT_DNS/>
+         <IPV6_LINK_LOCAL>FE80::202:16FF:FEE0:714B</IPV6_LINK_LOCAL>
+         <IPV6_DEFAULT_LINK_LOCAL>FE80::202:16FF:FEE0:714B</IPV6_DEFAULT_LINK_LOCAL>
+         <IPV6_PORT_DHCP_ENABLED>false</IPV6_PORT_DHCP_ENABLED>
+         <IPV6_ADDRESSES/>
+         <IP_UNNUMBERED/>
+         <DHCP_SERVER_IP>0.0.0.0</DHCP_SERVER_IP>
+        </PORT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+        <MODEL>PT-UNV-PWR-ADAPTER</MODEL>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAABAAAAC4AUABSAE8ARwBSAEEATQBNAEkATgBHAF8AQwBVAFIAUgBFAE4AVABfAEQASQBSAAAACgAAAAAoAFMAbwBsAGEAcgAgAFAAYQBuAGUAbAAgACgAUAB5AHQAaABvAG4AKQAAADAAUABSAE8ARwBSAEEATQBNAEkATgBHAF8AQwBVAFIAUgBFAE4AVABfAEYASQBMAEUAAAAKAAAAAA4AbQBhAGkAbgAuAHAAeQAAAC4AUABSAE8ARwBSAEEATQBNAEkATgBHAF8ARQBEAEkAVABJAE4ARwBfAEQASQBSAAAACgAAAAAoAFMAbwBsAGEAcgAgAFAAYQBuAGUAbAAgACgAUAB5AHQAaABvAG4AKQAAAAoAbABlAHYAZQBsAAAACgAAAAAGADEAMAA2</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1232.4</X_COORD>
+      <Y_COORD>1229.09</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT0810AQUB-</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:43800;cost:8000;power source:0;rack units:1;wattage:10;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>1689907057935</TEMPLATE_CREATION_TIME>
+     <STARTTIME>730972800000</STARTTIME>
+     <STARTSIMTIME>0</STARTSIMTIME>
+     <USER_APPS>
+      <RUNNING_APPS>
+       <USER_APP>Solar Panel (Python)</USER_APP>
+      </RUNNING_APPS>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <BLUETOOTH_PORT>
+      <PORT>
+       <TYPE>eBluetooth</TYPE>
+       <POWER>false</POWER>
+       <MEDIATYPE>0</MEDIATYPE>
+       <PINS>false</PINS>
+       <BANDWIDTH>25000</BANDWIDTH>
+       <SPEED>100</SPEED>
+       <FULLDUPLEX>false</FULLDUPLEX>
+       <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+       <AUTONEGOTIATESPEED>true</AUTONEGOTIATESPEED>
+       <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+       <MACADDRESS>0000.0000.0000</MACADDRESS>
+       <BIA>0000.0000.0000</BIA>
+       <CLOCKRATE>2000000</CLOCKRATE>
+       <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+       <DESCRIPTION/>
+       <CHANNEL>0</CHANNEL>
+       <CHANNEL5GHZ>0</CHANNEL5GHZ>
+       <COVERAGERANGE>10</COVERAGERANGE>
+       <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+       <UP_METHOD>5</UP_METHOD>
+       <IP/>
+       <SUBNET/>
+       <PORT_GATEWAY/>
+       <PORT_DNS/>
+       <PORT_DHCP_ENABLE>false</PORT_DHCP_ENABLE>
+       <ND_SUPPRESSED>false</ND_SUPPRESSED>
+       <ND_IPV6_DNS_ADDRESSES/>
+       <TIMEOUT>14400000</TIMEOUT>
+       <PC_FIREWALL>false</PC_FIREWALL>
+       <PC_IPV6_FIREWALL>false</PC_IPV6_FIREWALL>
+       <IPV6_ENABLED>false</IPV6_ENABLED>
+       <IPV6_ADDRESS_AUTOCONFIG>false</IPV6_ADDRESS_AUTOCONFIG>
+       <IPV6_PORT_GATEWAY/>
+       <IPV6_PORT_DNS/>
+       <IPV6_LINK_LOCAL/>
+       <IPV6_DEFAULT_LINK_LOCAL>FE80::230:F2FF:FE86:AD69</IPV6_DEFAULT_LINK_LOCAL>
+       <IPV6_PORT_DHCP_ENABLED>false</IPV6_PORT_DHCP_ENABLED>
+       <IPV6_ADDRESSES/>
+       <IP_UNNUMBERED/>
+       <DHCP_SERVER_IP>0.0.0.0</DHCP_SERVER_IP>
+      </PORT>
+     </BLUETOOTH_PORT>
+     <SAVE_REF_ID>save-ref-id:0</SAVE_REF_ID>
+     <SYS_NAME></SYS_NAME>
+     <GATEWAY>1.0.0.1</GATEWAY>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP>
+       <PORT_DATA_ENTRY>
+        <PORT>Bluetooth</PORT>
+       </PORT_DATA_ENTRY>
+      </PORT_DATA_MAP>
+     </DHCP_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+       <STANDARD_CHANNEL5G>112</STANDARD_CHANNEL5G>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <GATEWAYV6/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>DE-4D-5C-BA-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST>
+       <PORT>GigabitEthernet0</PORT>
+       <ENABLED>0</ENABLED>
+      </ENABLED_HOST>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT class="CTextFileContent">
+        <TEXT>from options import Options
+from time import *
+import math
+from physical import *
+from gpio import *
+from environment import Environment
+from ioeclient import IoEClient
+#from pyjs import *
+
+
+#Solar Panel
+#Read the sunlight levels
+#Output electricity based on sunlight
+#Panel will be 160Watts per square meter
+
+#Features output to IoE Server:
+# number of kWh of energy produced since turning on
+# number of kWh per minute
+# current production
+ENVIRONMENT_NAME = "Sunlight"        # var ENVIRONMENT_NAME
+MULTIPLIER = 255. / 1023        # var MULTIPLIER
+MAX_POWER = 1000. #1000 Watts of power based on one meter solar panel at noon at the equator        # var MAX_POWER
+EFFICIENCY = 0.16 #About a 16 percent efficiency per solar panel        # var EFFICIENCY
+PANEL_POWER = MAX_POWER * EFFICIENCY        # var PANEL_POWER
+LOG_BASE = 1.0749111034571373359815489867558        # var LOG_BASE
+
+state = 1        # var state
+electricity = 0        # var electricity
+#tick = 0        # var tick
+
+
+def setup ():
+    
+    IoEClient.setup({
+        "type": "Solar",
+        "states": [{
+            "name": "Status",
+            "type": "number",
+            "unit": 'Wh',
+            "controllable": False
+        }]
+    })
+
+    IoEClient.onInputReceive ( lambda rinput: processData(rinput, True) )
+
+    sendReport()
+
+
+
+
+def loop ():
+    global electricity
+    ##    if  (tick++ % 10) is 0 )    # is tick consistent across devices?
+    ##    {
+    electricity = int(getElectricityProduction())
+    ##print(electricity)
+    displayElectricity()
+    sendReport()
+    outputElectricity()
+    delay(1000)
+    ##    
+
+
+
+def displayElectricity ():
+    setCustomText(70, 45, 1000, 1000, str(int(electricity)) + '\tW')
+
+
+
+def getElectricityProduction ():
+    return PANEL_POWER * Environment.get(ENVIRONMENT_NAME) / 100
+
+
+
+def sendReport ():
+    report = state # comma seperated states        # var report
+    IoEClient.reportStates(electricity)
+    setDeviceProperty(getName(), "level", electricity)
+
+
+
+def outputElectricity ():
+    el_log = math.floor(math.log(electricity) / math.log(LOG_BASE))        # var el_log
+    if el_log &lt; 0:
+        el_log = 0
+    elif el_log > 255:
+        el_log = 255
+    ##    print(el_log)
+    analogWrite(0, el_log)
+
+
+
+
+
+if __name__ == "__main__":
+    setup()
+    while True:
+        loop()
+        idle()
+
+</TEXT>
+       </FILE_CONTENT>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT class="CTextFileContent">
+          <TEXT>from options import Options
+from time import *
+import math
+from physical import *
+from gpio import *
+from environment import Environment
+from ioeclient import IoEClient
+#from pyjs import *
+
+
+#Solar Panel
+#Read the sunlight levels
+#Output electricity based on sunlight
+#Panel will be 160Watts per square meter
+
+#Features output to IoE Server:
+# number of kWh of energy produced since turning on
+# number of kWh per minute
+# current production
+ENVIRONMENT_NAME = "Sunlight"        # var ENVIRONMENT_NAME
+MULTIPLIER = 255. / 1023        # var MULTIPLIER
+MAX_POWER = 1000. #1000 Watts of power based on one meter solar panel at noon at the equator        # var MAX_POWER
+EFFICIENCY = 0.16 #About a 16 percent efficiency per solar panel        # var EFFICIENCY
+PANEL_POWER = MAX_POWER * EFFICIENCY        # var PANEL_POWER
+LOG_BASE = 1.0749111034571373359815489867558        # var LOG_BASE
+
+state = 1        # var state
+electricity = 0        # var electricity
+#tick = 0        # var tick
+
+
+def setup ():
+    
+    IoEClient.setup({
+        "type": "Solar",
+        "states": [{
+            "name": "Status",
+            "type": "number",
+            "unit": 'Wh',
+            "controllable": False
+        }]
+    })
+
+    IoEClient.onInputReceive ( lambda rinput: processData(rinput, True) )
+
+    sendReport()
+
+
+
+
+def loop ():
+    global electricity
+    ##    if  (tick++ % 10) is 0 )    # is tick consistent across devices?
+    ##    {
+    electricity = int(getElectricityProduction())
+    ##print(electricity)
+    displayElectricity()
+    sendReport()
+    outputElectricity()
+    delay(1000)
+    ##    
+
+
+
+def displayElectricity ():
+    setCustomText(70, 45, 1000, 1000, str(int(electricity)) + '\tW')
+
+
+
+def getElectricityProduction ():
+    return PANEL_POWER * Environment.get(ENVIRONMENT_NAME) / 100
+
+
+
+def sendReport ():
+    report = state # comma seperated states        # var report
+    IoEClient.reportStates(electricity)
+    setDeviceProperty(getName(), "level", electricity)
+
+
+
+def outputElectricity ():
+    el_log = math.floor(math.log(electricity) / math.log(LOG_BASE))        # var el_log
+    if el_log &lt; 0:
+        el_log = 0
+    elif el_log > 255:
+        el_log = 255
+    ##    print(el_log)
+    analogWrite(0, el_log)
+
+
+
+
+
+if __name__ == "__main__":
+    setup()
+    while True:
+        loop()
+        idle()
+
+</TEXT>
+         </FILE_CONTENT>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>3</FILE_NUMBER>
+           <NAME>Solar Panel (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>//Solar Panel&#xd;
+//Read the sunlight levels&#xd;
+//Output electricity based on sunlight&#xd;
+//Panel will be 160Watts per square meter&#xd;
+&#xd;
+//Features output to IoE Server:&#xd;
+// number of kWh of energy produced since turning on&#xd;
+// number of kWh per minute&#xd;
+// current production&#xd;
+var ENVIRONMENT_NAME = "Sunlight";&#xd;
+var MULTIPLIER = 255/1023;&#xd;
+var MAX_POWER = 1000;//1000 Watts of power based on one meter solar panel at noon at the equator&#xd;
+var EFFICIENCY = 0.16;//About a 16 percent efficiency per solar panel&#xd;
+var PANEL_POWER = MAX_POWER * EFFICIENCY;&#xd;
+var LOG_BASE = 1.0749111034571373359815489867558;&#xd;
+&#xd;
+var state = 1;&#xd;
+var electricity = 0;&#xd;
+//var tick = 0;&#xd;
+&#xd;
+function setup(){&#xd;
+	&#xd;
+	IoEClient.setup({&#xd;
+		type: "Solar",&#xd;
+		states: [&#xd;
+			{&#xd;
+			name: "Status",&#xd;
+			type: "number",&#xd;
+			unit: 'Wh',&#xd;
+			controllable: false&#xd;
+			}&#xd;
+	 ]&#xd;
+	 });&#xd;
+	 &#xd;
+	 IoEClient.onInputReceive = function(input) {&#xd;
+		// Serial.println("input: " + input);&#xd;
+	 	processData(input, true);&#xd;
+	 };&#xd;
+	&#xd;
+	&#xd;
+	sendReport();&#xd;
+&#xd;
+}&#xd;
+&#xd;
+function loop(){&#xd;
+//	if ( (tick++ % 10) === 0 )	// is tick consistent across devices? &#xd;
+//	{&#xd;
+		electricity = Math.round(getElectricityProduction());&#xd;
+		//Serial.println(electricity);&#xd;
+		displayElectricity();&#xd;
+		sendReport();&#xd;
+		outputElectricity();&#xd;
+		delay(1000);&#xd;
+//	}&#xd;
+}&#xd;
+&#xd;
+function displayElectricity(){&#xd;
+	setCustomText(70, 45, 1000, 1000, String(parseInt(electricity)) + '\tW');&#xd;
+}&#xd;
+&#xd;
+function getElectricityProduction(){&#xd;
+	return PANEL_POWER * Environment.get(ENVIRONMENT_NAME) / 100;&#xd;
+}&#xd;
+&#xd;
+function sendReport()&#xd;
+{&#xd;
+	var report = state;	// comma seperated states&#xd;
+	IoEClient.reportStates(electricity);&#xd;
+	setDeviceProperty(getName(), "level", electricity);&#xd;
+}&#xd;
+&#xd;
+function outputElectricity(){&#xd;
+	var el_log = Math.floor(Math.log(electricity)/Math.log(LOG_BASE));&#xd;
+	if(el_log &lt; 0)&#xd;
+		el_log = 0;&#xd;
+	else if (el_log > 255)&#xd;
+		el_log = 255;&#xd;
+//	Serial.println(el_log);&#xd;
+	analogWrite(0, el_log);&#xd;
+}&#xd;
+&#xd;
+</TEXT>
+           </FILE_CONTENT>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>4</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>//Solar Panel&#xd;
+//Read the sunlight levels&#xd;
+//Output electricity based on sunlight&#xd;
+//Panel will be 160Watts per square meter&#xd;
+&#xd;
+//Features output to IoE Server:&#xd;
+// number of kWh of energy produced since turning on&#xd;
+// number of kWh per minute&#xd;
+// current production&#xd;
+var ENVIRONMENT_NAME = "Sunlight";&#xd;
+var MULTIPLIER = 255/1023;&#xd;
+var MAX_POWER = 1000;//1000 Watts of power based on one meter solar panel at noon at the equator&#xd;
+var EFFICIENCY = 0.16;//About a 16 percent efficiency per solar panel&#xd;
+var PANEL_POWER = MAX_POWER * EFFICIENCY;&#xd;
+var LOG_BASE = 1.0749111034571373359815489867558;&#xd;
+&#xd;
+var state = 1;&#xd;
+var electricity = 0;&#xd;
+//var tick = 0;&#xd;
+&#xd;
+function setup(){&#xd;
+	&#xd;
+	IoEClient.setup({&#xd;
+		type: "Solar",&#xd;
+		states: [&#xd;
+			{&#xd;
+			name: "Status",&#xd;
+			type: "number",&#xd;
+			unit: 'Wh',&#xd;
+			controllable: false&#xd;
+			}&#xd;
+	 ]&#xd;
+	 });&#xd;
+	 &#xd;
+	 IoEClient.onInputReceive = function(input) {&#xd;
+		// Serial.println("input: " + input);&#xd;
+	 	processData(input, true);&#xd;
+	 };&#xd;
+	&#xd;
+	&#xd;
+	sendReport();&#xd;
+&#xd;
+}&#xd;
+&#xd;
+function loop(){&#xd;
+//	if ( (tick++ % 10) === 0 )	// is tick consistent across devices? &#xd;
+//	{&#xd;
+		electricity = Math.round(getElectricityProduction());&#xd;
+		//Serial.println(electricity);&#xd;
+		displayElectricity();&#xd;
+		sendReport();&#xd;
+		outputElectricity();&#xd;
+		delay(1000);&#xd;
+//	}&#xd;
+}&#xd;
+&#xd;
+function displayElectricity(){&#xd;
+	setCustomText(70, 45, 1000, 1000, String(parseInt(electricity)) + '\tW');&#xd;
+}&#xd;
+&#xd;
+function getElectricityProduction(){&#xd;
+	return PANEL_POWER * Environment.get(ENVIRONMENT_NAME) / 100;&#xd;
+}&#xd;
+&#xd;
+function sendReport()&#xd;
+{&#xd;
+	var report = state;	// comma seperated states&#xd;
+	IoEClient.reportStates(electricity);&#xd;
+	setDeviceProperty(getName(), "level", electricity);&#xd;
+}&#xd;
+&#xd;
+function outputElectricity(){&#xd;
+	var el_log = Math.floor(Math.log(electricity)/Math.log(LOG_BASE));&#xd;
+	if(el_log &lt; 0)&#xd;
+		el_log = 0;&#xd;
+	else if (el_log > 255)&#xd;
+		el_log = 255;&#xd;
+//	Serial.println(el_log);&#xd;
+	analogWrite(0, el_log);&#xd;
+}&#xd;
+&#xd;
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>5</FILE_NUMBER>
+           <NAME>Solar Panel (Python)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>from options import Options
+from time import *
+import math
+from physical import *
+from gpio import *
+from environment import Environment
+from ioeclient import IoEClient
+#from pyjs import *
+
+
+#Solar Panel
+#Read the sunlight levels
+#Output electricity based on sunlight
+#Panel will be 160Watts per square meter
+
+#Features output to IoE Server:
+# number of kWh of energy produced since turning on
+# number of kWh per minute
+# current production
+ENVIRONMENT_NAME = "Sunlight"        # var ENVIRONMENT_NAME
+MULTIPLIER = 255. / 1023        # var MULTIPLIER
+MAX_POWER = 1000. #1000 Watts of power based on one meter solar panel at noon at the equator        # var MAX_POWER
+EFFICIENCY = 0.16 #About a 16 percent efficiency per solar panel        # var EFFICIENCY
+PANEL_POWER = MAX_POWER * EFFICIENCY        # var PANEL_POWER
+LOG_BASE = 1.0749111034571373359815489867558        # var LOG_BASE
+
+state = 1        # var state
+electricity = 0        # var electricity
+#tick = 0        # var tick
+
+
+def setup ():
+    
+    IoEClient.setup({
+        "type": "Solar",
+        "states": [{
+            "name": "Status",
+            "type": "number",
+            "unit": 'Wh',
+            "controllable": False
+        }]
+    })
+
+    IoEClient.onInputReceive ( lambda rinput: processData(rinput, True) )
+
+    sendReport()
+
+
+
+
+def loop ():
+    global electricity
+    ##    if  (tick++ % 10) is 0 )    # is tick consistent across devices?
+    ##    {
+    electricity = int(getElectricityProduction())
+    ##print(electricity)
+    displayElectricity()
+    sendReport()
+    outputElectricity()
+    delay(1000)
+    ##    
+
+
+
+def displayElectricity ():
+    setCustomText(70, 45, 1000, 1000, str(int(electricity)) + '\tW')
+
+
+
+def getElectricityProduction ():
+    return PANEL_POWER * Environment.get(ENVIRONMENT_NAME) / 100
+
+
+
+def sendReport ():
+    report = state # comma seperated states        # var report
+    IoEClient.reportStates(electricity)
+    setDeviceProperty(getName(), "level", electricity)
+
+
+
+def outputElectricity ():
+    el_log = math.floor(math.log(electricity) / math.log(LOG_BASE))        # var el_log
+    if el_log &lt; 0:
+        el_log = 0
+    elif el_log > 255:
+        el_log = 255
+    ##    print(el_log)
+    analogWrite(0, el_log)
+
+
+
+
+
+if __name__ == "__main__":
+    setup()
+    while True:
+        loop()
+        idle()
+
+</TEXT>
+           </FILE_CONTENT>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>6</FILE_NUMBER>
+             <NAME>main.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>from options import Options
+from time import *
+import math
+from physical import *
+from gpio import *
+from environment import Environment
+from ioeclient import IoEClient
+#from pyjs import *
+
+
+#Solar Panel
+#Read the sunlight levels
+#Output electricity based on sunlight
+#Panel will be 160Watts per square meter
+
+#Features output to IoE Server:
+# number of kWh of energy produced since turning on
+# number of kWh per minute
+# current production
+ENVIRONMENT_NAME = "Sunlight"        # var ENVIRONMENT_NAME
+MULTIPLIER = 255. / 1023        # var MULTIPLIER
+MAX_POWER = 1000. #1000 Watts of power based on one meter solar panel at noon at the equator        # var MAX_POWER
+EFFICIENCY = 0.16 #About a 16 percent efficiency per solar panel        # var EFFICIENCY
+PANEL_POWER = MAX_POWER * EFFICIENCY        # var PANEL_POWER
+LOG_BASE = 1.0749111034571373359815489867558        # var LOG_BASE
+
+state = 1        # var state
+electricity = 0        # var electricity
+#tick = 0        # var tick
+
+
+def setup ():
+    
+    IoEClient.setup({
+        "type": "Solar",
+        "states": [{
+            "name": "Status",
+            "type": "number",
+            "unit": 'Wh',
+            "controllable": False
+        }]
+    })
+
+    IoEClient.onInputReceive ( lambda rinput: processData(rinput, True) )
+
+    sendReport()
+
+
+
+
+def loop ():
+    global electricity
+    ##    if  (tick++ % 10) is 0 )    # is tick consistent across devices?
+    ##    {
+    electricity = int(getElectricityProduction())
+    ##print(electricity)
+    displayElectricity()
+    sendReport()
+    outputElectricity()
+    delay(1000)
+    ##    
+
+
+
+def displayElectricity ():
+    setCustomText(70, 45, 1000, 1000, str(int(electricity)) + '\tW')
+
+
+
+def getElectricityProduction ():
+    return PANEL_POWER * Environment.get(ENVIRONMENT_NAME) / 100
+
+
+
+def sendReport ():
+    report = state # comma seperated states        # var report
+    IoEClient.reportStates(electricity)
+    setDeviceProperty(getName(), "level", electricity)
+
+
+
+def outputElectricity ():
+    if electricity == 0: return
+    el_log = math.floor(math.log(electricity) / math.log(LOG_BASE))        # var el_log
+    if el_log &lt; 0:
+        el_log = 0
+    elif el_log > 255:
+        el_log = 255
+    ##    print(el_log)
+    analogWrite(0, el_log)
+
+
+
+
+
+if __name__ == "__main__":
+    setup()
+    while True:
+        loop()
+        sleep(0)
+
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>6</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <THING_MODEL>
+      <NAME></NAME>
+      <WIDTH>117.5</WIDTH>
+      <HEIGHT>75.5</HEIGHT>
+      <ANALOG_SLOTS_COUNT>4</ANALOG_SLOTS_COUNT>
+      <DIGITAL_SLOTS_COUNT>6</DIGITAL_SLOTS_COUNT>
+      <SPECIFICATIONS>&lt;html contenteditable="true">&lt;head>&lt;/head>&lt;body style="word-wrap: break-word; -webkit-nbsp-mode: space; -webkit-line-break: after-white-space; ">&lt;font class="Apple-style-span" face="'Arial Black'" size="5">Solar Panel&lt;/font>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;font class="Apple-style-span" face="'Arial Black'" size="5">&lt;br>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Features:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Registration Server Compatible&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Detects and displays the ammount of power being generated.&lt;/font>&lt;/li>&lt;/ul>&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Usage:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Generates power based on the ammount of SUNLIGHT in the environment.&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Sends generated power to another device such as Battery.&lt;/font>&lt;/li>&lt;/ul>&lt;/div>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Direct Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Local Control:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Remote Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Data Specifications:&lt;/u>&lt;/span>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Output Slot: D0&lt;br>&lt;/span>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Output uses logarithmic scale in order to accommodate power values up to 100 MW (+/-20%).&lt;/span>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Message Format: [level]&lt;/span>&lt;/div>&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">level: a positive number&lt;/span>&lt;/div>&lt;/font>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&amp;nbsp;&lt;/span>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Example:&lt;/u>&lt;/span>&lt;/div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Connect Solar Panel to Battery.&lt;/font>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;br>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/body>&lt;/html></SPECIFICATIONS>
+      <ROTATION>0</ROTATION>
+      <SCALE>1</SCALE>
+      <IS_END_DEVICE>TRUE</IS_END_DEVICE>
+      <IS_DESKTOP_AVAILABLE>FALSE</IS_DESKTOP_AVAILABLE>
+      <SUBCOMPONENTS>
+       <SUBCOMPONENT>
+        <NAME>solar_panel</NAME>
+        <X>0</X>
+        <Y>0</Y>
+        <Z_ORDER>1</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>0</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>-1</SLOT_NUM>
+        <SLOT_TYPE>0</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/SmartGrid/SolarPanel.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+      </SUBCOMPONENTS>
+      <RULES/>
+     </THING_MODEL>
+     <IOE_CLIENT>
+      <CLIENT_MODE>REMOTE_SERVER</CLIENT_MODE>
+      <SERVER_ADDRESS>1.0.0.1</SERVER_ADDRESS>
+      <USERNAME>admin</USERNAME>
+      <PASSWORD>admin</PASSWORD>
+     </IOE_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME></NAME>
+      <MAIL_ID></MAIL_ID>
+      <POP3_SERVER></POP3_SERVER>
+      <SMTP_SERVER></SMTP_SERVER>
+      <USER></USER>
+      <PASSWORD></PASSWORD>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+     <BLUETOOTH_MANAGER>
+      <DISCOVERABLE>true</DISCOVERABLE>
+      <PAIRED_DEVICES/>
+      <BEACON_BROADCASTING>false</BEACON_BROADCASTING>
+      <BEACON_FREQUENCY>10</BEACON_FREQUENCY>
+      <BEACON_UUID>{f7e3b991-1d75-47b7-9b9a-578feadd8dbb}</BEACON_UUID>
+      <BEACON_DATA></BEACON_DATA>
+      <TETHER>false</TETHER>
+      <TETHERED_MAC>false</TETHERED_MAC>
+     </BLUETOOTH_MANAGER>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL>{e7d58569-1994-4a86-be38-ef3ed78b37f7},{da63044c-cd60-457d-8b7f-398dec65c5f6},{ddc7a3af-1c3a-42b6-9d6d-33004a233e4f},{2144d2ec-1a30-41b4-855b-bc37858f31b0}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.0644599</X_PN>
+      <Y_PN>0.0771749</Y_PN>
+      <X>222</X>
+      <Y>165</Y>
+      <SLOT>0</SLOT>
+      <SUBSLOT>0</SUBSLOT>
+      <PARENT_PATH>{e7d58569-1994-4a86-be38-ef3ed78b37f7},{da63044c-cd60-457d-8b7f-398dec65c5f6},{ddc7a3af-1c3a-42b6-9d6d-33004a233e4f}</PARENT_PATH>
+      <CONTAINER_ID>{ddc7a3af-1c3a-42b6-9d6d-33004a233e4f}</CONTAINER_ID>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

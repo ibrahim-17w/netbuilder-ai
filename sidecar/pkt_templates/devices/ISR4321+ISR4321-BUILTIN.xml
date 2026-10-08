@@ -1,0 +1,524 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="" model="ISR4321">Router</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>eNonRemovableInterfaceCard</TYPE>
+         <MODULE>
+          <TYPE>eNonRemovableInterfaceCard</TYPE>
+          <MODEL>ISR4321-BUILTIN</MODEL>
+          <SLOT>
+           <TYPE>eSfpModule</TYPE>
+          </SLOT>
+          <PORT>
+           <TYPE>eCopperGigabitEthernet</TYPE>
+           <POWER>true</POWER>
+           <MEDIATYPE>0</MEDIATYPE>
+           <PINS>false</PINS>
+           <BANDWIDTH>1000000</BANDWIDTH>
+           <FULLDUPLEX>true</FULLDUPLEX>
+           <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+           <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+           <MACADDRESS>0000.0000.0000</MACADDRESS>
+           <BIA>0000.0000.0000</BIA>
+           <CLOCKRATE>2000000</CLOCKRATE>
+           <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+           <DESCRIPTION/>
+           <CHANNEL>0</CHANNEL>
+           <CHANNEL5GHZ>0</CHANNEL5GHZ>
+           <COVERAGERANGE>0</COVERAGERANGE>
+           <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+           <UP_METHOD>3</UP_METHOD>
+           <IP/>
+           <SUBNET/>
+           <PORT_GATEWAY/>
+           <PORT_DNS/>
+           <PORT_DHCP_ENABLE>false</PORT_DHCP_ENABLE>
+           <ND_SUPPRESSED>false</ND_SUPPRESSED>
+           <TIMEOUT>14400000</TIMEOUT>
+           <PC_FIREWALL>false</PC_FIREWALL>
+           <PC_IPV6_FIREWALL>false</PC_IPV6_FIREWALL>
+           <IPV6_ENABLED>false</IPV6_ENABLED>
+           <IPV6_ADDRESS_AUTOCONFIG>false</IPV6_ADDRESS_AUTOCONFIG>
+           <IPV6_PORT_GATEWAY/>
+           <IPV6_PORT_DNS/>
+           <IPV6_LINK_LOCAL/>
+           <IPV6_DEFAULT_LINK_LOCAL>FE80::240:BFF:FEB2:297B</IPV6_DEFAULT_LINK_LOCAL>
+           <IPV6_PORT_DHCP_ENABLED>false</IPV6_PORT_DHCP_ENABLED>
+           <IPV6_ADDRESSES/>
+           <IP_UNNUMBERED/>
+           <DHCP_SERVER_IP>0.0.0.0</DHCP_SERVER_IP>
+           <MANAGEMENT_INTERFACE>false</MANAGEMENT_INTERFACE>
+          </PORT>
+          <PORT>
+           <TYPE>eCopperGigabitEthernet</TYPE>
+           <POWER>true</POWER>
+           <MEDIATYPE>0</MEDIATYPE>
+           <PINS>false</PINS>
+           <BANDWIDTH>1000000</BANDWIDTH>
+           <FULLDUPLEX>true</FULLDUPLEX>
+           <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+           <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+           <MACADDRESS>0000.0000.0000</MACADDRESS>
+           <BIA>0000.0000.0000</BIA>
+           <CLOCKRATE>2000000</CLOCKRATE>
+           <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+           <DESCRIPTION/>
+           <CHANNEL>0</CHANNEL>
+           <CHANNEL5GHZ>0</CHANNEL5GHZ>
+           <COVERAGERANGE>0</COVERAGERANGE>
+           <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+           <UP_METHOD>3</UP_METHOD>
+           <IP/>
+           <SUBNET/>
+           <PORT_GATEWAY/>
+           <PORT_DNS/>
+           <PORT_DHCP_ENABLE>false</PORT_DHCP_ENABLE>
+           <ND_SUPPRESSED>false</ND_SUPPRESSED>
+           <TIMEOUT>14400000</TIMEOUT>
+           <PC_FIREWALL>false</PC_FIREWALL>
+           <PC_IPV6_FIREWALL>false</PC_IPV6_FIREWALL>
+           <IPV6_ENABLED>false</IPV6_ENABLED>
+           <IPV6_ADDRESS_AUTOCONFIG>false</IPV6_ADDRESS_AUTOCONFIG>
+           <IPV6_PORT_GATEWAY/>
+           <IPV6_PORT_DNS/>
+           <IPV6_LINK_LOCAL/>
+           <IPV6_DEFAULT_LINK_LOCAL>FE80::201:43FF:FE77:D02C</IPV6_DEFAULT_LINK_LOCAL>
+           <IPV6_PORT_DHCP_ENABLED>false</IPV6_PORT_DHCP_ENABLED>
+           <IPV6_ADDRESSES/>
+           <IP_UNNUMBERED/>
+           <DHCP_SERVER_IP>0.0.0.0</DHCP_SERVER_IP>
+           <MANAGEMENT_INTERFACE>false</MANAGEMENT_INTERFACE>
+          </PORT>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>eInterfaceCard</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>eInterfaceCard</TYPE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAAAA==</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1269.51</X_COORD>
+      <Y_COORD>1236.93</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>FDO1302EP0P-</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:300000;cost:250;power source:1;rack units:2;wattage:5;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>0</TEMPLATE_CREATION_TIME>
+     <STARTTIME>730972800000</STARTTIME>
+     <STARTSIMTIME>0</STARTSIMTIME>
+     <USER_APPS>
+      <RUNNING_APPS/>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SAVE_REF_ID>save-ref-id:0</SAVE_REF_ID>
+     <SYS_NAME></SYS_NAME>
+     <RUNNINGCONFIG/>
+     <STARTUPCONFIG/>
+     <CURRENT_COMMAND_SET>4300_universal_security_15.4</CURRENT_COMMAND_SET>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>flash:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES>
+          <FILE class="CFile">
+           <FILE_NUMBER>3</FILE_NUMBER>
+           <NAME>isr4300-universalk9.03.16.05.S.155-3.S5-ext.SPA.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>4300_universal_security_15.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>2</FILE_NUMBER>
+           <NAME>sigdef-category.xml</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIpsCategoryFileContent">
+            <SIG_CAT/>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>sigdef-default.xml</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIpsDatFileContent">
+            <ICMP_SIGNATURE>
+             <SIGNATURE>
+              <SIG_ID>2004</SIG_ID>
+              <SUB_ID>0</SUB_ID>
+              <RETIRED>0</RETIRED>
+              <ENABLED>0</ENABLED>
+              <EVENT_ACTION>0</EVENT_ACTION>
+             </SIGNATURE>
+            </ICMP_SIGNATURE>
+           </FILE_CONTENT>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>3</FILE_COUNTER>
+         <CAPACITY>3249049600</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <CONFIG_REGISTER>8450</CONFIG_REGISTER>
+     <NEXT_CONFIG_REGISTER>8450</NEXT_CONFIG_REGISTER>
+     <CURRENT_BOOT_FILE>flash:/isr4300-universalk9.03.16.05.S.155-3.S5-ext.SPA.bin</CURRENT_BOOT_FILE>
+     <CONFIG_BOOT_FILES></CONFIG_BOOT_FILES>
+     <BUILD_IN_ADDR>000C.85A6.7E56</BUILD_IN_ADDR>
+     <BIOS_VERSION></BIOS_VERSION>
+     <SECURITY>
+      <KEY_NAME></KEY_NAME>
+      <TEMP_KEY_NAME></TEMP_KEY_NAME>
+      <RSA_KEY></RSA_KEY>
+      <TEMP_RSA_KEY></TEMP_RSA_KEY>
+      <TIME_DATE></TIME_DATE>
+      <ENABLED>0</ENABLED>
+      <MODULUS_BITS>0</MODULUS_BITS>
+     </SECURITY>
+     <ALGORITHM_SETTINGS>
+      <USE_GLOBAL>true</USE_GLOBAL>
+      <CBAC_HALF_OPEN_SESSION_MULTIPLIER>1</CBAC_HALF_OPEN_SESSION_MULTIPLIER>
+      <TCP_MAX_CONNECTING_SESSIONS>100</TCP_MAX_CONNECTING_SESSIONS>
+      <TCP_MAX_OPENED_SESSIONS>1000</TCP_MAX_OPENED_SESSIONS>
+      <INTERFACE_QUEUE_SIZE>10</INTERFACE_QUEUE_SIZE>
+      <STORM_CONTROL_MULTIPLIER>10</STORM_CONTROL_MULTIPLIER>
+      <TCP_MAX_RETRANSMISSION_TIMEOUT>1000</TCP_MAX_RETRANSMISSION_TIMEOUT>
+     </ALGORITHM_SETTINGS>
+     <LICENSE_MANAGER>
+      <NEXT_UNIQUE_ID>12</NEXT_UNIQUE_ID>
+      <LICENSES>
+       <LICENSE>
+        <UNIQUE_ID>1</UNIQUE_ID>
+        <STORE_INDEX>0</STORE_INDEX>
+        <CURRENT_BOOT>0</CURRENT_BOOT>
+        <NEXT_REBOOT>0</NEXT_REBOOT>
+        <LICENSE_COUNT>0</LICENSE_COUNT>
+        <RIGHT_TO_USE>0</RIGHT_TO_USE>
+        <ENFORCED>1</ENFORCED>
+        <LICENSE_TYPE>0</LICENSE_TYPE>
+        <FEATURE_NAME>hseck9</FEATURE_NAME>
+        <TECHNOLOGY>hsec</TECHNOLOGY>
+        <VERSION>1.0</VERSION>
+        <LICENSE_STATE>Inactive</LICENSE_STATE>
+        <EVAL_TOTAL>208 weeks 2 days</EVAL_TOTAL>
+        <EVAL_LEFT>208 weeks 2 days</EVAL_LEFT>
+        <EVAL_USED>0  minute  0  second</EVAL_USED>
+        <LICENSE_PRIORITY>None</LICENSE_PRIORITY>
+        <STORE_NAME></STORE_NAME>
+        <DEFAULT>0</DEFAULT>
+        <SHOW_IN_FEATURE>1</SHOW_IN_FEATURE>
+        <SHOW_IN_ALL>0</SHOW_IN_ALL>
+        <IS_BOOTABLE>1</IS_BOOTABLE>
+       </LICENSE>
+       <LICENSE>
+        <UNIQUE_ID>2</UNIQUE_ID>
+        <STORE_INDEX>4</STORE_INDEX>
+        <CURRENT_BOOT>0</CURRENT_BOOT>
+        <NEXT_REBOOT>0</NEXT_REBOOT>
+        <LICENSE_COUNT>0</LICENSE_COUNT>
+        <RIGHT_TO_USE>1</RIGHT_TO_USE>
+        <ENFORCED>1</ENFORCED>
+        <LICENSE_TYPE>7</LICENSE_TYPE>
+        <FEATURE_NAME>AdvUCSuiteK9</FEATURE_NAME>
+        <TECHNOLOGY>AdvUCSuiteK9</TECHNOLOGY>
+        <VERSION>1.0</VERSION>
+        <LICENSE_STATE>Active, Not in Use, EULA not accepted</LICENSE_STATE>
+        <EVAL_TOTAL>208 weeks 2 days</EVAL_TOTAL>
+        <EVAL_LEFT>208 weeks 2 days</EVAL_LEFT>
+        <EVAL_USED>0  minute  0  second</EVAL_USED>
+        <LICENSE_PRIORITY>None</LICENSE_PRIORITY>
+        <STORE_NAME>Built-In License Storage</STORE_NAME>
+        <DEFAULT>0</DEFAULT>
+        <SHOW_IN_FEATURE>1</SHOW_IN_FEATURE>
+        <SHOW_IN_ALL>1</SHOW_IN_ALL>
+        <IS_BOOTABLE>1</IS_BOOTABLE>
+       </LICENSE>
+       <LICENSE>
+        <UNIQUE_ID>3</UNIQUE_ID>
+        <STORE_INDEX>3</STORE_INDEX>
+        <CURRENT_BOOT>0</CURRENT_BOOT>
+        <NEXT_REBOOT>0</NEXT_REBOOT>
+        <LICENSE_COUNT>0</LICENSE_COUNT>
+        <RIGHT_TO_USE>1</RIGHT_TO_USE>
+        <ENFORCED>1</ENFORCED>
+        <LICENSE_TYPE>7</LICENSE_TYPE>
+        <FEATURE_NAME>FoundationSuiteK9</FEATURE_NAME>
+        <TECHNOLOGY>FoundationSuiteK9</TECHNOLOGY>
+        <VERSION>1.0</VERSION>
+        <LICENSE_STATE>Active, Not in Use, EULA not accepted</LICENSE_STATE>
+        <EVAL_TOTAL>208 weeks 2 days</EVAL_TOTAL>
+        <EVAL_LEFT>208 weeks 2 days</EVAL_LEFT>
+        <EVAL_USED>0  minute  0  second</EVAL_USED>
+        <LICENSE_PRIORITY>None</LICENSE_PRIORITY>
+        <STORE_NAME>Built-In License Storage</STORE_NAME>
+        <DEFAULT>0</DEFAULT>
+        <SHOW_IN_FEATURE>1</SHOW_IN_FEATURE>
+        <SHOW_IN_ALL>1</SHOW_IN_ALL>
+        <IS_BOOTABLE>1</IS_BOOTABLE>
+       </LICENSE>
+       <LICENSE>
+        <UNIQUE_ID>4</UNIQUE_ID>
+        <STORE_INDEX>0</STORE_INDEX>
+        <CURRENT_BOOT>0</CURRENT_BOOT>
+        <NEXT_REBOOT>0</NEXT_REBOOT>
+        <LICENSE_COUNT>0</LICENSE_COUNT>
+        <RIGHT_TO_USE>1</RIGHT_TO_USE>
+        <ENFORCED>1</ENFORCED>
+        <LICENSE_TYPE>7</LICENSE_TYPE>
+        <FEATURE_NAME>appxk9</FEATURE_NAME>
+        <TECHNOLOGY>appx</TECHNOLOGY>
+        <VERSION>1.0</VERSION>
+        <LICENSE_STATE>Active, Not in Use, EULA not accepted</LICENSE_STATE>
+        <EVAL_TOTAL>208 weeks 2 days</EVAL_TOTAL>
+        <EVAL_LEFT>208 weeks 2 days</EVAL_LEFT>
+        <EVAL_USED>0  minute  0  second</EVAL_USED>
+        <LICENSE_PRIORITY>None</LICENSE_PRIORITY>
+        <STORE_NAME>Built-In License Storage</STORE_NAME>
+        <DEFAULT>0</DEFAULT>
+        <SHOW_IN_FEATURE>1</SHOW_IN_FEATURE>
+        <SHOW_IN_ALL>1</SHOW_IN_ALL>
+        <IS_BOOTABLE>1</IS_BOOTABLE>
+       </LICENSE>
+       <LICENSE>
+        <UNIQUE_ID>5</UNIQUE_ID>
+        <STORE_INDEX>5</STORE_INDEX>
+        <CURRENT_BOOT>0</CURRENT_BOOT>
+        <NEXT_REBOOT>0</NEXT_REBOOT>
+        <LICENSE_COUNT>0</LICENSE_COUNT>
+        <RIGHT_TO_USE>1</RIGHT_TO_USE>
+        <ENFORCED>1</ENFORCED>
+        <LICENSE_TYPE>7</LICENSE_TYPE>
+        <FEATURE_NAME>cme-srst</FEATURE_NAME>
+        <TECHNOLOGY>cme-srst</TECHNOLOGY>
+        <VERSION>1.0</VERSION>
+        <LICENSE_STATE>Active, Not in Use, EULA not accepted</LICENSE_STATE>
+        <EVAL_TOTAL>208 weeks 2 days</EVAL_TOTAL>
+        <EVAL_LEFT>208 weeks 2 days</EVAL_LEFT>
+        <EVAL_USED>0  minute  0  second</EVAL_USED>
+        <LICENSE_PRIORITY>None</LICENSE_PRIORITY>
+        <STORE_NAME>Built-In License Storage</STORE_NAME>
+        <DEFAULT>0</DEFAULT>
+        <SHOW_IN_FEATURE>1</SHOW_IN_FEATURE>
+        <SHOW_IN_ALL>1</SHOW_IN_ALL>
+        <IS_BOOTABLE>1</IS_BOOTABLE>
+       </LICENSE>
+       <LICENSE>
+        <UNIQUE_ID>6</UNIQUE_ID>
+        <STORE_INDEX>1</STORE_INDEX>
+        <CURRENT_BOOT>2</CURRENT_BOOT>
+        <NEXT_REBOOT>2</NEXT_REBOOT>
+        <LICENSE_COUNT>0</LICENSE_COUNT>
+        <RIGHT_TO_USE>0</RIGHT_TO_USE>
+        <ENFORCED>0</ENFORCED>
+        <LICENSE_TYPE>1</LICENSE_TYPE>
+        <FEATURE_NAME>ipbasek9</FEATURE_NAME>
+        <TECHNOLOGY>ipbase</TECHNOLOGY>
+        <VERSION>1.0</VERSION>
+        <LICENSE_STATE>Active, In Use</LICENSE_STATE>
+        <EVAL_TOTAL>208 weeks 2 days</EVAL_TOTAL>
+        <EVAL_LEFT>208 weeks 2 days</EVAL_LEFT>
+        <EVAL_USED>0  minute  0  second</EVAL_USED>
+        <LICENSE_PRIORITY>Medium</LICENSE_PRIORITY>
+        <STORE_NAME>Primary License Storage</STORE_NAME>
+        <DEFAULT>0</DEFAULT>
+        <SHOW_IN_FEATURE>1</SHOW_IN_FEATURE>
+        <SHOW_IN_ALL>1</SHOW_IN_ALL>
+        <IS_BOOTABLE>1</IS_BOOTABLE>
+       </LICENSE>
+       <LICENSE>
+        <UNIQUE_ID>7</UNIQUE_ID>
+        <STORE_INDEX>0</STORE_INDEX>
+        <CURRENT_BOOT>2</CURRENT_BOOT>
+        <NEXT_REBOOT>2</NEXT_REBOOT>
+        <LICENSE_COUNT>0</LICENSE_COUNT>
+        <RIGHT_TO_USE>1</RIGHT_TO_USE>
+        <ENFORCED>1</ENFORCED>
+        <LICENSE_TYPE>6</LICENSE_TYPE>
+        <FEATURE_NAME>securityk9</FEATURE_NAME>
+        <TECHNOLOGY>security</TECHNOLOGY>
+        <VERSION>1.0</VERSION>
+        <LICENSE_STATE>Active, In Use</LICENSE_STATE>
+        <EVAL_TOTAL>208 weeks 2 days</EVAL_TOTAL>
+        <EVAL_LEFT>208 weeks 2 days</EVAL_LEFT>
+        <EVAL_USED>0  minute  0  second</EVAL_USED>
+        <LICENSE_PRIORITY>Medium</LICENSE_PRIORITY>
+        <STORE_NAME>Primary License Storage</STORE_NAME>
+        <DEFAULT>0</DEFAULT>
+        <SHOW_IN_FEATURE>1</SHOW_IN_FEATURE>
+        <SHOW_IN_ALL>1</SHOW_IN_ALL>
+        <IS_BOOTABLE>1</IS_BOOTABLE>
+       </LICENSE>
+       <LICENSE>
+        <UNIQUE_ID>8</UNIQUE_ID>
+        <STORE_INDEX>2</STORE_INDEX>
+        <CURRENT_BOOT>0</CURRENT_BOOT>
+        <NEXT_REBOOT>0</NEXT_REBOOT>
+        <LICENSE_COUNT>0</LICENSE_COUNT>
+        <RIGHT_TO_USE>1</RIGHT_TO_USE>
+        <ENFORCED>1</ENFORCED>
+        <LICENSE_TYPE>7</LICENSE_TYPE>
+        <FEATURE_NAME>securityk9</FEATURE_NAME>
+        <TECHNOLOGY>security</TECHNOLOGY>
+        <VERSION>1.0</VERSION>
+        <LICENSE_STATE>Inactive</LICENSE_STATE>
+        <EVAL_TOTAL>208 weeks 2 days</EVAL_TOTAL>
+        <EVAL_LEFT>208 weeks 2 days</EVAL_LEFT>
+        <EVAL_USED>0  minute  0  second</EVAL_USED>
+        <LICENSE_PRIORITY>None</LICENSE_PRIORITY>
+        <STORE_NAME>Built-In License Storage</STORE_NAME>
+        <DEFAULT>0</DEFAULT>
+        <SHOW_IN_FEATURE>0</SHOW_IN_FEATURE>
+        <SHOW_IN_ALL>1</SHOW_IN_ALL>
+        <IS_BOOTABLE>0</IS_BOOTABLE>
+       </LICENSE>
+       <LICENSE>
+        <UNIQUE_ID>9</UNIQUE_ID>
+        <STORE_INDEX>6</STORE_INDEX>
+        <CURRENT_BOOT>0</CURRENT_BOOT>
+        <NEXT_REBOOT>0</NEXT_REBOOT>
+        <LICENSE_COUNT>0</LICENSE_COUNT>
+        <RIGHT_TO_USE>1</RIGHT_TO_USE>
+        <ENFORCED>1</ENFORCED>
+        <LICENSE_TYPE>7</LICENSE_TYPE>
+        <FEATURE_NAME>throughput</FEATURE_NAME>
+        <TECHNOLOGY>throughput</TECHNOLOGY>
+        <VERSION>1.0</VERSION>
+        <LICENSE_STATE>Active, Not in Use, EULA not accepted</LICENSE_STATE>
+        <EVAL_TOTAL>208 weeks 2 days</EVAL_TOTAL>
+        <EVAL_LEFT>208 weeks 2 days</EVAL_LEFT>
+        <EVAL_USED>0  minute  0  second</EVAL_USED>
+        <LICENSE_PRIORITY>None</LICENSE_PRIORITY>
+        <STORE_NAME>Built-In License Storage</STORE_NAME>
+        <DEFAULT>0</DEFAULT>
+        <SHOW_IN_FEATURE>1</SHOW_IN_FEATURE>
+        <SHOW_IN_ALL>1</SHOW_IN_ALL>
+        <IS_BOOTABLE>1</IS_BOOTABLE>
+       </LICENSE>
+       <LICENSE>
+        <UNIQUE_ID>10</UNIQUE_ID>
+        <STORE_INDEX>1</STORE_INDEX>
+        <CURRENT_BOOT>0</CURRENT_BOOT>
+        <NEXT_REBOOT>0</NEXT_REBOOT>
+        <LICENSE_COUNT>0</LICENSE_COUNT>
+        <RIGHT_TO_USE>1</RIGHT_TO_USE>
+        <ENFORCED>1</ENFORCED>
+        <LICENSE_TYPE>7</LICENSE_TYPE>
+        <FEATURE_NAME>uck9</FEATURE_NAME>
+        <TECHNOLOGY>uc</TECHNOLOGY>
+        <VERSION>1.0</VERSION>
+        <LICENSE_STATE>Active, Not in Use, EULA not accepted</LICENSE_STATE>
+        <EVAL_TOTAL>208 weeks 2 days</EVAL_TOTAL>
+        <EVAL_LEFT>208 weeks 2 days</EVAL_LEFT>
+        <EVAL_USED>0  minute  0  second</EVAL_USED>
+        <LICENSE_PRIORITY>None</LICENSE_PRIORITY>
+        <STORE_NAME>Built-In License Storage</STORE_NAME>
+        <DEFAULT>0</DEFAULT>
+        <SHOW_IN_FEATURE>1</SHOW_IN_FEATURE>
+        <SHOW_IN_ALL>1</SHOW_IN_ALL>
+        <IS_BOOTABLE>1</IS_BOOTABLE>
+       </LICENSE>
+       <LICENSE>
+        <UNIQUE_ID>11</UNIQUE_ID>
+        <STORE_INDEX>0</STORE_INDEX>
+        <CURRENT_BOOT>0</CURRENT_BOOT>
+        <NEXT_REBOOT>0</NEXT_REBOOT>
+        <LICENSE_COUNT>0</LICENSE_COUNT>
+        <RIGHT_TO_USE>0</RIGHT_TO_USE>
+        <ENFORCED>1</ENFORCED>
+        <LICENSE_TYPE>0</LICENSE_TYPE>
+        <FEATURE_NAME>internal_service</FEATURE_NAME>
+        <TECHNOLOGY>internal_service</TECHNOLOGY>
+        <VERSION>1.0</VERSION>
+        <LICENSE_STATE>Inactive</LICENSE_STATE>
+        <EVAL_TOTAL>208 weeks 2 days</EVAL_TOTAL>
+        <EVAL_LEFT>208 weeks 2 days</EVAL_LEFT>
+        <EVAL_USED>0  minute  0  second</EVAL_USED>
+        <LICENSE_PRIORITY>None</LICENSE_PRIORITY>
+        <STORE_NAME></STORE_NAME>
+        <DEFAULT>0</DEFAULT>
+        <SHOW_IN_FEATURE>1</SHOW_IN_FEATURE>
+        <SHOW_IN_ALL>0</SHOW_IN_ALL>
+        <IS_BOOTABLE>1</IS_BOOTABLE>
+       </LICENSE>
+      </LICENSES>
+     </LICENSE_MANAGER>
+     <SCP_SERVER_ENABLED>false</SCP_SERVER_ENABLED>
+     <VLANS>
+      <VLAN name="default" rspan="0" number="1"/>
+      <VLAN name="fddi-default" rspan="0" number="1002"/>
+      <VLAN name="token-ring-default" rspan="0" number="1003"/>
+      <VLAN name="fddinet-default" rspan="0" number="1004"/>
+      <VLAN name="trnet-default" rspan="0" number="1005"/>
+     </VLANS>
+     <VTP>
+      <DOMAIN_NAME></DOMAIN_NAME>
+      <MODE>0</MODE>
+      <VERSION>1</VERSION>
+      <PASSWORD></PASSWORD>
+      <CONFIG_REVISION>0</CONFIG_REVISION>
+      <UPDATER_IP>0.0.0.0</UPDATER_IP>
+      <UPDATE_TIMESTAMP>0-0-00 00:00:00</UPDATE_TIMESTAMP>
+     </VTP>
+     <SIG_IPSPROCESS>
+      <SIGNATURE>
+       <SIG_ID>2004</SIG_ID>
+       <SUB_ID>0</SUB_ID>
+       <RETIRED>0</RETIRED>
+       <ENABLED>0</ENABLED>
+       <EVENT_ACTION>0</EVENT_ACTION>
+      </SIGNATURE>
+     </SIG_IPSPROCESS>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL translate="true">{c4086464-4ab1-45b7-9a2e-d69d2d761b92},{0b167691-b225-43ee-8625-caa15ca77dd4},{fe5b2c05-52d5-40f0-bc24-fe355fd6073e},{2cfd4bd7-2e76-47c7-a36e-c996a87f7cf8},{7f6a8e1a-f326-477f-a6e6-f1343f1d2093},{8fba198f-a93b-4ff3-90ed-c2347db688d4}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.09625</X_PN>
+      <Y_PN>0.118</Y_PN>
+      <X>19</X>
+      <Y>0</Y>
+      <PARENT_PATH>{c4086464-4ab1-45b7-9a2e-d69d2d761b92},{0b167691-b225-43ee-8625-caa15ca77dd4},{fe5b2c05-52d5-40f0-bc24-fe355fd6073e},{2cfd4bd7-2e76-47c7-a36e-c996a87f7cf8}</PARENT_PATH>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

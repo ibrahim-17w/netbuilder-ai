@@ -1,0 +1,548 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="" model="Thing">MCUComponent</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+        <MODEL>PT-UNV-PWR-ADAPTER</MODEL>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAAAQAAAAoAbABlAHYAZQBsAAAACgAAAAAIADEAMAAyADM=</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1264.45</X_COORD>
+      <Y_COORD>1231.99</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT081041U5</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:300000;cost:250;power source:1;rack units:2;wattage:5;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>0</TEMPLATE_CREATION_TIME>
+     <STARTTIME>730972800000</STARTTIME>
+     <STARTSIMTIME>0</STARTSIMTIME>
+     <USER_APPS>
+      <RUNNING_APPS>
+       <USER_APP>LED (Python)</USER_APP>
+      </RUNNING_APPS>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SAVE_REF_ID>save-ref-id:0</SAVE_REF_ID>
+     <SYS_NAME></SYS_NAME>
+     <GATEWAY/>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP/>
+     </DHCP_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+       <STANDARD_CHANNEL5G>112</STANDARD_CHANNEL5G>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <GATEWAYV6/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>35-89-8E-53-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT class="CTextFileContent">
+          <TEXT>############################################################## 
+# Helper class to help porting code using JS object notation:
+#
+#   JS: var obj = {type: "unknown"}
+#   JS: obj.type = "analog"
+#
+#   PY: obj = JsObject({"type" : "unknown"})
+#   PY: obj.type = "analog"
+#
+class JsObject(dict):
+    def __init__(self, d):
+        for k in d.keys():
+            setattr(self, k, d[k])
+  
+
+
+############################################################## 
+# Map value from one range to another
+#
+def js_map(x, inMin, inMax, outMin, outMax):
+    return float((x - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin
+
+
+</TEXT>
+         </FILE_CONTENT>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>27</FILE_NUMBER>
+           <NAME>LED (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>var MAX_LIGHT_PERCENT = 1;
+var VOLUME_AT_RATE = 100000;
+var input;
+var value;
+
+function setup() {
+	setComponentOpacity("black", 1);
+	attachInterrupt(0, isr);
+	isr();
+}
+
+function isr() {
+	input = analogRead(0);
+	value = map(input, 0, 1023, 0, 1);
+	// customized code:
+	if (input > 0)
+		input = 1023;
+	setComponentOpacity("black", 1-value);
+	setDeviceProperty(getName(), "level",input);
+}
+
+var lastTimeInSeconds = 0;
+function loop()
+{
+	updateEnvironment();
+	
+	delay(1000);
+}
+
+function updateEnvironment()
+{
+	var rate = value*MAX_LIGHT_PERCENT*VOLUME_AT_RATE / Environment.getVolume();
+	// rate equals limit because we want it to happen immediately
+	Environment.setContribution("Visible Light", rate, rate, false);
+}
+</TEXT>
+           </FILE_CONTENT>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>28</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>var MAX_LIGHT_PERCENT = 1;
+var VOLUME_AT_RATE = 100000;
+var input;
+var value;
+
+function setup() {
+	setComponentOpacity("black", 1);
+	attachInterrupt(0, isr);
+	isr();
+}
+
+function isr() {
+	input = analogRead(0);
+	value = map(input, 0, 1023, 0, 1);
+	// customized code:
+	if (input > 0)
+		input = 1023;
+	setComponentOpacity("black", 1-value);
+	setDeviceProperty(getName(), "level",input);
+}
+
+var lastTimeInSeconds = 0;
+function loop()
+{
+	updateEnvironment();
+	
+	delay(1000);
+}
+
+function updateEnvironment()
+{
+	var rate = value*MAX_LIGHT_PERCENT*VOLUME_AT_RATE / Environment.getVolume();
+	// rate equals limit because we want it to happen immediately
+	Environment.setContribution("Visible Light", rate, rate, false);
+}
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>29</FILE_NUMBER>
+           <NAME>LED (Python)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>############################################################## 
+# Helper class to help porting code using JS object notation:
+#
+#   JS: var obj = {type: "unknown"}
+#   JS: obj.type = "analog"
+#
+#   PY: obj = JsObject({"type" : "unknown"})
+#   PY: obj.type = "analog"
+#
+class JsObject(dict):
+    def __init__(self, d):
+        for k in d.keys():
+            setattr(self, k, d[k])
+  
+
+
+############################################################## 
+# Map value from one range to another
+#
+def js_map(x, inMin, inMax, outMin, outMax):
+    return float((x - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin
+
+
+</TEXT>
+           </FILE_CONTENT>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>30</FILE_NUMBER>
+             <NAME>main.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>from environment import *
+from physical import *
+from gpio import *
+from time import *
+from pyjs import *
+
+MAX_LIGHT_PERCENT = 1
+VOLUME_AT_RATE = 100000
+value = 0
+
+def setup():
+    setComponentOpacity("black", 1)
+    add_event_detect(0, isr)
+    isr()
+
+
+def isr():
+    global value
+    analoginput = analogRead(0)
+    #customized code:
+    if analoginput > 0:
+        analoginput = 1023
+		
+    value = js_map(analoginput, 0, 1023, 0, 1)
+    setComponentOpacity("black", 1-value)
+    setDeviceProperty(getName(), "level",analoginput)
+
+
+
+def main():
+    setup()
+    while True:
+        updateEnvironment()
+        delay(1000)
+
+
+def updateEnvironment():
+    global value
+    global MAX_LIGHT_PERCENT
+    global VOLUME_AT_RATE
+    rate = float(value*MAX_LIGHT_PERCENT*VOLUME_AT_RATE) / Environment.getVolume()
+    # rate equals limit because we want it to happen immediately
+    Environment.setContribution("Visible Light", rate, rate, False)
+
+if __name__ == "__main__":
+    main()
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+            <FILE class="CFile">
+             <FILE_NUMBER>31</FILE_NUMBER>
+             <NAME>pyjs.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>############################################################## 
+# Helper class to help porting code using JS object notation:
+#
+#   JS: var obj = {type: "unknown"}
+#   JS: obj.type = "analog"
+#
+#   PY: obj = JsObject({"type" : "unknown"})
+#   PY: obj.type = "analog"
+#
+class JsObject(dict):
+    def __init__(self, d):
+        for k in d.keys():
+            setattr(self, k, d[k])
+  
+
+
+############################################################## 
+# Map value from one range to another
+#
+def js_map(x, inMin, inMax, outMin, outMax):
+    return float((x - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin
+
+
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>31</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>User:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>0</FILE_COUNTER>
+         <CAPACITY>10000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <THING_MODEL>
+      <NAME></NAME>
+      <WIDTH>70.5</WIDTH>
+      <HEIGHT>70.5</HEIGHT>
+      <ANALOG_SLOTS_COUNT>4</ANALOG_SLOTS_COUNT>
+      <DIGITAL_SLOTS_COUNT>6</DIGITAL_SLOTS_COUNT>
+      <SPECIFICATIONS>&lt;html>&lt;head>&lt;/head>&lt;body>Add specifications here.&lt;/body>&lt;/html></SPECIFICATIONS>
+      <ROTATION>0</ROTATION>
+      <SCALE>1</SCALE>
+      <IS_END_DEVICE>TRUE</IS_END_DEVICE>
+      <IS_DESKTOP_AVAILABLE>TRUE</IS_DESKTOP_AVAILABLE>
+      <SUBCOMPONENTS>
+       <SUBCOMPONENT>
+        <NAME>led</NAME>
+        <X>0</X>
+        <Y>0</Y>
+        <Z_ORDER>1</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>0</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>-1</SLOT_NUM>
+        <SLOT_TYPE>0</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/Components/led_green.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+       <SUBCOMPONENT>
+        <NAME>black</NAME>
+        <X>0</X>
+        <Y>0</Y>
+        <Z_ORDER>2</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>0</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>-1</SLOT_NUM>
+        <SLOT_TYPE>0</SLOT_TYPE>
+        <OPACITY>0</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/Components/led_black.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+      </SUBCOMPONENTS>
+      <RULES/>
+     </THING_MODEL>
+     <IOE_CLIENT>
+      <CLIENT_MODE>NO_SERVER</CLIENT_MODE>
+      <SERVER_ADDRESS></SERVER_ADDRESS>
+      <USERNAME></USERNAME>
+      <PASSWORD></PASSWORD>
+     </IOE_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME></NAME>
+      <MAIL_ID></MAIL_ID>
+      <POP3_SERVER></POP3_SERVER>
+      <SMTP_SERVER></SMTP_SERVER>
+      <USER></USER>
+      <PASSWORD></PASSWORD>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL>{e7d58569-1994-4a86-be38-ef3ed78b37f7},{da63044c-cd60-457d-8b7f-398dec65c5f6},{ddc7a3af-1c3a-42b6-9d6d-33004a233e4f},{e584fc7d-e197-418e-8454-09b1c5babbdf}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.224739</X_PN>
+      <Y_PN>0.100561</Y_PN>
+      <X>774</X>
+      <Y>215</Y>
+      <SLOT>0</SLOT>
+      <SUBSLOT>0</SUBSLOT>
+      <PARENT_PATH>{e7d58569-1994-4a86-be38-ef3ed78b37f7},{da63044c-cd60-457d-8b7f-398dec65c5f6},{ddc7a3af-1c3a-42b6-9d6d-33004a233e4f}</PARENT_PATH>
+      <CONTAINER_ID>{ddc7a3af-1c3a-42b6-9d6d-33004a233e4f}</CONTAINER_ID>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

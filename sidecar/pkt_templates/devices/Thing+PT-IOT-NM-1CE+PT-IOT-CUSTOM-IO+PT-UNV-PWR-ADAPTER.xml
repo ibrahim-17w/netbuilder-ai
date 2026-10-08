@@ -1,0 +1,739 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="" model="Thing">MCUComponent</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeNetworkModule</TYPE>
+        <MODEL>PT-IOT-NM-1CE</MODEL>
+        <PORT>
+         <ACL_IN_ID></ACL_IN_ID>
+         <ACL_OUT_ID></ACL_OUT_ID>
+         <ACLv6_IN_ID></ACLv6_IN_ID>
+         <ACLv6_OUT_ID></ACLv6_OUT_ID>
+         <TIMEOUT>14400000</TIMEOUT>
+         <TYPE>eCopperEthernet</TYPE>
+         <POWER>true</POWER>
+         <MEDIATYPE>0</MEDIATYPE>
+         <PINS>false</PINS>
+         <FIBERMULTIMODE>true</FIBERMULTIMODE>
+         <BANDWIDTH>10000</BANDWIDTH>
+         <SPEED>100</SPEED>
+         <FULLDUPLEX>false</FULLDUPLEX>
+         <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+         <AUTONEGOTIATESPEED>true</AUTONEGOTIATESPEED>
+         <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+         <MACADDRESS>0000.0000.0000</MACADDRESS>
+         <BIA>0000.0000.0000</BIA>
+         <CLOCKRATE>2000000</CLOCKRATE>
+         <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+         <DESCRIPTION/>
+         <CHANNEL>0</CHANNEL>
+         <CHANNEL5GHZ>0</CHANNEL5GHZ>
+         <COVERAGERANGE>0</COVERAGERANGE>
+         <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+         <UP_METHOD>5</UP_METHOD>
+         <IP/>
+         <SUBNET/>
+         <PORT_GATEWAY/>
+         <PORT_DNS/>
+         <PORT_DHCP_ENABLE>false</PORT_DHCP_ENABLE>
+         <ND_SUPPRESSED>false</ND_SUPPRESSED>
+         <ND_IPV6_DNS_ADDRESSES/>
+         <PC_FIREWALL>false</PC_FIREWALL>
+         <PC_IPV6_FIREWALL>false</PC_IPV6_FIREWALL>
+         <IPV6_ENABLED>false</IPV6_ENABLED>
+         <IPV6_ADDRESS_AUTOCONFIG>false</IPV6_ADDRESS_AUTOCONFIG>
+         <IPV6_PORT_GATEWAY/>
+         <IPV6_PORT_DNS/>
+         <IPV6_LINK_LOCAL>FE80::290:2BFF:FE47:E545</IPV6_LINK_LOCAL>
+         <IPV6_DEFAULT_LINK_LOCAL>FE80::290:2BFF:FE47:E545</IPV6_DEFAULT_LINK_LOCAL>
+         <IPV6_PORT_DHCP_ENABLED>false</IPV6_PORT_DHCP_ENABLED>
+         <IPV6_ADDRESSES/>
+         <IP_UNNUMBERED/>
+         <DHCP_SERVER_IP>0.0.0.0</DHCP_SERVER_IP>
+        </PORT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+        <MODEL>PT-UNV-PWR-ADAPTER</MODEL>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAAAwAAAC4AUABSAE8ARwBSAEEATQBNAEkATgBHAF8AQwBVAFIAUgBFAE4AVABfAEQASQBSAAAACgAAAAAwAE4AZQB3ACAAUAByAG8AagBlAGMAdAAgACgASgBhAHYAYQBTAGMAcgBpAHAAdAApAAAAMABQAFIATwBHAFIAQQBNAE0ASQBOAEcAXwBDAFUAUgBSAEUATgBUAF8ARgBJAEwARQAAAAoAAAAADgBtAGEAaQBuAC4AagBzAAAALgBQAFIATwBHAFIAQQBNAE0ASQBOAEcAXwBFAEQASQBUAEkATgBHAF8ARABJAFIAAAAKAAAAADAATgBlAHcAIABQAHIAbwBqAGUAYwB0ACAAKABKAGEAdgBhAFMAYwByAGkAcAB0ACk=</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1262.37</X_COORD>
+      <Y_COORD>1229.09</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT081000I6</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:500;cost:40;power source:0;rack units:1;wattage:5;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>0</TEMPLATE_CREATION_TIME>
+     <STARTTIME>730981074730</STARTTIME>
+     <STARTSIMTIME>0</STARTSIMTIME>
+     <USER_APPS>
+      <RUNNING_APPS>
+       <USER_APP>New Project (JavaScript)</USER_APP>
+      </RUNNING_APPS>
+      <DESKTOP_APPS>
+       <application>
+        <project_dir>New Project (JavaScript)</project_dir>
+        <id>net.netacad.cisco.example_desktop</id>
+        <version>1.0</version>
+        <name>Desktop Example</name>
+        <description>Desktop example with desktop GUI app and CLI commands</description>
+        <author>Packet Tracer Team</author>
+        <contact></contact>
+        <language></language>
+        <gui>
+         <name>GUI Example</name>
+         <html>main.html</html>
+         <icon>icon.png</icon>
+         <background>true</background>
+         <on_desktop>true</on_desktop>
+        </gui>
+        <cli>
+         <command>
+          <name>example_cmd</name>
+          <description>Example Command</description>
+         </command>
+         <command>
+          <name>example_cmd2</name>
+          <description>Example Command 2</description>
+         </command>
+        </cli>
+        <auto-install>
+         <device>PC</device>
+         <device>Server</device>
+         <device>Laptop</device>
+         <device>Tablet</device>
+         <device>Smartphone</device>
+         <device>SBC</device>
+         <device>Thing</device>
+        </auto-install>
+        <auto-run>false</auto-run>
+        <kioskMode>false</kioskMode>
+        <desktopTabOverrideName></desktopTabOverrideName>
+       </application>
+      </DESKTOP_APPS>
+     </USER_APPS>
+     <SAVE_REF_ID>save-ref-id:0</SAVE_REF_ID>
+     <SYS_NAME></SYS_NAME>
+     <PTP_ENALBED>0</PTP_ENALBED>
+     <GATEWAY/>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP/>
+     </DHCP_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+       <STANDARD_CHANNEL5G>112</STANDARD_CHANNEL5G>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <GATEWAYV6/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>1E-38-DA-73-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT class="CTextFileContent">
+          <TEXT>var opcObj = {"fr":"45","fs":"50","sr":"45","ss":"50"};
+
+function loop() 
+{
+	/*
+	customWrite(6, opcObj["fr"]);
+	customWrite(7, opcObj["fs"]);
+	customWrite(8, opcObj["sr"]);
+	customWrite(9, opcObj["ss"]);	
+	*/
+	opcObj["fr"] = customRead(6);
+	opcObj["fs"] = customRead(7);
+	opcObj["sr"] = customRead(8);
+	opcObj["ss"] = customRead(9);
+	var rotateForearm = "arm.rotateForearm("+opcObj["fr"]+","+opcObj["fs"]+")";
+	var rotateShoulder = "arm.rotateShoulder("+opcObj["sr"]+","+opcObj["ss"]+")";
+	
+	Serial.println(rotateForearm);
+	Serial.println(rotateShoulder);
+	GUI.update('eval',rotateForearm);
+	GUI.update('eval',rotateShoulder);
+	delay(3000);
+}
+
+/*
+OPC.onReceive = function(data) {
+	Serial.println("onReceive=" + data);
+	var jsonObj = JSON.parse(data);
+	for (var propName in jsonObj) {
+		opcObj[propName] = jsonObj[propName];
+	}
+	var rotateForearm = "arm.rotateForearm("+opcObj["fr"]+","+opcObj["fs"]+")";
+	var rotateShoulder = "arm.rotateShoulder("+opcObj["sr"]+","+opcObj["ss"]+")";
+	
+	Serial.println(rotateForearm);
+	Serial.println(rotateShoulder);
+	GUI.update('eval',rotateForearm);
+	GUI.update('eval',rotateShoulder);
+}
+*/
+
+function setup() {
+	GUI.setup();
+	CLI.setup();
+}
+
+
+function handleOnReceive(ip, port, data)
+{
+	GUI.update('eval', data);
+}
+
+
+function guiEvent(type, args) {
+
+}
+
+function cliEvent(type, args) {
+
+}
+</TEXT>
+         </FILE_CONTENT>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>Blink (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>function setup() {
+	pinMode(1, OUTPUT);
+	Serial.println("Blinking");
+}
+
+function loop() {
+	digitalWrite(1, HIGH);
+	delay(1000);
+	digitalWrite(1, LOW);
+	delay(500);
+}
+</TEXT>
+           </FILE_CONTENT>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>2</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>function setup() {
+	pinMode(1, OUTPUT);
+	Serial.println("Blinking");
+}
+
+function loop() {
+	digitalWrite(1, HIGH);
+	delay(1000);
+	digitalWrite(1, LOW);
+	delay(500);
+}
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>3</FILE_NUMBER>
+           <NAME>New Project (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>var opcObj = {"fr":"45","fs":"50","sr":"45","ss":"50"};
+
+function loop() 
+{
+	/*
+	customWrite(6, opcObj["fr"]);
+	customWrite(7, opcObj["fs"]);
+	customWrite(8, opcObj["sr"]);
+	customWrite(9, opcObj["ss"]);	
+	*/
+	opcObj["fr"] = customRead(6);
+	opcObj["fs"] = customRead(7);
+	opcObj["sr"] = customRead(8);
+	opcObj["ss"] = customRead(9);
+	var rotateForearm = "arm.rotateForearm("+opcObj["fr"]+","+opcObj["fs"]+")";
+	var rotateShoulder = "arm.rotateShoulder("+opcObj["sr"]+","+opcObj["ss"]+")";
+	
+	Serial.println(rotateForearm);
+	Serial.println(rotateShoulder);
+	GUI.update('eval',rotateForearm);
+	GUI.update('eval',rotateShoulder);
+	delay(3000);
+}
+
+/*
+OPC.onReceive = function(data) {
+	Serial.println("onReceive=" + data);
+	var jsonObj = JSON.parse(data);
+	for (var propName in jsonObj) {
+		opcObj[propName] = jsonObj[propName];
+	}
+	var rotateForearm = "arm.rotateForearm("+opcObj["fr"]+","+opcObj["fs"]+")";
+	var rotateShoulder = "arm.rotateShoulder("+opcObj["sr"]+","+opcObj["ss"]+")";
+	
+	Serial.println(rotateForearm);
+	Serial.println(rotateShoulder);
+	GUI.update('eval',rotateForearm);
+	GUI.update('eval',rotateShoulder);
+}
+*/
+
+function setup() {
+	GUI.setup();
+	CLI.setup();
+}
+
+
+function handleOnReceive(ip, port, data)
+{
+	GUI.update('eval', data);
+}
+
+
+function guiEvent(type, args) {
+
+}
+
+function cliEvent(type, args) {
+
+}
+</TEXT>
+           </FILE_CONTENT>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>9</FILE_NUMBER>
+             <NAME>[gui]icon.png</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>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</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+            <FILE class="CFile">
+             <FILE_NUMBER>6</FILE_NUMBER>
+             <NAME>[gui]main.html</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>&lt;html>
+	&lt;script src="script.js">&lt;/script>
+    &lt;body>
+        &lt;div class="arm">                
+            &lt;div id="header" class="header">
+                &lt;div id="shoulder" class="shoulder">
+                    &lt;div id="forearm" class="welder">&lt;/div>                
+                &lt;/div>
+            &lt;/div>            
+        &lt;/div>
+        &lt;script>(()=>{"use strict";var e={426:(e,n,t)=>{t.d(n,{Z:()=>c});var r=t(81),a=t.n(r),o=t(645),A=t.n(o)()(a());A.push([e.id,".arm{\n    position: relative;\n    width: 400px;\n    height: 300px;                \n    \n}\n\n.header {\n    position: absolute;\n    left:100px;\n    /* webpack doens't base64 below */\n    /* background: url('./images/arm-header.png'); */\n}\n.shoulder{\n    position: absolute;\n    left: 85px;\n    top: 55px;\n    transform-origin: 70% 10%;                \n}\n.welder  {\n    position:absolute;\n    left: 5px;\n    top: 100px;\n    transform-origin: 50% 0%;\n}\n",""]);const c=A},645:e=>{e.exports=function(e){var n=[];return n.toString=function(){return this.map((function(n){var t="",r=void 0!==n[5];return n[4]&amp;&amp;(t+="@supports (".concat(n[4],") {")),n[2]&amp;&amp;(t+="@media ".concat(n[2]," {")),r&amp;&amp;(t+="@layer".concat(n[5].length>0?" ".concat(n[5]):""," {")),t+=e(n),r&amp;&amp;(t+="}"),n[2]&amp;&amp;(t+="}"),n[4]&amp;&amp;(t+="}"),t})).join("")},n.i=function(e,t,r,a,o){"string"==typeof e&amp;&amp;(e=[[null,e,void 0]]);var A={};if(r)for(var c=0;c&lt;this.length;c++){var s=this[c][0];null!=s&amp;&amp;(A[s]=!0)}for(var i=0;i&lt;e.length;i++){var g=[].concat(e[i]);r&amp;&amp;A[g[0]]||(void 0!==o&amp;&amp;(void 0===g[5]||(g[1]="@layer".concat(g[5].length>0?" ".concat(g[5]):""," {").concat(g[1],"}")),g[5]=o),t&amp;&amp;(g[2]?(g[1]="@media ".concat(g[2]," {").concat(g[1],"}"),g[2]=t):g[2]=t),a&amp;&amp;(g[4]?(g[1]="@supports (".concat(g[4],") {").concat(g[1],"}"),g[4]=a):g[4]="".concat(a)),n.push(g))}},n}},81:e=>{e.exports=function(e){return e[1]}},379:e=>{var n=[];function t(e){for(var t=-1,r=0;r&lt;n.length;r++)if(n[r].identifier===e){t=r;break}return t}function r(e,r){for(var o={},A=[],c=0;c&lt;e.length;c++){var s=e[c],i=r.base?s[0]+r.base:s[0],g=o[i]||0,u="".concat(i," ").concat(g);o[i]=g+1;var l=t(u),d={css:s[1],media:s[2],sourceMap:s[3],supports:s[4],layer:s[5]};if(-1!==l)n[l].references++,n[l].updater(d);else{var p=a(d,r);r.byIndex=c,n.splice(c,0,{identifier:u,updater:p,references:1})}A.push(u)}return A}function a(e,n){var t=n.domAPI(n);return t.update(e),function(n){if(n){if(n.css===e.css&amp;&amp;n.media===e.media&amp;&amp;n.sourceMap===e.sourceMap&amp;&amp;n.supports===e.supports&amp;&amp;n.layer===e.layer)return;t.update(e=n)}else t.remove()}}e.exports=function(e,a){var o=r(e=e||[],a=a||{});return function(e){e=e||[];for(var A=0;A&lt;o.length;A++){var c=t(o[A]);n[c].references--}for(var s=r(e,a),i=0;i&lt;o.length;i++){var g=t(o[i]);0===n[g].references&amp;&amp;(n[g].updater(),n.splice(g,1))}o=s}}},569:e=>{var n={};e.exports=function(e,t){var r=function(e){if(void 0===n[e]){var t=document.querySelector(e);if(window.HTMLIFrameElement&amp;&amp;t instanceof window.HTMLIFrameElement)try{t=t.contentDocument.head}catch(e){t=null}n[e]=t}return n[e]}(e);if(!r)throw new Error("Couldn't find a style target. This probably means that the value for the 'insert' parameter is invalid.");r.appendChild(t)}},216:e=>{e.exports=function(e){var n=document.createElement("style");return e.setAttributes(n,e.attributes),e.insert(n,e.options),n}},565:(e,n,t)=>{e.exports=function(e){var n=t.nc;n&amp;&amp;e.setAttribute("nonce",n)}},795:e=>{e.exports=function(e){if("undefined"==typeof document)return{update:function(){},remove:function(){}};var n=e.insertStyleElement(e);return{update:function(t){!function(e,n,t){var r="";t.supports&amp;&amp;(r+="@supports (".concat(t.supports,") {")),t.media&amp;&amp;(r+="@media ".concat(t.media," {"));var a=void 0!==t.layer;a&amp;&amp;(r+="@layer".concat(t.layer.length>0?" ".concat(t.layer):""," {")),r+=t.css,a&amp;&amp;(r+="}"),t.media&amp;&amp;(r+="}"),t.supports&amp;&amp;(r+="}");var o=t.sourceMap;o&amp;&amp;"undefined"!=typeof btoa&amp;&amp;(r+="\n/*# sourceMappingURL=data:application/json;base64,".concat(btoa(unescape(encodeURIComponent(JSON.stringify(o))))," */")),n.styleTagTransform(r,e,n.options)}(n,e,t)},remove:function(){!function(e){if(null===e.parentNode)return!1;e.parentNode.removeChild(e)}(n)}}}},589:e=>{e.exports=function(e,n){if(n.styleSheet)n.styleSheet.cssText=e;else{for(;n.firstChild;)n.removeChild(n.firstChild);n.appendChild(document.createTextNode(e))}}}},n={};function t(r){var a=n[r];if(void 0!==a)return a.exports;var o=n[r]={id:r,exports:{}};return e[r](o,o.exports,t),o.exports}t.n=e=>{var n=e&amp;&amp;e.__esModule?()=>e.default:()=>e;return t.d(n,{a:n}),n},t.d=(e,n)=>{for(var r in n)t.o(n,r)&amp;&amp;!t.o(e,r)&amp;&amp;Object.defineProperty(e,r,{enumerable:!0,get:n[r]})},t.o=(e,n)=>Object.prototype.hasOwnProperty.call(e,n),t.r=e=>{"undefined"!=typeof Symbol&amp;&amp;Symbol.toStringTag&amp;&amp;Object.defineProperty(e,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(e,"__esModule",{value:!0})},t.nc=void 0,(()=>{var e={};t.r(e),t.d(e,{rotateForearm:()=>w,rotateShoulder:()=>m});var n=t(379),r=t.n(n),a=t(795),o=t.n(a),A=t(569),c=t.n(A),s=t(565),i=t.n(s),g=t(216),u=t.n(g),l=t(589),d=t.n(l),p=t(426),f={};function m(e,n){document.getElementById("shoulder"),v(shoulder,e,n)}function w(e,n){v(document.getElementById("forearm"),e,n)}function v(e,n,t){var r=function(e){const n=window.getComputedStyle(e).getPropertyValue("transform"),t=new DOMMatrix(n);return Math.round(Math.atan2(t.b,t.a)*(180/Math.PI))}(e);const a=[{transform:`rotate(${r}deg)`},{transform:`rotate(${n}deg)`}],o={duration:60/t*1e3,easing:"linear",fill:"forwards"};e.animate(a,o)}f.styleTagTransform=d(),f.setAttributes=i(),f.insert=c().bind(null,"head"),f.domAPI=o(),f.insertStyleElement=u(),r()(p.Z,f),p.Z&amp;&amp;p.Z.locals&amp;&amp;p.Z.locals,document.getElementById("header").appendChild(new Image).src="data:image/png;base64,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",document.getElementById("shoulder").appendChild(new Image).src="data:image/png;base64,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",document.getElementById("forearm").appendChild(new Image).src="data:image/png;base64,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",window.arm=e})()})();&lt;/script>
+    &lt;/body>
+&lt;/html></TEXT>
+             </FILE_CONTENT>
+            </FILE>
+            <FILE class="CFile">
+             <FILE_NUMBER>7</FILE_NUMBER>
+             <NAME>[gui]script.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>function onLoad() {
+	guiEvent('onLoad');
+}
+
+function action() {
+	guiEvent('click', 'some arg');
+}
+
+function update(type, args) {
+	console.log("eval args2222 " + args);
+	eval(args);
+}
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+            <FILE class="CFile">
+             <FILE_NUMBER>4</FILE_NUMBER>
+             <NAME>app_manifest.xml</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>&lt;application>
+  
+  &lt;!-- Unique ID to identify this project,
+       recommend using reverse domain name notation -->
+  &lt;id>net.netacad.cisco.example_desktop&lt;/id>
+  &lt;version>1.0&lt;/version>
+  &lt;name>Desktop Example&lt;/name>
+  
+  &lt;!-- Optional tags -->
+  &lt;description>Desktop example with desktop GUI app and CLI commands&lt;/description>
+  &lt;author>Packet Tracer Team&lt;/author>
+  &lt;contact/>
+  
+  &lt;!-- If this app is to be installed on the Desktop,
+       provide this tag and its children. -->
+  &lt;gui>
+    &lt;name>GUI Example&lt;/name>
+    &lt;html>main.html&lt;/html>
+    &lt;icon>icon.png&lt;/icon>
+    &lt;background>true&lt;/background>
+  &lt;/gui>
+  
+  &lt;!-- If this app is to provide commands in the Command Prompt,
+       provide this tag and a command tag for each command. -->
+  &lt;cli>
+    &lt;command>
+      &lt;name>example_cmd&lt;/name>
+      &lt;description>Example Command&lt;/description>
+    &lt;/command>
+    &lt;command>
+      &lt;name>example_cmd2&lt;/name>
+      &lt;description>Example Command 2&lt;/description>
+    &lt;/command>
+  &lt;/cli>
+  
+  &lt;!-- If this app is to be exported, you can specify the devices
+       that this app will automatically installed on.
+	   Either the gui or cli tag is required.
+	   Possible values are PC, Laptop, Server, Tablet, Smartphone, SBC, Thing. -->
+  &lt;auto-install>
+    &lt;device>PC&lt;/device>
+    &lt;device>Laptop&lt;/device>
+    &lt;device>Server&lt;/device>
+    &lt;device>Tablet&lt;/device>
+    &lt;device>Smartphone&lt;/device>
+    &lt;device>SBC&lt;/device>
+    &lt;device>Thing&lt;/device>
+  &lt;/auto-install>
+  
+&lt;/application></TEXT>
+             </FILE_CONTENT>
+            </FILE>
+            <FILE class="CFile">
+             <FILE_NUMBER>5</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>var opcObj = {"fr":"45","fs":"50","sr":"45","ss":"50"};
+
+function loop() 
+{
+	/*
+	customWrite(6, opcObj["fr"]);
+	customWrite(7, opcObj["fs"]);
+	customWrite(8, opcObj["sr"]);
+	customWrite(9, opcObj["ss"]);	
+	*/
+	opcObj["fr"] = customRead(6);
+	opcObj["fs"] = customRead(7);
+	opcObj["sr"] = customRead(8);
+	opcObj["ss"] = customRead(9);
+	var rotateForearm = "arm.rotateForearm("+opcObj["fr"]+","+opcObj["fs"]+")";
+	var rotateShoulder = "arm.rotateShoulder("+opcObj["sr"]+","+opcObj["ss"]+")";
+	
+	Serial.println(rotateForearm);
+	Serial.println(rotateShoulder);
+	GUI.update('eval',rotateForearm);
+	GUI.update('eval',rotateShoulder);
+	delay(3000);
+}
+
+/*
+OPC.onReceive = function(data) {
+	Serial.println("onReceive=" + data);
+	var jsonObj = JSON.parse(data);
+	for (var propName in jsonObj) {
+		opcObj[propName] = jsonObj[propName];
+	}
+	var rotateForearm = "arm.rotateForearm("+opcObj["fr"]+","+opcObj["fs"]+")";
+	var rotateShoulder = "arm.rotateShoulder("+opcObj["sr"]+","+opcObj["ss"]+")";
+	
+	Serial.println(rotateForearm);
+	Serial.println(rotateShoulder);
+	GUI.update('eval',rotateForearm);
+	GUI.update('eval',rotateShoulder);
+}
+*/
+
+function setup() {
+	GUI.setup();
+	CLI.setup();
+}
+
+
+function handleOnReceive(ip, port, data)
+{
+	GUI.update('eval', data);
+}
+
+
+function guiEvent(type, args) {
+
+}
+
+function cliEvent(type, args) {
+
+}
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>9</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>User:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>0</FILE_COUNTER>
+         <CAPACITY>10000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <THING_MODEL>
+      <NAME></NAME>
+      <WIDTH>0</WIDTH>
+      <HEIGHT>0</HEIGHT>
+      <ANALOG_SLOTS_COUNT>4</ANALOG_SLOTS_COUNT>
+      <DIGITAL_SLOTS_COUNT>6</DIGITAL_SLOTS_COUNT>
+      <SPECIFICATIONS>&lt;html contenteditable="true">&lt;head>&lt;/head>&lt;body>Add specifications here.&lt;/body>&lt;/html></SPECIFICATIONS>
+      <ROTATION>0</ROTATION>
+      <SCALE>1</SCALE>
+      <PROXY_WIDTH>595</PROXY_WIDTH>
+      <PROXY_HEIGHT>498</PROXY_HEIGHT>
+      <IS_END_DEVICE>TRUE</IS_END_DEVICE>
+      <IS_DESKTOP_AVAILABLE>TRUE</IS_DESKTOP_AVAILABLE>
+      <IS_WORKSPACE_USERAPP>TRUE</IS_WORKSPACE_USERAPP>
+      <IS_TRANSPARENT_BACKGROUND>TRUE</IS_TRANSPARENT_BACKGROUND>
+      <WORKSPACE_OFFSET_X>0</WORKSPACE_OFFSET_X>
+      <WORKSPACE_OFFSET_Y>0</WORKSPACE_OFFSET_Y>
+      <WORKSPACE_Z_LEVEL>10000</WORKSPACE_Z_LEVEL>
+      <WORKSPACE_USERAPP_SHOW_IN_LOGICAL_VIEW>TRUE</WORKSPACE_USERAPP_SHOW_IN_LOGICAL_VIEW>
+      <WORKSPACE_USERAPP_SHOW_IN_PHYSICAL_VIEW>TRUE</WORKSPACE_USERAPP_SHOW_IN_PHYSICAL_VIEW>
+      <SUBCOMPONENTS>
+       <SUBCOMPONENT>
+        <NAME>component 1</NAME>
+        <X>0</X>
+        <Y>0</Y>
+        <Z_ORDER>1</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>0</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>-1</SLOT_NUM>
+        <SLOT_TYPE>0</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES/>
+       </SUBCOMPONENT>
+      </SUBCOMPONENTS>
+      <RULES/>
+     </THING_MODEL>
+     <IOE_CLIENT>
+      <CLIENT_MODE>NO_SERVER</CLIENT_MODE>
+      <SERVER_ADDRESS></SERVER_ADDRESS>
+      <USERNAME></USERNAME>
+      <PASSWORD></PASSWORD>
+     </IOE_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME></NAME>
+      <MAIL_ID></MAIL_ID>
+      <POP3_SERVER></POP3_SERVER>
+      <SMTP_SERVER></SMTP_SERVER>
+      <USER></USER>
+      <PASSWORD></PASSWORD>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+     <NTP_SERVER>
+      <ENABLED>0</ENABLED>
+      <ENABLED_SERVER_AUTHENTICATE>0</ENABLED_SERVER_AUTHENTICATE>
+      <KEY>0</KEY>
+      <MD5PASSWORD></MD5PASSWORD>
+      <SERVER_IP_LIST/>
+     </NTP_SERVER>
+     <PTP_PROCESS>
+      <PTP_CLOCK_ID>0xff:FF:FF:FF:FE:FF:FF:F0</PTP_CLOCK_ID>
+      <PTP_CLOCK_TIME>1301456757433</PTP_CLOCK_TIME>
+     </PTP_PROCESS>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL>{a8cf3927-d4d7-4b4e-a7d1-03aeff35b246},{e0a54403-72ba-4a9b-b88e-3c9574cb7c5a},{f02a1e60-d744-42e0-8d0f-a95245884432},{b61cd8e6-50da-40a9-b5a5-5c871401b21d}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.214286</X_PN>
+      <Y_PN>0.0771749</Y_PN>
+      <X>738</X>
+      <Y>165</Y>
+      <SLOT>0</SLOT>
+      <SUBSLOT>0</SUBSLOT>
+      <PARENT_PATH>{a8cf3927-d4d7-4b4e-a7d1-03aeff35b246},{e0a54403-72ba-4a9b-b88e-3c9574cb7c5a},{f02a1e60-d744-42e0-8d0f-a95245884432}</PARENT_PATH>
+      <CONTAINER_ID>{f02a1e60-d744-42e0-8d0f-a95245884432}</CONTAINER_ID>
+      <ICP_CONTAINER_SCENE_X>0</ICP_CONTAINER_SCENE_X>
+      <ICP_CONTAINER_SCENE_Y>0</ICP_CONTAINER_SCENE_Y>
+      <ORIGINAL_DEVICE_UUID>{226eabf3-06ba-1b48-8199-048fb099aa77}</ORIGINAL_DEVICE_UUID>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

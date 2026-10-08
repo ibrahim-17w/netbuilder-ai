@@ -1,0 +1,1500 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="" model="Meraki-Server">MerakiServer</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtHostModule</TYPE>
+       <MODULE>
+        <TYPE>ePtHostModule</TYPE>
+        <MODEL>PT-HOST-NM-1CFE</MODEL>
+        <PORT>
+         <TYPE>eCopperFastEthernet</TYPE>
+         <POWER>true</POWER>
+         <MEDIATYPE>0</MEDIATYPE>
+         <PINS>false</PINS>
+         <BANDWIDTH>100000</BANDWIDTH>
+         <FULLDUPLEX>true</FULLDUPLEX>
+         <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+         <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+         <MACADDRESS>0000.0000.0000</MACADDRESS>
+         <BIA>0000.0000.0000</BIA>
+         <CLOCKRATE>2000000</CLOCKRATE>
+         <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+         <DESCRIPTION/>
+         <CHANNEL>0</CHANNEL>
+         <CHANNEL5GHZ>0</CHANNEL5GHZ>
+         <COVERAGERANGE>0</COVERAGERANGE>
+         <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+         <UP_METHOD>5</UP_METHOD>
+         <IP/>
+         <SUBNET/>
+         <PORT_GATEWAY/>
+         <PORT_DNS/>
+         <PORT_DHCP_ENABLE>false</PORT_DHCP_ENABLE>
+         <ND_SUPPRESSED>false</ND_SUPPRESSED>
+         <ND_IPV6_DNS_ADDRESSES/>
+         <TIMEOUT>14400000</TIMEOUT>
+         <PC_FIREWALL>false</PC_FIREWALL>
+         <PC_IPV6_FIREWALL>false</PC_IPV6_FIREWALL>
+         <IPV6_ENABLED>true</IPV6_ENABLED>
+         <IPV6_ADDRESS_AUTOCONFIG>false</IPV6_ADDRESS_AUTOCONFIG>
+         <IPV6_PORT_GATEWAY/>
+         <IPV6_PORT_DNS/>
+         <IPV6_LINK_LOCAL>FE80::203:E4FF:FE93:27E6</IPV6_LINK_LOCAL>
+         <IPV6_DEFAULT_LINK_LOCAL>FE80::203:E4FF:FE93:27E6</IPV6_DEFAULT_LINK_LOCAL>
+         <IPV6_PORT_DHCP_ENABLED>false</IPV6_PORT_DHCP_ENABLED>
+         <IPV6_ADDRESSES/>
+         <IP_UNNUMBERED/>
+         <DHCP_SERVER_IP>0.0.0.0</DHCP_SERVER_IP>
+        </PORT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtHostModule</TYPE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAAAA==</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1269.51</X_COORD>
+      <Y_COORD>1236.93</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT0810EMQA-</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:300000;cost:250;power source:1;rack units:2;wattage:5;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>0</TEMPLATE_CREATION_TIME>
+     <STARTTIME>1517565766000</STARTTIME>
+     <STARTSIMTIME>0</STARTSIMTIME>
+     <USER_APPS>
+      <RUNNING_APPS/>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SAVE_REF_ID>save-ref-id:0</SAVE_REF_ID>
+     <SYS_NAME></SYS_NAME>
+     <GATEWAY>1.1.1.1</GATEWAY>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME></NAME>
+      <MAIL_ID></MAIL_ID>
+      <POP3_SERVER></POP3_SERVER>
+      <SMTP_SERVER></SMTP_SERVER>
+      <USER></USER>
+      <PASSWORD></PASSWORD>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>Default</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+       <STANDARD_CHANNEL5G>112</STANDARD_CHANNEL5G>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>Default</NAME>
+        <SSID>Default</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>Default</NAME>
+        <SSID>Default</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <CELLULAR_CLIENT>
+      <WIRELESS_CLIENT>
+       <WIRELESS_COMMON>
+        <NETWORK_MODE>7</NETWORK_MODE>
+        <SSID>ptcellular</SSID>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <WIDE_CHANNEL>0</WIDE_CHANNEL>
+        <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+        <STANDARD_CHANNEL5G>112</STANDARD_CHANNEL5G>
+       </WIRELESS_COMMON>
+       <PROFILES>
+        <WIRELESS_PROFILE>
+         <NAME>ptcellular</NAME>
+         <SSID>ptcellular</SSID>
+         <NETWORK_TYPE>7</NETWORK_TYPE>
+         <RADIO_BAND>0</RADIO_BAND>
+         <AUTHEN_TYPE>0</AUTHEN_TYPE>
+         <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+         <WEP_KEY></WEP_KEY>
+         <WPA_EAP_USERID></WPA_EAP_USERID>
+         <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+         <DHCP_ENABLED>1</DHCP_ENABLED>
+         <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+         <IP_ADDRESS/>
+         <SUBNET_MASK/>
+         <DEFAULT_GATEWAY/>
+         <DNS/>
+         <CHANNEL>1</CHANNEL>
+         <VLAN>1</VLAN>
+        </WIRELESS_PROFILE>
+       </PROFILES>
+       <CURRENT_PROFILE>
+        <WIRELESS_PROFILE>
+         <NAME>ptcellular</NAME>
+         <SSID>ptcellular</SSID>
+         <NETWORK_TYPE>7</NETWORK_TYPE>
+         <RADIO_BAND>0</RADIO_BAND>
+         <AUTHEN_TYPE>0</AUTHEN_TYPE>
+         <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+         <WEP_KEY></WEP_KEY>
+         <WPA_EAP_USERID></WPA_EAP_USERID>
+         <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+         <DHCP_ENABLED>1</DHCP_ENABLED>
+         <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+         <IP_ADDRESS/>
+         <SUBNET_MASK/>
+         <DEFAULT_GATEWAY/>
+         <DNS/>
+         <CHANNEL>1</CHANNEL>
+         <VLAN>1</VLAN>
+        </WIRELESS_PROFILE>
+       </CURRENT_PROFILE>
+      </WIRELESS_CLIENT>
+      <PROFILES/>
+      <CURRENT_PROFILE_NUM>0</CURRENT_PROFILE_NUM>
+      <CO_USERNAME>CentralOffice</CO_USERNAME>
+      <CO_PASSWORD>cisco</CO_PASSWORD>
+      <ACTIVATED>0</ACTIVATED>
+     </CELLULAR_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP/>
+     </DHCP_CLIENT>
+     <ACL_PROCESS>
+      <ACLS/>
+     </ACL_PROCESS>
+     <ACL_V6_PROCESS>
+      <ACLS/>
+     </ACL_V6_PROCESS>
+     <GATEWAYV6/>
+     <ISATAP_ENABLED>false</ISATAP_ENABLED>
+     <ISATAP_ROUTER/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>1B-AA-43-E5-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>1</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD>
+       <PORT_DATA_PAIR>
+        <PORT_NAME>FastEthernet0</PORT_NAME>
+        <SERVER_ROUTER_PORT_DATA>
+         <ADV_SEND_ADVERTISEMENT>1</ADV_SEND_ADVERTISEMENT>
+         <MAX_RTR_ADV_INTERVAL>600</MAX_RTR_ADV_INTERVAL>
+         <MIN_RTR_ADV_INTERVAL>198</MIN_RTR_ADV_INTERVAL>
+         <ADV_MANAGED_FLAG>1</ADV_MANAGED_FLAG>
+         <ADV_OTHER_CONFIG_FLAG>0</ADV_OTHER_CONFIG_FLAG>
+         <ADV_LINK_MTU>1500</ADV_LINK_MTU>
+         <ADV_REACHABLE_TIME>0</ADV_REACHABLE_TIME>
+         <ADV_RESTRANS_TIMER>0</ADV_RESTRANS_TIMER>
+         <ADV_CUR_HOP_LIMIT>64</ADV_CUR_HOP_LIMIT>
+         <ADV_DEFAULT_LIFETIME>1800</ADV_DEFAULT_LIFETIME>
+         <ENABLED_ROUTER>1</ENABLED_ROUTER>
+        </SERVER_ROUTER_PORT_DATA>
+       </PORT_DATA_PAIR>
+      </SERVER_ROUTER_PORT_DATA_HEAD>
+     </NDV6>
+     <NF_COLLECTOR>
+      <ENABLED>0</ENABLED>
+     </NF_COLLECTOR>
+     <VOIP_TFTP_IP>
+      <TFTP_IP>0.0.0.0</TFTP_IP>
+      <IS_DEFAULT_TFTP>1</IS_DEFAULT_TFTP>
+     </VOIP_TFTP_IP>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Desktop:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT class="CLinksysFirmwareUpgPage">
+          <TEXT></TEXT>
+          <Firmware_Version>v1.1_1.51.2</Firmware_Version>
+         </FILE_CONTENT>
+         <FILES>
+          <FILE class="CFile">
+           <FILE_NUMBER>3</FILE_NUMBER>
+           <NAME>HomeRouter-PT-AC_v1.04.16_fw,0.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CLinksysFirmwareUpgPage">
+            <TEXT></TEXT>
+            <Firmware_Version>v1.04.16</Firmware_Version>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>4</FILE_NUMBER>
+           <NAME>HomeRouter-PT-AC_v2.0_10.1.17_fw,0.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CLinksysFirmwareUpgPage">
+            <TEXT></TEXT>
+            <Firmware_Version>v2.0_10.1.17</Firmware_Version>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>WRT300N-v1.03.6_fw,0.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CLinksysFirmwareUpgPage">
+            <TEXT></TEXT>
+            <Firmware_Version>v1.03.6</Firmware_Version>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>2</FILE_NUMBER>
+           <NAME>WRT300N-v1.1_1.51.2_fw,0.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CLinksysFirmwareUpgPage">
+            <TEXT></TEXT>
+            <Firmware_Version>v1.1_1.51.2</Firmware_Version>
+           </FILE_CONTENT>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>4</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>0</FILE_COUNTER>
+         <CAPACITY>1000000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>c:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT class="CTextFileContent">
+          <TEXT>This is a sample text file</TEXT>
+         </FILE_CONTENT>
+         <FILES>
+          <FILE class="CFile">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>sampleFile.txt</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>This is a sample text file</TEXT>
+           </FILE_CONTENT>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>1</FILE_COUNTER>
+         <CAPACITY>1000000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>ftp:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT class="CIosFileContent">
+          <DEVICE_TYPE>Switch</DEVICE_TYPE>
+          <SET_NAME>pt_12.1_EA4</SET_NAME>
+         </FILE_CONTENT>
+         <FILES>
+          <FILE class="CFile">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>asa842-k8.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CASAFileContent">
+            <DEVICE_TYPE>ASA</DEVICE_TYPE>
+            <SET_NAME>5505_8.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>2</FILE_NUMBER>
+           <NAME>asa923-k8.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CASAFileContent">
+            <DEVICE_TYPE>ASA</DEVICE_TYPE>
+            <SET_NAME>5505_9.2</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>3</FILE_NUMBER>
+           <NAME>c1841-advipservicesk9-mz.124-15.T1.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>1841_advip_12.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>4</FILE_NUMBER>
+           <NAME>c1841-ipbase-mz.123-14.T7.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>1841_12.3</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>5</FILE_NUMBER>
+           <NAME>c1841-ipbasek9-mz.124-12.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>1841_12.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>6</FILE_NUMBER>
+           <NAME>c1900-universalk9-mz.SPA.155-3.M4a.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>1900_foundation_suite_15.3</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>7</FILE_NUMBER>
+           <NAME>c2600-advipservicesk9-mz.124-15.T1.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>2600_advip_12.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>8</FILE_NUMBER>
+           <NAME>c2600-i-mz.122-28.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>2600_12.2</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>9</FILE_NUMBER>
+           <NAME>c2600-ipbasek9-mz.124-8.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>2600_12.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>10</FILE_NUMBER>
+           <NAME>c2800nm-advipservicesk9-mz.124-15.T1.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>2800_advip_12.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>11</FILE_NUMBER>
+           <NAME>c2800nm-advipservicesk9-mz.151-4.M4.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>2800_advip_15.1</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>12</FILE_NUMBER>
+           <NAME>c2800nm-ipbase-mz.123-14.T7.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>2800_12.3</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>13</FILE_NUMBER>
+           <NAME>c2800nm-ipbasek9-mz.124-8.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>2800_12.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>14</FILE_NUMBER>
+           <NAME>c2900-universalk9-mz.SPA.155-3.M4a.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>2900_foundation_suite_15.3</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>15</FILE_NUMBER>
+           <NAME>c2950-i6q4l2-mz.121-22.EA4.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Switch</DEVICE_TYPE>
+            <SET_NAME>2950_12.1_EA4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>16</FILE_NUMBER>
+           <NAME>c2950-i6q4l2-mz.121-22.EA8.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Switch</DEVICE_TYPE>
+            <SET_NAME>2950_12.1_EA8</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>17</FILE_NUMBER>
+           <NAME>c2960-lanbase-mz.122-25.FX.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Switch</DEVICE_TYPE>
+            <SET_NAME>2960_12.2_FX</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>18</FILE_NUMBER>
+           <NAME>c2960-lanbase-mz.122-25.SEE1.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Switch</DEVICE_TYPE>
+            <SET_NAME>2960_12.2_SEE1</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>19</FILE_NUMBER>
+           <NAME>c2960-lanbasek9-mz.150-2.SE4.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Switch</DEVICE_TYPE>
+            <SET_NAME>2960_15.0_SE4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>20</FILE_NUMBER>
+           <NAME>c3560-advipservicesk9-mz.122-37.SE1.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>MultiLayerSwitch</DEVICE_TYPE>
+            <SET_NAME>3560_advip_12.2</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>21</FILE_NUMBER>
+           <NAME>c3560-advipservicesk9-mz.122-46.SE.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>MultiLayerSwitch</DEVICE_TYPE>
+            <SET_NAME>3560_advip_12.2_46</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>22</FILE_NUMBER>
+           <NAME>c800-universalk9-mz.SPA.152-4.M4.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>800_universal_base_15.2</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>23</FILE_NUMBER>
+           <NAME>c800-universalk9-mz.SPA.154-3.M6a.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>800_universal_base_15.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>24</FILE_NUMBER>
+           <NAME>cat3k_caa-universalk9.16.03.02.SPA.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>MultiLayerSwitch</DEVICE_TYPE>
+            <SET_NAME>3650_daneli_16.3.2</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>25</FILE_NUMBER>
+           <NAME>cgr1000-universalk9-mz.SPA.154-2.CG</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>1240_universal_15.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>26</FILE_NUMBER>
+           <NAME>cgr1000-universalk9-mz.SPA.156-3.CG</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>1240_universal_15.6.3</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>27</FILE_NUMBER>
+           <NAME>ir800-universalk9-bundle.SPA.156-3.M.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosBundleFileContent">
+            <FILE_SIZE>160968869</FILE_SIZE>
+            <HYPERVISOR_NAME>ir800-hv.srp.SPA.2.5.7</HYPERVISOR_NAME>
+            <HYPERVISOR_SIZE>25094997</HYPERVISOR_SIZE>
+            <IOS_FILE_NAME>ir800-universalk9-mz.SPA.156-3.M</IOS_FILE_NAME>
+            <FILE_CONTENT class="CIosFileContent">
+             <DEVICE_TYPE>Router</DEVICE_TYPE>
+             <SET_NAME>829_universal_15.6</SET_NAME>
+            </FILE_CONTENT>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>28</FILE_NUMBER>
+           <NAME>ir800-universalk9-mz.SPA.155-3.M</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>829_universal_15.5</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>29</FILE_NUMBER>
+           <NAME>ir800-universalk9-mz.SPA.156-3.M</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>829_universal_15.6</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>30</FILE_NUMBER>
+           <NAME>ir800_yocto-1.7.2.tar</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CPaasFileContent">
+            <VERSION></VERSION>
+            <MANIFEST_AUTHOR_LINK></MANIFEST_AUTHOR_LINK>
+            <MANIFEST_AUTHOR_NAME></MANIFEST_AUTHOR_NAME>
+            <MANIFEST_ID></MANIFEST_ID>
+            <MANIFEST_DESCRIPTION></MANIFEST_DESCRIPTION>
+            <MANIFEST_NAME></MANIFEST_NAME>
+            <MANIFEST_VERSION></MANIFEST_VERSION>
+            <MANIFEST_APP_TYPE></MANIFEST_APP_TYPE>
+            <CODE></CODE>
+            <PYTHON>false</PYTHON>
+            <YOCTO>true</YOCTO>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>31</FILE_NUMBER>
+           <NAME>ir800_yocto-1.7.2_python-2.7.3.tar</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CPaasFileContent">
+            <VERSION></VERSION>
+            <MANIFEST_AUTHOR_LINK></MANIFEST_AUTHOR_LINK>
+            <MANIFEST_AUTHOR_NAME></MANIFEST_AUTHOR_NAME>
+            <MANIFEST_ID></MANIFEST_ID>
+            <MANIFEST_DESCRIPTION></MANIFEST_DESCRIPTION>
+            <MANIFEST_NAME></MANIFEST_NAME>
+            <MANIFEST_VERSION></MANIFEST_VERSION>
+            <MANIFEST_APP_TYPE></MANIFEST_APP_TYPE>
+            <CODE></CODE>
+            <PYTHON>true</PYTHON>
+            <YOCTO>false</YOCTO>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>32</FILE_NUMBER>
+           <NAME>pt1000-i-mz.122-28.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>pt_12.2</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>33</FILE_NUMBER>
+           <NAME>pt3000-i6q4l2-mz.121-22.EA4.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Switch</DEVICE_TYPE>
+            <SET_NAME>pt_12.1_EA4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>33</FILE_COUNTER>
+         <CAPACITY>4000000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>ioe:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT class="CHttpPage">
+          <TEXT>&lt;html>
+&lt;head>
+&lt;script>
+function validateLogin()
+{
+  if (document.forms["login"]["userid"].value.length == 0)
+  {
+    alert("Please enter the userid.");
+    return false;
+  }
+  else if (document.forms["login"]["pw"].value.length == 0)
+  {
+    alert("Please enter the password.");
+    return false;
+  }
+  else
+  {
+    CHttpFormExtractor.submitIoeLogin();
+    return true;
+  }
+}
+&lt;/script>
+&lt;/head>
+&lt;body>
+&lt;center>
+&lt;h3>Registration Server Login&lt;/h3>
+&lt;table>
+&lt;tr>&lt;td>
+&lt;form name="login" method="post" action="login_action.php" onsubmit="return validateLogin()">
+Username: &lt;input type="text" name="userid" id="userid" value="" size="20">&lt;br>
+Password: &lt;input type="password" name="pw" id="pw" value="" size="20">&lt;br>
+&lt;br>
+&lt;center>
+&lt;input type="submit" name="submit" value="Sign In">
+&lt;/center>
+&lt;/form>
+&lt;/td>&lt;/tr>
+&lt;/table>
+&lt;/center>
+&lt;span>Don't have an IoE account?&lt;/span> &lt;a id="idA_SignUp" class="TextSemiBold" href="create_account.html">Sign up now&lt;/a>
+&lt;/body>
+&lt;/html></TEXT>
+         </FILE_CONTENT>
+         <FILES>
+          <FILE class="CFile">
+           <FILE_NUMBER>2</FILE_NUMBER>
+           <NAME>create_account.html</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>14</PERMISSION>
+           <FILE_CONTENT class="CHttpPage">
+            <TEXT>&lt;html>
+&lt;head>
+&lt;script>
+function validateAccount()
+{
+  if (document.forms["createAccount"]["userid"].value.length == 0)
+  {
+    alert("Please enter the userid.");
+    return false;
+  }
+  else if (document.forms["createAccount"]["pw"].value.length == 0)
+  {
+    alert("Please enter the password.");
+    return false;
+  }
+  else
+  {
+    CHttpFormExtractor.submitIoeLogin();
+    return true;
+  }
+}
+&lt;/script>
+&lt;/head>
+&lt;body>
+&lt;center>
+&lt;h3>Registration Server Account Creation&lt;/h3>
+&lt;table>
+&lt;tr>&lt;td>
+&lt;form name="createAccount" method="post" action="account_action.php" onsubmit="return validateAccount()">
+Username: &lt;input type="text" name="userid" id="userid" value="" size="20">&lt;br>
+Password: &lt;input type="password" name="pw" id="pw" value="" size="20">&lt;br>
+&lt;br>
+&lt;center>
+&lt;input type="submit" name="submit" value="Create">
+&lt;/center>
+&lt;/form>
+&lt;/td>&lt;/tr>
+&lt;/table>
+&lt;/center>
+&lt;/body>
+&lt;/html></TEXT>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>index.php</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CHttpPage">
+            <TEXT>&lt;html>
+&lt;head>
+&lt;script>
+function validateLogin()
+{
+  if (document.forms["login"]["userid"].value.length == 0)
+  {
+    alert("Please enter the userid.");
+    return false;
+  }
+  else if (document.forms["login"]["pw"].value.length == 0)
+  {
+    alert("Please enter the password.");
+    return false;
+  }
+  else
+  {
+    CHttpFormExtractor.submitIoeLogin();
+    return true;
+  }
+}
+&lt;/script>
+&lt;/head>
+&lt;body>
+&lt;center>
+&lt;h3>Registration Server Login&lt;/h3>
+&lt;table>
+&lt;tr>&lt;td>
+&lt;form name="login" method="post" action="login_action.php" onsubmit="return validateLogin()">
+Username: &lt;input type="text" name="userid" id="userid" value="" size="20">&lt;br>
+Password: &lt;input type="password" name="pw" id="pw" value="" size="20">&lt;br>
+&lt;br>
+&lt;center>
+&lt;input type="submit" name="submit" value="Sign In">
+&lt;/center>
+&lt;/form>
+&lt;/td>&lt;/tr>
+&lt;/table>
+&lt;/center>
+&lt;span>Don't have an IoE account?&lt;/span> &lt;a id="idA_SignUp" class="TextSemiBold" href="create_account.html">Sign up now&lt;/a>
+&lt;/body>
+&lt;/html></TEXT>
+           </FILE_CONTENT>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>2</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>ioeusers:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>0</FILE_COUNTER>
+         <CAPACITY>1000000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>tftp:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT class="CIosFileContent">
+          <DEVICE_TYPE>Switch</DEVICE_TYPE>
+          <SET_NAME>pt_12.1_EA4</SET_NAME>
+         </FILE_CONTENT>
+         <FILES>
+          <FILE class="CFile">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>asa842-k8.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CASAFileContent">
+            <DEVICE_TYPE>ASA</DEVICE_TYPE>
+            <SET_NAME>5505_8.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>2</FILE_NUMBER>
+           <NAME>asa923-k8.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CASAFileContent">
+            <DEVICE_TYPE>ASA</DEVICE_TYPE>
+            <SET_NAME>5505_9.2</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>3</FILE_NUMBER>
+           <NAME>c1841-advipservicesk9-mz.124-15.T1.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>1841_advip_12.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>4</FILE_NUMBER>
+           <NAME>c1841-ipbase-mz.123-14.T7.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>1841_12.3</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>5</FILE_NUMBER>
+           <NAME>c1841-ipbasek9-mz.124-12.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>1841_12.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>6</FILE_NUMBER>
+           <NAME>c1900-universalk9-mz.SPA.155-3.M4a.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>1900_foundation_suite_15.3</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>7</FILE_NUMBER>
+           <NAME>c2600-advipservicesk9-mz.124-15.T1.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>2600_advip_12.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>8</FILE_NUMBER>
+           <NAME>c2600-i-mz.122-28.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>2600_12.2</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>9</FILE_NUMBER>
+           <NAME>c2600-ipbasek9-mz.124-8.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>2600_12.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>10</FILE_NUMBER>
+           <NAME>c2800nm-advipservicesk9-mz.124-15.T1.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>2800_advip_12.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>11</FILE_NUMBER>
+           <NAME>c2800nm-advipservicesk9-mz.151-4.M4.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>2800_advip_15.1</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>12</FILE_NUMBER>
+           <NAME>c2800nm-ipbase-mz.123-14.T7.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>2800_12.3</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>13</FILE_NUMBER>
+           <NAME>c2800nm-ipbasek9-mz.124-8.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>2800_12.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>14</FILE_NUMBER>
+           <NAME>c2900-universalk9-mz.SPA.155-3.M4a.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>2900_foundation_suite_15.3</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>15</FILE_NUMBER>
+           <NAME>c2950-i6q4l2-mz.121-22.EA4.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Switch</DEVICE_TYPE>
+            <SET_NAME>2950_12.1_EA4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>16</FILE_NUMBER>
+           <NAME>c2950-i6q4l2-mz.121-22.EA8.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Switch</DEVICE_TYPE>
+            <SET_NAME>2950_12.1_EA8</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>17</FILE_NUMBER>
+           <NAME>c2960-lanbase-mz.122-25.FX.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Switch</DEVICE_TYPE>
+            <SET_NAME>2960_12.2_FX</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>18</FILE_NUMBER>
+           <NAME>c2960-lanbase-mz.122-25.SEE1.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Switch</DEVICE_TYPE>
+            <SET_NAME>2960_12.2_SEE1</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>19</FILE_NUMBER>
+           <NAME>c2960-lanbasek9-mz.150-2.SE4.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Switch</DEVICE_TYPE>
+            <SET_NAME>2960_15.0_SE4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>20</FILE_NUMBER>
+           <NAME>c3560-advipservicesk9-mz.122-37.SE1.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>MultiLayerSwitch</DEVICE_TYPE>
+            <SET_NAME>3560_advip_12.2</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>21</FILE_NUMBER>
+           <NAME>c3560-advipservicesk9-mz.122-46.SE.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>MultiLayerSwitch</DEVICE_TYPE>
+            <SET_NAME>3560_advip_12.2_46</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>22</FILE_NUMBER>
+           <NAME>c800-universalk9-mz.SPA.152-4.M4.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>800_universal_base_15.2</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>23</FILE_NUMBER>
+           <NAME>c800-universalk9-mz.SPA.154-3.M6a.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>800_universal_base_15.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>24</FILE_NUMBER>
+           <NAME>cat3k_caa-universalk9.16.03.02.SPA.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>MultiLayerSwitch</DEVICE_TYPE>
+            <SET_NAME>3650_daneli_16.3.2</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>25</FILE_NUMBER>
+           <NAME>cgr1000-universalk9-mz.SPA.154-2.CG</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>1240_universal_15.4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>26</FILE_NUMBER>
+           <NAME>cgr1000-universalk9-mz.SPA.156-3.CG</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>1240_universal_15.6.3</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>27</FILE_NUMBER>
+           <NAME>ir800-universalk9-bundle.SPA.156-3.M.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosBundleFileContent">
+            <FILE_SIZE>160968869</FILE_SIZE>
+            <HYPERVISOR_NAME>ir800-hv.srp.SPA.2.5.7</HYPERVISOR_NAME>
+            <HYPERVISOR_SIZE>25094997</HYPERVISOR_SIZE>
+            <IOS_FILE_NAME>ir800-universalk9-mz.SPA.156-3.M</IOS_FILE_NAME>
+            <FILE_CONTENT class="CIosFileContent">
+             <DEVICE_TYPE>Router</DEVICE_TYPE>
+             <SET_NAME>829_universal_15.6</SET_NAME>
+            </FILE_CONTENT>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>28</FILE_NUMBER>
+           <NAME>ir800-universalk9-mz.SPA.155-3.M</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>829_universal_15.5</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>29</FILE_NUMBER>
+           <NAME>ir800-universalk9-mz.SPA.156-3.M</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>829_universal_15.6</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>30</FILE_NUMBER>
+           <NAME>ir800_yocto-1.7.2.tar</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CPaasFileContent">
+            <VERSION></VERSION>
+            <MANIFEST_AUTHOR_LINK></MANIFEST_AUTHOR_LINK>
+            <MANIFEST_AUTHOR_NAME></MANIFEST_AUTHOR_NAME>
+            <MANIFEST_ID></MANIFEST_ID>
+            <MANIFEST_DESCRIPTION></MANIFEST_DESCRIPTION>
+            <MANIFEST_NAME></MANIFEST_NAME>
+            <MANIFEST_VERSION></MANIFEST_VERSION>
+            <MANIFEST_APP_TYPE></MANIFEST_APP_TYPE>
+            <CODE></CODE>
+            <PYTHON>false</PYTHON>
+            <YOCTO>true</YOCTO>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>31</FILE_NUMBER>
+           <NAME>ir800_yocto-1.7.2_python-2.7.3.tar</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CPaasFileContent">
+            <VERSION></VERSION>
+            <MANIFEST_AUTHOR_LINK></MANIFEST_AUTHOR_LINK>
+            <MANIFEST_AUTHOR_NAME></MANIFEST_AUTHOR_NAME>
+            <MANIFEST_ID></MANIFEST_ID>
+            <MANIFEST_DESCRIPTION></MANIFEST_DESCRIPTION>
+            <MANIFEST_NAME></MANIFEST_NAME>
+            <MANIFEST_VERSION></MANIFEST_VERSION>
+            <MANIFEST_APP_TYPE></MANIFEST_APP_TYPE>
+            <CODE></CODE>
+            <PYTHON>true</PYTHON>
+            <YOCTO>false</YOCTO>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>32</FILE_NUMBER>
+           <NAME>pt1000-i-mz.122-28.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Router</DEVICE_TYPE>
+            <SET_NAME>pt_12.2</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+          <FILE class="CFile">
+           <FILE_NUMBER>33</FILE_NUMBER>
+           <NAME>pt3000-i6q4l2-mz.121-22.EA4.bin</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CIosFileContent">
+            <DEVICE_TYPE>Switch</DEVICE_TYPE>
+            <SET_NAME>pt_12.1_EA4</SET_NAME>
+           </FILE_CONTENT>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>33</FILE_COUNTER>
+         <CAPACITY>4000000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <ALGORITHM_SETTINGS>
+      <USE_GLOBAL>true</USE_GLOBAL>
+      <CBAC_HALF_OPEN_SESSION_MULTIPLIER>1</CBAC_HALF_OPEN_SESSION_MULTIPLIER>
+      <TCP_MAX_CONNECTING_SESSIONS>100</TCP_MAX_CONNECTING_SESSIONS>
+      <TCP_MAX_OPENED_SESSIONS>1000</TCP_MAX_OPENED_SESSIONS>
+      <INTERFACE_QUEUE_SIZE>10</INTERFACE_QUEUE_SIZE>
+      <STORM_CONTROL_MULTIPLIER>10</STORM_CONTROL_MULTIPLIER>
+      <TCP_MAX_RETRANSMISSION_TIMEOUT>1000</TCP_MAX_RETRANSMISSION_TIMEOUT>
+     </ALGORITHM_SETTINGS>
+     <TRAFFICGEN_USER_TRAFFIC/>
+     <TERMINAL_SETTINGS>
+      <BITS>9600</BITS>
+      <DATA_BITS>8</DATA_BITS>
+      <PARITY>2</PARITY>
+      <STOP_BITS>1</STOP_BITS>
+      <FLOW_CONTROL>0</FLOW_CONTROL>
+     </TERMINAL_SETTINGS>
+     <PPPOE_SETTINGS>
+      <AUTHEN_TYPE>1/2/</AUTHEN_TYPE>
+     </PPPOE_SETTINGS>
+     <LOCK_SETTINGS>
+      <DLOCK>1</DLOCK>
+      <LOCK>0</LOCK>
+      <PASSWD></PASSWD>
+     </LOCK_SETTINGS>
+     <HTML_TAB>
+      <HTML_CODE></HTML_CODE>
+     </HTML_TAB>
+     <GUI_TAB>
+      <GUI_CODE></GUI_CODE>
+     </GUI_TAB>
+     <IMAGE_SETTINGS>
+      <CUSTOM_PHYSICAL></CUSTOM_PHYSICAL>
+     </IMAGE_SETTINGS>
+     <DOT1X_SETTINGS>
+      <PORTS/>
+     </DOT1X_SETTINGS>
+     <SNMP_MANAGER>
+      <AGENT_IP>0.0.0.0</AGENT_IP>
+      <AGENT_PORT>161</AGENT_PORT>
+      <MANAGER_PORT>161</MANAGER_PORT>
+      <READ_COMMUNITY></READ_COMMUNITY>
+      <WRITE_COMMUNITY></WRITE_COMMUNITY>
+      <SNMP_VERSION>1</SNMP_VERSION>
+     </SNMP_MANAGER>
+     <IOX_SEVICE>
+      <HTTPSENABLED>1</HTTPSENABLED>
+      <EMPTY_PAGE>0</EMPTY_PAGE>
+     </IOX_SEVICE>
+     <DNS_SERVER>
+      <ENABLED>1</ENABLED>
+      <NAMESERVER-DATABASE>
+       <RESOURCE-RECORD>
+        <TYPE>A-REC</TYPE>
+        <NAME>dashboard.meraki.com</NAME>
+        <TTL>86400</TTL>
+        <IPADDRESS>1.1.1.2</IPADDRESS>
+       </RESOURCE-RECORD>
+       <RESOURCE-RECORD>
+        <TYPE>A-REC</TYPE>
+        <NAME>meraki.cisco.com</NAME>
+        <TTL>86400</TTL>
+        <IPADDRESS>1.1.1.2</IPADDRESS>
+       </RESOURCE-RECORD>
+       <RESOURCE-RECORD>
+        <TYPE>A-REC</TYPE>
+        <NAME>www.meraki.com</NAME>
+        <TTL>86400</TTL>
+        <IPADDRESS>1.1.1.2</IPADDRESS>
+       </RESOURCE-RECORD>
+      </NAMESERVER-DATABASE>
+     </DNS_SERVER>
+     <NF_COLLECTOR>
+      <ENABLED>0</ENABLED>
+     </NF_COLLECTOR>
+     <DHCP_SERVERS>
+      <ASSOCIATED_PORTS>
+       <ASSOCIATED_PORT>
+        <NAME>FastEthernet0</NAME>
+        <DHCP_SERVER>
+         <ENABLED>0</ENABLED>
+         <POOLS>
+          <POOL>
+           <NAME>serverPool</NAME>
+           <NETWORK>0.0.0.0</NETWORK>
+           <MASK>0.0.0.0</MASK>
+           <DEFAULT_ROUTER>0.0.0.0</DEFAULT_ROUTER>
+           <TFTP_ADDRESS>0.0.0.0</TFTP_ADDRESS>
+           <START_IP>0.0.0.0</START_IP>
+           <END_IP>0.0.2.0</END_IP>
+           <DNS_SERVER>0.0.0.0</DNS_SERVER>
+           <MAX_USERS>512</MAX_USERS>
+           <DOMAIN_NAME></DOMAIN_NAME>
+           <DHCP_POOL_LEASES/>
+           <LEASE_TIME>86400000</LEASE_TIME>
+           <WLC_ADDRESS>0.0.0.0</WLC_ADDRESS>
+          </POOL>
+         </POOLS>
+         <DHCP_RESERVATIONS/>
+         <AUTOCONFIG></AUTOCONFIG>
+        </DHCP_SERVER>
+       </ASSOCIATED_PORT>
+      </ASSOCIATED_PORTS>
+     </DHCP_SERVERS>
+     <DHCPV6_SERVER_LIST>
+      <ASSOCIATED_PORTS/>
+      <DHCPv6_POOLS/>
+      <IPv6_LOCAL_POOLS/>
+     </DHCPV6_SERVER_LIST>
+     <FTP_SERVER>
+      <ENABLED>1</ENABLED>
+      <USER_ACCOUNT_MNGR>
+       <ACCOUNT>
+        <USERNAME>cisco</USERNAME>
+        <PASSWORD>cisco</PASSWORD>
+        <PERMISSIONS>RWDNL</PERMISSIONS>
+       </ACCOUNT>
+      </USER_ACCOUNT_MNGR>
+     </FTP_SERVER>
+     <NTP_SERVER>
+      <ENABLED>1</ENABLED>
+      <ENABLED_SERVER_AUTHENTICATE>0</ENABLED_SERVER_AUTHENTICATE>
+      <KEY>0</KEY>
+      <MD5PASSWORD></MD5PASSWORD>
+      <SERVER_IP_LIST/>
+     </NTP_SERVER>
+     <SYSLOG_SERVER>
+      <ENABLED>1</ENABLED>
+     </SYSLOG_SERVER>
+     <ACS_SERVER>
+      <ENABLED>0</ENABLED>
+      <USERS/>
+      <ACS_CLIENTS/>
+      <RADIUS_SETTINGS>
+       <AUTH_PORT>1645</AUTH_PORT>
+      </RADIUS_SETTINGS>
+     </ACS_SERVER>
+     <EMAIL_SERVER>
+      <SMTP_ENABLED>1</SMTP_ENABLED>
+      <SMTP_DOMAIN></SMTP_DOMAIN>
+      <POP3_ENABLED>1</POP3_ENABLED>
+      <FORWARD_MAIL>0</FORWARD_MAIL>
+      <NO_OF_USERS>0</NO_OF_USERS>
+     </EMAIL_SERVER>
+     <IOE_USER_MANAGER>
+      <USERS/>
+     </IOE_USER_MANAGER>
+     <IOX_VM_MANAGER>
+      <VMS/>
+     </IOX_VM_MANAGER>
+     <REGISTRATION_SEVER>false</REGISTRATION_SEVER>
+     <EAP_METHODS/>
+     <MERAKI_SERVER>
+      <MERAKI_USERS>
+       <MERAKI_USER>
+        <EMAIL>PT_admin@pt.cisco.com</EMAIL>
+        <FULL_NAME>PT Admin</FULL_NAME>
+        <PASSWORD>12345678</PASSWORD>
+        <COMPANY>Cisco</COMPANY>
+        <ADDRESS>170 West  Tasman Dr
+San Jose, CA 95134
+USA</ADDRESS>
+        <LAST_ACTIVE></LAST_ACTIVE>
+        <PRIVILEGE>Organization</PRIVILEGE>
+       </MERAKI_USER>
+       <MERAKI_USER>
+        <EMAIL>PTnetwork_admin@pt.cisco.com</EMAIL>
+        <FULL_NAME>PTNetwork Admin</FULL_NAME>
+        <PASSWORD>12345678</PASSWORD>
+        <COMPANY></COMPANY>
+        <ADDRESS></ADDRESS>
+        <LAST_ACTIVE></LAST_ACTIVE>
+        <PRIVILEGE>PTNetwork</PRIVILEGE>
+       </MERAKI_USER>
+      </MERAKI_USERS>
+      <MERAKI_DEVICES>
+       <MERAKI_DEVICE>
+        <SERIAL_NUMBER>B5UU-0R0P-4OXC</SERIAL_NUMBER>
+        <NETWORK>PTNetwork</NETWORK>
+        <MODEL>MX65W</MODEL>
+        <MAC_ADDRESS>00:09:7C:EA:8A:B3</MAC_ADDRESS>
+       </MERAKI_DEVICE>
+      </MERAKI_DEVICES>
+      <MERAKI_NETWORKS>
+       <MERAKI_NETWORK>
+        <NETWORK_NAME>CiscoNetwork</NETWORK_NAME>
+        <NETWORK_TYPE>Security appliance</NETWORK_TYPE>
+        <NETWORK_CONFIG>Default Meraki</NETWORK_CONFIG>
+        <NETWORK_NOTE></NETWORK_NOTE>
+        <WIRELESS_SETTING>
+         <SSID_NAME></SSID_NAME>
+         <SSID_ENABLED></SSID_ENABLED>
+         <SSID_SECURITY></SSID_SECURITY>
+         <SSID_VISIBLE></SSID_VISIBLE>
+         <KEY_SECRET></KEY_SECRET>
+         <ENCRYPTION></ENCRYPTION>
+         <RADIUS_SERVER></RADIUS_SERVER>
+        </WIRELESS_SETTING>
+        <FIREWALL_SETTINGS/>
+       </MERAKI_NETWORK>
+       <MERAKI_NETWORK>
+        <NETWORK_NAME>PTNetwork</NETWORK_NAME>
+        <NETWORK_TYPE>Security appliance</NETWORK_TYPE>
+        <NETWORK_CONFIG>Default Meraki</NETWORK_CONFIG>
+        <NETWORK_NOTE>Packettracer network</NETWORK_NOTE>
+        <WIRELESS_SETTING>
+         <SSID_NAME></SSID_NAME>
+         <SSID_ENABLED></SSID_ENABLED>
+         <SSID_SECURITY></SSID_SECURITY>
+         <SSID_VISIBLE></SSID_VISIBLE>
+         <KEY_SECRET></KEY_SECRET>
+         <ENCRYPTION></ENCRYPTION>
+         <RADIUS_SERVER></RADIUS_SERVER>
+        </WIRELESS_SETTING>
+        <FIREWALL_SETTINGS/>
+       </MERAKI_NETWORK>
+      </MERAKI_NETWORKS>
+      <MERAKI_HTTP_SERVICE>
+       <SELECTED_NW_NAME></SELECTED_NW_NAME>
+      </MERAKI_HTTP_SERVICE>
+      <MERAKI_HTTPS_SERVICE>
+       <SELECTED_NW_NAME>PTNetwork</SELECTED_NW_NAME>
+      </MERAKI_HTTPS_SERVICE>
+     </MERAKI_SERVER>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL>{99110586-b0c3-4410-9b03-69da93dc0a23},{8b83e854-8af6-4319-8872-0d079b2ba6e4},{91dd4f05-03cf-47c7-87ab-78ca9293394c},{91bd6fcf-229b-4dbf-be7a-f85261049122},{e6c6fa18-2c47-4a72-8b52-042146009712},{548696f9-5850-4169-bdc7-1960b6d05844}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.1925</X_PN>
+      <Y_PN>0.0325</Y_PN>
+      <X>27</X>
+      <Y>0</Y>
+      <SLOT>0</SLOT>
+      <SUBSLOT>0</SUBSLOT>
+      <PARENT_PATH>{99110586-b0c3-4410-9b03-69da93dc0a23},{8b83e854-8af6-4319-8872-0d079b2ba6e4},{91dd4f05-03cf-47c7-87ab-78ca9293394c},{91bd6fcf-229b-4dbf-be7a-f85261049122}</PARENT_PATH>
+      <CONTAINER_ID>{e6c6fa18-2c47-4a72-8b52-042146009712}</CONTAINER_ID>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

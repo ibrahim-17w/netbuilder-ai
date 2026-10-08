@@ -1,0 +1,568 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="Window" model="Window">MCUComponent</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeNetworkModule</TYPE>
+        <MODEL>PT-IOT-NM-1CFE</MODEL>
+        <PORT>
+         <TYPE>eCopperFastEthernet</TYPE>
+         <POWER>true</POWER>
+         <MEDIATYPE>0</MEDIATYPE>
+         <PINS>false</PINS>
+         <BANDWIDTH>100000</BANDWIDTH>
+         <FULLDUPLEX>false</FULLDUPLEX>
+         <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+         <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+         <MACADDRESS>0000.0000.0000</MACADDRESS>
+         <BIA>0000.0000.0000</BIA>
+         <CLOCKRATE>2000000</CLOCKRATE>
+         <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+         <DESCRIPTION/>
+         <CHANNEL>0</CHANNEL>
+         <CHANNEL5GHZ>0</CHANNEL5GHZ>
+         <COVERAGERANGE>0</COVERAGERANGE>
+         <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+         <UP_METHOD>5</UP_METHOD>
+         <IP/>
+         <SUBNET/>
+         <PORT_GATEWAY/>
+         <PORT_DNS/>
+         <PORT_DHCP_ENABLE>false</PORT_DHCP_ENABLE>
+         <ND_SUPPRESSED>false</ND_SUPPRESSED>
+         <TIMEOUT>14400000</TIMEOUT>
+         <PC_FIREWALL>false</PC_FIREWALL>
+         <PC_IPV6_FIREWALL>false</PC_IPV6_FIREWALL>
+         <IPV6_ENABLED>false</IPV6_ENABLED>
+         <IPV6_ADDRESS_AUTOCONFIG>false</IPV6_ADDRESS_AUTOCONFIG>
+         <IPV6_PORT_GATEWAY/>
+         <IPV6_PORT_DNS/>
+         <IPV6_LINK_LOCAL>FE80::205:5EFF:FE60:4E0E</IPV6_LINK_LOCAL>
+         <IPV6_DEFAULT_LINK_LOCAL>FE80::205:5EFF:FE60:4E0E</IPV6_DEFAULT_LINK_LOCAL>
+         <IPV6_PORT_DHCP_ENABLED>false</IPV6_PORT_DHCP_ENABLED>
+         <IPV6_ADDRESSES/>
+         <IP_UNNUMBERED/>
+        </PORT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+        <MODEL>PT-UNV-PWR-ADAPTER</MODEL>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAAAQAAAAoAcwB0AGEAdABlAAAACgAAAAACADA=</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1320.79</X_COORD>
+      <Y_COORD>1267.81</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT0810ZTF3</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:300000;cost:250;power source:1;rack units:2;wattage:5;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>1491529969243</TEMPLATE_CREATION_TIME>
+     <STARTTIME>730972800000</STARTTIME>
+     <STARTSIMTIME>0</STARTSIMTIME>
+     <USER_APPS>
+      <RUNNING_APPS>
+       <USER_APP>Window (JavaScript)</USER_APP>
+      </RUNNING_APPS>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SAVE_REF_ID>save-ref-id:0</SAVE_REF_ID>
+     <SYS_NAME></SYS_NAME>
+     <GATEWAY/>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP/>
+     </DHCP_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+       <STANDARD_CHANNEL5G>112</STANDARD_CHANNEL5G>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <GATEWAYV6/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>A6-C4-73-1E-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>Window (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT/>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>2</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>var ENVIRONMENTS = ["Argon", "CO", "CO2", "Hydrogen", "Helium", "Methane", "Nitrogen", "O2", "Ozone", "Propane", "Smoke"];&#xd;
+var ENVIRONMENT_MAX_IMPACT = -0.01; // 2% max when door opens&#xd;
+var TEMPERATURE_TRANSFERENCE_MULTIPLIER = 1.20; // increase speed 25% when door open&#xd;
+var HUMIDITY_TRANSFERENCE_MULTIPLIER = 1.20;&#xd;
+var GASES_TRANSFERENCE_MULTIPLIER = 2;&#xd;
+&#xd;
+var state = 0;&#xd;
+&#xd;
+//set up client to talk and listen to IoE registration server&#xd;
+function setup() {&#xd;
+	IoEClient.setup({&#xd;
+		type: "Window",&#xd;
+		states: [{&#xd;
+			name: "On",&#xd;
+			type: "bool",&#xd;
+			controllable: true&#xd;
+		}]&#xd;
+	});&#xd;
+	&#xd;
+	IoEClient.onInputReceive = function(input) {&#xd;
+		processData(input, true);&#xd;
+	};&#xd;
+	&#xd;
+	attachInterrupt(0, function() {&#xd;
+		processData(customRead(0), false);&#xd;
+	});&#xd;
+	&#xd;
+	state = restoreProperty("state", 0);&#xd;
+	setState(state);&#xd;
+}&#xd;
+&#xd;
+function restoreProperty(propertyName, defaultValue)&#xd;
+{&#xd;
+	var value = getDeviceProperty(getName(), propertyName);&#xd;
+	if ( !(value === "" || value == "undefined") ){&#xd;
+		if ( typeof(defaultValue) == "number" )&#xd;
+			value = Number(value);&#xd;
+		&#xd;
+		setDeviceProperty(getName(), propertyName, value);&#xd;
+		return value;&#xd;
+	}&#xd;
+	&#xd;
+	return defaultValue;&#xd;
+}&#xd;
+&#xd;
+function mouseEvent(pressed, x, y, firstPress) {&#xd;
+	if (firstPress)&#xd;
+		setState(state ? 0 : 1);&#xd;
+}&#xd;
+&#xd;
+//update carbon dioxide and carbon monoxide and send new data to registration server&#xd;
+function loop() {&#xd;
+	updateEnvironment();	&#xd;
+	delay(1000);&#xd;
+}&#xd;
+&#xd;
+//process data received from server&#xd;
+function processData(data, bIsRemote)&#xd;
+{&#xd;
+	if ( data.length &lt;= 0  )&#xd;
+		return;&#xd;
+	data = data.split(",");&#xd;
+	setState(parseInt(data[0]));&#xd;
+}&#xd;
+&#xd;
+//set state and update component image to reflect the current state&#xd;
+function setState(newState)&#xd;
+{&#xd;
+	if ( newState === 0 )&#xd;
+		digitalWrite(1, LOW);&#xd;
+	else{&#xd;
+		digitalWrite(1, HIGH);&#xd;
+	}&#xd;
+	state = newState;&#xd;
+	customWrite(0, state);&#xd;
+	IoEClient.reportStates(state);&#xd;
+	setDeviceProperty(getName(), "state", state);&#xd;
+}&#xd;
+&#xd;
+function updateEnvironment()&#xd;
+{&#xd;
+	var rate,max;&#xd;
+	if ( state == 1)&#xd;
+	{&#xd;
+		for(var i=0; i&lt;ENVIRONMENTS.length; i++){&#xd;
+			max = Environment.get(ENVIRONMENTS[i]) * ENVIRONMENT_MAX_IMPACT;&#xd;
+			// the max is reached in an hour, so we divide by 3600 to get seconds&#xd;
+			// then this rate is also based on 100,000 cubic meters (approx. coporate office size)&#xd;
+			rate = max / 3600 * 100000 / Environment.getVolume();&#xd;
+			Environment.setContribution(ENVIRONMENTS[i], rate, max);&#xd;
+			Environment.setTransferenceMultiplier(ENVIRONMENTS[i], GASES_TRANSFERENCE_MULTIPLIER);&#xd;
+&#xd;
+		}&#xd;
+		&#xd;
+		Environment.setTransferenceMultiplier("Ambient Temperature", TEMPERATURE_TRANSFERENCE_MULTIPLIER);&#xd;
+		Environment.setTransferenceMultiplier("Humidity", HUMIDITY_TRANSFERENCE_MULTIPLIER);&#xd;
+	}&#xd;
+	else&#xd;
+	{&#xd;
+		for(var j=0; j&lt;ENVIRONMENTS.length; j++){&#xd;
+			Environment.setContribution(ENVIRONMENTS[j], 0, 0);&#xd;
+			Environment.removeCumulativeContribution(ENVIRONMENTS[j]);&#xd;
+			Environment.setTransferenceMultiplier(ENVIRONMENTS[j], 1);&#xd;
+		}&#xd;
+		Environment.setTransferenceMultiplier("Ambient Temperature", 1);&#xd;
+		Environment.setTransferenceMultiplier("Humidity", 1);&#xd;
+		&#xd;
+	}&#xd;
+}&#xd;
+&#xd;
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>3</FILE_NUMBER>
+           <NAME>Window (Python)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT/>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>4</FILE_NUMBER>
+             <NAME>main.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>from gpio import *
+from time import *
+from ioeclient import *
+from physical import *
+from environment import *
+import math
+
+ENVIRONMENTS = ["Argon", "CO", "CO2", "Hydrogen", "Helium", "Methane", "Nitrogen", "O2", "Ozone", "Propane", "Smoke"]
+ENVIRONMENT_MAX_IMPACT = -0.01; # 2% max when door opens
+TEMPERATURE_TRANSFERENCE_MULTIPLIER = 1.20; # increase speed 25% when door open
+HUMIDITY_TRANSFERENCE_MULTIPLIER = 1.20
+GASES_TRANSFERENCE_MULTIPLIER = 2
+
+state = 0
+
+def main():
+	setup()
+	while True:
+		loop()
+#set up client to talk and listen to IoE registration server
+def setup():
+    IoEClient.setup({
+        "type": "Window",
+        "states": [{
+            "name": "On",
+            "type": "bool",
+            "controllable": True
+        }]
+    })
+
+    IoEClient.onInputReceive(onInputReceiveDone)
+    add_event_detect(0, detect)
+    
+    state = restoreProperty("state", 0)
+    setState(state)
+
+def onInputReceiveDone(data):
+    processData(data, True)
+    
+def detect():
+    processData(customRead(0), false)
+    
+def restoreProperty(propertyName, defaultValue):
+    value = getDeviceProperty(getName(), propertyName)
+    if  not (value is "" or value is None):
+        if  type(defaultValue) is int :
+            value = int(value)
+
+        setDeviceProperty(getName(), propertyName, value)
+        return value
+    return defaultValue
+
+
+def mouseEvent(pressed, x, y, firstPress):
+    global state
+    if firstPress:
+        if state == True:
+        	setState(0)
+        else:
+        	setState(1)
+
+
+#update carbon dioxide and carbon monoxide and send new data to registration server
+def loop():
+    updateEnvironment()
+    delay(1000)
+
+
+#process data received from server
+def processData(data, bIsRemote):
+    if  len(data) &lt;= 0 :
+        return
+    data = data.split(",")
+    setState(int(data[0]))
+
+
+#set state and update component image to reflect the current state
+def setState(newState):
+    global state
+    if  newState is 0 :
+        digitalWrite(1, LOW)
+    else:
+        digitalWrite(1, HIGH)
+    
+    state = newState
+    customWrite(0, state)
+    IoEClient.reportStates(state)
+    setDeviceProperty(getName(), "state", state)
+
+def updateEnvironment():
+    global ENVIRONMENTS
+    global ENVIRONMENT_MAX_IMPACT
+    global GASES_TRANSFERENCE_MULTIPLIER
+    global TEMPERATURE_TRANSFERENCE_MULTIPLIER
+    global HUMIDITY_TRANSFERENCE_MULTIPLIER
+    global state
+
+    if  state == 1:
+        for i in range (0,len(ENVIRONMENTS)):
+            max = Environment.get(ENVIRONMENTS[i]) * ENVIRONMENT_MAX_IMPACT
+            # the max is reached in an hour, so we divide by 3600 to get seconds
+            # then this rate is also based on 100,000 cubic meters (approx. coporate office size)
+            rate = float(max) / 3600 * 100000 / Environment.getVolume()
+            Environment.setContribution(ENVIRONMENTS[i], rate, max, True)
+            Environment.setTransferenceMultiplier(ENVIRONMENTS[i], GASES_TRANSFERENCE_MULTIPLIER)
+
+        Environment.setTransferenceMultiplier("Ambient Temperature", TEMPERATURE_TRANSFERENCE_MULTIPLIER)
+        Environment.setTransferenceMultiplier("Humidity", HUMIDITY_TRANSFERENCE_MULTIPLIER)
+    else:
+        for j in range (0, len(ENVIRONMENTS)):
+            Environment.setContribution(ENVIRONMENTS[j], 0, 0, True)
+            Environment.removeCumulativeContribution(ENVIRONMENTS[j])
+            Environment.setTransferenceMultiplier(ENVIRONMENTS[j], 1)
+
+        Environment.setTransferenceMultiplier("Ambient Temperature", 1)
+        Environment.setTransferenceMultiplier("Humidity", 1)
+
+if __name__ == "__main__":
+    main()</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>4</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <THING_MODEL>
+      <NAME></NAME>
+      <WIDTH>76.5</WIDTH>
+      <HEIGHT>80.5</HEIGHT>
+      <ANALOG_SLOTS_COUNT>4</ANALOG_SLOTS_COUNT>
+      <DIGITAL_SLOTS_COUNT>6</DIGITAL_SLOTS_COUNT>
+      <SPECIFICATIONS>&lt;html>&lt;head>&lt;/head>&lt;body style="word-wrap: break-word; -webkit-nbsp-mode: space; -webkit-line-break: after-white-space; ">&lt;font class="Apple-style-span" face="'Arial Black'" size="5">Window&lt;/font>&lt;div>&lt;div>&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">A window that can open or close&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;br>&lt;/font>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Features:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Registration Server Compatible&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Ability to vent Carbon Dioxide and Carbon Monoxide&lt;/font>&lt;/li>&lt;/ul>&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Usage:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Window works with Environment object. It reads CARBON_DIOXIDE and CARBON_MONOXIDE variables set in the Environment object and change these variables when users activate window opening/closing&lt;/font>&lt;/li>&lt;/ul>&lt;/div>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Direct Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">ALT-click to open and close&amp;nbsp;&lt;/span>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Local Control:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Connect device to&amp;nbsp;MCU/SBC/Thing. Use the "customWrite" API per Data Specifications&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Remote Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Connect device to Registration Server using Config Tab&lt;/span>&lt;/li>&lt;/ul>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Data Specifications:&lt;br>&lt;/u>&lt;/span>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Message Format: [state]&lt;br>&lt;/span>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">state: 0 = closed, 1 = open&lt;/span>&lt;/div>&lt;/div>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;br>&lt;/span>&lt;/div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Example:&lt;/u>&lt;/font>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;/body>&lt;/html></SPECIFICATIONS>
+      <ROTATION>0</ROTATION>
+      <SCALE>1</SCALE>
+      <IS_END_DEVICE>TRUE</IS_END_DEVICE>
+      <IS_DESKTOP_AVAILABLE>FALSE</IS_DESKTOP_AVAILABLE>
+      <SUBCOMPONENTS>
+       <SUBCOMPONENT>
+        <NAME>window</NAME>
+        <X>0</X>
+        <Y>0</Y>
+        <Z_ORDER>1</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>0</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>1</SLOT_NUM>
+        <SLOT_TYPE>1</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/SmartDevices/window_icon_closed.png]]></IMAGE>
+         <IMAGE><![CDATA[../art/IoE/SmartDevices/window_icon_opened.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+      </SUBCOMPONENTS>
+      <RULES>
+       <RULE>
+        <SUBCOMPONENT>window</SUBCOMPONENT>
+        <IMAGE_INDEX>0</IMAGE_INDEX>
+        <DIGITAL_VALUE>0</DIGITAL_VALUE>
+        <ANALOG_LOW>0</ANALOG_LOW>
+        <ANALOG_HIGH>0</ANALOG_HIGH>
+       </RULE>
+       <RULE>
+        <SUBCOMPONENT>window</SUBCOMPONENT>
+        <IMAGE_INDEX>1</IMAGE_INDEX>
+        <DIGITAL_VALUE>1000</DIGITAL_VALUE>
+        <ANALOG_LOW>0</ANALOG_LOW>
+        <ANALOG_HIGH>0</ANALOG_HIGH>
+       </RULE>
+      </RULES>
+     </THING_MODEL>
+     <IOE_CLIENT>
+      <CLIENT_MODE>NO_SERVER</CLIENT_MODE>
+      <SERVER_ADDRESS></SERVER_ADDRESS>
+      <USERNAME></USERNAME>
+      <PASSWORD></PASSWORD>
+     </IOE_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME></NAME>
+      <MAIL_ID></MAIL_ID>
+      <POP3_SERVER></POP3_SERVER>
+      <SMTP_SERVER></SMTP_SERVER>
+      <USER></USER>
+      <PASSWORD></PASSWORD>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL translate="true">{63fde132-da5e-4a6f-9504-ce3ad46e082a},{1ff1f2ff-983e-4c4b-a323-1c0b03c47fdb},{7d79ed2e-887d-4988-8bb7-555bdf9eccb8},{4176e83b-c4fe-4922-8017-3d2d1a1be082}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.0795587</X_PN>
+      <Y_PN>0.05145</Y_PN>
+      <X>274</X>
+      <Y>110</Y>
+      <PARENT_PATH>{63fde132-da5e-4a6f-9504-ce3ad46e082a},{1ff1f2ff-983e-4c4b-a323-1c0b03c47fdb},{7d79ed2e-887d-4988-8bb7-555bdf9eccb8}</PARENT_PATH>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

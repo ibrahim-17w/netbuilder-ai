@@ -1,0 +1,310 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="LCD" model="LCD">MCUComponent</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION/>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+        <MODEL>PT-UNV-PWR-ADAPTER</MODEL>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAAAwAAAAgAdABlAHgAdAAAAAoAAAAAAgAKAAAAMABQAFIATwBHAFIAQQBNAE0ASQBOAEcAXwBDAFUAUgBSAEUATgBUAF8ARgBJAEwARQAAAAoAAAAAFgBtAGEAaQBuAC4AdgBpAHMAdQBhAGwAAAAuAFAAUgBPAEcAUgBBAE0ATQBJAE4ARwBfAEMAVQBSAFIARQBOAFQAXwBEAEkAUgAAAAoAAAAAJgBMAEMARAAtAHYAaQBzAHUAYQBsACAAKABWAGkAcwB1AGEAbAAp</CUSTOM_VARS>
+     <CUSTOM_INTERFACE/>
+     <SYS_CONTACT/>
+     <SYS_LOCATION/>
+     <COORD_SETTINGS>
+      <X_COORD>1239.49</X_COORD>
+      <Y_COORD>1232.1</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT08101R3S</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:43800;cost:500;power source:0;rack units:1;wattage:10;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>1491440485152</TEMPLATE_CREATION_TIME>
+     <USER_APPS>
+      <RUNNING_APPS>
+       <USER_APP>LCD-visual (Visual)</USER_APP>
+      </RUNNING_APPS>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SYS_NAME/>
+     <GATEWAY/>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP/>
+     </DHCP_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY/>
+        <WPA_EAP_USERID/>
+        <WPA_EAP_PASSWORD/>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY/>
+        <WPA_EAP_USERID/>
+        <WPA_EAP_PASSWORD/>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <GATEWAYV6/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>C9-95-2C-10-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME/>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>6</FILE_NUMBER>
+           <NAME>LCD-visual (Visual)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT/>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>7</FILE_NUMBER>
+             <NAME>main.visual</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>&lt;xml>&lt;block type="variables_set" id="1" inline="true" x="-90" y="-1286">&lt;field name="VAR">charLimitPerLine&lt;/field>&lt;value name="VALUE">&lt;block type="math_number" id="2">&lt;field name="NUM">14&lt;/field>&lt;/block>&lt;/value>&lt;next>&lt;block type="variables_set" id="3" inline="true">&lt;field name="VAR">lineLimit&lt;/field>&lt;value name="VALUE">&lt;block type="math_number" id="4">&lt;field name="NUM">2&lt;/field>&lt;/block>&lt;/value>&lt;next>&lt;block type="variables_set" id="5" inline="true">&lt;field name="VAR">textPos&lt;/field>&lt;value name="VALUE">&lt;block type="lists_create_with" id="6" inline="false">&lt;mutation items="2">&lt;/mutation>&lt;value name="ADD0">&lt;block type="math_number" id="7">&lt;field name="NUM">16&lt;/field>&lt;/block>&lt;/value>&lt;value name="ADD1">&lt;block type="math_number" id="8">&lt;field name="NUM">20&lt;/field>&lt;/block>&lt;/value>&lt;/block>&lt;/value>&lt;next>&lt;block type="variables_set" id="9" inline="true">&lt;field name="VAR">textAreaSize&lt;/field>&lt;value name="VALUE">&lt;block type="lists_create_with" id="10" inline="false">&lt;mutation items="2">&lt;/mutation>&lt;value name="ADD0">&lt;block type="math_number" id="11">&lt;field name="NUM">230&lt;/field>&lt;/block>&lt;/value>&lt;value name="ADD1">&lt;block type="math_number" id="12">&lt;field name="NUM">52&lt;/field>&lt;/block>&lt;/value>&lt;/block>&lt;/value>&lt;next>&lt;block type="variables_set" id="13" inline="true">&lt;field name="VAR">tick&lt;/field>&lt;value name="VALUE">&lt;block type="math_number" id="14">&lt;field name="NUM">0&lt;/field>&lt;/block>&lt;/value>&lt;next>&lt;block type="procedures_callnoreturn" id="15">&lt;mutation name="setup">&lt;/mutation>&lt;next>&lt;block type="controls_whileUntil" id="16" inline="false">&lt;field name="MODE">WHILE&lt;/field>&lt;value name="BOOL">&lt;block type="logic_boolean" id="17">&lt;field name="BOOL">TRUE&lt;/field>&lt;/block>&lt;/value>&lt;statement name="DO">&lt;block type="procedures_callnoreturn" id="18">&lt;mutation name="loop">&lt;/mutation>&lt;/block>&lt;/statement>&lt;/block>&lt;/next>&lt;/block>&lt;/next>&lt;/block>&lt;/next>&lt;/block>&lt;/next>&lt;/block>&lt;/next>&lt;/block>&lt;/next>&lt;/block>&lt;block type="procedures_defreturn" id="19" inline="false" collapsed="true" disabled="true" x="761" y="-1277">&lt;mutation>&lt;arg name="text">&lt;/arg>&lt;/mutation>&lt;field name="NAME">splitText&lt;/field>&lt;statement name="STACK">&lt;block type="variables_set" id="20" inline="true">&lt;field name="VAR">result&lt;/field>&lt;value name="VALUE">&lt;block type="lists_create_empty" id="21">&lt;/block>&lt;/value>&lt;next>&lt;block type="variables_set" id="22" inline="true">&lt;field name="VAR">pos&lt;/field>&lt;value name="VALUE">&lt;block type="math_number" id="23">&lt;field name="NUM">0&lt;/field>&lt;/block>&lt;/value>&lt;next>&lt;block type="controls_whileUntil" id="24" inline="false">&lt;field name="MODE">WHILE&lt;/field>&lt;value name="BOOL">&lt;block type="logic_compare" id="25" inline="true">&lt;field name="OP">LT&lt;/field>&lt;value name="A">&lt;block type="variables_get" id="26">&lt;field name="VAR">pos&lt;/field>&lt;/block>&lt;/value>&lt;value name="B">&lt;block type="text_length" id="27" inline="false">&lt;value name="VALUE">&lt;block type="variables_get" id="28">&lt;field name="VAR">text&lt;/field>&lt;/block>&lt;/value>&lt;/block>&lt;/value>&lt;/block>&lt;/value>&lt;statement name="DO">&lt;block type="variables_set" id="29" inline="true">&lt;field name="VAR">nl_pos&lt;/field>&lt;value name="VALUE">&lt;block type="text_indexOf" id="30" inline="true">&lt;field name="END">FIRST&lt;/field>&lt;value name="VALUE">&lt;block type="variables_get" id="31">&lt;field name="VAR">...&lt;/field>&lt;/block>&lt;/value>&lt;value name="FIND">&lt;block type="text" id="32">&lt;field name="TEXT">\n&lt;/field>&lt;/block>&lt;/value>&lt;/block>&lt;/value>&lt;next>&lt;block type="controls_if" id="33" inline="false">&lt;value name="IF0">&lt;block type="logic_compare" id="34" inline="true">&lt;field name="OP">EQ&lt;/field>&lt;value name="A">&lt;block type="variables_get" id="35">&lt;field name="VAR">nl_pos&lt;/field>&lt;/block>&lt;/value>&lt;value name="B">&lt;block type="math_number" id="36">&lt;field name="NUM">-1&lt;/field>&lt;/block>&lt;/value>&lt;/block>&lt;/value>&lt;statement name="DO0">&lt;block type="variables_set" id="37" inline="true">&lt;field name="VAR">nl_pos&lt;/field>&lt;value name="VALUE">&lt;block type="text_length" id="38" inline="false">&lt;value name="VALUE">&lt;block type="variables_get" id="39">&lt;field name="VAR">text&lt;/field>&lt;/block>&lt;/value>&lt;/block>&lt;/value>&lt;/block>&lt;/statement>&lt;next>&lt;block type="variables_set" id="40" inline="true">&lt;field name="VAR">line&lt;/field>&lt;value name="VALUE">&lt;block type="text_getSubstring" id="41" inline="true">&lt;mutation at1="true" at2="true">&lt;/mutation>&lt;field name="WHERE1">FROM_START&lt;/field>&lt;field name="WHERE2">FROM_START&lt;/field>&lt;value name="STRING">&lt;block type="variables_get" id="42">&lt;field name="VAR">...&lt;/field>&lt;/block>&lt;/value>&lt;value name="AT1">&lt;block type="variables_get" id="43">&lt;field name="VAR">pos&lt;/field>&lt;/block>&lt;/value>&lt;value name="AT2">&lt;block type="variables_get" id="44">&lt;field name="VAR">nl_pos&lt;/field>&lt;/block>&lt;/value>&lt;/block>&lt;/value>&lt;next>&lt;block type="text_print" id="45" inline="false">&lt;value name="TEXT">&lt;block type="variables_get" id="46">&lt;field name="VAR">line&lt;/field>&lt;/block>&lt;/value>&lt;next>&lt;block type="text_append" id="47" inline="false">&lt;field name="VAR">result&lt;/field>&lt;value name="TEXT">&lt;block type="variables_get" id="48">&lt;field name="VAR">line&lt;/field>&lt;/block>&lt;/value>&lt;next>&lt;block type="variables_set" id="49" inline="true">&lt;field name="VAR">pos&lt;/field>&lt;value name="VALUE">&lt;block type="math_arithmetic" id="50" inline="true">&lt;field name="OP">ADD&lt;/field>&lt;value name="A">&lt;block type="variables_get" id="51">&lt;field name="VAR">nl_pos&lt;/field>&lt;/block>&lt;/value>&lt;value name="B">&lt;block type="math_number" id="52">&lt;field name="NUM">1&lt;/field>&lt;/block>&lt;/value>&lt;/block>&lt;/value>&lt;/block>&lt;/next>&lt;/block>&lt;/next>&lt;/block>&lt;/next>&lt;/block>&lt;/next>&lt;/block>&lt;/next>&lt;/block>&lt;/statement>&lt;/block>&lt;/next>&lt;/block>&lt;/next>&lt;/block>&lt;/statement>&lt;value name="RETURN">&lt;block type="variables_get" id="53">&lt;field name="VAR">result&lt;/field>&lt;/block>&lt;/value>&lt;/block>&lt;block type="procedures_defnoreturn" id="54" x="-92" y="-919">&lt;mutation>&lt;/mutation>&lt;field name="NAME">setup&lt;/field>&lt;statement name="STACK">&lt;block type="procedures_callnoreturn" id="55" inline="false">&lt;mutation name="setText">&lt;arg name="text">&lt;/arg>&lt;/mutation>&lt;value name="ARG0">&lt;block type="text" id="56">&lt;field name="TEXT">&lt;/field>&lt;/block>&lt;/value>&lt;/block>&lt;/statement>&lt;/block>&lt;block type="procedures_defnoreturn" id="57" x="-92" y="-784">&lt;mutation>&lt;/mutation>&lt;field name="NAME">loop&lt;/field>&lt;statement name="STACK">&lt;block type="variables_set" id="58" inline="true">&lt;field name="VAR">tick&lt;/field>&lt;value name="VALUE">&lt;block type="math_arithmetic" id="59" inline="true">&lt;field name="OP">ADD&lt;/field>&lt;value name="A">&lt;block type="variables_get" id="60">&lt;field name="VAR">tick&lt;/field>&lt;/block>&lt;/value>&lt;value name="B">&lt;block type="math_number" id="61">&lt;field name="NUM">1&lt;/field>&lt;/block>&lt;/value>&lt;/block>&lt;/value>&lt;next>&lt;block type="text_print" id="62" inline="false" disabled="true">&lt;value name="TEXT">&lt;block type="variables_get" id="63">&lt;field name="VAR">tick&lt;/field>&lt;/block>&lt;/value>&lt;next>&lt;block type="procedures_callnoreturn" id="64" inline="false">&lt;mutation name="setText">&lt;arg name="text">&lt;/arg>&lt;/mutation>&lt;value name="ARG0">&lt;block type="ioe_analogRead" id="65" inline="true">&lt;value name="slot">&lt;block type="math_number" id="66">&lt;field name="NUM">6&lt;/field>&lt;/block>&lt;/value>&lt;/block>&lt;/value>&lt;next>&lt;block type="ioe_delay" id="67" inline="true">&lt;value name="ms">&lt;block type="math_number" id="68">&lt;field name="NUM">100&lt;/field>&lt;/block>&lt;/value>&lt;/block>&lt;/next>&lt;/block>&lt;/next>&lt;/block>&lt;/next>&lt;/block>&lt;/statement>&lt;/block>&lt;block type="procedures_defnoreturn" id="69" x="-92" y="-552">&lt;mutation>&lt;arg name="text">&lt;/arg>&lt;/mutation>&lt;field name="NAME">setText&lt;/field>&lt;statement name="STACK">&lt;block type="physical_setCustomText" id="70" inline="true">&lt;value name="text">&lt;block type="variables_get" id="71">&lt;field name="VAR">text&lt;/field>&lt;/block>&lt;/value>&lt;value name="x">&lt;block type="lists_getIndex" id="72" inline="true">&lt;mutation statement="false" at="true">&lt;/mutation>&lt;field name="MODE">GET&lt;/field>&lt;field name="WHERE">FROM_START&lt;/field>&lt;value name="VALUE">&lt;block type="variables_get" id="73">&lt;field name="VAR">textPos&lt;/field>&lt;/block>&lt;/value>&lt;value name="AT">&lt;block type="math_number" id="74">&lt;field name="NUM">1&lt;/field>&lt;/block>&lt;/value>&lt;/block>&lt;/value>&lt;value name="y">&lt;block type="lists_getIndex" id="75" inline="true">&lt;mutation statement="false" at="true">&lt;/mutation>&lt;field name="MODE">GET&lt;/field>&lt;field name="WHERE">FROM_START&lt;/field>&lt;value name="VALUE">&lt;block type="variables_get" id="76">&lt;field name="VAR">textPos&lt;/field>&lt;/block>&lt;/value>&lt;value name="AT">&lt;block type="math_number" id="77">&lt;field name="NUM">2&lt;/field>&lt;/block>&lt;/value>&lt;/block>&lt;/value>&lt;value name="w">&lt;block type="lists_getIndex" id="78" inline="true">&lt;mutation statement="false" at="true">&lt;/mutation>&lt;field name="MODE">GET&lt;/field>&lt;field name="WHERE">FROM_START&lt;/field>&lt;value name="VALUE">&lt;block type="variables_get" id="79">&lt;field name="VAR">textAreaSize&lt;/field>&lt;/block>&lt;/value>&lt;value name="AT">&lt;block type="math_number" id="80">&lt;field name="NUM">1&lt;/field>&lt;/block>&lt;/value>&lt;/block>&lt;/value>&lt;value name="h">&lt;block type="lists_getIndex" id="81" inline="true">&lt;mutation statement="false" at="true">&lt;/mutation>&lt;field name="MODE">GET&lt;/field>&lt;field name="WHERE">FROM_START&lt;/field>&lt;value name="VALUE">&lt;block type="variables_get" id="82">&lt;field name="VAR">textAreaSize&lt;/field>&lt;/block>&lt;/value>&lt;value name="AT">&lt;block type="math_number" id="83">&lt;field name="NUM">2&lt;/field>&lt;/block>&lt;/value>&lt;/block>&lt;/value>&lt;/block>&lt;/statement>&lt;/block>&lt;jscode>&lt;![CDATA[var charLimitPerLine;
+var text;
+var lineLimit;
+var result;
+var tick;
+var textPos;
+var pos;
+var textAreaSize;
+var nl_pos;
+var ___;
+var line;
+
+function setup() {
+  setText('');
+}
+
+function loop() {
+  tick = tick + 1;
+  setText((analogRead(6)));
+  delay(100);
+}
+
+function setText(text) {
+  setCustomText(textPos[0], textPos[1], textAreaSize[0], textAreaSize[1], text)
+}
+
+
+charLimitPerLine = 14;
+lineLimit = 2;
+textPos = [16, 20];
+textAreaSize = [230, 52];
+tick = 0;
+setup();
+while (true) {
+  loop();
+}
+]]&gt;&lt;/jscode>&lt;/xml></TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>7</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>User:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>0</FILE_COUNTER>
+         <CAPACITY>10000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <THING_MODEL>
+      <NAME/>
+      <WIDTH>130.5</WIDTH>
+      <HEIGHT>70.5</HEIGHT>
+      <ANALOG_SLOTS_COUNT>4</ANALOG_SLOTS_COUNT>
+      <DIGITAL_SLOTS_COUNT>6</DIGITAL_SLOTS_COUNT>
+      <SPECIFICATIONS>&lt;html>&lt;head>&lt;/head>&lt;body style="word-wrap: break-word; -webkit-nbsp-mode: space; -webkit-line-break: after-white-space; ">&lt;span class="Apple-style-span" style="font-family: 'Arial Black'; font-size: x-large; ">LCD&lt;/span>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5" style="font-family: Arial; font-size: x-large; ">&lt;div>&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">Text display component.&lt;/font>&lt;/div>&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>&lt;br>&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;/font>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Features:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Can display two lines of text, fourteen characters per line.&lt;/span>&lt;/li>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Can be set to use analog or custom read.&lt;/span>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;span class="Apple-style-span" style="font-size: medium; font-family: 'Times New Roman'; ">&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Usage:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Connect to MCU or SBC.&lt;/span>&lt;/li>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Display text when input is detected from either pin.&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;/span>&lt;/font>&lt;/div>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Direct Control:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;span class="Apple-style-span" style="font-family: 'Times New Roman'; font-size: medium; ">&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Local Control:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Connect to digital or analog slot.&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;/span>&lt;/font>&lt;/div>&lt;/div>&lt;div>&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Remote Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Data Specifications:&lt;/u>&lt;/font>&lt;/div>&lt;/font>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Input Slot: D0 for customRead&lt;/span>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">Input Slot: A0 for analogRead&lt;/font>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;br>&lt;/font>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">Example:&lt;/font>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">Connect to an MCU and potentiometer and see the text change in the LCD as the potentiometer is turned.&lt;/font>&lt;/div>&lt;/body>&lt;/html></SPECIFICATIONS>
+      <ROTATION>0</ROTATION>
+      <SCALE>1</SCALE>
+      <IS_END_DEVICE>FALSE</IS_END_DEVICE>
+      <IS_DESKTOP_AVAILABLE>FALSE</IS_DESKTOP_AVAILABLE>
+      <SUBCOMPONENTS>
+       <SUBCOMPONENT>
+        <NAME>LCD</NAME>
+        <X>0</X>
+        <Y>0</Y>
+        <Z_ORDER>1</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>0</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>-1</SLOT_NUM>
+        <SLOT_TYPE>0</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/Components/LCD.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+      </SUBCOMPONENTS>
+      <RULES/>
+     </THING_MODEL>
+     <IOE_CLIENT>
+      <CLIENT_MODE>NO_SERVER</CLIENT_MODE>
+      <SERVER_ADDRESS/>
+      <USERNAME/>
+      <PASSWORD/>
+     </IOE_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME/>
+      <MAIL_ID/>
+      <POP3_SERVER/>
+      <SMTP_SERVER/>
+      <USER/>
+      <PASSWORD/>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL/>
+      <CUSTOM_IMAGE_PHYSICAL/>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL translate="true">{4d5a8357-1cf0-4511-8c6e-df16e4ea09fb},{e75f6b2c-2ada-4754-ba2f-a9d39e808082},{b178837b-519b-4071-840f-f1924fd42676},{26ab2fff-41c4-4e9b-bf46-54c0ff081cca}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.0998839</X_PN>
+      <Y_PN>0.100561</Y_PN>
+      <X>344</X>
+      <Y>215</Y>
+      <PARENT_PATH>{4d5a8357-1cf0-4511-8c6e-df16e4ea09fb},{e75f6b2c-2ada-4754-ba2f-a9d39e808082},{b178837b-519b-4071-840f-f1924fd42676}</PARENT_PATH>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

@@ -38,8 +38,10 @@ flutter:
     # from real Packet Tracer saves. This is what lets a phone build a real save
     # with no sidecar: every device model's <DEVICE> block, its port inventory
     # (names Packet Tracer derives from the module layout), one <LINK> block per
-    # cable kind, and the global skeleton the topology is written into.
-    - assets/pkt_templates/manifest.json
-    - assets/pkt_templates/skeleton.xml
-    - assets/pkt_templates/devices/
-    - assets/pkt_templates/links/
+    # cable kind, and the global skeleton the topology is written into. The
+    # single copy lives in sidecar/pkt_templates/ next to the generator that
+    # produces it, so the app bundles it straight from there.
+    - sidecar/pkt_templates/manifest.json
+    - sidecar/pkt_templates/skeleton.xml
+    - sidecar/pkt_templates/devices/
+    - sidecar/pkt_templates/links/

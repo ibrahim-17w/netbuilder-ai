@@ -1,0 +1,788 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="Thermostat" model="Thermostat">MCUComponent</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeNetworkModule</TYPE>
+        <MODEL>PT-IOT-NM-1CFE</MODEL>
+        <PORT>
+         <TYPE>eCopperFastEthernet</TYPE>
+         <POWER>true</POWER>
+         <MEDIATYPE>0</MEDIATYPE>
+         <PINS>false</PINS>
+         <BANDWIDTH>100000</BANDWIDTH>
+         <FULLDUPLEX>false</FULLDUPLEX>
+         <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+         <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+         <MACADDRESS>0000.0000.0000</MACADDRESS>
+         <BIA>0000.0000.0000</BIA>
+         <CLOCKRATE>2000000</CLOCKRATE>
+         <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+         <DESCRIPTION/>
+         <CHANNEL>0</CHANNEL>
+         <CHANNEL5GHZ>0</CHANNEL5GHZ>
+         <COVERAGERANGE>0</COVERAGERANGE>
+         <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+         <UP_METHOD>5</UP_METHOD>
+         <IP/>
+         <SUBNET/>
+         <PORT_GATEWAY/>
+         <PORT_DNS/>
+         <PORT_DHCP_ENABLE>false</PORT_DHCP_ENABLE>
+         <ND_SUPPRESSED>false</ND_SUPPRESSED>
+         <TIMEOUT>14400000</TIMEOUT>
+         <PC_FIREWALL>false</PC_FIREWALL>
+         <PC_IPV6_FIREWALL>false</PC_IPV6_FIREWALL>
+         <IPV6_ENABLED>false</IPV6_ENABLED>
+         <IPV6_ADDRESS_AUTOCONFIG>false</IPV6_ADDRESS_AUTOCONFIG>
+         <IPV6_PORT_GATEWAY/>
+         <IPV6_PORT_DNS/>
+         <IPV6_LINK_LOCAL>FE80::2D0:FFFF:FEB4:A83C</IPV6_LINK_LOCAL>
+         <IPV6_DEFAULT_LINK_LOCAL>FE80::2D0:FFFF:FEB4:A83C</IPV6_DEFAULT_LINK_LOCAL>
+         <IPV6_PORT_DHCP_ENABLED>false</IPV6_PORT_DHCP_ENABLED>
+         <IPV6_ADDRESSES/>
+         <IP_UNNUMBERED/>
+        </PORT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+        <MODEL>PT-UNV-PWR-ADAPTER</MODEL>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAABAAAABYAdABlAG0AcABlAHIAYQB0AHUAcgBlAAAACgAAAAACADAAAAAKAHMAdABhAHQAZQAAAAoAAAAAAgAwAAAAHABhAHUAdABvACAAaABlAGEAdAAgAHQAZQBtAHAAAAAKAAAAAAQAMQA5AAAAHABhAHUAdABvACAAYwBvAG8AbAAgAHQAZQBtAHAAAAAKAAAAAAQAMgAw</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1247.91</X_COORD>
+      <Y_COORD>1241.33</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT08107N8K</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:43800;cost:4500;power source:0;rack units:1;wattage:10;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>1500088687194</TEMPLATE_CREATION_TIME>
+     <STARTTIME>730972800000</STARTTIME>
+     <STARTSIMTIME>0</STARTSIMTIME>
+     <USER_APPS>
+      <RUNNING_APPS>
+       <USER_APP>Thermostat (JavaScript)</USER_APP>
+      </RUNNING_APPS>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SAVE_REF_ID>save-ref-id:0</SAVE_REF_ID>
+     <SYS_NAME></SYS_NAME>
+     <GATEWAY/>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP/>
+     </DHCP_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+       <STANDARD_CHANNEL5G>112</STANDARD_CHANNEL5G>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <GATEWAYV6/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>DD-3D-DD-46-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>3</FILE_NUMBER>
+           <NAME>Termostat (Python)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT/>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>4</FILE_NUMBER>
+             <NAME>main.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>from options import Options
+from time import *
+from physical import *
+from gpio import *
+from environment import Environment
+from ioeclient import IoEClient
+
+autoCoolTemp = 20
+autoHeatTemp = 19
+
+METRIC = ""
+
+HEATER_PIN = 1
+COOLER_PIN = 2
+state = 0    # 0 off, 1 cooling, 2 heating, 3 auto
+STATE_NAMES = ["OFF", "COOL", "HEAT", "AUTO"]
+temperature = 0
+unit = ""
+
+def setup ():
+    global autoCoolTemp , autoHeatTemp , temperature , state
+    
+    IoEClient.setup({
+        "type": "Thermostat",
+        "states": [{
+            "name": "Status",
+            "type": "options",
+            "options": {
+                0: "Off",
+                1: "Cooling",
+                2: "Heating",
+                3: "Auto"
+            },
+            "controllable": True
+        }, {
+            "name": "Temperature",
+            "type": "number",
+            "unit": "&amp;deg;C",
+            "imperialUnit": "&amp;deg;F",
+            "toImperialConversion": "x*1.8+32",
+            "toMetricConversion": "(x-32)/1.8",
+            "decimalDigits": 1
+        }, {
+            "name": "Auto Cool Temperature",
+            "type": "number",
+            "unit": "&amp;deg;C",
+            "imperialUnit": "&amp;deg;F",
+            "toImperialConversion": "x*1.8+32",
+            "toMetricConversion": "(x-32)/1.8",
+            "decimalDigits": 1,
+            "controllable": True,
+            "minValue": 10,
+            "maxValue": 100
+        }, {
+            "name": "Auto Heat Temperature",
+            "type": "number",
+            "unit": "&amp;deg;C",
+            "imperialUnit": "&amp;deg;F",
+            "toImperialConversion": "x*1.8+32",
+            "toMetricConversion": "(x-32)/1.8",
+            "decimalDigits": 1,
+            "controllable": True,
+            "minValue": -100,
+            "maxValue": 20
+        }]
+    })
+
+    IoEClient.onInputReceive(on_input_receive) 
+
+    add_event_detect(0, on_event_detect_0)
+
+    temperature = Environment.get("Ambient Temperature")
+
+    measurementSystemChangeEvent()
+
+    state = restoreProperty("state", 0)
+    setState(state)
+
+    autoCoolTemp = restoreProperty("auto cool temp", 20)
+    autoHeatTemp = restoreProperty("auto heat temp", 19)
+
+    Environment.removeCumulativeContribution("Ambient Temperature")
+
+    updateEnvironment()
+    sendReport()
+    on_event_detect_0()
+
+def on_event_detect_0 () :
+    processData(customRead(0), False)
+
+def on_input_receive(input) :
+    processData(input, True)
+
+
+def restoreProperty (propertyName, defaultValue):
+    value = getDeviceProperty(getName(), propertyName)
+    if  not (value == "" or value == None) :
+        if  isinstance(defaultValue, (int, float)) :
+            value = int(value)
+
+        setDeviceProperty(getName(), propertyName, value)
+        return value
+
+    return defaultValue
+
+
+def loop ():
+    global temperature
+    temperature = Environment.get("Ambient Temperature")
+    updateEnvironment()
+    measurementSystemChangeEvent()
+    sendReport()
+    delay(1000)
+
+
+def measurementSystemChangeEvent ():
+    global METRIC, unit
+    METRIC = Options.isUsingMetric()
+    unit = "C" if METRIC else "F"
+    setCustomText(27, 15, 200, 100,
+        STATE_NAMES[state] + "  " +
+        convertTemperature(temperature) + " " + unit)
+
+
+def mouseEvent (pressed, x, y, firstPress):
+    global state
+    # if mouse pressed, then flip it
+    if firstPress:
+        state+=1
+        if state >= 4:
+            state = 0
+
+
+        setState(state)
+
+
+def processData (data, bIsRemote):
+    global autoCoolTemp, autoHeatTemp
+    if data:
+#        print data
+        data = data.split(",")
+#        print data[0],data[1],data[2],data[3]
+        setState(int(data[0]))
+        autoCoolTemp = float(data[2])
+        autoHeatTemp = float(data[3])
+        if autoCoolTemp &lt; autoHeatTemp:
+            autoCoolTemp,autoHeatTemp = autoHeatTemp,autoCoolTemp	
+
+
+def setState (newState):
+    global state
+    state = newState
+
+    analogWrite(A1, state) # change graphic
+    setCustomText(27, 15, 200, 100,
+        STATE_NAMES[state] + "  " +
+        convertTemperature(temperature) + " " + unit)
+
+    sendReport()
+
+
+def sendReport ():
+    report = str(state) + "," + str(temperature) + "," + str(autoCoolTemp) + "," + str(autoHeatTemp)
+    customWrite(0, report)
+    IoEClient.reportStates(report)
+    setDeviceProperty(getName(), "state", state)
+#    print "SR: ", autoCoolTemp, autoHeatTemp, temperature
+    setDeviceProperty(getName(), "temperature", temperature)
+    setDeviceProperty(getName(), "auto cool temp", autoCoolTemp)
+    setDeviceProperty(getName(), "auto heat temp", autoHeatTemp)
+
+
+def updateEnvironment ():
+    global autoMode	
+    autoCoolTemp = float(getDeviceProperty(getName(), "auto cool temp"))
+    autoHeatTemp = float(getDeviceProperty(getName(), "auto heat temp"))
+
+    digitalWrite(HEATER_PIN, LOW)
+    digitalWrite(COOLER_PIN, LOW)
+
+    if  state == 0 :
+        digitalWrite(HEATER_PIN, LOW)
+        digitalWrite(COOLER_PIN, LOW)
+
+    elif  state == 1 :
+        digitalWrite(COOLER_PIN, HIGH)
+
+    elif  state == 2 :
+        digitalWrite(HEATER_PIN, HIGH)
+
+    elif  state == 3 :
+        if temperature >= autoCoolTemp:
+            digitalWrite(COOLER_PIN, HIGH)
+
+        elif temperature &lt; autoHeatTemp:
+            digitalWrite(HEATER_PIN, HIGH)
+
+
+def convertTemperature (value):
+    if METRIC:
+        return "%.0f"%(value,)
+    else:
+        return "%.0f"%(value * 1.8 + 32,)
+
+
+if __name__ == "__main__":
+    setup()
+    while True:
+        loop()
+
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>Thermostat (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT/>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>2</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>
+var autoCoolTemp = 20;
+var autoHeatTemp = 19;
+
+var METRIC;
+
+var HEATER_PIN = 1;
+var COOLER_PIN = 2;
+var state = 0;	// 0 off, 1 cooling, 2 heating, 3 auto
+var STATE_NAMES = ["OFF", "COOL", "HEAT", "AUTO"];
+var temperature = 0;
+var unit;
+
+
+function setup () {
+	IoEClient.setup({
+		type: "Thermostat",
+		states: [{
+			name: "Status",
+			type: "options",
+			options: {
+				"0": "Off",
+				"1": "Cooling",
+				"2": "Heating",
+				"3": "Auto"
+			},
+			controllable: true
+		}, {
+			name: "Temperature",
+			type: "number",
+			unit: "&amp;deg;C",
+			imperialUnit: "&amp;deg;F",
+			toImperialConversion: "x*1.8+32",
+			toMetricConversion: "(x-32)/1.8",
+			decimalDigits: 1
+		}, {
+			name: "Auto Cool Temperature",
+			type: "number",
+			unit: "&amp;deg;C",
+			imperialUnit: "&amp;deg;F",
+			toImperialConversion: "x*1.8+32",
+			toMetricConversion: "(x-32)/1.8",
+			decimalDigits: 1,
+			controllable: true,
+			minValue: 10,
+			maxValue: 100
+		}, {
+			name: "Auto Heat Temperature",
+			type: "number",
+			unit: "&amp;deg;C",
+			imperialUnit: "&amp;deg;F",
+			toImperialConversion: "x*1.8+32",
+			toMetricConversion: "(x-32)/1.8",
+			decimalDigits: 1,
+			controllable: true,
+			minValue: -100,
+			maxValue: 20
+		}]
+	});
+	
+	IoEClient.onInputReceive = function(input) {
+		processData(input, true);
+	};
+	
+	attachInterrupt(0, function() {
+		processData(customRead(0), false);
+	});
+	
+
+	temperature = Environment.get("Ambient Temperature");
+	
+	measurementSystemChangeEvent();
+	
+	state = restoreProperty("state", 0);
+	setState(state);
+	
+	autoCoolTemp = restoreProperty("auto cool temp", 20);
+	autoHeatTemp = restoreProperty("auto heat temp", 19);
+	
+
+	
+	
+	Environment.removeCumulativeContribution("Ambient Temperature");
+	
+	updateEnvironment();
+	sendReport();
+	processData(customRead(0), false);
+}
+
+function restoreProperty (propertyName, defaultValue) {
+	var value = getDeviceProperty(getName(), propertyName);
+	if ( !(value === "" || value == "undefined") ) {
+		if ( typeof(defaultValue) == "number" ) {
+			value = Number(value);
+        }
+		
+		setDeviceProperty(getName(), propertyName, value);
+		return value;
+	}
+	
+	return defaultValue;
+}
+
+
+function loop () {
+	
+	temperature = Environment.get("Ambient Temperature");
+	updateEnvironment();
+	measurementSystemChangeEvent();
+	sendReport();
+	delay(1000);
+}
+
+function measurementSystemChangeEvent () {
+	METRIC = isUsingMetric();
+	unit = METRIC ? "C" : "F";
+	setCustomText(27, 15, 200, 100,
+		STATE_NAMES[state] + "  " +
+		convertTemperature(temperature) + " " + unit);		
+}
+
+function mouseEvent (pressed, x, y, firstPress) {
+	// if mouse pressed, then flip it
+	if (firstPress) {
+		state++;
+		if (state >= 4) {
+			state = 0;
+        }
+		
+		setState(state);
+	}
+}
+
+function processData (data, bIsRemote) {
+	if (data) {
+		data = data.split(",");
+		
+		setState(parseInt(data[0]));
+		autoCoolTemp = parseFloat(data[2]);
+		autoHeatTemp = parseFloat(data[3]);
+		if(autoHeatTemp > autoCoolTemp) {
+			var t = autoCoolTemp
+			autoCoolTemp = autoHeatTemp
+			autoHeatTemp = t
+		}
+	}
+}
+
+function setState (newState) {
+	state = newState;
+
+	analogWrite(A1, state); // change graphic
+	setCustomText(27, 15, 200, 100,
+		STATE_NAMES[state] + "  " +
+		convertTemperature(temperature) + " " + unit);		
+
+	sendReport();
+
+}
+
+function sendReport () {
+	var report = state + "," + temperature + ","
+		+ autoCoolTemp + "," + autoHeatTemp;
+	customWrite(0, report);
+	IoEClient.reportStates(report);
+	setDeviceProperty(getName(), "state", state);
+	setDeviceProperty(getName(), "temperature", temperature);
+	setDeviceProperty(getName(), "auto cool temp", autoCoolTemp);
+	setDeviceProperty(getName(), "auto heat temp", autoHeatTemp);
+}
+
+function updateEnvironment ()
+{
+	var autoCoolTemp = getDeviceProperty(getName(), "auto cool temp");
+	var autoHeatTemp = getDeviceProperty(getName(), "auto heat temp");
+
+	digitalWrite(HEATER_PIN, LOW);
+	digitalWrite(COOLER_PIN, LOW);
+
+	if ( state === 0 ) {
+		digitalWrite(HEATER_PIN, LOW);
+		digitalWrite(COOLER_PIN, LOW);
+	}
+	else if ( state === 1 ) {
+		digitalWrite(COOLER_PIN, HIGH);
+	}
+	else if ( state == 2 ) {
+		digitalWrite(HEATER_PIN, HIGH);
+	}
+	else if ( state == 3 ) {
+        if( temperature >= autoCoolTemp)
+            digitalWrite(COOLER_PIN, HIGH);
+        else if( temperature &lt;= autoHeatTemp )
+            digitalWrite(HEATER_PIN, HIGH);
+	}
+}
+
+function convertTemperature (value) {
+	if (METRIC) {
+		return value.toFixed(0);
+    } else {
+		return (value * 1.8 + 32).toFixed(0);
+    }
+}
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>4</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>User:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>0</FILE_COUNTER>
+         <CAPACITY>10000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <THING_MODEL>
+      <NAME></NAME>
+      <WIDTH>112.5</WIDTH>
+      <HEIGHT>70.5</HEIGHT>
+      <ANALOG_SLOTS_COUNT>4</ANALOG_SLOTS_COUNT>
+      <DIGITAL_SLOTS_COUNT>6</DIGITAL_SLOTS_COUNT>
+      <SPECIFICATIONS>&lt;html>&lt;head>&lt;/head>&lt;body style="word-wrap: break-word; -webkit-nbsp-mode: space; -webkit-line-break: after-white-space; ">&lt;font class="Apple-style-span" face="'Arial Black'" size="5">Thermostat&lt;/font>&lt;div>&lt;div>&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;br>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Features:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Registration Server Compatible&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Off Mode&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Cooling Mode&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Heating Mode&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Auto Mode&lt;/font>&lt;/li>&lt;/ul>&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Usage:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Connect a Furnace to D1&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Connect an Air Conditioner (AC) to D2&lt;/font>&lt;/li>&lt;/ul>&lt;/div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Direct Control:&lt;/u>&lt;/span>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">ALT-click to interact&amp;nbsp;&lt;/span>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Local Control:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Connect device to&amp;nbsp;MCU/SBC/Thing. Use the "customWrite" API per Data Specifications&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Remote Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Connect the device to Registration Server using Config Tab&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Data Specifications:&lt;/u>&lt;/span>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Input Slot: D0&lt;/font>&lt;br>&lt;font class="Apple-style-span" face="Arial" size="5">Message Format: [state],[temperature],[autoCoolTemperature],[autoHeatTemperature]&lt;/font>&lt;br>&lt;font class="Apple-style-span" face="Arial" size="5">state:&lt;br>0 = off, 1 = cooling, 2 = heating, 3 = auto&lt;br>&lt;/font>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;br>temperature:&lt;br>Current temperature in Celcius&lt;br>&lt;br>autoCoolTemperature:&lt;br>&lt;/span>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">If in Auto mode and current&lt;span class="Apple-tab-span" style="white-space:pre">	&lt;/span>temperature is &amp;gt;= autoCoolTemperature, it would start cooling&lt;br>&lt;/span>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;br>autoHeatTemperature:&lt;br>If in Auto mode and current temperature is &amp;lt;= autoHeatTemperature, it would start heating&lt;br>&lt;br>&lt;/span>&lt;/li>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Output Slot: D1&lt;br>Heating device such as Furnace&lt;/span>&lt;/li>&lt;/ul>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Output Slot: D2&lt;br>Cooling device such as AC&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Example:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Work with a temperature sensor to show changes ranging from heating to cooling.&lt;/span>&lt;/div>&lt;/body>&lt;/html></SPECIFICATIONS>
+      <ROTATION>0</ROTATION>
+      <SCALE>1</SCALE>
+      <IS_END_DEVICE>TRUE</IS_END_DEVICE>
+      <IS_DESKTOP_AVAILABLE>FALSE</IS_DESKTOP_AVAILABLE>
+      <SUBCOMPONENTS>
+       <SUBCOMPONENT>
+        <NAME>thermostat</NAME>
+        <X>0</X>
+        <Y>0</Y>
+        <Z_ORDER>1</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>0</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>7</SLOT_NUM>
+        <SLOT_TYPE>2</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/SmartDevices/thermostat_icon_off.png]]></IMAGE>
+         <IMAGE><![CDATA[../art/IoE/SmartDevices/thermostat_icon_cool.png]]></IMAGE>
+         <IMAGE><![CDATA[../art/IoE/SmartDevices/thermostat_icon_heat.png]]></IMAGE>
+         <IMAGE><![CDATA[../art/IoE/SmartDevices/thermostat_icon_auto.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+      </SUBCOMPONENTS>
+      <RULES>
+       <RULE>
+        <SUBCOMPONENT>thermostat</SUBCOMPONENT>
+        <IMAGE_INDEX>0</IMAGE_INDEX>
+        <DIGITAL_VALUE>0</DIGITAL_VALUE>
+        <ANALOG_LOW>0</ANALOG_LOW>
+        <ANALOG_HIGH>0</ANALOG_HIGH>
+       </RULE>
+       <RULE>
+        <SUBCOMPONENT>thermostat</SUBCOMPONENT>
+        <IMAGE_INDEX>1</IMAGE_INDEX>
+        <DIGITAL_VALUE>0</DIGITAL_VALUE>
+        <ANALOG_LOW>1</ANALOG_LOW>
+        <ANALOG_HIGH>1</ANALOG_HIGH>
+       </RULE>
+       <RULE>
+        <SUBCOMPONENT>thermostat</SUBCOMPONENT>
+        <IMAGE_INDEX>2</IMAGE_INDEX>
+        <DIGITAL_VALUE>0</DIGITAL_VALUE>
+        <ANALOG_LOW>2</ANALOG_LOW>
+        <ANALOG_HIGH>2</ANALOG_HIGH>
+       </RULE>
+       <RULE>
+        <SUBCOMPONENT>thermostat</SUBCOMPONENT>
+        <IMAGE_INDEX>3</IMAGE_INDEX>
+        <DIGITAL_VALUE>0</DIGITAL_VALUE>
+        <ANALOG_LOW>3</ANALOG_LOW>
+        <ANALOG_HIGH>3</ANALOG_HIGH>
+       </RULE>
+      </RULES>
+     </THING_MODEL>
+     <IOE_CLIENT>
+      <CLIENT_MODE>NO_SERVER</CLIENT_MODE>
+      <SERVER_ADDRESS></SERVER_ADDRESS>
+      <USERNAME></USERNAME>
+      <PASSWORD></PASSWORD>
+     </IOE_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME></NAME>
+      <MAIL_ID></MAIL_ID>
+      <POP3_SERVER></POP3_SERVER>
+      <SMTP_SERVER></SMTP_SERVER>
+      <USER></USER>
+      <PASSWORD></PASSWORD>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL translate="true">{64dabe8c-acf5-433e-b49c-1b8173e7e934},{24bb05ae-a055-4d29-8306-bff9819ae31a},{777b3223-9c00-4461-a815-0cb2a280f8dd},{63ff7a8c-c247-4d54-a947-20ba845a3ec7}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.141986</X_PN>
+      <Y_PN>0.17493</Y_PN>
+      <X>489</X>
+      <Y>374</Y>
+      <PARENT_PATH>{64dabe8c-acf5-433e-b49c-1b8173e7e934},{24bb05ae-a055-4d29-8306-bff9819ae31a},{777b3223-9c00-4461-a815-0cb2a280f8dd}</PARENT_PATH>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

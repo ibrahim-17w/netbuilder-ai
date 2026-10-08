@@ -1,0 +1,923 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="Signal Generator" model="Signal Generator">MCUComponent</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION/>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeNetworkModule</TYPE>
+        <MODEL>PT-IOT-NM-1CFE</MODEL>
+        <PORT>
+         <TYPE>eCopperFastEthernet</TYPE>
+         <POWER>true</POWER>
+         <MEDIATYPE>0</MEDIATYPE>
+         <PINS>false</PINS>
+         <BANDWIDTH>100000</BANDWIDTH>
+         <FULLDUPLEX>false</FULLDUPLEX>
+         <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+         <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+         <MACADDRESS>0000.0000.0000</MACADDRESS>
+         <BIA>0000.0000.0000</BIA>
+         <CLOCKRATE>2000000</CLOCKRATE>
+         <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+         <DESCRIPTION/>
+         <CHANNEL>0</CHANNEL>
+         <CHANNEL5GHZ>0</CHANNEL5GHZ>
+         <COVERAGERANGE>0</COVERAGERANGE>
+         <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+         <IP/>
+         <SUBNET/>
+         <PORT_GATEWAY/>
+         <PORT_DNS/>
+         <PORT_DHCP_ENABLE>false</PORT_DHCP_ENABLE>
+         <ND_SUPPRESSED>false</ND_SUPPRESSED>
+         <TIMEOUT>14400000</TIMEOUT>
+         <PC_FIREWALL>false</PC_FIREWALL>
+         <PC_IPV6_FIREWALL>false</PC_IPV6_FIREWALL>
+         <IPV6_ENABLED>false</IPV6_ENABLED>
+         <IPV6_ADDRESS_AUTOCONFIG>false</IPV6_ADDRESS_AUTOCONFIG>
+         <IPV6_PORT_GATEWAY/>
+         <IPV6_PORT_DNS/>
+         <IPV6_LINK_LOCAL>FE80::260:5CFF:FE93:4919</IPV6_LINK_LOCAL>
+         <IPV6_DEFAULT_LINK_LOCAL>FE80::260:5CFF:FE93:4919</IPV6_DEFAULT_LINK_LOCAL>
+         <IPV6_PORT_DHCP_ENABLED>false</IPV6_PORT_DHCP_ENABLED>
+         <IPV6_ADDRESSES/>
+         <IP_UNNUMBERED/>
+        </PORT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+        <MODEL>PT-UNV-PWR-ADAPTER</MODEL>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAAAA==</CUSTOM_VARS>
+     <CUSTOM_INTERFACE/>
+     <SYS_CONTACT/>
+     <SYS_LOCATION/>
+     <COORD_SETTINGS>
+      <X_COORD>1234.49</X_COORD>
+      <Y_COORD>1232.1</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT08100F6H</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:26280;cost:500;power source:0;rack units:1;wattage:10;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>1499822740630</TEMPLATE_CREATION_TIME>
+     <USER_APPS>
+      <RUNNING_APPS>
+       <USER_APP>Signal Generator (JavaScript)</USER_APP>
+      </RUNNING_APPS>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SYS_NAME/>
+     <GATEWAY/>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP/>
+     </DHCP_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY/>
+        <WPA_EAP_USERID/>
+        <WPA_EAP_PASSWORD/>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY/>
+        <WPA_EAP_USERID/>
+        <WPA_EAP_PASSWORD/>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <GATEWAYV6/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>8A-E5-08-89-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME/>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>Signal Generator (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT/>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>2</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>
+// Customizable Variables
+
+var V_NAME = "Example Signal";     // Value name displayed in the display 
+var V_MIN = 0;             // generated value minimum
+var V_MAX = 1000;              // generated value maximum
+var V_STEPS_PER_PERIOD = 21; // > 1.
+var V_TICKS_PER_STEP = 3;    // > 1. 
+var V_TICK_DELAY = 150;       // delay inside the the loop() function before the next iteration 
+var V_CURVE_TYPE = "triangle";   // type of the curve the values will follow
+var V_CURVE_PARAM = 0.25;     // curve parameter is from 0 to 1
+var V_OUT_D = [0, 1, 2, 3, 4, 5];   // output signal value into digital outputs designated by their indices
+var V_OUT_A = [0, 1, 2, 3];   // output signal value into analog outputs designated by their indices
+
+// Implementation 
+
+var tick = 0;
+var step_tick = 0;
+var display_sep = "\n             ";
+var oo_ticks_period = 1.0 / (V_STEPS_PER_PERIOD * V_TICKS_PER_STEP);
+var signal_func = null;
+var EPS = 1.0e-6; 
+var OFF_0 = EPS;
+var OFF_1 = 1.0 - EPS;
+var OO_VCP = 1.0 / V_CURVE_PARAM;
+var OO_1mVCP = 1.0 / (1.0 - V_CURVE_PARAM);
+var PI2 = Math.PI * 2.0;
+var uiControl;
+
+function reset(){
+	tick = 0;
+	step_tick = 0;
+	oo_ticks_period = 1.0 / (V_STEPS_PER_PERIOD * V_TICKS_PER_STEP);
+	OO_VCP = 1.0 / V_CURVE_PARAM;
+	OO_1mVCP = 1.0 / (1.0 - V_CURVE_PARAM);
+}
+
+function setup() {
+    setup_signal_func();
+    
+    if(V_CURVE_PARAM &lt; 0 || V_CURVE_PARAM > 1)
+    	throw("ERROR: V_CURVE_PARAM must be from range [0.0, 1.0]: \"" + V_CURVE_PARAM + "\"");
+    
+    var i, len;
+    for(i=0, len=V_OUT_D.length; i&lt;len; ++i)
+        if(!check_bounds(V_OUT_D[i], 0, 5))
+       		throw("ERROR: V_OUT_D index must be from 0-5: \"" + V_OUT_D[i] + "\"");
+     
+    for(i=0, len=V_OUT_A.length; i&lt;len; ++i)
+        if(!check_bounds(V_OUT_A[i], 0, 3))
+       		throw("ERROR: V_OUT_A index must be from 0-3: \"" + V_OUT_A[i] + "\"");
+    
+    	
+    output(signal_func(tick * oo_ticks_period));
+    step_tick = 0;
+    
+    uiControl = new UiControl();
+}
+
+function loop() {
+    ++tick;
+    ++step_tick;
+//    Serial.println(step_tick);
+//    Serial.println(V_TICKS_PER_STEP);
+    if(step_tick == V_TICKS_PER_STEP){
+        var time = tick * oo_ticks_period,
+            func_value = signal_func(time);
+//	Serial.println(func_value);
+        output(func_value);
+        step_tick = 0;
+    }
+    delay(V_TICK_DELAY);
+    delay(0);
+}
+
+function setup_signal_func(){
+    switch(V_CURVE_TYPE) {
+        case 'cosine': signal_func = signal_cosine; break;
+        case 'cosine_inv': signal_func = signal_cosine_inv; break;
+        case 'square': signal_func = signal_square; break;
+        case 'square_inv': signal_func = signal_square_inv; break;
+        case 'triangle': signal_func = signal_triangle; break;
+        case 'triangle_inv': signal_func = signal_triangle_inv; break;
+        case 'zero': signal_func = signal_zero; break;
+        case 'one': signal_func = signal_one; break;
+        default: throw("ERROR: Unknown signal curve type: \"" + V_CURVE_TYPE + "\"");
+    }
+}
+
+function output(func_value){
+    var disp_value = Math.floor(V_MIN + func_value * (V_MAX - V_MIN));
+    var i,len;
+
+    update_display(V_NAME, disp_value);
+
+    // analog output values are from 0 to 255 inclusive 
+    var avalue = Math.floor(func_value * 255);
+
+    for(i=0, len=V_OUT_D.length; i&lt;len; ++i)
+        analogWrite(V_OUT_D[i], avalue);
+
+    for(i=0, len=V_OUT_A.length; i&lt;len; ++i)
+        analogWrite(V_OUT_A[i]+A0, avalue);
+}
+
+function check_bounds(v, min, max){
+	return v >= min &amp;&amp; v &lt;= max;
+}
+
+function update_display(name, value){
+    var text = name + display_sep + value;    
+    setCustomText(20,15,150,100, text);
+}
+
+// signal functions 
+
+function signal_triangle(time){
+    var t = time - Math.floor(time),
+        EPS = 1e-6;
+    if(V_CURVE_PARAM &lt; OFF_0)
+        return 1.0 - t;
+    else if(V_CURVE_PARAM > OFF_1)
+        return t;
+    else if(t &lt;= V_CURVE_PARAM)
+        return t * OO_VCP;
+    else if(t > V_CURVE_PARAM)
+        return (1.0 - t) * OO_1mVCP;
+}
+
+function signal_triangle_inv(time){
+    return 1.0 - signal_triangle(time);
+}
+
+
+function signal_cosine_inv(time){
+    return 1.0 - signal_cosine(time);
+}
+
+function signal_cosine(time){
+    return 0.5 * (1.0 + Math.cos(PI2*time));
+}
+
+function signal_square(time){
+    var t = time - Math.floor(time);
+    if(t &lt; V_CURVE_PARAM)
+        return 1;
+    return 0;
+}
+
+function signal_square_inv(time){
+    return 1.0 - signal_square(time);
+}
+
+function signal_zero(time){
+    return 0; 
+}
+
+function signal_one(time){
+    return 1; 
+}
+
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+            <FILE class="CFile">
+             <FILE_NUMBER>3</FILE_NUMBER>
+             <NAME>ui-control.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>function UiControl() {
+    this.ui = {
+        type: "Signal Generator",
+        states: [
+            {
+                name: "Signal Name", type: "options", controllable: true, vname: "V_NAME",
+                options: {
+                    name: V_NAME
+                }
+            }, {
+                name: "Curve Shape", type: "options", controllable: true, vname: "V_CURVE_TYPE",
+                options: {triangle:"Tri", triangle_inv:"TriInv", square:"Sqr", square_inv:"SqrInv", one: "Max", zero:"Min", cosine:"Cos", cosine_inv:"CosInv"}                
+            }, {
+                name: "Curve Parameter", type: "options", controllable: true, vname: "V_CURVE_PARAM",
+                options: {}
+            }, {
+                name: "Min", type: "options", controllable: true, vname: "V_MIN",
+                options: {}
+            }, {
+                name: "Max", type: "options", controllable: true, vname: "V_MAX",
+                options: {}
+            }, {
+                name: "Tick Delay", type: "options",        controllable: true, vname: "V_TICK_DELAY",
+                options:{}
+            }, {
+                name: "Sample Count", type: "options",      controllable: true, vname: "V_STEPS_PER_PERIOD",
+                options:{}
+            }, {
+                name: "Ticks Per Sample", type: "options",          controllable: true, vname: "V_TICKS_PER_STEP",
+                options:{}
+            }
+        ]
+    };
+    
+    for(var d=0; d&lt;6; ++d){
+        this.ui.states.push({                                                           
+            name: "Out D"+d, type: "bool", controllable: true, vname: "V_OUT_D"+d
+        });
+    }
+
+    for(var a=0; a&lt;4; ++a){
+        this.ui.states.push({                                                           
+            name: "Out D"+a, type: "bool", controllable: true, vname: "V_OUT_A"+a
+        });
+    }
+
+    for(var s=0; s&lt;this.ui.states.length; ++s){
+        var state = this.ui.states[s];
+        switch(state.vname){
+            case "V_MAX": 
+                for(var mx=-500; mx&lt;=1050; mx+=84)
+                    state.options[mx] = mx;
+                break;
+            case "V_MIN": 
+                for(var m=-1000; m&lt;=500; m+=100)
+                    state.options[m] = m;
+                break;
+            case "V_TICK_DELAY": 
+                for(var td=75; td&lt;=1000; td+=75)
+                    state.options[td] = td;
+                break;
+            case "V_STEPS_PER_PERIOD": 
+                for(var spp=1; spp&lt;=50; spp+=5)
+                    state.options[spp] = spp;
+                break;
+            case "V_TICKS_PER_STEP": 
+                for(var tps=1; tps&lt;=20; tps+=2)
+                    state.options[tps] = tps;
+                break;
+            case "V_CURVE_PARAM": 
+                var params = [0,25,50,75,100];
+                for(var p=0; p&lt;params.length; ++p)
+                    state.options[params[p]] = params[p]/100;
+                break;
+        }
+    }
+
+    IoEClient.setup(this.ui);
+	
+    var me = this;
+	IoEClient.onInputReceive = function(uiData) {
+        me.ui2vars(uiData);
+	};
+
+    this.vars2ui();
+}    
+
+UiControl.prototype.vars2ui = function() {
+    var fileds = []; 
+    for(var s=0; s&lt;this.ui.states.length; ++s){
+    	var vname = this.ui.states[s].vname;
+        var state = this.var_value(vname);
+        fileds.push(state);
+    }
+    var uiData = fileds.join(",");
+    Serial.println("sending uiData: " + uiData);
+    IoEClient.reportStates(uiData);
+};
+
+UiControl.prototype.ui2vars = function(uiData) {
+    Serial.println("receiving uiData: " + uiData);
+    var fields = uiData.split(',');
+    for(var f=0; f&lt;fields.length; ++f){
+        var state = this.ui.states[f];
+        if(state === undefined)
+            throw "ERROR: Unknown ui state at index: "+f+"\n\tin data received: \n\t\t"+uiData;
+        this.var_value(state.vname, fields[f]);
+    }
+    
+	reset();
+
+    this.vars2ui();
+};
+
+UiControl.prototype.var_value = function(vname, value) {
+    switch(vname){
+        case "V_NAME": 
+            if(value === undefined)
+                return 'name'; // option id
+            break;
+        case "V_MAX": 
+            if(value !== undefined)
+                V_MAX = parseInt(value); 
+            else
+                return V_MAX;
+            break;
+        case "V_MIN": 
+            if(value !== undefined)
+                V_MIN = parseInt(value); 
+            else
+                return V_MIN;
+            break;
+        case "V_CURVE_PARAM": 
+            if(value !== undefined)
+                V_CURVE_PARAM = parseFloat(value)/100; 
+            else{
+                return V_CURVE_PARAM*100;
+            }
+            break;
+        case "V_CURVE_TYPE": 
+            if(value !== undefined){
+                V_CURVE_TYPE = value; 
+                setup_signal_func();
+            }
+            else
+                return V_CURVE_TYPE;
+            break;
+        case "V_TICK_DELAY": 
+            if(value !== undefined)
+                V_TICK_DELAY = parseFloat(value); 
+            else
+                return V_TICK_DELAY;
+            break;
+        case "V_STEPS_PER_PERIOD": 
+            if(value !== undefined)
+                V_STEPS_PER_PERIOD = parseInt(value); 
+            else
+                return V_STEPS_PER_PERIOD;
+            break;
+        case "V_TICKS_PER_STEP":
+            if(value !== undefined)
+                V_TICKS_PER_STEP = parseInt(value); 
+            else
+                return V_TICKS_PER_STEP;
+            break;
+        default:
+        	var result = this.var_value_da_out(vname, value, V_OUT_D, "V_OUT_D");
+            if(result === undefined)
+            	result = this.var_value_da_out(vname, value, V_OUT_A, "V_OUT_A");
+            return result;
+    }
+};
+
+/*
+UiControl.prototype.var_value_num = function(vname, value, value_convert) {
+	var ev = eval;
+    if(value !== undefined)
+        ev(vname + "=" + value_convert(value)); 
+    else
+        return ev(vname);
+};
+*/
+
+UiControl.prototype.var_value_da_out = function(vname, value, out_arr, out_var_name) {
+    if(vname.substr(0,7) === out_var_name){
+        var index = parseInt(vname.substr(7,1));
+        if(value !== undefined){
+    		Serial.println(vname + " (setting): " + value);
+            if(value == 1){
+                if(out_arr.indexOf(index) == -1)
+                    out_arr.push(index);
+            }
+            else {
+                var out = [];
+                while(out_arr.length > 0){
+                    var di = out_arr.pop();
+                    if(di != index)
+                        out.push(di);
+                }
+                while(out.length > 0)
+                    out_arr.push(out.pop());
+            }
+        }
+        else{
+            return out_arr.indexOf(index) == -1 ? 0 : 1;
+        }
+        return index;
+    }
+};
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>4</FILE_NUMBER>
+           <NAME>Signal Generator (Python)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT/>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>5</FILE_NUMBER>
+             <NAME>main.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>from time import *
+import math
+from physical import *
+from gpio import *
+
+
+# Customizable Variables
+
+V_NAME = "Example Signal" # Value name displayed in the display        # var V_NAME
+V_MIN = 0 # generated value minimum        # var V_MIN
+V_MAX = 1000 # generated value maximum        # var V_MAX
+V_STEPS_PER_PERIOD = 21 # > 1.        # var V_STEPS_PER_PERIOD
+V_TICKS_PER_STEP = 3 # > 1.        # var V_TICKS_PER_STEP
+V_TICK_DELAY = 150 # delay inside the the loop() function before the next iteration        # var V_TICK_DELAY
+V_CURVE_TYPE = "triangle" # type of the curve the values will follow        # var V_CURVE_TYPE
+V_CURVE_PARAM = 0.25 # curve parameter is from 0 to 1        # var V_CURVE_PARAM
+V_OUT_D = [0, 1, 2, 3, 4, 5] # output signal value into digital outputs designated by their indices        # var V_OUT_D
+V_OUT_A = [0, 1, 2, 3] # output signal value into analog outputs designated by their indices        # var V_OUT_A
+
+# Implementation
+
+tick = 0        # var tick
+step_tick = 0        # var step_tick
+display_sep = "\n             "        # var display_sep
+oo_ticks_period = 1.0 / (V_STEPS_PER_PERIOD * V_TICKS_PER_STEP)        # var oo_ticks_period
+signal_func = None        # var signal_func
+EPS = 1.0e-6        # var EPS
+OFF_0 = EPS        # var OFF_0
+OFF_1 = 1.0 - EPS        # var OFF_1
+OO_VCP = 1.0 / V_CURVE_PARAM        # var OO_VCP
+OO_1mVCP = 1.0 / (1.0 - V_CURVE_PARAM)        # var OO_1mVCP
+PI2 = math.pi * 2.0        # var PI2
+uiControl = None        # var uiControl
+
+
+def setup ():
+    global step_tick
+    setup_signal_func()
+
+    if V_CURVE_PARAM &lt; 0 or V_CURVE_PARAM > 1:
+        raise ("ERROR: V_CURVE_PARAM must be from range [0.0, 1.0]: \"" + V_CURVE_PARAM + "\"")
+
+    for i in xrange( 0, len(V_OUT_D)):
+        if not check_bounds(V_OUT_D[i], 0, 5):
+            raise ("ERROR: V_OUT_D index must be from 0-5: \"" + V_OUT_D[i] + "\"")
+
+    for i in xrange( 0, len(V_OUT_A)):
+        if not check_bounds(V_OUT_A[i], 0, 3):
+            raise ("ERROR: V_OUT_A index must be from 0-3: \"" + V_OUT_A[i] + "\"")
+
+    output(signal_func(tick * oo_ticks_period))
+    step_tick = 0
+
+    #uiControl = new UiControl()
+
+def loop ():
+    global tick, step_tick
+    tick += 1
+    step_tick += 1
+    if step_tick == V_TICKS_PER_STEP:
+        time = tick * oo_ticks_period        # var time
+        func_value = signal_func(time)
+        output(func_value)
+        step_tick = 0
+
+    delay(V_TICK_DELAY)
+
+
+
+def setup_signal_func ():
+    global signal_func
+    if V_CURVE_TYPE is 'cosine':
+        signal_func = signal_cosine
+    elif V_CURVE_TYPE is 'cosine_inv':
+        signal_func = signal_cosine_inv
+    elif V_CURVE_TYPE is 'square':
+        signal_func = signal_square
+    elif V_CURVE_TYPE is 'square_inv':
+        signal_func = signal_square_inv
+    elif V_CURVE_TYPE is 'triangle':
+        signal_func = signal_triangle
+    elif V_CURVE_TYPE is 'triangle_inv':
+        signal_func = signal_triangle_inv
+    elif V_CURVE_TYPE is 'zero':
+        signal_func = signal_zero
+    elif V_CURVE_TYPE is 'one':
+        signal_func = signal_one
+    else:
+        raise ("ERROR: Unknown signal curve type: \"" + V_CURVE_TYPE + "\"")
+    
+
+
+
+def output (func_value) :
+    disp_value = math.floor(V_MIN + func_value * (V_MAX - V_MIN))        # var disp_value
+
+    update_display(V_NAME, disp_value)
+
+    # analog output values are from 0 to 255 inclusive
+    avalue = math.floor(func_value * 255)        # var avalue
+
+    for i in xrange( 0, len(V_OUT_D)):
+        analogWrite(V_OUT_D[i], avalue)
+
+    for i in xrange( 0, len(V_OUT_A)):
+        analogWrite(V_OUT_A[i] + A0, avalue)
+
+
+
+def check_bounds (v, min, max) :
+    return min &lt;= v &lt;= max
+
+
+
+def update_display (name, value) :
+    text = name + display_sep + str(value)        # var text
+    setCustomText(20, 15, 150, 100, text)
+
+
+# signal functions
+
+
+def signal_triangle (time) :
+    t = time - math.floor(time)        # var t
+    if V_CURVE_PARAM &lt; OFF_0:
+        return 1.0 - t
+    elif V_CURVE_PARAM > OFF_1:
+        return t
+    elif t &lt;= V_CURVE_PARAM:
+        return t * OO_VCP
+    elif t > V_CURVE_PARAM:
+        return (1.0 - t) * OO_1mVCP
+
+
+
+def signal_triangle_inv (time):
+    return 1.0 - signal_triangle(time)
+
+
+
+
+def signal_cosine_inv (time):
+    return 1.0 - signal_cosine(time)
+
+
+
+def signal_cosine (time):
+    return 0.5 * (1.0 + math.cos(PI2 * time))
+
+
+
+def signal_square (time):
+    t = time - math.floor(time)        # var t
+    if t &lt; V_CURVE_PARAM:
+        return 1
+    return 0
+
+
+
+def signal_square_inv (time):
+    return 1.0 - signal_square(time)
+
+
+
+def signal_zero (time):
+    return 0
+
+
+
+def signal_one (time):
+    return 1
+
+
+if __name__ == "__main__":
+    setup()
+    while True:
+        loop()
+        sleep(0)
+
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>5</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>User:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>0</FILE_COUNTER>
+         <CAPACITY>10000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <THING_MODEL>
+      <NAME/>
+      <WIDTH>240.5</WIDTH>
+      <HEIGHT>88.5</HEIGHT>
+      <ANALOG_SLOTS_COUNT>4</ANALOG_SLOTS_COUNT>
+      <DIGITAL_SLOTS_COUNT>6</DIGITAL_SLOTS_COUNT>
+      <SPECIFICATIONS>&lt;html>&lt;head>&lt;/head>&lt;body style="word-wrap: break-word; -webkit-nbsp-mode: space; -webkit-line-break: after-white-space; ">&lt;font class="Apple-style-span" face="'Arial Black'" size="5">Signal Generator&lt;/font>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Produces analog, digital or Environment periodic outputs that follow a set of common signal curves. &amp;nbsp;&lt;/span>&lt;/div>&lt;div>&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;br>&lt;/font>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Features:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Generates signals of the following shapes:&amp;nbsp;&lt;i>cosine[_inv]&lt;/i>,&amp;nbsp;&lt;i>square[_inv]&lt;/i>&amp;nbsp;(with duty cycle),&amp;nbsp;&lt;i>triangle[_inv]&lt;/i>&amp;nbsp;(with adjustable apex),&amp;nbsp;&lt;i>minimum&lt;/i>,&amp;nbsp;&lt;i>maximum&lt;/i>.&amp;nbsp;&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">It can be customized by changing values of variables (see below) inside&amp;nbsp;&lt;i>main.js&lt;/i>&amp;nbsp;with names that start with prefix&amp;nbsp;&lt;i>V_&lt;/i>. Look for an example&amp;nbsp;&lt;i>signal-generator.pkt&lt;/i>&amp;nbsp;in Packet Tracer samples.&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Signals are generated in the range from 0 to 1 and then scaled to the user value range defined by&amp;nbsp;&lt;i>V_MIN&lt;/i>&amp;nbsp;and&amp;nbsp;&lt;i>M_MAX&lt;/i>.&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;i>V_NAME&lt;/i>&amp;nbsp;can be set to name the signal with user-chosen text (Pressure, Flow, etc.)&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;i>V_CURVE_TYPE&lt;/i>&amp;nbsp;can be set to:&amp;nbsp;&lt;i>triangle[_inv], cosine[_inv], zero, one, square[_inv]&lt;/i>. Where&amp;nbsp;&lt;i>_inv&lt;/i>&amp;nbsp;suffix is given, the cirve will be flipped upside within its value range.&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;i>V_CURVE_PARAM&lt;/i>&amp;nbsp;defines a value from 0 to 1 with the following semantics:&lt;/font>&lt;/li>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;i>triangle[_inv]&lt;/i>&amp;nbsp;- determines position of the triangle apex along the time axis. Value of 0.5 - wave is an equilateral triangle, value of 0 - apex is at the leftmost edge of its period, value of 1 - apex is at the rightmost edge of its period.&amp;nbsp;&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;i>square[_inv]&lt;/i>&amp;nbsp;- determines the signal's duty cycle.&lt;/font>&lt;/li>&lt;/ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;i>V_OUT_D&amp;nbsp;&lt;/i>variable determine digital outputs the final value will be applied to. The variable holds index values of the desired output pins. &lt;i>V_OUT_D&lt;/i>&amp;nbsp;array may be empty. In this case no values will be output.&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;i>V_OUT_A&lt;/i>&amp;nbsp;variable determines analog outputs the final value will be applied to. The variable holds index values of the desired output pins. &lt;i>V_OUT_A&lt;/i>&amp;nbsp;array may be empty. In this case no values will be output.&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;i>V_STEPS_PER_PERIOD&lt;/i>&amp;nbsp;defines how many samples will be produced for every period length of time for a given curve. The higher this number, the more accurately samples will represent the actual curve.&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;i>V_TICKS_PER_STEP&lt;/i>&amp;nbsp;defines how many&amp;nbsp;&lt;i>loop()&lt;/i>&amp;nbsp;iterations it takes to produce one sample.&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;i>V_TICK_DELAY&lt;/i>&amp;nbsp;defines how long every&amp;nbsp;&lt;i>loop()&lt;/i>&amp;nbsp;iteration sleeps before it moves to the next tick.&lt;/font>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Usage:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Use this device as a signal output device connecting it to inputs of other devices that require analog or digital inputs.&amp;nbsp;&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Direct Control:&lt;/u>&lt;/span>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">N/A&lt;/font>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;div>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Local Control:&lt;/u>&lt;/span>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">N/A&lt;/font>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;/div>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Remote Control:&lt;/u>&lt;/span>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Connect device to Registration Server using Config Tab&lt;/span>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;span class="Apple-style-span" style="font-family: 'Times New Roman'; font-size: medium; ">&lt;div>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Data Specification:&lt;/u>&lt;/span>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">N/A&lt;/font>&lt;/li>&lt;/ul>&lt;div>&lt;div>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Example:&lt;/u>&lt;/span>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">N/A&lt;/font>&lt;/li>&lt;/ul>&lt;/div>&lt;/div>&lt;/div>&lt;div>&lt;/div>&lt;/span>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/div>&lt;/body>&lt;/html></SPECIFICATIONS>
+      <ROTATION>0</ROTATION>
+      <SCALE>1</SCALE>
+      <IS_END_DEVICE>TRUE</IS_END_DEVICE>
+      <IS_DESKTOP_AVAILABLE>FALSE</IS_DESKTOP_AVAILABLE>
+      <SUBCOMPONENTS>
+       <SUBCOMPONENT>
+        <NAME>display</NAME>
+        <X>0</X>
+        <Y>0</Y>
+        <Z_ORDER>1</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>0</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>-1</SLOT_NUM>
+        <SLOT_TYPE>0</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/SmartDevices/value-gen-display.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+      </SUBCOMPONENTS>
+      <RULES/>
+     </THING_MODEL>
+     <IOE_CLIENT>
+      <CLIENT_MODE>NO_SERVER</CLIENT_MODE>
+      <SERVER_ADDRESS/>
+      <USERNAME/>
+      <PASSWORD/>
+     </IOE_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME/>
+      <MAIL_ID/>
+      <POP3_SERVER/>
+      <SMTP_SERVER/>
+      <USER/>
+      <PASSWORD/>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL/>
+      <CUSTOM_IMAGE_PHYSICAL/>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL translate="true">{4d5a8357-1cf0-4511-8c6e-df16e4ea09fb},{e75f6b2c-2ada-4754-ba2f-a9d39e808082},{b178837b-519b-4071-840f-f1924fd42676},{0c59c0d3-682d-479d-be89-ab0c2420a534}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.0749129</X_PN>
+      <Y_PN>0.100561</Y_PN>
+      <X>258</X>
+      <Y>215</Y>
+      <PARENT_PATH>{4d5a8357-1cf0-4511-8c6e-df16e4ea09fb},{e75f6b2c-2ada-4754-ba2f-a9d39e808082},{b178837b-519b-4071-840f-f1924fd42676}</PARENT_PATH>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

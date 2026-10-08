@@ -1,0 +1,454 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="Old Car" model="Old Car">MCUComponent</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+        <MODEL>PT-UNV-PWR-ADAPTER</MODEL>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAABAAAAC4AUABSAE8ARwBSAEEATQBNAEkATgBHAF8AQwBVAFIAUgBFAE4AVABfAEQASQBSAAAACgAAAAAgAE8AbABkACAAQwBhAHIAIAAoAFAAeQB0AGgAbwBuACkAAAAwAFAAUgBPAEcAUgBBAE0ATQBJAE4ARwBfAEMAVQBSAFIARQBOAFQAXwBGAEkATABFAAAACgAAAAAOAG0AYQBpAG4ALgBwAHkAAAAuAFAAUgBPAEcAUgBBAE0ATQBJAE4ARwBfAEUARABJAFQASQBOAEcAXwBEAEkAUgAAAAoAAAAAIABPAGwAZAAgAEMAYQByACAAKABQAHkAdABoAG8AbgApAAAACgBzAHQAYQB0AGUAAAAKAAAAAAIAMA==</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1249.47</X_COORD>
+      <Y_COORD>1231.99</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT0810P1VN</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:8760;cost:500;power source:0;rack units:1;wattage:10;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>1499966681495</TEMPLATE_CREATION_TIME>
+     <STARTTIME>730972800000</STARTTIME>
+     <STARTSIMTIME>0</STARTSIMTIME>
+     <USER_APPS>
+      <RUNNING_APPS>
+       <USER_APP>Old Car (JavaScript)</USER_APP>
+      </RUNNING_APPS>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SAVE_REF_ID>save-ref-id:0</SAVE_REF_ID>
+     <SYS_NAME></SYS_NAME>
+     <GATEWAY/>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP/>
+     </DHCP_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+       <STANDARD_CHANNEL5G>112</STANDARD_CHANNEL5G>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <GATEWAYV6/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>2B-A2-52-61-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>Old Car (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT/>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>2</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>var CO_RATE = 1/3600; // 1% per hour&#xd;
+var CO2_RATE = 2/3600;&#xd;
+var SMOKE_RATE = 3/3600;&#xd;
+var TEMPERATURE_RATE = 1/3600;&#xd;
+var VOLUME_AT_RATE = 100000;&#xd;
+&#xd;
+var state = 0;&#xd;
+&#xd;
+function updateEnvironment()&#xd;
+{&#xd;
+	if ( state == 1 )&#xd;
+	{&#xd;
+		var volumeRatio = VOLUME_AT_RATE / Environment.getVolume();&#xd;
+		Environment.setContribution("CO", CO_RATE*volumeRatio);&#xd;
+		Environment.setContribution("CO2", CO2_RATE*volumeRatio);&#xd;
+		Environment.setContribution("Smoke", SMOKE_RATE*volumeRatio);&#xd;
+		Environment.setContribution("Ambient Temperature",TEMPERATURE_RATE*volumeRatio );&#xd;
+		&#xd;
+		&#xd;
+	}&#xd;
+	else&#xd;
+	{&#xd;
+		Environment.setContribution("CO", 0);&#xd;
+		Environment.setContribution("CO2", 0);&#xd;
+		Environment.setContribution("Smoke", 0);&#xd;
+		Environment.setContribution("Ambient Temperature", 0 );&#xd;
+	}&#xd;
+	&#xd;
+}&#xd;
+&#xd;
+&#xd;
+function setup() {&#xd;
+	state = restoreProperty("state", 0);&#xd;
+	setState(state);&#xd;
+}&#xd;
+&#xd;
+function restoreProperty(propertyName, defaultValue)&#xd;
+{&#xd;
+	var value = getDeviceProperty(getName(), propertyName);&#xd;
+	if ( !(value === "" || value == "undefined") ){&#xd;
+		if ( typeof(defaultValue) == "number" )&#xd;
+			value = Number(value);&#xd;
+		&#xd;
+		setDeviceProperty(getName(), propertyName, value);&#xd;
+		return value;&#xd;
+	}&#xd;
+	&#xd;
+	return defaultValue;&#xd;
+}&#xd;
+&#xd;
+&#xd;
+function mouseEvent(pressed, x, y, firstPress) {&#xd;
+	if (firstPress)&#xd;
+		setState(state ? 0 : 1);&#xd;
+}&#xd;
+&#xd;
+function setState(newState)&#xd;
+{&#xd;
+	if ( newState === 0 )&#xd;
+		digitalWrite(1, LOW);&#xd;
+	else{&#xd;
+		digitalWrite(1, HIGH);&#xd;
+	}&#xd;
+	state = newState;&#xd;
+	setDeviceProperty(getName(), "state", state);&#xd;
+	updateEnvironment();&#xd;
+}&#xd;
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>3</FILE_NUMBER>
+           <NAME>Old Car (Python)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT/>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>4</FILE_NUMBER>
+             <NAME>main.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>from time import *
+from physical import *
+from gpio import *
+from environment import Environment
+from ioeclient import IoEClient
+
+CO_RATE = 1./3600 # 1% per hour
+CO2_RATE = 2./3600
+SMOKE_RATE = 3./3600
+TEMPERATURE_RATE = 1./3600
+VOLUME_AT_RATE = 100000.
+MAX_RATE = 1.e6
+
+state = 0
+
+def updateEnvironment ():
+    if  state == 1 :
+        volumeRatio = VOLUME_AT_RATE / Environment.getVolume()
+        Environment.setContribution("CO", CO_RATE*volumeRatio, MAX_RATE, True)
+        Environment.setContribution("CO2", CO2_RATE*volumeRatio, MAX_RATE, True)
+        Environment.setContribution("Smoke", SMOKE_RATE*volumeRatio, MAX_RATE, True)
+        Environment.setContribution("Ambient Temperature",TEMPERATURE_RATE*volumeRatio, MAX_RATE, True)
+    else:
+        Environment.setContribution("CO", 0, 0, True)
+        Environment.setContribution("CO2", 0, 0, True)
+        Environment.setContribution("Smoke", 0, 0, True)
+        Environment.setContribution("Ambient Temperature", 0 , 0, True)
+
+def setup ():
+    global state
+    state = restoreProperty("state", 0);
+    setState(state)
+
+def restoreProperty(propertyName, defaultValue):
+    value = getDeviceProperty(getName(), propertyName)
+    if  not (value is "" or value is None):
+        if  type(defaultValue) is int :
+            value = int(value)
+
+        setDeviceProperty(getName(), propertyName, value)
+        return value
+    return defaultValue
+
+def mouseEvent (pressed, x, y, firstPress):
+    if firstPress:
+        setState(0 if state else 1)
+
+def setState (newState):
+    global state
+    if  newState == 0 :
+        digitalWrite(1, LOW)
+    else:
+        digitalWrite(1, HIGH)
+
+    state = newState
+    setDeviceProperty(getName(), "state", state)
+    updateEnvironment()
+
+if __name__ == "__main__":
+    setup()
+    while True:
+        sleep(3600)
+
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>4</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>User:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>0</FILE_COUNTER>
+         <CAPACITY>10000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <THING_MODEL>
+      <NAME></NAME>
+      <WIDTH>44.5</WIDTH>
+      <HEIGHT>113.5</HEIGHT>
+      <ANALOG_SLOTS_COUNT>4</ANALOG_SLOTS_COUNT>
+      <DIGITAL_SLOTS_COUNT>6</DIGITAL_SLOTS_COUNT>
+      <SPECIFICATIONS>&lt;html>&lt;head>&lt;/head>&lt;body style="word-wrap: break-word; -webkit-nbsp-mode: space; -webkit-line-break: after-white-space; ">&lt;!--StartFragment-->&lt;font class="Apple-style-span" face="'Arial Black'" size="5">Old Car&lt;/font>&lt;div>&lt;font class="Apple-style-span" face="'Arial Black'" size="5">&lt;span class="Apple-style-span" style="font-family: Arial; ">A car having lots of problems.&lt;/span>&lt;br>&lt;/font>&lt;div>&lt;div>&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;br>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Features:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Off&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">On&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Increases Carbon Dioxide&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Increases Carbon Monoxide&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Increases Smoke&lt;/font>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Usage:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&amp;nbsp;&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Direct Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">ALT-click to interact&amp;nbsp;&lt;/span>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Local Control:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Remote Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">N/A&lt;/font>&lt;/li>&lt;/ul>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Data Specifications:&lt;/u>&lt;/span>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>&lt;br>&lt;/u>&lt;/font>&lt;/div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;div>N/A&lt;/div>&lt;div>&lt;br>&lt;/div>&lt;div>&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Example:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ol>&lt;li>Place a CO detector and a CO2 detector within the same container as the car.&lt;/li>&lt;li>Turn on the car and notice the alarm indicators go off on the detectors.&lt;/li>&lt;/ol>&lt;/div>&lt;/div>&lt;/font>&lt;/font>&lt;/span>&lt;/div>&lt;/div>&lt;!--EndFragment-->&lt;/body>&lt;/html></SPECIFICATIONS>
+      <ROTATION>0</ROTATION>
+      <SCALE>1</SCALE>
+      <IS_END_DEVICE>TRUE</IS_END_DEVICE>
+      <IS_DESKTOP_AVAILABLE>FALSE</IS_DESKTOP_AVAILABLE>
+      <SUBCOMPONENTS>
+       <SUBCOMPONENT>
+        <NAME>car</NAME>
+        <X>0</X>
+        <Y>38</Y>
+        <Z_ORDER>1</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>0</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>-1</SLOT_NUM>
+        <SLOT_TYPE>0</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/ParkingLot/redcar.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+       <SUBCOMPONENT>
+        <NAME>smoke</NAME>
+        <X>0</X>
+        <Y>0</Y>
+        <Z_ORDER>2</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>1</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>1</SLOT_NUM>
+        <SLOT_TYPE>1</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/ParkingLot/smoke_small.png]]></IMAGE>
+         <IMAGE><![CDATA[../art/IoE/ParkingLot/smoke_none.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+      </SUBCOMPONENTS>
+      <RULES>
+       <RULE>
+        <SUBCOMPONENT>smoke</SUBCOMPONENT>
+        <IMAGE_INDEX>1</IMAGE_INDEX>
+        <DIGITAL_VALUE>0</DIGITAL_VALUE>
+        <ANALOG_LOW>0</ANALOG_LOW>
+        <ANALOG_HIGH>0</ANALOG_HIGH>
+       </RULE>
+       <RULE>
+        <SUBCOMPONENT>smoke</SUBCOMPONENT>
+        <IMAGE_INDEX>0</IMAGE_INDEX>
+        <DIGITAL_VALUE>1000</DIGITAL_VALUE>
+        <ANALOG_LOW>0</ANALOG_LOW>
+        <ANALOG_HIGH>0</ANALOG_HIGH>
+       </RULE>
+      </RULES>
+     </THING_MODEL>
+     <IOE_CLIENT>
+      <CLIENT_MODE>NO_SERVER</CLIENT_MODE>
+      <SERVER_ADDRESS></SERVER_ADDRESS>
+      <USERNAME></USERNAME>
+      <PASSWORD></PASSWORD>
+     </IOE_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME></NAME>
+      <MAIL_ID></MAIL_ID>
+      <POP3_SERVER></POP3_SERVER>
+      <SMTP_SERVER></SMTP_SERVER>
+      <USER></USER>
+      <PASSWORD></PASSWORD>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL>{b1e47989-47db-442d-9e9f-13428e324173},{90a9a587-3692-4f34-b3da-fd3d201d4bbe},{21dfe92a-5ab8-49ad-9b88-c52762b337b4},{bf7c743d-bbc3-4d2b-8899-2ed5362ff0a0}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.149826</X_PN>
+      <Y_PN>0.100561</Y_PN>
+      <X>516</X>
+      <Y>215</Y>
+      <SLOT>0</SLOT>
+      <SUBSLOT>0</SUBSLOT>
+      <PARENT_PATH>{b1e47989-47db-442d-9e9f-13428e324173},{90a9a587-3692-4f34-b3da-fd3d201d4bbe},{21dfe92a-5ab8-49ad-9b88-c52762b337b4}</PARENT_PATH>
+      <CONTAINER_ID>{21dfe92a-5ab8-49ad-9b88-c52762b337b4}</CONTAINER_ID>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

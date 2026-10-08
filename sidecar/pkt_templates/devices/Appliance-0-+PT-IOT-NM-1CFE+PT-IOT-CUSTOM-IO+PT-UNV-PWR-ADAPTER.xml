@@ -1,0 +1,593 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="Appliance(0)" model="Appliance(0)">MCUComponent</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeNetworkModule</TYPE>
+        <MODEL>PT-IOT-NM-1CFE</MODEL>
+        <PORT>
+         <TYPE>eCopperFastEthernet</TYPE>
+         <POWER>true</POWER>
+         <MEDIATYPE>0</MEDIATYPE>
+         <PINS>false</PINS>
+         <BANDWIDTH>100000</BANDWIDTH>
+         <FULLDUPLEX>false</FULLDUPLEX>
+         <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+         <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+         <MACADDRESS>0000.0000.0000</MACADDRESS>
+         <BIA>0000.0000.0000</BIA>
+         <CLOCKRATE>2000000</CLOCKRATE>
+         <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+         <DESCRIPTION/>
+         <CHANNEL>0</CHANNEL>
+         <CHANNEL5GHZ>0</CHANNEL5GHZ>
+         <COVERAGERANGE>0</COVERAGERANGE>
+         <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+         <UP_METHOD>5</UP_METHOD>
+         <IP/>
+         <SUBNET/>
+         <PORT_GATEWAY/>
+         <PORT_DNS/>
+         <PORT_DHCP_ENABLE>false</PORT_DHCP_ENABLE>
+         <ND_SUPPRESSED>false</ND_SUPPRESSED>
+         <ND_IPV6_DNS_ADDRESSES/>
+         <TIMEOUT>14400000</TIMEOUT>
+         <PC_FIREWALL>false</PC_FIREWALL>
+         <PC_IPV6_FIREWALL>false</PC_IPV6_FIREWALL>
+         <IPV6_ENABLED>false</IPV6_ENABLED>
+         <IPV6_ADDRESS_AUTOCONFIG>false</IPV6_ADDRESS_AUTOCONFIG>
+         <IPV6_PORT_GATEWAY/>
+         <IPV6_PORT_DNS/>
+         <IPV6_LINK_LOCAL>FE80::230:F2FF:FE08:5C04</IPV6_LINK_LOCAL>
+         <IPV6_DEFAULT_LINK_LOCAL>FE80::230:F2FF:FE08:5C04</IPV6_DEFAULT_LINK_LOCAL>
+         <IPV6_PORT_DHCP_ENABLED>false</IPV6_PORT_DHCP_ENABLED>
+         <IPV6_ADDRESSES/>
+         <IP_UNNUMBERED/>
+         <DHCP_SERVER_IP>0.0.0.0</DHCP_SERVER_IP>
+        </PORT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+        <MODEL>PT-UNV-PWR-ADAPTER</MODEL>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAAAwAAAC4AUABSAE8ARwBSAEEATQBNAEkATgBHAF8AQwBVAFIAUgBFAE4AVABfAEQASQBSAAAACgAAAAAkAEEAcABwAGwAaQBhAG4AYwBlACAAKABQAHkAdABoAG8AbgApAAAAMABQAFIATwBHAFIAQQBNAE0ASQBOAEcAXwBDAFUAUgBSAEUATgBUAF8ARgBJAEwARQAAAAoAAAAADgBtAGEAaQBuAC4AcAB5AAAACgBzAHQAYQB0AGUAAAAKAAAAAAIAMQ==</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1229.5</X_COORD>
+      <Y_COORD>1231.99</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT0810GR52</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:26280;cost:500;power source:0;rack units:1;wattage:10;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>1490929469454</TEMPLATE_CREATION_TIME>
+     <STARTTIME>730940400000</STARTTIME>
+     <STARTSIMTIME>0</STARTSIMTIME>
+     <USER_APPS>
+      <RUNNING_APPS>
+       <USER_APP>Appliance (Python)</USER_APP>
+      </RUNNING_APPS>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SAVE_REF_ID>save-ref-id:0</SAVE_REF_ID>
+     <SYS_NAME></SYS_NAME>
+     <GATEWAY/>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP/>
+     </DHCP_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+       <STANDARD_CHANNEL5G>112</STANDARD_CHANNEL5G>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <GATEWAYV6/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>A3-43-13-0C-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>5</FILE_NUMBER>
+           <NAME>Appliance (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>var state = 0;
+
+function setup() {
+	
+	IoEClient.setup({
+		type: "Appliance",
+		states: [{
+			name: "On",
+			type: "bool",
+			controllable: true
+		}]
+	});
+	
+	IoEClient.onInputReceive = function(input) {
+		processData(input, true);
+	};
+	
+	attachInterrupt(0, function() {
+		processData(customRead(0), false);
+	});
+	
+	setState(state);
+}
+
+function mouseEvent(pressed, x, y, firstPress) {
+	if (firstPress)
+		setState(state ? 0 : 1);
+}
+
+function processData(data, bIsRemote) {
+	if ( data.length &lt;= 0  )
+		return;
+	setState(parseInt(data));
+}
+
+function setState(newState) {
+	state = newState;
+	
+	if ( state === 0 )
+		digitalWrite(1, LOW);
+	else
+		digitalWrite(1, HIGH);
+	
+	customWrite(0, state);
+	IoEClient.reportStates(state);
+	setDeviceProperty(getName(), "state", state);
+}
+</TEXT>
+           </FILE_CONTENT>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>6</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>var state = 0;
+
+function setup() {
+	
+	IoEClient.setup({
+		type: "Appliance",
+		states: [{
+			name: "On",
+			type: "bool",
+			controllable: true
+		}]
+	});
+	
+	IoEClient.onInputReceive = function(input) {
+		processData(input, true);
+	};
+	
+	attachInterrupt(0, function() {
+		processData(customRead(0), false);
+	});
+	
+	setState(state);
+}
+
+function mouseEvent(pressed, x, y, firstPress) {
+	if (firstPress)
+		setState(state ? 0 : 1);
+}
+
+function processData(data, bIsRemote) {
+	if ( data.length &lt;= 0  )
+		return;
+	setState(parseInt(data));
+}
+
+function setState(newState) {
+	state = newState;
+	
+	if ( state === 0 )
+		digitalWrite(1, LOW);
+	else
+		digitalWrite(1, HIGH);
+	
+	customWrite(0, state);
+	IoEClient.reportStates(state);
+	setDeviceProperty(getName(), "state", state);
+}
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>3</FILE_NUMBER>
+           <NAME>Appliance (Python)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>from gpio import *
+from time import *
+from ioeclient import *
+from environment import *
+from physical import *
+
+state = 0
+
+def main():
+    setup()
+    global state
+    while True:
+        state = restoreProperty("state", 0)
+        setState(state)
+        delay(1000)
+        
+def setup():
+    IoEClient.setup({
+        "type": "Appliance",
+        "states": [{
+            "name": "On",
+            "type": "bool",
+            "controllable": True
+        }]
+    })
+    IoEClient.onInputReceive(onInputReceiveDone)
+    add_event_detect(0, detect)
+        
+def onInputReceiveDone(data):
+    processData(data, True)
+        
+
+def detect():
+    processData(customRead(0), False)
+    
+def restoreProperty(propertyName, defaultValue):
+    value = getDeviceProperty(getName(), propertyName)
+    if  not (value is "" or value is None):
+        if  type(defaultValue) is int :
+            value = int(value)
+
+        setDeviceProperty(getName(), propertyName, value)
+        return value
+    return defaultValue
+
+
+def mouseEvent(pressed, x, y, firstPress):
+    global state
+    if firstPress:
+        if state == True:
+        	setState(0)
+        else:
+        	setState(1)
+
+
+def processData(data, bIsRemote):
+    if  len(data) &lt;= 0 :
+        return
+    setState(int(data))
+
+
+def setState(newState):
+    global state
+    state = newState
+
+    if  state == 0 :
+        digitalWrite(1, LOW)
+    else:
+        digitalWrite(1, HIGH)
+    customWrite(0, state)
+    IoEClient.reportStates(state)
+    setDeviceProperty(getName(), "state", state)
+
+if __name__ == "__main__":
+	main()</TEXT>
+           </FILE_CONTENT>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>4</FILE_NUMBER>
+             <NAME>main.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>from gpio import *
+from time import *
+from ioeclient import *
+from environment import *
+from physical import *
+
+state = 0
+
+def main():
+    setup()
+    global state
+    while True:
+        state = restoreProperty("state", 0)
+        setState(state)
+        delay(1000)
+        
+def setup():
+    IoEClient.setup({
+        "type": "Appliance",
+        "states": [{
+            "name": "On",
+            "type": "bool",
+            "controllable": True
+        }]
+    })
+    IoEClient.onInputReceive(onInputReceiveDone)
+    add_event_detect(0, detect)
+        
+def onInputReceiveDone(data):
+    processData(data, True)
+        
+
+def detect():
+    processData(customRead(0), False)
+    
+def restoreProperty(propertyName, defaultValue):
+    value = getDeviceProperty(getName(), propertyName)
+    if  not (value is "" or value is None):
+        if  type(defaultValue) is int :
+            value = int(value)
+
+        setDeviceProperty(getName(), propertyName, value)
+        return value
+    return defaultValue
+
+
+def mouseEvent(pressed, x, y, firstPress):
+    global state
+    if firstPress:
+        if state == True:
+        	setState(0)
+        else:
+        	setState(1)
+
+
+def processData(data, bIsRemote):
+    if  len(data) &lt;= 0 :
+        return
+    setState(int(data))
+
+
+def setState(newState):
+    global state
+    state = newState
+
+    if  state == 0 :
+        digitalWrite(1, LOW)
+    else:
+        digitalWrite(1, HIGH)
+    customWrite(0, state)
+    IoEClient.reportStates(state)
+    setDeviceProperty(getName(), "state", state)
+
+if __name__ == "__main__":
+	main()</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>6</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <THING_MODEL>
+      <NAME></NAME>
+      <WIDTH>50.5</WIDTH>
+      <HEIGHT>70.5</HEIGHT>
+      <ANALOG_SLOTS_COUNT>4</ANALOG_SLOTS_COUNT>
+      <DIGITAL_SLOTS_COUNT>6</DIGITAL_SLOTS_COUNT>
+      <SPECIFICATIONS>&lt;html>&lt;head>&lt;/head>&lt;body>Add specifications here.&lt;/body>&lt;/html></SPECIFICATIONS>
+      <ROTATION>0</ROTATION>
+      <SCALE>1</SCALE>
+      <IS_END_DEVICE>TRUE</IS_END_DEVICE>
+      <IS_DESKTOP_AVAILABLE>FALSE</IS_DESKTOP_AVAILABLE>
+      <SUBCOMPONENTS>
+       <SUBCOMPONENT>
+        <NAME>appliance</NAME>
+        <X>0</X>
+        <Y>0</Y>
+        <Z_ORDER>1</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>1</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>1</SLOT_NUM>
+        <SLOT_TYPE>1</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/SmartDevices/on_off_device_icon_off.png]]></IMAGE>
+         <IMAGE><![CDATA[../art/IoE/SmartDevices/on_off_device_icon_on.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+      </SUBCOMPONENTS>
+      <RULES>
+       <RULE>
+        <SUBCOMPONENT>appliance</SUBCOMPONENT>
+        <IMAGE_INDEX>0</IMAGE_INDEX>
+        <DIGITAL_VALUE>0</DIGITAL_VALUE>
+        <ANALOG_LOW>0</ANALOG_LOW>
+        <ANALOG_HIGH>0</ANALOG_HIGH>
+       </RULE>
+       <RULE>
+        <SUBCOMPONENT>appliance</SUBCOMPONENT>
+        <IMAGE_INDEX>1</IMAGE_INDEX>
+        <DIGITAL_VALUE>1000</DIGITAL_VALUE>
+        <ANALOG_LOW>0</ANALOG_LOW>
+        <ANALOG_HIGH>0</ANALOG_HIGH>
+       </RULE>
+      </RULES>
+     </THING_MODEL>
+     <IOE_CLIENT>
+      <CLIENT_MODE>NO_SERVER</CLIENT_MODE>
+      <SERVER_ADDRESS></SERVER_ADDRESS>
+      <USERNAME></USERNAME>
+      <PASSWORD></PASSWORD>
+     </IOE_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME></NAME>
+      <MAIL_ID></MAIL_ID>
+      <POP3_SERVER></POP3_SERVER>
+      <SMTP_SERVER></SMTP_SERVER>
+      <USER></USER>
+      <PASSWORD></PASSWORD>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL>{13cd9a24-3088-431b-9418-17fb75cfe3fe},{5d1f13bc-02d7-4bf5-8066-4afff13b36c1},{7abd22b4-cda4-492a-b36e-55496515e52d},{68871c3f-cc9f-4d2c-b168-1722431ea470}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.0499419</X_PN>
+      <Y_PN>0.100561</Y_PN>
+      <X>172</X>
+      <Y>215</Y>
+      <SLOT>0</SLOT>
+      <SUBSLOT>0</SUBSLOT>
+      <PARENT_PATH>{13cd9a24-3088-431b-9418-17fb75cfe3fe},{5d1f13bc-02d7-4bf5-8066-4afff13b36c1},{7abd22b4-cda4-492a-b36e-55496515e52d}</PARENT_PATH>
+      <CONTAINER_ID>{7abd22b4-cda4-492a-b36e-55496515e52d}</CONTAINER_ID>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

@@ -1,0 +1,474 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="" model="MCU-PT">MCU</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeNetworkModule</TYPE>
+        <MODEL>PT-IOT-NM-1CGE</MODEL>
+        <PORT>
+         <TYPE>eCopperGigabitEthernet</TYPE>
+         <POWER>true</POWER>
+         <MEDIATYPE>0</MEDIATYPE>
+         <PINS>false</PINS>
+         <FIBERMULTIMODE>true</FIBERMULTIMODE>
+         <BANDWIDTH>100000</BANDWIDTH>
+         <SPEED>100</SPEED>
+         <FULLDUPLEX>true</FULLDUPLEX>
+         <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+         <AUTONEGOTIATESPEED>true</AUTONEGOTIATESPEED>
+         <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+         <MACADDRESS>0000.0000.0000</MACADDRESS>
+         <BIA>0000.0000.0000</BIA>
+         <CLOCKRATE>2000000</CLOCKRATE>
+         <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+         <DESCRIPTION/>
+         <CHANNEL>0</CHANNEL>
+         <CHANNEL5GHZ>0</CHANNEL5GHZ>
+         <COVERAGERANGE>0</COVERAGERANGE>
+         <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+         <UP_METHOD>5</UP_METHOD>
+         <IP/>
+         <SUBNET/>
+         <PORT_GATEWAY/>
+         <PORT_DNS/>
+         <PORT_DHCP_ENABLE>false</PORT_DHCP_ENABLE>
+         <ND_SUPPRESSED>false</ND_SUPPRESSED>
+         <ND_IPV6_DNS_ADDRESSES/>
+         <TIMEOUT>14400000</TIMEOUT>
+         <PC_FIREWALL>false</PC_FIREWALL>
+         <PC_IPV6_FIREWALL>false</PC_IPV6_FIREWALL>
+         <IPV6_ENABLED>false</IPV6_ENABLED>
+         <IPV6_ADDRESS_AUTOCONFIG>false</IPV6_ADDRESS_AUTOCONFIG>
+         <IPV6_PORT_GATEWAY/>
+         <IPV6_PORT_DNS/>
+         <IPV6_LINK_LOCAL>FE80::230:F2FF:FE27:9D21</IPV6_LINK_LOCAL>
+         <IPV6_DEFAULT_LINK_LOCAL>FE80::230:F2FF:FE27:9D21</IPV6_DEFAULT_LINK_LOCAL>
+         <IPV6_PORT_DHCP_ENABLED>false</IPV6_PORT_DHCP_ENABLED>
+         <IPV6_ADDRESSES/>
+         <IP_UNNUMBERED/>
+         <DHCP_SERVER_IP>0.0.0.0</DHCP_SERVER_IP>
+        </PORT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoePowerAdapter</TYPE>
+       <MODULE>
+        <TYPE>ePtIoePowerAdapter</TYPE>
+        <MODEL>PT-IOT-POWER-ADAPTER</MODEL>
+       </MODULE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAAAwAAAC4AUABSAE8ARwBSAEEATQBNAEkATgBHAF8AQwBVAFIAUgBFAE4AVABfAEQASQBSAAAACgAAAAAwAE4AZQB3ACAAUAByAG8AagBlAGMAdAAgACgASgBhAHYAYQBTAGMAcgBpAHAAdAApAAAAMABQAFIATwBHAFIAQQBNAE0ASQBOAEcAXwBDAFUAUgBSAEUATgBUAF8ARgBJAEwARQAAAAoAAAAADgBtAGEAaQBuAC4AagBzAAAALgBQAFIATwBHAFIAQQBNAE0ASQBOAEcAXwBFAEQASQBUAEkATgBHAF8ARABJAFIAAAAKAAAAADAATgBlAHcAIABQAHIAbwBqAGUAYwB0ACAAKABKAGEAdgBhAFMAYwByAGkAcAB0ACk=</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1229.5</X_COORD>
+      <Y_COORD>1232</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT081000C6-</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:300;cost:20;power source:0;rack units:1;wattage:4;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>1</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>0</TEMPLATE_CREATION_TIME>
+     <STARTTIME>730972962383</STARTTIME>
+     <STARTSIMTIME>0</STARTSIMTIME>
+     <USER_APPS>
+      <RUNNING_APPS>
+       <USER_APP>New Project (JavaScript)</USER_APP>
+      </RUNNING_APPS>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SAVE_REF_ID>save-ref-id:0</SAVE_REF_ID>
+     <SYS_NAME></SYS_NAME>
+     <PTP_ENALBED>0</PTP_ENALBED>
+     <GATEWAY/>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP/>
+     </DHCP_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+       <STANDARD_CHANNEL5G>112</STANDARD_CHANNEL5G>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <GATEWAYV6/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>C7-98-CA-22-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT class="CTextFileContent">
+          <TEXT>var opcObj = {"my_val1": 123.45, "my_val2":"abc"};
+
+OPC.onDataReceive = function(ip, data) {
+	Serial.println("onDataReceive=" + ip + "," + data);
+}
+
+OPC.onReceive = function(data) {
+	Serial.println("onReceive=" + data);
+	var jsonObj = JSON.parse(data);
+	for (var propName in jsonObj) {
+		if (propName == "my_val1")
+			opcObj[propName] = parseFloat(jsonObj[propName]);
+		else
+			opcObj[propName] = jsonObj[propName];
+	}
+	/*
+	Object.keys(jsonObj).forEach(function(key) {
+		if (key == "my_val1")
+			opcObj[key] = parseFloat(jsonObj[key]);
+		else
+			opcObj[key] = jsonObj[key];
+	});
+	*/
+}
+
+function loop() {
+	delay(1000);
+	opcObj["my_val1"] += 1;
+	OPC.updateVariable("my_val1", opcObj["my_val1"]);
+}
+
+
+function setup() {
+	OPC.setup();
+	OPC.addVariable("my_val1", opcObj["my_val1"]);
+	OPC.addVariable("my_val2", opcObj["my_val2"]);
+}</TEXT>
+         </FILE_CONTENT>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>3</FILE_NUMBER>
+           <NAME>New Project (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>var opcObj = {"my_val1": 123.45, "my_val2":"abc"};
+
+OPC.onDataReceive = function(ip, data) {
+	Serial.println("onDataReceive=" + ip + "," + data);
+}
+
+OPC.onReceive = function(data) {
+	Serial.println("onReceive=" + data);
+	var jsonObj = JSON.parse(data);
+	for (var propName in jsonObj) {
+		if (propName == "my_val1")
+			opcObj[propName] = parseFloat(jsonObj[propName]);
+		else
+			opcObj[propName] = jsonObj[propName];
+	}
+	/*
+	Object.keys(jsonObj).forEach(function(key) {
+		if (key == "my_val1")
+			opcObj[key] = parseFloat(jsonObj[key]);
+		else
+			opcObj[key] = jsonObj[key];
+	});
+	*/
+}
+
+function loop() {
+	delay(1000);
+	opcObj["my_val1"] += 1;
+	OPC.updateVariable("my_val1", opcObj["my_val1"]);
+}
+
+
+function setup() {
+	OPC.setup();
+	OPC.addVariable("my_val1", opcObj["my_val1"]);
+	OPC.addVariable("my_val2", opcObj["my_val2"]);
+}</TEXT>
+           </FILE_CONTENT>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>4</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>var opcObj = {"my_val1": 123.45, "my_val2":"abc"};
+
+OPC.onDataReceive = function(ip, data) {
+	Serial.println("onDataReceive=" + ip + "," + data);
+}
+
+OPC.onReceive = function(data) {
+	Serial.println("onReceive=" + data);
+	var jsonObj = JSON.parse(data);
+	for (var propName in jsonObj) {
+		if (propName == "my_val1")
+			opcObj[propName] = parseFloat(jsonObj[propName]);
+		else
+			opcObj[propName] = jsonObj[propName];
+	}
+	/*
+	Object.keys(jsonObj).forEach(function(key) {
+		if (key == "my_val1")
+			opcObj[key] = parseFloat(jsonObj[key]);
+		else
+			opcObj[key] = jsonObj[key];
+	});
+	*/
+}
+
+function loop() {
+	delay(1000);
+	opcObj["my_val1"] += 1;
+	OPC.updateVariable("my_val1", opcObj["my_val1"]);
+}
+
+
+function setup() {
+	OPC.setup();
+	OPC.addVariable("my_val1", opcObj["my_val1"]);
+	OPC.addVariable("my_val2", opcObj["my_val2"]);
+}</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>4</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>User:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>0</FILE_COUNTER>
+         <CAPACITY>10000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <THING_MODEL>
+      <NAME></NAME>
+      <WIDTH>0</WIDTH>
+      <HEIGHT>0</HEIGHT>
+      <ANALOG_SLOTS_COUNT>4</ANALOG_SLOTS_COUNT>
+      <DIGITAL_SLOTS_COUNT>6</DIGITAL_SLOTS_COUNT>
+      <SPECIFICATIONS>&lt;html contenteditable="true">&lt;head>&lt;/head>&lt;body>Add specifications here.&lt;/body>&lt;/html></SPECIFICATIONS>
+      <ROTATION>0</ROTATION>
+      <SCALE>1</SCALE>
+      <PROXY_WIDTH>500</PROXY_WIDTH>
+      <PROXY_HEIGHT>500</PROXY_HEIGHT>
+      <IS_END_DEVICE>TRUE</IS_END_DEVICE>
+      <IS_DESKTOP_AVAILABLE>TRUE</IS_DESKTOP_AVAILABLE>
+      <IS_WORKSPACE_USERAPP>FALSE</IS_WORKSPACE_USERAPP>
+      <IS_TRANSPARENT_BACKGROUND>FALSE</IS_TRANSPARENT_BACKGROUND>
+      <WORKSPACE_OFFSET_X>0</WORKSPACE_OFFSET_X>
+      <WORKSPACE_OFFSET_Y>0</WORKSPACE_OFFSET_Y>
+      <WORKSPACE_Z_LEVEL>10000</WORKSPACE_Z_LEVEL>
+      <SUBCOMPONENTS/>
+      <RULES/>
+     </THING_MODEL>
+     <IOE_CLIENT>
+      <CLIENT_MODE>NO_SERVER</CLIENT_MODE>
+      <SERVER_ADDRESS></SERVER_ADDRESS>
+      <USERNAME></USERNAME>
+      <PASSWORD></PASSWORD>
+     </IOE_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME></NAME>
+      <MAIL_ID></MAIL_ID>
+      <POP3_SERVER></POP3_SERVER>
+      <SMTP_SERVER></SMTP_SERVER>
+      <USER></USER>
+      <PASSWORD></PASSWORD>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+     <NTP_SERVER>
+      <ENABLED>0</ENABLED>
+      <ENABLED_SERVER_AUTHENTICATE>0</ENABLED_SERVER_AUTHENTICATE>
+      <KEY>0</KEY>
+      <MD5PASSWORD></MD5PASSWORD>
+      <SERVER_IP_LIST/>
+     </NTP_SERVER>
+     <PTP_PROCESS>
+      <PTP_CLOCK_ID>0xff:FF:FF:FF:FE:FF:FF:F0</PTP_CLOCK_ID>
+      <PTP_CLOCK_TIME>1301448642383</PTP_CLOCK_TIME>
+     </PTP_PROCESS>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL>{942a12af-aa3f-4069-a46c-62e9bcfe9a91},{983cdd28-7da9-4213-b55d-2861a5f495a5},{47a71374-97e5-428e-a91d-0fe9b3186869},{af020cdb-6131-4454-ac5a-6b4d2a9f5acc}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.0499419</X_PN>
+      <Y_PN>0.100561</Y_PN>
+      <X>172</X>
+      <Y>215</Y>
+      <SLOT>0</SLOT>
+      <SUBSLOT>0</SUBSLOT>
+      <PARENT_PATH>{942a12af-aa3f-4069-a46c-62e9bcfe9a91},{983cdd28-7da9-4213-b55d-2861a5f495a5},{47a71374-97e5-428e-a91d-0fe9b3186869}</PARENT_PATH>
+      <CONTAINER_ID>{47a71374-97e5-428e-a91d-0fe9b3186869}</CONTAINER_ID>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>
