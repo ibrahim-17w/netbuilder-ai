@@ -22,17 +22,23 @@ import 'lexicon.dart';
 /// `NetworkIntent.parseSimple` still exists and still delegates here, so no
 /// call site in the app moved when this file was created.
 
+final RegExp _bidiControls = RegExp(r'[‎‏\u202a-\u202e؜]');
+final RegExp _arabicDiacritics = RegExp(r'[ً-ِٰـ]');
+final RegExp _hamzaForms = RegExp(r'[آإٱا]');
+
 String _foldArabic(String s) => s
-    .replaceAll(RegExp(r'[\u200e\u200f\u202a-\u202e\u061c]'), ' ')
-    .replaceAll(RegExp(r'[\u064b-\u0652\u0670\u0640]'), '')
-    .replaceAll(RegExp(r'[\u0623\u0625\u0622\u0671]'), '\u0627')
-    .replaceAll('\u0649', '\u064a')
-    .replaceAll('\u0629', '\u0647')
-    .replaceAll('\u060c', ',');
+    .replaceAll(_bidiControls, ' ')
+    .replaceAll(_arabicDiacritics, '')
+    .replaceAll(_hamzaForms, 'ا')
+    .replaceAll('ى', 'ي')
+    .replaceAll('ة', 'ه')
+    .replaceAll('،', ',');
+
+final RegExp _arabicIndicDigits = RegExp(r'[٠-٩۰-۹]');
 
 /// ٢٣ (Arabic-Indic) and ۲۳ (Extended Arabic-Indic) are the same numbers.
 String _asciiDigits(String s) => s.replaceAllMapped(
-  RegExp(r'[\u0660-\u0669\u06f0-\u06f9]'),
+  _arabicIndicDigits,
   (m) {
     final c = m.group(0)!.codeUnitAt(0);
     return '${c >= 0x06f0 ? c - 0x06f0 : c - 0x0660}';
@@ -63,10 +69,12 @@ int? _maskToPrefix(String mask) {
 /// "10.1.1.0 255.255.255.252", "10.1.1.0 subnet mask 255.255.255.252" and
 /// their Arabic spellings become one CIDR, so a single regex serves every
 /// brief - including the address tables course briefs are written as.
+final RegExp _maskPair = RegExp(
+  r'(\d{1,3}(?:\.\d{1,3}){3})[\s,;:]*(?:/|subnet\s+mask|netmask|mask|prefix|qina3|قناع(?:\s+الشبكه)?)?[\s,;:]*(\d{1,3}(?:\.\d{1,3}){3})',
+);
+
 String _bridgeMasks(String s) => s.replaceAllMapped(
-  RegExp(
-    r'(\d{1,3}(?:\.\d{1,3}){3})[\s,;:]*(?:/|subnet\s+mask|netmask|mask|prefix|qina3|قناع(?:\s+الشبكه)?)?[\s,;:]*(\d{1,3}(?:\.\d{1,3}){3})',
-  ),
+  _maskPair,
   (m) {
     final prefix = _maskToPrefix(m.group(2)!);
     if (prefix == null || prefix == 0) return m.group(0)!;
@@ -257,13 +265,13 @@ const List<List<String>> _phraseBridge = [
 
 bool _isAscii(String s) => s.codeUnits.every((c) => c < 128);
 
+final RegExp _nonWordChars = RegExp(r'[^A-Za-z0-9\u0600-\u06ff]');
+
 /// "two switches" -> "2 switches", "اثنين موجه" -> "2 router".
 String _bridgeNumberWords(String s) => s
     .split(' ')
     .map((token) {
-      final bare = token
-          .replaceAll(RegExp(r'[^A-Za-z0-9\u0600-\u06ff]'), '')
-          .toLowerCase();
+      final bare = token.replaceAll(_nonWordChars, '').toLowerCase();
       final n = numberWords[bare];
       return n == null ? token : '$n';
     })
@@ -276,6 +284,12 @@ String _bridgeNumberWords(String s) => s
 /// couple of words and sit in the same clause, so a subnet mentioned inside
 /// a sentence about something else ("the 10.0.0.0/30 transit link between
 /// the sites") is never claimed by a site it did not name.
+final RegExp _siteCue = RegExp(
+  r'^\s*(?:is\s+)?(?:at|for|in|on|to)\s+(?:the\s+|our\s+|its\s+)?'
+  r'(?:headquarters|hq|main|site|branch|office|building|floor|school|'
+  r'campus|department|location|store|shop)\b',
+);
+
 bool subnetSitsAtASite(String text, String cidr) {
   final at = text.indexOf(cidr);
   if (at < 0) return false;
@@ -283,27 +297,61 @@ bool subnetSitsAtASite(String text, String cidr) {
   final tail = text
       .substring(from, from + 40 > text.length ? text.length : from + 40)
       .toLowerCase();
-  return RegExp(
-    r'^\s*(?:is\s+)?(?:at|for|in|on|to)\s+(?:the\s+|our\s+|its\s+)?'
-    r'(?:headquarters|hq|main|site|branch|office|building|floor|school|'
-    r'campus|department|location|store|shop)\b',
-  ).hasMatch(tail);
+  return _siteCue.hasMatch(tail);
 }
 
 /// How many identical sites a brief describes - "2 branch offices",
 /// "three floors", "2 sites" - or null when it describes one.  The digits
 /// must sit directly on the site word ("2 offices", not "2 routers in the
 /// office"), and a count of one is not an expansion.
+final RegExp _siteCountPhrase = RegExp(
+  r'(\d{1,3})\s*(?:separate\s+|identical\s+|different\s+|remote\s+|branch\s+|physical\s+)?'
+  r'(?:offices?|branches|sites?|floors?|buildings?|classrooms?|departments?|locations?)\b',
+  caseSensitive: false,
+);
+
 int? siteCount(String text) {
-  final m = RegExp(
-    r'(\d{1,3})\s*(?:separate\s+|identical\s+|different\s+|remote\s+|branch\s+|physical\s+)?'
-    r'(?:offices?|branches|sites?|floors?|buildings?|classrooms?|departments?|locations?)\b',
-    caseSensitive: false,
-  ).firstMatch(text);
+  final m = _siteCountPhrase.firstMatch(text);
   if (m == null) return null;
   final n = int.parse(m.group(1)!);
   return (n < 2 || n > 25) ? null : n;
 }
+
+final RegExp _perSiteCue = RegExp(
+  r'\b(?:each|per\s+(?:site|office|branch|floor|building|location|classroom|department))\b',
+  caseSensitive: false,
+);
+
+final RegExp _perSiteAside = RegExp(
+  r'[,;]?\s*(?:plus|as well as|in addition|additionally|also|and an additional)\b',
+  caseSensitive: false,
+);
+
+final RegExp _sentenceBreak = RegExp(r'[.;\n]');
+
+const List<String> _perSiteWords = [
+  'router',
+  'gateway',
+  'switch',
+  'pc',
+  'workstation',
+  'desktop',
+  'server',
+];
+
+final Set<String> _perSiteKeywords = {
+  ..._perSiteWords,
+  for (final kind in deviceKinds) ...kind.keywords,
+};
+
+final Map<String, RegExp> _countPatternByWord = {
+  for (final w in _perSiteKeywords)
+    w: RegExp('(\\d{1,3})\\s*${RegExp.escape(w)}s?\\b'),
+};
+
+final Map<String, RegExp> _barePatternByWord = {
+  for (final w in _perSiteKeywords) w: RegExp('\\b${RegExp.escape(w)}\\b'),
+};
 
 /// The device counts that belong to ONE site of a brief worded as
 /// "... each with a router, a switch and 3 pcs".
@@ -313,31 +361,23 @@ int? siteCount(String text) {
 /// global count instead of being multiplied with everything else.
 /// Returns null when the brief has no per-site cue at all.
 Map<String, int>? perSiteCounts(String text) {
-  final cue = RegExp(
-    r'\b(?:each|per\s+(?:site|office|branch|floor|building|location|classroom|department))\b',
-    caseSensitive: false,
-  ).firstMatch(text);
+  final cue = _perSiteCue.firstMatch(text);
   if (cue == null) return null;
   var clause = text.substring(cue.end);
-  final aside = RegExp(
-    r'[,;]?\s*(?:plus|as well as|in addition|additionally|also|and an additional)\b',
-    caseSensitive: false,
-  ).firstMatch(clause);
+  final aside = _perSiteAside.firstMatch(clause);
   if (aside != null) clause = clause.substring(0, aside.start);
-  final stop = clause.indexOf(RegExp(r'[.;\n]'));
+  final stop = clause.indexOf(_sentenceBreak);
   if (stop >= 0) clause = clause.substring(0, stop);
   final lower = clause.toLowerCase();
 
   /// "3 pcs" and a bare "a switch" both mean something per site.
   int countOf(List<String> words) {
     for (final w in words) {
-      final m = RegExp(
-        '(\\d{1,3})\\s*${RegExp.escape(w)}s?\\b',
-      ).firstMatch(lower);
+      final m = _countPatternByWord[w]!.firstMatch(lower);
       if (m != null) return int.parse(m.group(1)!);
     }
     for (final w in words) {
-      if (RegExp('\\b${RegExp.escape(w)}\\b').hasMatch(lower)) return 1;
+      if (_barePatternByWord[w]!.hasMatch(lower)) return 1;
     }
     return 0;
   }
@@ -355,32 +395,47 @@ Map<String, int>? perSiteCounts(String text) {
   return counts;
 }
 
+final RegExp _extraSpaces = RegExp(r'[ \t]+');
+
+/// The phrase bridge, longest key first, with the pattern each ASCII key is
+/// matched by already compiled.
+///
+/// Whole words only. These keys are matched case-insensitively without
+/// boundaries, so a filler phrase for the standalone article "a" -
+/// 'set up a' - also matched the first eight characters of any word
+/// starting with a: "set up AAA" became "AA", and the AAA role word
+/// vanished from the brief before the roles were read. A key that
+/// starts and ends on a word character must not match inside one.
+final List<({RegExp? pattern, String from, String to})> _phraseBridgeTable = [
+  for (final e in [..._phraseBridge]
+    ..sort((a, b) => b[0].length.compareTo(a[0].length)))
+    if (_isAscii(e[0]))
+      (
+        pattern: RegExp(
+          '${RegExp.escape(e[0][0]) == e[0][0] ? r'\b' : ''}'
+          '${RegExp.escape(e[0])}'
+          '${RegExp.escape(e[0][e[0].length - 1]) == e[0][e[0].length - 1] ? r'\b' : ''}',
+          caseSensitive: false,
+        ),
+        from: e[0],
+        to: e[1],
+      )
+    else
+      (pattern: null, from: e[0], to: e[1]),
+];
+
 /// Rewrite a brief into the wording this parser understands.
 String bridgeBrief(String raw) {
   var s = _bridgeMasks(_asciiDigits(_foldArabic(raw)));
-  final entries = [..._phraseBridge]
-    ..sort((a, b) => b[0].length.compareTo(a[0].length));
-  for (final e in entries) {
-    if (_isAscii(e[0])) {
-      // Whole words only. These keys are matched case-insensitively without
-      // boundaries, so a filler phrase for the standalone article "a" -
-      // 'set up a' - also matched the first eight characters of any word
-      // starting with a: "set up AAA" became "AA", and the AAA role word
-      // vanished from the brief before the roles were read. A key that
-      // starts and ends on a word character must not match inside one.
-      final key = e[0];
-      final pattern = RegExp(
-        '${RegExp.escape(key[0]) == key[0] ? r'\b' : ''}'
-        '${RegExp.escape(key)}'
-        '${RegExp.escape(key[key.length - 1]) == key[key.length - 1] ? r'\b' : ''}',
-        caseSensitive: false,
-      );
-      s = s.replaceAll(pattern, e[1]);
-    } else if (s.contains(e[0])) {
-      s = s.replaceAll(e[0], e[1]);
+  for (final e in _phraseBridgeTable) {
+    final pattern = e.pattern;
+    if (pattern != null) {
+      s = s.replaceAll(pattern, e.to);
+    } else if (s.contains(e.from)) {
+      s = s.replaceAll(e.from, e.to);
     }
   }
-  return _bridgeNumberWords(s).replaceAll(RegExp(r'[ \t]+'), ' ');
+  return _bridgeNumberWords(s).replaceAll(_extraSpaces, ' ');
 }
 
 /// Does this brief name a device kind (or an explicit device label like
@@ -402,11 +457,12 @@ final RegExp namesAnyDevice = RegExp(
       ')\\b)',
 );
 
+final RegExp _deviceLabel = RegExp(r'\b(?:R|SW|PC|SRV)\d{1,2}\b');
+
 /// True when [lower] mentions a device kind or a label like R1 / SW2 /
 /// PC3 / SRV1. Pure; see [namesAnyDevice].
 bool namesAnyDeviceIn(String lower) =>
-    namesAnyDevice.hasMatch(lower) ||
-    RegExp(r'\b(?:R|SW|PC|SRV)\d{1,2}\b').hasMatch(lower);
+    namesAnyDevice.hasMatch(lower) || _deviceLabel.hasMatch(lower);
 
 /// A server label whose name says which service it runs: DHCP1, DNS1,
 /// WEB1, AAA1, FTP1, MAIL1, NTP1 ...

@@ -684,33 +684,37 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  FilledButton(
-                    onPressed: () async {
-                      await s.setOpenAiBaseUrl(_base.text);
-                      await s.setOpenAiModel(_oaModel.text);
-                      await s.setOpenAiHeaders(_headers.text);
-                      if (_oaKey.text.trim().isNotEmpty) {
-                        await s.setOpenAiKey(_oaKey.text);
-                        _oaKey.clear();
-                      }
-                      if (mounted) setState(() {});
-                      _toast('Provider settings saved.');
-                    },
-                    child: const Text('Save provider'),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () async {
+                        await s.setOpenAiBaseUrl(_base.text);
+                        await s.setOpenAiModel(_oaModel.text);
+                        await s.setOpenAiHeaders(_headers.text);
+                        if (_oaKey.text.trim().isNotEmpty) {
+                          await s.setOpenAiKey(_oaKey.text);
+                          _oaKey.clear();
+                        }
+                        if (mounted) setState(() {});
+                        _toast('Provider settings saved.');
+                      },
+                      child: const Text('Save provider'),
+                    ),
                   ),
                   const SizedBox(width: 8),
-                  OutlinedButton(
-                    onPressed: () async {
-                      await s.setOpenAiBaseUrl(_base.text);
-                      await s.setOpenAiModel(_oaModel.text);
-                      await s.setOpenAiHeaders(_headers.text);
-                      if (_oaKey.text.trim().isNotEmpty) {
-                        await s.setOpenAiKey(_oaKey.text);
-                        _oaKey.clear();
-                      }
-                      await _test(s);
-                    },
-                    child: const Text('Test connection'),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        await s.setOpenAiBaseUrl(_base.text);
+                        await s.setOpenAiModel(_oaModel.text);
+                        await s.setOpenAiHeaders(_headers.text);
+                        if (_oaKey.text.trim().isNotEmpty) {
+                          await s.setOpenAiKey(_oaKey.text);
+                          _oaKey.clear();
+                        }
+                        await _test(s);
+                      },
+                      child: const Text('Test connection'),
+                    ),
                   ),
                 ],
               ),
@@ -774,13 +778,15 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                OutlinedButton(
-                  onPressed: () async {
-                    await s.setApiKey('');
-                    await _refreshKeyStatus();
-                    if (mounted) _toast('Key cleared.');
-                  },
-                  child: const Text('Clear'),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () async {
+                      await s.setApiKey('');
+                      await _refreshKeyStatus();
+                      if (mounted) _toast('Key cleared.');
+                    },
+                    child: const Text('Clear'),
+                  ),
                 ),
               ],
             ),
@@ -810,9 +816,11 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                OutlinedButton(
-                  onPressed: () => s.setModel(_model.text.trim()),
-                  child: const Text('Save model'),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => s.setModel(_model.text.trim()),
+                    child: const Text('Save model'),
+                  ),
                 ),
               ],
             ),
@@ -982,22 +990,26 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
             const SizedBox(height: 6),
             Row(
               children: [
-                OutlinedButton.icon(
-                  onPressed: () => _chooseFolder(s),
-                  icon: const Icon(Icons.folder_open, size: 18),
-                  label: const Text('Choose folder'),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _chooseFolder(s),
+                    icon: const Icon(Icons.folder_open, size: 18),
+                    label: const Text('Choose folder'),
+                  ),
                 ),
                 const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: () async {
-                    await s.setOutputDir(_output.text);
-                    if (mounted) {
-                      _toast(s.outputDir.isEmpty
-                          ? 'Using the engine default folder.'
-                          : 'Saving to ${s.outputDir}');
-                    }
-                  },
-                  child: const Text('Save folder'),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () async {
+                      await s.setOutputDir(_output.text);
+                      if (mounted) {
+                        _toast(s.outputDir.isEmpty
+                            ? 'Using the engine default folder.'
+                            : 'Saving to ${s.outputDir}');
+                      }
+                    },
+                    child: const Text('Save folder'),
+                  ),
                 ),
               ],
             ),

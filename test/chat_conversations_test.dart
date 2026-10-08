@@ -1,8 +1,12 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:net_builder/models/chat_message.dart';
 import 'package:net_builder/services/memory_service.dart';
+import 'package:net_builder/services/settings_service.dart';
+import 'package:net_builder/widgets/settings_drawer.dart';
+import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 /// The sidebar lists chats, so the store has to keep them apart. The storage
@@ -97,9 +101,50 @@ void main() {
     expect(await memory.conversations(), isEmpty);
   });
 
-  // NOTE: there is deliberately no widget test that opens the sidebar here.
-  // Doing so surfaced a pre-existing horizontal overflow inside the drawer
-  // ("A RenderFlex overflowed by 257 pixels on the right"), which is a real
-  // layout bug a user would see as striped bars. It is recorded in
-  // packaging/UI-REDESIGN-2026-09-22.md rather than hidden by a passing test.
+  // The sidebar is the whole settings surface, so it has to open on the
+  // smallest phone the app still supports. A drawer wider than its own
+  // buttons paints yellow-and-black overflow bars across them.
+  testWidgets('the drawer opens on a 320dp phone without overflowing',
+      (tester) async {
+    final settings = SettingsService();
+    // The provider buttons only exist for the OpenAI-compatible provider,
+    // which is not the default one.
+    await settings.setProviderName('openai');
+    tester.view.physicalSize = const Size(320, 4096);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsService>.value(value: settings),
+          ChangeNotifierProvider<MemoryService>(create: (_) => MemoryService()),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(drawer: SettingsDrawer(), body: SizedBox()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    tester.state<ScaffoldState>(find.byType(Scaffold)).openDrawer();
+    await tester.pumpAndSettle();
+
+    // Only a row that is actually laid out can overflow, and a ListView
+    // lays its children out in order - so the surface has to be tall enough
+    // to build the last one, or the rows below the fold would go unchecked.
+    expect(find.textContaining('/budget <tokens>'), findsOneWidget,
+        reason: 'the test surface holds the entire drawer');
+
+    expect(find.widgetWithText(FilledButton, 'Save provider'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Test connection'),
+        findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Choose folder'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Save folder'), findsOneWidget);
+
+    // An overflow reaches the test as an exception, not as a wrong number.
+    expect(tester.takeException(), isNull,
+        reason: 'a drawer row is wider than the drawer itself');
+  });
 }

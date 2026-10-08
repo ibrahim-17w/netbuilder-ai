@@ -30,6 +30,9 @@ class ValidatorService {
   static final _interfacePattern = RegExp(
     r'^[A-Za-z][A-Za-z0-9-]*\d+(?:/\d+){0,2}(?:\.\d+)?$',
   );
+  /// FastEthernet and above on a switch: `f0/1`, `fa0/1`, `gi0/1`. Used to
+  /// count how many distinct switch ports a plan cables.
+  static final _switchPortPattern = RegExp(r'^f[a-z]*0?/\d+$');
   static final _serviceNames = <String>{
     'dhcp',
     'dns',
@@ -384,7 +387,7 @@ class ValidatorService {
     final usedPorts = <String, Set<String>>{};
     for (final l in intent.links) {
       for (final endpoint in [MapEntry(l.a, l.aIf), MapEntry(l.b, l.bIf)]) {
-        if (!RegExp(r'^f[a-z]*0?/\d+$').hasMatch(endpoint.value.toLowerCase())) {
+        if (!_switchPortPattern.hasMatch(endpoint.value.toLowerCase())) {
           continue;
         }
         (usedPorts[endpoint.key] ??= <String>{}).add(endpoint.value.toLowerCase());
@@ -766,6 +769,75 @@ class ValidatorService {
 
   static bool hasErrors(List<ValidationIssue> issues) =>
       issues.any((i) => i.severity == 'error');
+
+  // --- memoized read of the same findings, for the UI hot path -------------
+
+  /// The one entry [validateCached] keeps. `NetworkIntent` is compared by
+  /// identity (not `==`), because the plan a chat screen holds is one mutable
+  /// object the user edits in place, and a value comparison would walk the
+  /// whole topology on every call - the very cost the cache exists to avoid.
+  static NetworkIntent? _cachedIntent;
+  static String? _cachedTarget;
+  static String? _cachedRevision;
+  static List<ValidationIssue>? _cachedIssues;
+
+  /// The findings [validate] reports for [intent], served from a one-entry
+  /// cache when nothing that can change them has moved.
+  ///
+  /// WHY: the chat screen asks the same question about the same plan over and
+  /// over - every rebuild of the activity list, every badge, every card - and
+  /// [validate] walks every node, every address, every link and every service
+  /// rule each time. A plan with 54 devices costs a few milliseconds, which is
+  /// a dropped frame or two while a reply is still streaming.
+  ///
+  /// WHY THE KEY IS THREE THINGS AND NOT ONE:
+  ///
+  /// * `identical(intent)` - a plan is a long-lived object the UI keeps
+  ///   handing to the same widgets, so identity catches the common case for
+  ///   free. It is NOT enough on its own: the plan is edited in place by
+  ///   follow-up messages, so the identical object can hold a different
+  ///   network a moment later.
+  /// * `intent.revision` - recomputed on every call, because it is cheap
+  ///   relative to the pass it saves (see the gate in
+  ///   `test/dart_perf_gates_test.dart`), and it moves on any real edit. It is
+  ///   NOT a sufficient key on its own either: `revision` deliberately does
+  ///   not hash `serviceRules`, `users` or `security.records` (they are the
+  ///   fields the parser fills in as prose, and hashing them made a canvas
+  ///   drag look like an edit) - and [validate] DOES read all three.
+  /// * `target` - the findings are target-specific.
+  ///
+  /// The returned list is a copy: a caller appending to it must not be able
+  /// to poison the next read. [validate] stays the single source of truth and
+  /// is called on every miss, so a cache hit can only ever return what
+  /// [validate] would have returned for the identical key.
+  static List<ValidationIssue> validateCached(
+    NetworkIntent intent, {
+    String? target,
+  }) {
+    final issues = _cachedIssues;
+    if (issues != null &&
+        identical(_cachedIntent, intent) &&
+        _cachedTarget == target &&
+        _cachedRevision == intent.revision) {
+      return List.of(issues);
+    }
+    final fresh = target == null
+        ? validate(intent)
+        : validate(intent, target: target);
+    _cachedIntent = intent;
+    _cachedTarget = target;
+    _cachedRevision = intent.revision;
+    _cachedIssues = fresh;
+    return List.of(fresh);
+  }
+
+  /// Drops the memo. Only a test needs this; the entry is one object.
+  static void clearCacheForTest() {
+    _cachedIntent = null;
+    _cachedTarget = null;
+    _cachedRevision = null;
+    _cachedIssues = null;
+  }
 
   /// A rule a device's own TYPE carries, without asking for a "service".
   ///

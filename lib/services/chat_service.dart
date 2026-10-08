@@ -442,6 +442,16 @@ class ChatService {
     );
   }
 
+  /// Pattern opening the readable reply: the key plus the quote that starts
+  /// its value.
+  static final RegExp _replyKey = RegExp(r'"reply"\s*:\s*"');
+
+  /// Start index of the last confirmed [_replyKey] match. A stream grows its
+  /// payload in place, so between calls the first match cannot move; checking
+  /// it at this remembered offset is constant-time, where a fresh scan of the
+  /// whole payload grows with every chunk that arrived before this one.
+  static int _replyKeyStart = -1;
+
   /// The readable part of a streaming reply, right now.
   ///
   /// Model replies arrive as the JSON object `{"reply": "...", ...}`, so raw
@@ -451,9 +461,23 @@ class ChatService {
   /// Returns null when the text is not that shape - status lines, offline
   /// answers, plain prose - so callers fall back to showing [raw] as-is.
   static String? streamPreview(String raw) {
-    final start = RegExp(r'"reply"\s*:\s*"').firstMatch(raw);
-    if (start == null) return null;
-    return _jsonStringValue(raw, start.end);
+    // matchAsPrefix throws past the end of a shorter payload, so an offset
+    // beyond [raw] is treated like any other miss.
+    var match = _replyKeyStart < 0 || _replyKeyStart > raw.length
+        ? null
+        : _replyKey.matchAsPrefix(raw, _replyKeyStart);
+    if (match == null) {
+      // The remembered offset goes stale the moment a new stream, retry or
+      // cancel swaps in a different payload, so a miss always falls back to
+      // a full search that re-anchors it - the cache confirms, never decides.
+      match = _replyKey.firstMatch(raw);
+      if (match == null) {
+        _replyKeyStart = -1;
+        return null;
+      }
+    }
+    _replyKeyStart = match.start;
+    return _jsonStringValue(raw, match.end);
   }
 
   /// Read a JSON string body starting at [from], stopping at its closing
@@ -501,7 +525,7 @@ class ChatService {
   /// text plus any action list that arrived complete, and an explicit note
   /// about what could not be recovered.
   static ChatReply? _salvageTruncated(String raw) {
-    final start = RegExp(r'"reply"\s*:\s*"').firstMatch(raw);
+    final start = _replyKey.firstMatch(raw);
     if (start == null) return null;
     final text = _jsonStringValue(raw, start.end).trimRight();
     if (text.trim().isEmpty) return null;

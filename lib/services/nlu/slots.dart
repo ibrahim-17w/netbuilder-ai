@@ -103,6 +103,15 @@ class BriefSlotPipeline {
     );
   }
 
+  static final _tacacsOrRadius = RegExp(r'\btacacs\+?\b|\bradius\b');
+
+  static final _wifiWord = RegExp(r'\b(wifi|wi-fi|wireless|wlan)\b');
+
+  static final _routerLabel = RegExp(r'\bR(\d+)\b');
+  static final _switchLabel = RegExp(r'\bSW(\d+)\b');
+  static final _pcLabel = RegExp(r'\bPC(\d+)\b');
+  static final _serverLabel = RegExp(r'\bSRV(\d+)\b');
+
   /// Device counts - the offline parser's own rules, in the parser's own
   /// order, so the app has ONE implementation of "what did this brief ask
   /// for": [NetworkIntent.parseSimple] consumes this map instead of keeping
@@ -149,8 +158,7 @@ class BriefSlotPipeline {
     // An AAA/TACACS+/RADIUS ask with no server named still means an AAA
     // server exists to configure - without it the role had no owner.
     if (serverCount == 0 &&
-        (lower.contains('aaa') ||
-            RegExp(r'\btacacs\+?\b|\bradius\b').hasMatch(lower))) {
+        (lower.contains('aaa') || _tacacsOrRadius.hasMatch(lower))) {
       serverCount = 1;
     }
     // Any service role named with no server count still provisions one -
@@ -177,8 +185,7 @@ class BriefSlotPipeline {
     }
 
     // 'wireless' alone still means a wireless network: one AP
-    if ((counts['wireless'] ?? 0) == 0 &&
-        RegExp(r'\b(wifi|wi-fi|wireless|wlan)\b').hasMatch(lower)) {
+    if ((counts['wireless'] ?? 0) == 0 && _wifiWord.hasMatch(lower)) {
       counts['wireless'] = 1;
     }
 
@@ -222,18 +229,18 @@ class BriefSlotPipeline {
     }
 
     // explicit labels are authoritative when the user names devices
-    void raiseByLabel(String type, String pattern) {
-      final highest = RegExp(pattern)
+    void raiseByLabel(String type, RegExp pattern) {
+      final highest = pattern
           .allMatches(normText)
           .map((m) => int.tryParse(m.group(1) ?? '') ?? 0)
           .fold(0, (max, v) => v > max ? v : max);
       if (highest > (counts[type] ?? 0)) counts[type] = highest;
     }
 
-    raiseByLabel('router', r'\bR(\d+)\b');
-    raiseByLabel('switch', r'\bSW(\d+)\b');
-    raiseByLabel('pc', r'\bPC(\d+)\b');
-    raiseByLabel('server', r'\bSRV(\d+)\b');
+    raiseByLabel('router', _routerLabel);
+    raiseByLabel('switch', _switchLabel);
+    raiseByLabel('pc', _pcLabel);
+    raiseByLabel('server', _serverLabel);
 
     // Servers the brief names one by one ("DHCP1, DNS1, WEB1, AAA1, FTP1
     // and MAIL1") are the authoritative count as well as the names.
@@ -272,11 +279,13 @@ class BriefSlotPipeline {
     return null;
   }
 
+  static final _fragmentSplit = RegExp(r'[\n.]');
+
   /// Server roles in the order the brief said them, sentence by sentence,
   /// with the same distribute-to-"the other" rule the parser applies.
   static List<String> extractRoles(String normText) {
     final found = <String>[];
-    final fragments = normText.toLowerCase().split(RegExp(r'[\n.]'));
+    final fragments = normText.toLowerCase().split(_fragmentSplit);
     for (final frag in fragments) {
       final hits = <MapEntry<int, String>>[];
       _roleWords.forEach((word, role) {
@@ -344,6 +353,34 @@ class BriefSlotPipeline {
 
   // --- quantities across clauses ------------------------------------------
 
+  static final _routerQty = RegExp(
+    r'\b(\d{1,3})\s*(?:(?:more|extra|additional|further)\s+)?'
+    r'routers?\b',
+  );
+
+  static final _switchQty = RegExp(
+    r'\b(\d{1,3})\s*(?:(?:more|extra|additional|further)\s+)?'
+    r'switch(?:es)?\b',
+  );
+
+  static final _pcQty = RegExp(
+    r'(\d+)\s*(?:(?:more|extra|additional|further)\s+)?'
+    r'(?:pcs?|computers?|workstations?)',
+  );
+
+  static final _serverQty = RegExp(
+    r'(\d+)\s*(?:(?:more|extra|additional|further)\s+)?servers?',
+  );
+
+  static final Map<String, RegExp> _keywordQty = {
+    for (final kind in deviceKinds)
+      for (final k in kind.keywords)
+        k: RegExp(
+          '(\\d{1,3})\\s*(?:(?:more|extra|additional|further)\\s+)?'
+          '${RegExp.escape(k)}s?\\b',
+        ),
+  };
+
   /// One quantity the brief stated for a device kind: the number, the kind
   /// it names, where it was said, and how it relates to the kind's other
   /// amounts (which site it belongs to, whether it corrects an earlier
@@ -381,49 +418,20 @@ class BriefSlotPipeline {
     for (final kind in deviceKinds) {
       switch (kind.type) {
         case 'router':
-          scan(
-            kind.type,
-            RegExp(
-              r'\b(\d{1,3})\s*(?:(?:more|extra|additional|further)\s+)?'
-              r'routers?\b',
-            ),
-          );
+          scan(kind.type, _routerQty);
           break;
         case 'switch':
-          scan(
-            kind.type,
-            RegExp(
-              r'\b(\d{1,3})\s*(?:(?:more|extra|additional|further)\s+)?'
-              r'switch(?:es)?\b',
-            ),
-          );
+          scan(kind.type, _switchQty);
           break;
         case 'pc':
-          scan(
-            kind.type,
-            RegExp(
-              r'(\d+)\s*(?:(?:more|extra|additional|further)\s+)?'
-              r'(?:pcs?|computers?|workstations?)',
-            ),
-          );
+          scan(kind.type, _pcQty);
           break;
         case 'server':
-          scan(
-            kind.type,
-            RegExp(
-              r'(\d+)\s*(?:(?:more|extra|additional|further)\s+)?servers?',
-            ),
-          );
+          scan(kind.type, _serverQty);
           break;
         default:
           for (final k in kind.keywords) {
-            scan(
-              kind.type,
-              RegExp(
-                '(\\d{1,3})\\s*(?:(?:more|extra|additional|further)\\s+)?'
-                '${RegExp.escape(k)}s?\\b',
-              ),
-            );
+            scan(kind.type, _keywordQty[k]!);
           }
       }
     }
@@ -473,6 +481,40 @@ class BriefSlotPipeline {
     return records;
   }
 
+  static final _pluralSuffix = RegExp(r'(s|x|z|ch|sh)$');
+
+  /// Quantity patterns for the everyday device words. The vocabulary can
+  /// learn new words mid-session, so each is compiled on first sight and
+  /// kept for every parse after that.
+  ///
+  /// The `RegExp` below is the ONE construction left inside a function body,
+  /// and it is not a per-call one: it is the `putIfAbsent` initializer for a
+  /// map that is itself `static final`, so it runs once in the app's lifetime
+  /// per word and the compiled pattern is handed to every parse after that.
+  /// It cannot be hoisted to a `static final` the way the fixed patterns are,
+  /// because the pattern is built from a word the vocabulary learned at
+  /// runtime - the very case the fixed patterns above cannot cover.
+  static final Map<String, RegExp> _everydayQty = {};
+
+  static RegExp _everydayPattern(String word) => _everydayQty.putIfAbsent(
+        word,
+        () => RegExp(
+          // The head is raw so \b and \s stay regex escapes; the tail is a
+          // NORMAL string because that is the only kind that interpolates
+          // (Dart raw strings do not), so its backslash is doubled. Writing
+          // '\b' there instead would put a backspace character in the pattern
+          // and the word would silently never match.
+          //
+          // The plural is optional because a brief counts the plural far more
+          // often than the singular - "6 kiosks", "15 staff" - and a pattern
+          // that only knew the singular dropped every one of them.
+          r'\b(\d{1,3})\s*(?:(?:more|extra|additional|further)\s+)?'
+          '${RegExp.escape(word)}'
+          '${_pluralSuffix.hasMatch(word) ? '(?:es)?' : 's?'}'
+          '\\b',
+        ),
+      );
+
   /// Records a quantity for every everyday word in the brief that names a
   /// device the technical patterns never had a phrase for.
   ///
@@ -505,22 +547,7 @@ class BriefSlotPipeline {
       if (!deviceKinds.any((k) => k.type == entry.key)) continue;
       for (final word in entry.value) {
         if (technical.contains(word)) continue;
-        // The head is raw so \b and \s stay regex escapes; the tail is a
-        // NORMAL string because that is the only kind that interpolates
-        // (Dart raw strings do not), so its backslash is doubled. Writing
-        // '\b' there instead would put a backspace character in the pattern
-        // and the word would silently never match.
-        //
-        // The plural is optional because a brief counts the plural far more
-        // often than the singular - "6 kiosks", "15 staff" - and a pattern
-        // that only knew the singular dropped every one of them.
-        final suffix = RegExp(r'(s|x|z|ch|sh)$').hasMatch(word)
-            ? '(?:es)?'
-            : 's?';
-        final pattern = RegExp(
-          r'\b(\d{1,3})\s*(?:(?:more|extra|additional|further)\s+)?'
-          '${RegExp.escape(word)}$suffix\\b',
-        );
+        final pattern = _everydayPattern(word);
         for (final m in pattern.allMatches(lower)) {
           final at = m.start;
           final clause = _clauseOf(clauses, at);
@@ -655,16 +682,19 @@ class BriefSlotPipeline {
     records.removeWhere((r) => !seen.add(r.at));
   }
 
+  static final _clauseSegment = RegExp(r'[^,;.\n]+');
+  static final _clauseCoordinator = RegExp(r'\b(?:and|but)\b');
+
   /// Clause runs with positions. Sentence breaks, commas and the
   /// coordinators "and"/"but" are boundaries, because a quantity stated in
   /// a second coordinated clause ("... and the ground floor 4") belongs to
   /// that clause's site rather than to the first phrase.
   static List<({int start, String text})> _clauses(String lower) {
     final out = <({int start, String text})>[];
-    for (final seg in RegExp(r'[^,;.\n]+').allMatches(lower)) {
+    for (final seg in _clauseSegment.allMatches(lower)) {
       final s = seg.group(0)!;
       var from = 0;
-      for (final m in RegExp(r'\b(?:and|but)\b').allMatches(s)) {
+      for (final m in _clauseCoordinator.allMatches(s)) {
         out.add((start: seg.start + from, text: s.substring(from, m.start)));
         from = m.end;
       }
@@ -715,6 +745,8 @@ class BriefSlotPipeline {
     return out;
   }
 
+  static final _sentenceBreak = RegExp(r'[.;\n]');
+
   /// The site a quantity at [at] belongs to, or null when it names none.
   ///
   /// A site's device list is split across clauses by the commas and the "and"
@@ -730,11 +762,10 @@ class BriefSlotPipeline {
     List<({int at, String label})> anchors,
     int at,
   ) {
-    final sentenceBreak = RegExp(r'[.;\n]');
     for (var i = anchors.length - 1; i >= 0; i--) {
       final anchor = anchors[i];
       if (anchor.at > at) continue;
-      if (sentenceBreak.hasMatch(lower.substring(anchor.at, at))) return null;
+      if (_sentenceBreak.hasMatch(lower.substring(anchor.at, at))) return null;
       return anchor.label;
     }
     return null;
@@ -773,6 +804,9 @@ class BriefSlotPipeline {
     'printer',
     'laptop',
   ];
+  static final List<RegExp> _wiredKindPatterns = [
+    for (final k in _wiredKindWords) RegExp('\\b$k(?:es|s)?\\b'),
+  ];
 
   /// True when the brief describes several sites with wired devices but
   /// neither a per-site breakdown ("each with ...") nor any router or
@@ -788,21 +822,38 @@ class BriefSlotPipeline {
     if (_anyBulkEndpoints.hasMatch(lower)) return true;
     // Two or more wired kinds named is a network worth splitting.
     var kinds = 0;
-    for (final k in _wiredKindWords) {
-      if (RegExp('\\b$k(?:es|s)?\\b').hasMatch(lower)) kinds++;
+    for (final pattern in _wiredKindPatterns) {
+      if (pattern.hasMatch(lower)) kinds++;
     }
     return kinds >= 2;
   }
+
+  static final RegExp _moreThanTail = RegExp(r'\b(?:more\s+than|over)\s*$');
 
   /// "more than 2", "over 2" directly in front of a number: the stated
   /// value is a lower bound, so the count is read as one more than stated.
   static bool _moreThanBefore(String clause, int at) {
     final head = clause.substring(0, at.clamp(0, clause.length));
-    return RegExp(r'\b(?:more\s+than|over)\s*$').hasMatch(head);
+    return _moreThanTail.hasMatch(head);
   }
 
   static final RegExp _howManyWord =
       RegExp(r'how\s+many', caseSensitive: false);
+
+  static final Map<String, RegExp> _mentionByWord = {
+    for (final w in const [
+      'router',
+      'switch',
+      'pc',
+      'computer',
+      'workstation',
+      'server',
+    ])
+      w: RegExp('\\b${RegExp.escape(w)}(?:es|s)?\\b'),
+    for (final kind in deviceKinds)
+      for (final w in kind.keywords)
+        w: RegExp('\\b${RegExp.escape(w)}(?:es|s)?\\b'),
+  };
 
   /// True when at least one mention of this kind is NOT part of a "how
   /// many ..." question. "i don't know how many phones" asks ABOUT phones
@@ -811,8 +862,7 @@ class BriefSlotPipeline {
   /// `NetworkIntent._howManyQuestions`).
   static bool _mentionedBeyondHowMany(String lower, List<String> keywords) {
     for (final k in keywords) {
-      final re = RegExp('\\b${RegExp.escape(k)}(?:es|s)?\\b');
-      for (final m in re.allMatches(lower)) {
+      for (final m in _mentionByWord[k]!.allMatches(lower)) {
         final from = m.start - 40 < 0 ? 0 : m.start - 40;
         if (!_howManyWord.hasMatch(lower.substring(from, m.start))) {
           return true;
@@ -822,15 +872,49 @@ class BriefSlotPipeline {
     return false;
   }
 
+  static final RegExp _negationTail = RegExp(
+    r'\b(?:not|no|never|instead\s+of|rather\s+than|without)\b'
+    r'[^,;.]{0,14}$',
+  );
+
   /// "not 6 access points" writes a number to reject. Negation binds to the
   /// nearest few words, not across a clause break.
   static bool _negationBefore(String clause, int at) {
     final head = clause.substring(0, at.clamp(0, clause.length));
-    return RegExp(
-      r'\b(?:not|no|never|instead\s+of|rather\s+than|without)\b'
-      r'[^,;.]{0,14}$',
-    ).hasMatch(head);
+    return _negationTail.hasMatch(head);
   }
+
+  /// The elliptical shapes' own pieces, hoisted out of [_ellipse] so the
+  /// pattern is compiled once instead of on every call.
+  static final String _ellipseAdjacent = r'(?:ground|first|second|third|'
+      r'fourth|fifth|sixth|top|upper|'
+      r'lower|main|front|back|branch|left|right|north|south|east|west)';
+  static const String _ellipseSiteWord = r'(?:floor|office|branch|site|'
+      r'building|classroom|room|'
+      'department|location)(?:es|s)?';
+  static final RegExp _ellipseNumberFirst = RegExp(
+    '^\\s*(?:and\\s+)?(\\d{1,3})\\s*(?:(more|extra|additional|further)\\s*)?'
+    '(?:on|in|at|for|to)\\s+(?:(?:the|our|its)\\s+)?(?:($_ellipseAdjacent)\\s+)?'
+    '($_ellipseSiteWord)\\s*\$',
+    caseSensitive: false,
+  );
+  static final RegExp _ellipseSiteFirst = RegExp(
+    '^\\s*(?:and\\s+)?(?:(?:the|our|its)\\s+)(?:($_ellipseAdjacent)\\s+)?'
+    '($_ellipseSiteWord)\\s*'
+    '(?:(?:also|then|still|needs?|has|having|gets?|takes?|wants?|with|'
+    'holds?|will\\s+have)\\s+)*(\\d{1,3})\\s*(?:(more|extra|additional|'
+    'further)\\s*)?\$',
+    caseSensitive: false,
+  );
+  static final RegExp _ellipseMoreOnly = RegExp(
+    r'^\s*(?:and\s+)?(\d{1,3})\s+(more|extra|additional|further)\s*$',
+    caseSensitive: false,
+  );
+  static final RegExp _ellipseCorrection = RegExp(
+    r'^\s*(?:and\s+)?(actually|rather|no\s+wait|i\s+mean|correction)\s*,?\s*(\d{1,3})\s*$',
+    caseSensitive: false,
+  );
+  static final RegExp _pluralTail = RegExp(r'(es|s)$');
 
   /// One elliptical quantity shape, or null. The shapes are deliberately
   /// strict - they only accept a clause that is a number plus a site phrase
@@ -841,23 +925,14 @@ class BriefSlotPipeline {
   ) {
     String? label(String? adj, String site) =>
         adj == null ? site : '${adj.toLowerCase()} $site';
-    final adj = r'(?:ground|first|second|third|fourth|fifth|sixth|top|upper|'
-        r'lower|main|front|back|branch|left|right|north|south|east|west)';
-    const site = r'(?:floor|office|branch|site|building|classroom|room|'
-        'department|location)(?:es|s)?';
-
     // "4 on the ground floor", "4 for the second floor"
-    final numberFirst = RegExp(
-      '^\\s*(?:and\\s+)?(\\d{1,3})\\s*(?:(more|extra|additional|further)\\s*)?'
-      '(?:on|in|at|for|to)\\s+(?:(?:the|our|its)\\s+)?(?:($adj)\\s+)?($site)\\s*\$',
-      caseSensitive: false,
-    ).firstMatch(text);
+    final numberFirst = _ellipseNumberFirst.firstMatch(text);
     if (numberFirst != null) {
       return (
         value: int.parse(numberFirst.group(1)!),
         site: label(
           numberFirst.group(3),
-          numberFirst.group(4)!.replaceAll(RegExp(r'(es|s)$'), ''),
+          numberFirst.group(4)!.replaceAll(_pluralTail, ''),
         ),
         add: numberFirst.group(2) != null,
         correction: false,
@@ -865,19 +940,13 @@ class BriefSlotPipeline {
     }
 
     // "the ground floor 4", "the second floor needs 4"
-    final siteFirst = RegExp(
-      '^\\s*(?:and\\s+)?(?:(?:the|our|its)\\s+)(?:($adj)\\s+)?($site)\\s*'
-      '(?:(?:also|then|still|needs?|has|having|gets?|takes?|wants?|with|'
-      'holds?|will\\s+have)\\s+)*(\\d{1,3})\\s*(?:(more|extra|additional|'
-      'further)\\s*)?\$',
-      caseSensitive: false,
-    ).firstMatch(text);
+    final siteFirst = _ellipseSiteFirst.firstMatch(text);
     if (siteFirst != null) {
       return (
         value: int.parse(siteFirst.group(3)!),
         site: label(
           siteFirst.group(1),
-          siteFirst.group(2)!.replaceAll(RegExp(r'(es|s)$'), ''),
+          siteFirst.group(2)!.replaceAll(_pluralTail, ''),
         ),
         add: siteFirst.group(4) != null,
         correction: false,
@@ -885,10 +954,7 @@ class BriefSlotPipeline {
     }
 
     // "and 4 more"
-    final moreOnly = RegExp(
-      r'^\s*(?:and\s+)?(\d{1,3})\s+(more|extra|additional|further)\s*$',
-      caseSensitive: false,
-    ).firstMatch(text);
+    final moreOnly = _ellipseMoreOnly.firstMatch(text);
     if (moreOnly != null) {
       return (
         value: int.parse(moreOnly.group(1)!),
@@ -899,10 +965,7 @@ class BriefSlotPipeline {
     }
 
     // "actually 8" (a correction with no device word of its own)
-    final correction = RegExp(
-      r'^\s*(?:and\s+)?(actually|rather|no\s+wait|i\s+mean|correction)\s*,?\s*(\d{1,3})\s*$',
-      caseSensitive: false,
-    ).firstMatch(text);
+    final correction = _ellipseCorrection.firstMatch(text);
     if (correction != null) {
       return (
         value: int.parse(correction.group(2)!),

@@ -848,6 +848,15 @@ void main() {
           isTrue,
           reason: '$style put a device off the left of the canvas',
         );
+        // Same guard on the other axis, for the same reason: a drawing whose
+        // first spoke points straight up puts its devices at a negative y
+        // unless the centre is pushed down the page far enough. The sidecar's
+        // own `star` did exactly that until it was caught.
+        expect(
+          snap.spots.every((s) => s.y >= 0),
+          isTrue,
+          reason: '$style put a device off the top of the canvas',
+        );
       }
     });
 

@@ -199,13 +199,9 @@ class _LocalModelSectionState extends State<LocalModelSection> {
         ),
         if (s.usesOpenAi) ...[
           const SizedBox(height: 8),
-          Row(
-            children: [
-              OutlinedButton(
-                onPressed: _testing ? null : _test,
-                child: const Text('Test local server'),
-              ),
-            ],
+          OutlinedButton(
+            onPressed: _testing ? null : _test,
+            child: const Text('Test local server'),
           ),
           if (_testing)
             const Padding(

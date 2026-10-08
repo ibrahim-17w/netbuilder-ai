@@ -60,7 +60,34 @@ class ChatMarkdown {
     return t.split('|').map((c) => c.trim()).toList();
   }
 
+  static final _headingPattern = RegExp(r'^(#{1,6})\s+(.*)$');
+  static final _bulletPattern = RegExp(r'^\s*(?:[-*+]|\d+\.)\s+(.*)$');
+  static final _headingPrefix = RegExp(r'^(#{1,6})\s+');
+  static final _bulletPrefix = RegExp(r'^\s*(?:[-*+]|\d+\.)\s+');
+
+  /// Recent [parse] results keyed by source, so a finished bubble stops
+  /// re-parsing on every rebuild while its neighbours stream in. The memo is
+  /// bounded - a streaming answer is a new source string per chunk, so an
+  /// unbounded map would keep every version of every answer alive for the
+  /// life of the chat - evicting the least recently used entry at the limit.
+  static final Map<String, List<MdBlock>> _parseMemo = {};
+  static const int _parseMemoLimit = 64;
+
   static List<MdBlock> parse(String source) {
+    final memoized = _parseMemo.remove(source);
+    if (memoized != null) {
+      _parseMemo[source] = memoized; // re-insert, so it leaves as most recent
+      return memoized;
+    }
+    final blocks = _parse(source);
+    if (_parseMemo.length >= _parseMemoLimit) {
+      _parseMemo.remove(_parseMemo.keys.first);
+    }
+    _parseMemo[source] = blocks;
+    return blocks;
+  }
+
+  static List<MdBlock> _parse(String source) {
     final blocks = <MdBlock>[];
     final lines = source.replaceAll('\r\n', '\n').split('\n');
     var i = 0;
@@ -109,7 +136,7 @@ class ChatMarkdown {
       }
 
       // heading
-      final heading = RegExp(r'^(#{1,6})\s+(.*)$').firstMatch(line);
+      final heading = _headingPattern.firstMatch(line);
       if (heading != null) {
         blocks.add(MdBlock(
           kind: MdKind.heading,
@@ -121,7 +148,7 @@ class ChatMarkdown {
       }
 
       // bullet
-      final bullet = RegExp(r'^\s*(?:[-*+]|\d+\.)\s+(.*)$').firstMatch(raw);
+      final bullet = _bulletPattern.firstMatch(raw);
       if (bullet != null) {
         blocks.add(MdBlock(kind: MdKind.bullet, text: bullet.group(1)!.trim()));
         i++;
@@ -135,8 +162,8 @@ class ChatMarkdown {
           lines[i].trim().isNotEmpty &&
           !lines[i].trimLeft().startsWith('```') &&
           !_isTableRow(lines[i]) &&
-          !RegExp(r'^(#{1,6})\s+').hasMatch(lines[i].trim()) &&
-          !RegExp(r'^\s*(?:[-*+]|\d+\.)\s+').hasMatch(lines[i])) {
+          !_headingPrefix.hasMatch(lines[i].trim()) &&
+          !_bulletPrefix.hasMatch(lines[i])) {
         paragraph.add(lines[i].trim());
         i++;
       }

@@ -17,6 +17,19 @@
 // isolate before each request, so growth there is felt as typing lag rather
 // than as a failed test.
 //
+// Added 2026-10-08 (measured on the machine this gate was written on,
+// Flutter 3.44, debug VM) for the memoized validator read:
+//
+//   revision    (54-device plan)    1.0 ms
+//
+// It is cheap compared to the validate pass it saves (4.5 ms measured here,
+// ~10 ms on the chat hot path), which is what allows
+// `ValidatorService.validateCached` to recompute it on every call instead of
+// trusting identity alone. That is also why its ceiling is 10x rather than the
+// ~5x used above: a hash that costs a tenth of the validation it stands in for
+// is still cheap, a hash that costs all of it is a bug, and a gate that
+// flips red on an ordinary slow CI machine tells nobody anything.
+//
 // Ceilings are ~5x measured. Raise them deliberately and say why in the
 // commit; do not quietly widen one to make a red build green.
 import 'package:flutter_test/flutter_test.dart';
@@ -77,6 +90,22 @@ void main() {
       ''');
     });
 
+    test('hashing the revision of a 54-device lab stays under 10 ms', () {
+      final plan = _lab();
+      expect(plan.nodes.length, greaterThanOrEqualTo(54),
+          reason: 'the fixture must stay the 54-device lab it was measured on');
+
+      final took = medianMs(() => plan.revision);
+
+      expect(took, lessThan(10.0), reason: '''
+        Reading the revision took ${took.toStringAsFixed(2)} ms (measured
+        1.0 ms). ValidatorService.validateCached recomputes it on every call
+        to know whether the plan it is holding the findings for has really
+        changed, so if this number ever grew towards the 40 ms validate
+        ceiling the memo would cost nearly as much as the pass it saves.
+      ''');
+    });
+
     test('planning the context for a 400-turn history stays under 1200 ms', () {
       final history = <ChatMessage>[
         for (var i = 0; i < 400; i++)
@@ -116,6 +145,25 @@ void main() {
       // early-out that returns empty would pass every timing gate above.
       expect(ValidatorService.validate(plan, target: 'packet-tracer'),
           isA<List<Object?>>());
+    });
+
+    test('the revision hash stays cheap relative to the pass it guards', () {
+      final plan = _lab();
+      expect(plan.nodes.length, greaterThanOrEqualTo(54),
+          reason: 'the fixture must stay the 54-device lab it was measured on');
+
+      final hashing = medianMs(() => plan.revision);
+      final validating = medianMs(() => ValidatorService.validate(plan));
+
+      expect(hashing, lessThan(validating), reason: '''
+        The revision hash cost ${hashing.toStringAsFixed(2)} ms for a plan
+        whose validate takes ${validating.toStringAsFixed(2)} ms. Both numbers
+        are taken here on the same machine, so a ratio test says something
+        whatever the CI box is worth. validateCached recomputes the hash on
+        every call, so a hash that stopped being cheaper than the work it
+        stands in for would make the memo slower than the thing it memoizes -
+        and the fix is then to make the hash cheaper, not to drop it.
+      ''');
     });
   });
 }

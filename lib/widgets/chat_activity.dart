@@ -223,9 +223,13 @@ class NetworkInspector extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    // Every rebuild re-asks the validator the same question about the same
+    // plan, which is what the memo in validateCached is for: the screen
+    // repaints while a reply streams, and walking 54 devices per repaint is
+    // a dropped frame each time.
     final issues = intent == null
         ? const <ValidationIssue>[]
-        : ValidatorService.validate(intent!);
+        : ValidatorService.validateCached(intent!);
     final errors = issues.where((i) => i.severity == 'error').toList();
     final warnings = issues.where((i) => i.severity == 'warning').toList();
 

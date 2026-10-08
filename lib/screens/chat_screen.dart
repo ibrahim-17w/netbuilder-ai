@@ -159,6 +159,18 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
+/// How the typed-out answer advances, and how often.
+///
+/// The reveal runs a timer that calls `setState` on the whole screen, so its
+/// frequency is the frame budget of the streaming answer: 24 characters every
+/// 12 ms was ~80 rebuilds a second, each one allocating a new `ChatMessage`
+/// (which breaks the bubble's `GlobalObjectKey`) and re-running the msg
+/// parse, the context budget and the validator's `NetworkInspector` read.
+/// Typing out at the same speed with ~3x fewer repaints is the same
+/// animation for roughly half the work.
+const int kRevealChunk = 48;
+const Duration kRevealTick = Duration(milliseconds: 30);
+
 class _ChatScreenState extends State<ChatScreen> {
   final _input = TextEditingController();
   final _project = TextEditingController();
@@ -1611,7 +1623,7 @@ class _ChatScreenState extends State<ChatScreen> {
   /// a plan is buildable.
   List<ValidationIssue> _blockingFindings(NetworkIntent? plan) => plan == null
       ? const <ValidationIssue>[]
-      : ValidatorService.validate(
+      : ValidatorService.validateCached(
           plan,
           target: _target,
         ).where((i) => i.blocks).toList();
@@ -3374,8 +3386,22 @@ class _ChatScreenState extends State<ChatScreen> {
   /// One tap on one of the assistant's own suggestions. It is sent as a real
   /// message, so it lands in the transcript and the offline path answers it
   /// exactly as if it had been typed.
+  ///
+  /// A suggestion tapped WHILE A TURN IS STILL RUNNING is not dropped and does
+  /// not eat the draft: the text the user already typed is theirs, so the box
+  /// is left exactly as it is (overwriting it is what used to destroy a
+  /// half-written message), the chips stay up, and the suggestion lands in the
+  /// composer so the tap has a visible result and the turn it belongs to goes
+  /// out as soon as the current one ends. `_send()` is the single place that
+  /// decides a turn may start, so an early return there leaves the draft
+  /// sitting in the box rather than throwing it away.
   Future<void> _sendQuickReply(String text) async {
-    if (_busy) return;
+    if (_busy) {
+      if (_input.text.trim().isEmpty) {
+        setState(() => _input.text = text);
+      }
+      return;
+    }
     setState(() {
       _input.text = text;
       _quickReplies = const [];
@@ -4499,10 +4525,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
     void step() {
       if (done) return;
-      end = end + 24 >= full.length ? full.length : end + 24;
+      end = end + kRevealChunk >= full.length ? full.length : end + kRevealChunk;
       write(full.substring(0, end));
       if (end < full.length) {
-        _reveal = Timer(const Duration(milliseconds: 12), step);
+        _reveal = Timer(kRevealTick, step);
       } else {
         complete();
       }
@@ -4552,7 +4578,17 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() => _pending = [..._pending, result.image!]);
       }
     } catch (e) {
-      if (mounted) setState(() => _status = 'Could not attach: $e');
+      // A person reads this, not a log: say what failed and what to do about
+      // it, in the idiom of [SettingsService.engineBaseError]. The raw detail
+      // rides along in brackets, the way the rest of the app keeps it.
+      if (mounted) {
+        setState(
+          () => _status =
+              'That file could not be attached. Check it is an image this '
+              'device can open (PNG, JPG or WebP), then pick it again '
+              '($e).',
+        );
+      }
     }
   }
 
@@ -4602,7 +4638,13 @@ class _ChatScreenState extends State<ChatScreen> {
     final shot = await _engine().shot(choice);
     final encoded = (shot['data'] ?? '').toString();
     if (encoded.isEmpty) {
-      if (mounted) setState(() => _status = 'Could not read $choice.');
+      if (mounted) {
+        setState(
+          () => _status =
+              'That screenshot could not be read. Run the capture again, '
+              'or attach an image file of your own ($choice).',
+        );
+      }
       return;
     }
     final result = await _chat!.persistImage(
@@ -4642,7 +4684,13 @@ class _ChatScreenState extends State<ChatScreen> {
         _status = '';
       });
     } catch (e) {
-      if (mounted) setState(() => _status = 'Clipboard read failed: $e');
+      if (mounted) {
+        setState(
+          () => _status =
+              'The clipboard could not be read. Copy the text again, or '
+              'type it into the box by hand ($e).',
+        );
+      }
     }
   }
 
@@ -7019,10 +7067,15 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _messageActions(int index, ChatMessage message, bool isUser) {
     final theme = Theme.of(context);
     final muted = AppPalette.mutedText(theme.colorScheme);
+    // A 44x44 TOUCH TARGET, the same one the corrections list uses
+    // (lib/widgets/correction_badges.dart:248-252): the row works on a
+    // finger, not only on a mouse. shrinkWrap keeps the visible icon at its
+    // 14px - the target grows, the button does not - so the row still fits a
+    // 320dp phone.
     final style = TextButton.styleFrom(
       foregroundColor: muted,
-      padding: const EdgeInsets.symmetric(horizontal: AppTheme.s8),
-      minimumSize: const Size(0, 30),
+      padding: const EdgeInsets.symmetric(horizontal: AppTheme.s4),
+      minimumSize: const Size(44, 44),
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       textStyle: theme.textTheme.labelSmall,
     );
@@ -8393,7 +8446,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   // its space.
                   PopupMenuButton<String>(
                     tooltip: 'Attach',
-                    enabled: !_busy,
                     icon: const Icon(Icons.add_circle_outline),
                     onSelected: (value) {
                       if (value == 'image') {
@@ -8457,7 +8509,12 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: TextField(
                         controller: _input,
                         focusNode: _composerFocus,
-                        enabled: !_busy,
+                        // NEVER DISABLED WHILE THE ASSISTANT ANSWERS. The box
+                        // used to lock the moment a turn started, so a thought
+                        // that arrived mid-answer had to be remembered by the
+                        // user instead of written down. A disabled field also
+                        // swallows the caret and the Android keyboard, which
+                        // reads as "the app is broken" rather than "busy".
                         autofocus: true,
                         minLines: 1,
                         maxLines: 6,

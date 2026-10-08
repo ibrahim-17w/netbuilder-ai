@@ -86,6 +86,10 @@ class AssistantReply {
 class OfflineAssistantService {
   const OfflineAssistantService._();
 
+  static final RegExp _arabicScript = RegExp(r'[\u0600-\u06FF]');
+
+  static final RegExp _whitespace = RegExp(r'\s+');
+
   static AssistantReply reply({
     required String rawText,
     required String normalized,
@@ -130,9 +134,8 @@ class OfflineAssistantService {
     // keep their English technical content (device commands ARE English) but
     // are framed in Arabic, so a mixed "كيف أعمل ssh" conversation is
     // answered, not ignored.
-    final arabic = RegExp(
-      r'[\u0600-\u06FF]',
-    ).hasMatch(rawText.isEmpty ? normalized : rawText);
+    final arabic =
+        _arabicScript.hasMatch(rawText.isEmpty ? normalized : rawText);
 
     // The answer starts with its CONTENT. Which brain produced it - the
     // planner, a model, a learned answer - is the app's state, shown once
@@ -418,7 +421,7 @@ class OfflineAssistantService {
     //
     // A short message that names a real topic ("and vlans?", "why stp?") is
     // not an opener - it is a follow-up, and it gets an answer.
-    final words = t.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    final words = t.split(_whitespace).where((w) => w.isNotEmpty).toList();
     final hasDeviceWord = _deviceWords.hasMatch(t);
     final concept = _concept(t);
     if (words.length <= 2 &&
@@ -1061,6 +1064,10 @@ class OfflineAssistantService {
     );
   }
 
+  static final RegExp _missingAccountRule = RegExp(
+    r'^(\S+)\s+(\S+)\s+rule has an account missing username or password',
+  );
+
   /// What is left to say for the findings the repair pass could NOT clear.
   ///
   /// The generic examples "fix the plan" otherwise offers are the wrong
@@ -1082,9 +1089,7 @@ class OfflineAssistantService {
     }
 
     for (final issue in issues) {
-      final m = RegExp(
-        r'^(\S+)\s+(\S+)\s+rule has an account missing username or password',
-      ).firstMatch(issue.message);
+      final m = _missingAccountRule.firstMatch(issue.message);
       if (m != null) {
         addLogin('${m.group(1)!} (${m.group(2)!.toUpperCase()})');
         continue;
@@ -1145,7 +1150,7 @@ class OfflineAssistantService {
     List<ChatMessage> history,
   ) {
     if (plan == null || plan.nodes.isEmpty || history.isEmpty) return '';
-    final words = t.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+    final words = t.split(_whitespace).where((w) => w.isNotEmpty).length;
     if (words > 6) return '';
     return 'For the lab you have planned (${_labLine(plan)}):\n\n';
   }
@@ -1510,6 +1515,11 @@ class OfflineAssistantService {
     r'adjacency|adjacencies|neighbou?rs?|ethernet|packet tracer|ios|cli)\b',
   );
 
+  static final RegExp _useChange = RegExp(
+    r'\buse\s+(?:ospf|eigrp|bgp|rip|static|a\s+\d|'
+    r'\d{1,3}(?:\.\d{1,3}){3})',
+  );
+
   static bool _isChange(String t) {
     if (t.isEmpty) return false;
     // "add 2 routers" is a build request, not a change to an existing plan.
@@ -1525,10 +1535,7 @@ class OfflineAssistantService {
     // they fell to the build answer, whose change-delta line happened to
     // carry the news; with the plan-aware composer on that path, the
     // change must be claimed here first.
-    final useChange = RegExp(
-      r'\buse\s+(?:ospf|eigrp|bgp|rip|static|a\s+\d|'
-      r'\d{1,3}(?:\.\d{1,3}){3})',
-    ).hasMatch(t);
+    final useChange = _useChange.hasMatch(t);
     return _changeVerb.hasMatch(t) || useChange;
   }
 
@@ -1552,6 +1559,20 @@ class OfflineAssistantService {
     r'lab)\b',
   );
 
+  static final RegExp _questionLead = RegExp(
+    r'^(how|what|why|when|where|which|who|is|are|does|do)\b',
+  );
+
+  static final RegExp _politeLead = RegExp(
+    r'^(?:can|could|would|will|please|kindly)\s+(?:you\s+)?',
+  );
+
+  static final RegExp _trailingPunct = RegExp(r'[?.!,;\u061f\u060c\s]+$');
+
+  static final RegExp _bareFixVerb = RegExp(
+    r'^(fix|repair|solve|resolve|correct|mend|clear)$',
+  );
+
   /// True when the message is an INSTRUCTION to repair the standing plan
   /// rather than a question about repair.
   ///
@@ -1565,25 +1586,30 @@ class OfflineAssistantService {
     if (t.isEmpty) return false;
     // "how do I fix an OSPF neighbour?" asks how, and "why is it broken?"
     // asks why: neither is an instruction to change this plan.
-    if (RegExp(r'^(how|what|why|when|where|which|who|is|are|does|do)\b')
-        .hasMatch(t)) {
+    if (_questionLead.hasMatch(t)) {
       return false;
     }
     // "Can you fix the plan?" is a request, however politely it is phrased.
-    t = t.replaceFirst(
-      RegExp(r'^(?:can|could|would|will|please|kindly)\s+(?:you\s+)?'),
-      '',
-    );
-    t = t.replaceAll(RegExp(r'[?.!,;\u061f\u060c\s]+$'), '');
+    t = t.replaceFirst(_politeLead, '');
+    t = t.replaceAll(_trailingPunct, '');
     if (!_fixVerb.hasMatch(t)) return false;
     // "fix 2 routers" is a build request, not a repair of what stands.
     if (_deviceCount.hasMatch(t)) return false;
     // A bare verb, or a verb with the thing it repairs named.
-    return _fixTarget.hasMatch(t) ||
-        RegExp(r'^(fix|repair|solve|resolve|correct|mend|clear)$').hasMatch(t);
+    return _fixTarget.hasMatch(t) || _bareFixVerb.hasMatch(t);
   }
 
   static bool _isFix(String t) => looksLikeRepairRequest(t);
+
+  static final RegExp _thenBuild = RegExp(
+    r'\b(then|and|then\s+please|after\s+that|afterwards|after)\b[^.]{0,20}?'
+    r'\b(build|compile|generate|produce|write|create|make)\b',
+  );
+
+  static final RegExp _buildIt = RegExp(
+    r'\b(build|compile|generate|produce|write)\s+(it|that|them|the\s+'
+    r"(?:file|\.?pkt|lab|network))\b",
+  );
 
   /// True when a repair request also asks for the BUILD in the same breath:
   /// "fix every finding you got then build", "repair the plan and compile it".
@@ -1596,14 +1622,7 @@ class OfflineAssistantService {
   static bool asksToBuildAfterRepair(String text) {
     if (!looksLikeRepairRequest(text)) return false;
     final t = text.toLowerCase();
-    return RegExp(
-      r'\b(then|and|then\s+please|after\s+that|afterwards|after)\b[^.]{0,20}?'
-      r'\b(build|compile|generate|produce|write|create|make)\b',
-    ).hasMatch(t) ||
-        RegExp(
-          r'\b(build|compile|generate|produce|write)\s+(it|that|them|the\s+'
-          r"(?:file|\.?pkt|lab|network))\b",
-        ).hasMatch(t);
+    return _thenBuild.hasMatch(t) || _buildIt.hasMatch(t);
   }
 
   /// The findings that would withhold a build for [plan], with the same
@@ -1615,10 +1634,22 @@ class OfflineAssistantService {
     String target = 'packet-tracer',
   }) => _blocking(plan, target);
 
+  static final RegExp _modelNumber = RegExp(
+    r'\b(4331|4321|2911|2901|1941|2960|2950|3560|829)\b',
+  );
+
+  static final RegExp _cidrPrefix = RegExp(
+    r'\b(\d{1,3}(?:\.\d{1,3}){3}/\d{1,2})\b',
+  );
+
+  static final Map<String, RegExp> _routingWords = {
+    for (final p in const ['ospf', 'eigrp', 'bgp', 'static'])
+      p: RegExp('\\b$p\\b'),
+  };
+
   static String _describeChange(String t) {
     final bits = <String>[];
-    final model =
-        RegExp(r'\b(4331|4321|2911|2901|1941|2960|2950|3560|829)\b').firstMatch(t);
+    final model = _modelNumber.firstMatch(t);
     if (model != null && t.contains('router')) {
       bits.add('use the ${model.group(1)} model for the routers');
     } else if (model != null && t.contains('switch')) {
@@ -1626,13 +1657,13 @@ class OfflineAssistantService {
     } else if (model != null) {
       bits.add('use model ${model.group(1)}');
     }
-    final cidr = RegExp(r'\b(\d{1,3}(?:\.\d{1,3}){3}/\d{1,2})\b').firstMatch(t);
+    final cidr = _cidrPrefix.firstMatch(t);
     if (cidr != null) bits.add('move the LANs onto ${cidr.group(1)}');
     if (t.contains('vlan')) {
       bits.add('create the VLAN on the switches and put its ports in it');
     }
     for (final p in const ['ospf', 'eigrp', 'bgp', 'static']) {
-      if (RegExp('\\b$p\\b').hasMatch(t)) {
+      if (_routingWords[p]!.hasMatch(t)) {
         bits.add('use $p for routing');
         break;
       }
@@ -1667,6 +1698,23 @@ class OfflineAssistantService {
     r'(diagnos|flow|troubleshoot)|exit\s+this)\b',
   );
 
+  static final RegExp _ipv4Address = RegExp(r'\d{1,3}(?:\.\d{1,3}){3}');
+
+  static final RegExp _stpWord = RegExp(r'\bstp\b');
+
+  static final RegExp _loopWord = RegExp(r'\bloops?\b');
+
+  static final RegExp _ipv6Prefix = RegExp(r'[0-9a-f:]{3,}\s*/\s*\d{1,3}');
+
+  static final Map<String, RegExp> _conceptWords = {
+    for (final w in const [
+      'ospf', 'eigrp', 'bgp', 'static', 'vs', 'difference', 'which', 'trunk',
+      'dhcp', 'dns', 'vlan', 'vlans', 'router', 'routers', 'nat', 'acl', 'nd',
+      'dr',
+    ])
+      w: RegExp('\\b$w\\b'),
+  };
+
   static String? _concept(String rawText) {
     // Full names and fault phrasings are canonicalized to the short forms
     // this chain matches on ("border gateway protocol" reaches the bgp
@@ -1692,7 +1740,7 @@ class OfflineAssistantService {
     // "recommend" into one canned blueprint is gone: the advisor's answer
     // is grounded in the request and the plan instead of always naming a
     // two-site company network.
-    bool has(String w) => RegExp('\\b$w\\b').hasMatch(t);
+    bool has(String w) => _conceptWords[w]!.hasMatch(t);
     if ((has('ospf') || has('eigrp') || has('bgp')) &&
         (has('static') ||
             has('vs') ||
@@ -1739,7 +1787,7 @@ class OfflineAssistantService {
     // question.
     if ((t.contains('subnet') || t.contains('mask')) &&
         !t.contains('/') &&
-        !RegExp(r'\d{1,3}(?:\.\d{1,3}){3}').hasMatch(t)) {
+        !_ipv4Address.hasMatch(t)) {
       return 'subnet';
     }
     // The wider expert set: routing, switching, services, transport,
@@ -1747,9 +1795,9 @@ class OfflineAssistantService {
     // Whole-word 'stp' only: 'rstp' is rapid spanning tree - a different
     // mode with its own commands - and the old substring test swallowed it
     // into the classic STP answer.
-    if (RegExp(r'\bstp\b').hasMatch(t) ||
+    if (_stpWord.hasMatch(t) ||
         t.contains('spanning') ||
-        RegExp(r'\bloops?\b').hasMatch(t)) {
+        _loopWord.hasMatch(t)) {
       return 'stp';
     }
     if (t.contains('etherchannel') || t.contains('port-channel') ||
@@ -1778,7 +1826,7 @@ class OfflineAssistantService {
     // the DHCPv6 corpus entry - the address plan, not the concept.
     if ((t.contains('ipv6') || t.contains('slaac') || has('nd')) &&
         !has('dhcp') &&
-        !RegExp(r'[0-9a-f:]{3,}\s*/\s*\d{1,3}').hasMatch(t)) {
+        !_ipv6Prefix.hasMatch(t)) {
       return 'ipv6';
     }
     if (t.contains('ospf area') || has('dr') || t.contains('lsa')) {
@@ -2228,12 +2276,14 @@ class OfflineAssistantService {
     'good', 'instead', 'also', 'just',
   };
 
+  static final RegExp _tokenSeparators = RegExp(r'[^a-z0-9+#]+');
+
   /// The content words of [t]. Lowercased first: the token pattern only
   /// accepts a-z, so an unlowercased 'VLSM' or 'OSPF' would be shredded
   /// into separator characters and the topic would lose its best word.
   static Set<String> _contentTokens(String t) {
     final out = <String>{};
-    for (final w in t.toLowerCase().split(RegExp(r'[^a-z0-9+#]+'))) {
+    for (final w in t.toLowerCase().split(_tokenSeparators)) {
       if (w.length < 2 || _topicStopwords.contains(w)) continue;
       out.add(w);
     }
@@ -2303,6 +2353,14 @@ class OfflineAssistantService {
     return [for (final (i, _) in scored.take(3)) _topicCatalog[i]];
   }
 
+  static final RegExp _openWhLead = RegExp(
+    r'^(what|why|how|which|where|who)\b',
+  );
+
+  static final RegExp _openArabicLead = RegExp(
+    r'^(ما|ماذا|كيف|لماذا|هل|أين|من)',
+  );
+
   /// A real question the offline material did not match. Deliberately
   /// narrow: a two-word opener belongs to the vague path, and a stated
   /// device count belongs to the planner.
@@ -2317,8 +2375,8 @@ class OfflineAssistantService {
     if (wordCount < 3) return false;
     final shaped = t.endsWith('?') ||
         t.endsWith('؟') ||
-        RegExp(r'^(what|why|how|which|where|who)\b').hasMatch(t) ||
-        RegExp(r'^(ما|ماذا|كيف|لماذا|هل|أين|من)').hasMatch(t);
+        _openWhLead.hasMatch(t) ||
+        _openArabicLead.hasMatch(t);
     if (!shaped) return false;
     if (_deviceCount.hasMatch(t)) return false;
     // With a plan on the table, an unmatched question is answered by the
