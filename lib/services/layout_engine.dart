@@ -629,22 +629,38 @@ Map<String, List<double>> _flatPositions(
   return _keepOnCanvas(spots);
 }
 
-/// A drawing centred on the canvas can reach past its left edge.
+/// A drawing centred on the canvas can reach past its edges.
 ///
 /// The ring layouts put devices all the way round a centre, so with enough
 /// roles the leftmost one lands at a negative x - which is off the visible
 /// workspace in Packet Tracer. Nudging the whole drawing right is the same
 /// picture on the canvas rather than one device lost off the side.
+///
+/// The same applies vertically: `star` and `radial` put their first spoke
+/// pointing straight UP from the centre, so a device on that spoke sits at
+/// `centreY - reach`. Left alone it parks off the top of the workspace, where
+/// nobody can click it; the sidecar's own `star` did exactly that until the
+/// generator's "every drawing places every device on canvas" test caught it.
+/// Shifting the drawing down is the same silhouette on the canvas.
 Map<String, List<double>> _keepOnCanvas(Map<String, List<double>> spots) {
   if (spots.isEmpty) return spots;
   var minX = double.infinity;
+  var minY = double.infinity;
   for (final spot in spots.values) {
     minX = math.min(minX, spot[0]);
+    minY = math.min(minY, spot[1]);
   }
-  if (minX >= kXStart) return spots;
-  final shift = kXStart - minX;
-  for (final spot in spots.values) {
-    spot[0] = spot[0] + shift;
+  if (minX < kXStart) {
+    final shift = kXStart - minX;
+    for (final spot in spots.values) {
+      spot[0] = spot[0] + shift;
+    }
+  }
+  if (minY < 0) {
+    final shift = -minY;
+    for (final spot in spots.values) {
+      spot[1] = spot[1] + shift;
+    }
   }
   return spots;
 }
