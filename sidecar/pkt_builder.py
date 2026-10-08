@@ -1048,9 +1048,16 @@ def _flat_positions(style: str, entries: list[tuple[str, str]], tier: dict,
                     + by_role.get(TIER_ACCESS, []))
         hosts = by_role.get(TIER_HOSTS, []) + by_role.get(TIER_SERVICES, [])
         centre_x = CANVAS_WIDTH / 2
-        centre_y = ROW_TOP + float(pitch) * 2
         per_switch = max(1, math.ceil(len(hosts) / max(1, len(switches))))
         rays = len(switches) if switches else max(1, len(hosts))
+        # The first ray points straight up, so the centre has to sit far
+        # enough DOWN the page for the furthest host on it to still be on the
+        # canvas. `radial` solves the same problem by growing its centre with
+        # its outermost ring; without that, a lab with any hosts at all put
+        # PC1-PC3 at y = -12, -120 and -228, which in Packet Tracer is a
+        # device parked off the visible workspace where nobody can click it.
+        reach = pitch * (2.6 + 0.9 * max(0, per_switch - 1))
+        centre_y = ROW_TOP + max(reach, float(pitch) * 2)
         spots.update(
             _keep_on_canvas({
                 name: (centre_x + (index - (len(core) - 1) / 2) * pitch,

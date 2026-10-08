@@ -1,0 +1,80 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze-and-test:
+    name: analyze + test (ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      # --fatal-infos, not --fatal-warnings: the suite's own style guide
+      # (analysis_options.yaml) is written to be clean at info level too, and a
+      # green analyzer is what lets a reviewer trust the diff.
+      - name: Static analysis
+        run: flutter analyze --fatal-infos
+
+      - name: Test suite
+        run: flutter test
+
+      - name: Release build (Linux target, proof the bundle assembles)
+        run: flutter build linux --release
+
+  sidecar:
+    name: sidecar pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install engine dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pyautogui pywinauto pillow pynput
+
+      # The suite is file-isolated through sidecar/conftest.py, so a shared
+      # working tree is safe. Some tests are platform-dependent (the Windows
+      # autopilot and the OCR golden), so deselect nothing here and let the
+      # markers do the work - a failure to import or collect is what this job
+      # exists to catch.
+      - name: Test suite
+        working-directory: sidecar
+        run: python -m pytest -q
+
+  windows:
+    name: windows release build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Release build
+        run: flutter build windows --release

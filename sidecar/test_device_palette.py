@@ -21,9 +21,13 @@ from unittest.mock import patch
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pt_autopilot as pt  # noqa: E402
 
+# The Dart `deviceKinds` table lived in `lib/models/network_intent.dart` until
+# the NLU extraction moved it into the lexicon. The test reads whichever file
+# declares it, so the cross-check survives the move instead of failing on a
+# missing substring.
 DART_CATALOG = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "lib", "models", "network_intent.dart")
+    "lib", "services", "nlu", "lexicon.dart")
 
 
 def _dart_kinds() -> list:
