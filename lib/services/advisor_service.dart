@@ -42,6 +42,13 @@ class AdvisorService {
     // answered in the office the profile remembers sizes for 40, not for the
     // profile's stale number.
     EnvironmentProfile? environmentProfile,
+    // The scale this conversation already settled, from the design brief.
+    // Like the profile it only fills in what the message leaves unsaid, but
+    // it outranks it: "20 employees" said two turns ago is something the user
+    // DID state, and the brief is where that fact lives once no plan exists
+    // yet. Without it, "what firewall do we need for an office with guests?"
+    // advises (and then plans) at no scale at all.
+    int? briefScale,
   }) {
     final t = text.trim().toLowerCase();
     if (t.isEmpty) return null;
@@ -60,6 +67,7 @@ class AdvisorService {
       target: target,
       kind: kind,
       profile: environmentProfile,
+      briefScale: briefScale,
     );
     for (final topic in _topics) {
       if (topic.match(ctx)) {
@@ -570,7 +578,7 @@ class AdvisorService {
       ],
       quickReplies: [
         if (c.planBrief != null) c.planBrief!,
-        'Plan a small office with a firewall, guest wifi and staff VLANs',
+        c.planSentence('a firewall, guest wifi and staff VLANs'),
       ],
       nextStep: 'Tell me what must be kept apart and I will turn it into '
           'VLANS/ACLs in the plan - or name the appliance and I will say what '
@@ -812,9 +820,9 @@ class AdvisorService {
         'Whatever you buy, the backhaul matters: a Wi-Fi 6 AP on a 100 Mbit '
             'uplink is a Wi-Fi 5 AP in practice.',
       ],
-      quickReplies: const [
+      quickReplies: [
         'How many access points do I need for 40 users?',
-        'Plan a small office with 2 access points and 1 PoE switch',
+        c.planSentence('2 access points and 1 PoE switch'),
       ],
       nextStep: 'Tell me the device count and whether the space is dense '
           '(classroom, cafe) or sparse (offices), and I will pick the tier.',
@@ -857,8 +865,8 @@ class AdvisorService {
             'the switch does not have to be replaced when the second AP '
             'arrives.',
       ],
-      quickReplies: const [
-        'Plan a small office with 2 access points and PoE cameras',
+      quickReplies: [
+        c.planSentence('2 access points and PoE cameras'),
       ],
       nextStep: 'List the powered devices (APs, cameras, phones) and I will '
           'total the budget for you.',
@@ -903,8 +911,8 @@ class AdvisorService {
           'In the lab this is a VLAN plus ACL exercise (${c.labLine()}) - '
               'say the word and I plan the VLAN and the ACL.',
       ],
-      quickReplies: const [
-        'Plan a camera VLAN with an ACL to the NVR',
+      quickReplies: [
+        c.planSentence('a camera VLAN with an ACL to the NVR'),
         'How many cameras can a PoE switch handle?',
       ],
       nextStep: 'Tell me how many cameras (and whether any are PTZ) and I '
@@ -1015,8 +1023,8 @@ class AdvisorService {
         'Do guests need to reach anything on the staff network (a printer, '
             'a display)?',
       ],
-      quickReplies: const [
-        'Plan a small office with guest wifi and staff VLANs',
+      quickReplies: [
+        c.planSentence('guest wifi and staff VLANs'),
       ],
       nextStep: 'Say what guests must reach (usually nothing) and I will '
           'plan the guest VLAN and the ACL that separates it.',
@@ -1289,8 +1297,8 @@ class AdvisorService {
               'one a role (DHCP/DNS/AAA) so the build configures its '
               'services tab rather than leaving it idle.',
       ],
-      quickReplies: const [
-        'Plan a small office with a DHCP/DNS server and a file server',
+      quickReplies: [
+        c.planSentence('a DHCP/DNS server and a file server'),
       ],
       nextStep: 'List the services you actually need and I will say what '
           'belongs on the router and what belongs on a server.',
@@ -1385,8 +1393,8 @@ class AdvisorService {
         'Which of these must never reach each other: staff, guests, '
             'cameras, or local servers?',
       ],
-      quickReplies: const [
-        'Plan a small office with guest wifi and staff VLANs',
+      quickReplies: [
+        c.planSentence('guest wifi and staff VLANs'),
       ],
       nextStep: 'Name the groups to separate and I will list the VLANs and '
           'the rules between them - or plan them into the lab.',
@@ -2111,8 +2119,9 @@ class _AdvisorContext {
     required this.target,
     required this.kind,
     EnvironmentProfile? profile,
+    int? briefScale,
   }) : venue = _venueFor(t, profile),
-       scale = _scaleFor(t, profile),
+       scale = _scaleFor(t, profile, briefScale),
        budget = _budget.hasMatch(t) || (profile?.budget ?? false),
        skill = (profile == null || profile.skill.isEmpty) ? '' : profile.skill;
 
@@ -2130,9 +2139,20 @@ class _AdvisorContext {
 
   /// The message's count of people/devices when it states one; the
   /// remembered scale otherwise.
-  static int? _scaleFor(String t, EnvironmentProfile? profile) {
+  static int? _scaleFor(
+    String t,
+    EnvironmentProfile? profile,
+    int? briefScale,
+  ) {
     final stated = _scaleOf(t);
     if (stated != null) return stated;
+    // What this conversation already settled ("small office network with 20
+    // employees" two turns ago) is a stated fact, just not one repeated in
+    // this turn. Without it, the follow-up "what firewall do we need for an
+    // office with guests?" answers using no scale at all - and the one-tap
+    // plan it offers then builds zero hosts. A stated fact always wins over a
+    // remembered one, which is why the profile comes last.
+    if (briefScale != null && briefScale > 0) return briefScale;
     final remembered = profile?.scale ?? 0;
     return remembered > 0 ? remembered : null;
   }
@@ -2191,6 +2211,27 @@ class _AdvisorContext {
 
   bool mentions(String phrase) => t.contains(phrase);
 
+  /// A one-tap plan sentence that keeps the user's own scale.
+  ///
+  /// The advice has just explained itself with the scale the user stated -
+  /// "you mentioned about 20 users/devices" - so a quick reply that reads
+  /// "Plan a small office with a firewall, guest wifi and staff VLANs" plans
+  /// ZERO hosts and the lab it builds answers a question nobody asked. That
+  /// is exactly what happened to a 20-employee office: the plan came back
+  /// with 4 devices and not one PC in it.
+  ///
+  /// [extra] is the rest of the sentence, in the words the topic already
+  /// had. The count is folded in front of it, where a person would put it, and
+  /// a default one is used when nothing was ever stated - a plan with an edge
+  /// and no hosts is not a plan.
+  String planSentence(String extra) {
+    final n = scale ?? 10;
+    if (venue == _Venue.home) {
+      return 'Plan a home network with 1 wireless router and $n PCs, $extra';
+    }
+    return 'Plan a small office with $n employees, $extra';
+  }
+
   bool mentionsAny(List<String> phrases) =>
       phrases.any((p) => t.contains(p));
 
@@ -2227,14 +2268,29 @@ class _AdvisorContext {
 
   /// The plan-able sentence the answer can offer as a one-tap next step,
   /// or null when there is nothing to add to the plan.
+  ///
+  /// The count is NOT a fixed "10 PCs". The advice answer has just explained
+  /// itself using the scale the user stated - "you mentioned about 20
+  /// users/devices" - so the sentence handed to "Plan this" has to carry that
+  /// same number or the plan it produces answers a different question: a
+  /// 20-employee office was being planned as 10 PCs (and, when the topic's
+  /// own fallback sentence carried no count at all, as ZERO - the inferred 4
+  /// devices with not one host on them). A sentence without the count is
+  /// silent about the one fact the advisor was just using.
   String? get planBrief {
     if (!lab) return null;
     if (hasPlan) return null; // the lab already exists; advice must not re-plan it
     final v = venue;
+    final n = scale;
     if (v == _Venue.home) {
-      return 'Build a home network with 1 wireless router and 4 PCs';
+      if (n == null) return 'Build a home network with 1 wireless router and 4 PCs';
+      return 'Build a home network with 1 wireless router and $n PCs';
+    }
+    if (n == null) {
+      return 'Build a small office with 1 router, 1 switch, 2 access points '
+          'and 10 PCs';
     }
     return 'Build a small office with 1 router, 1 switch, 2 access points '
-        'and 10 PCs';
+        'and $n PCs';
   }
 }

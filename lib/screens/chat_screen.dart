@@ -319,6 +319,16 @@ class _ChatScreenState extends State<ChatScreen> {
   /// conversation until it is actually ready to build.
   DesignBrief _brief = const DesignBrief();
 
+  /// The scale this conversation has settled, as a number, or null.
+  ///
+  /// The brief holds what the user said even before anything is planned, so
+  /// "small office network with 20 employees" followed two turns later by
+  /// "what firewall do we need for an office with guests?" still advises about
+  /// a 20-person office - and the one-tap plan it offers builds 20 hosts
+  /// instead of none.
+  int? get _briefScale =>
+      int.tryParse(_brief.facts[DesignBrief.scale]?.value ?? '');
+
   /// The standing plan as it was before the current turn, so the offline
   /// assistant can say what changed instead of describing the lab from scratch.
   NetworkIntent? _previousIntent;
@@ -3543,6 +3553,28 @@ class _ChatScreenState extends State<ChatScreen> {
           );
           _understoodOk = true;
           _reportAppliedDesign(_appliedDesign!);
+        } else {
+          // A design asked for by name that does not fit the plan's size is
+          // REFUSED (DesignLibrary.applyNamed checks the catalog's host
+          // range), and refusing silently is its own lie - the user asked
+          // for something and nothing happened. Say what was not applied
+          // and why, in the numbers the catalog states.
+          final named = DesignApplier.namedIn(brief);
+          if (named != null) {
+            final hosts = _lastIntent!.nodes
+                .where(
+                  (n) => const {'pc', 'laptop', 'tablet', 'phone'}.contains(
+                    n.type,
+                  ),
+                )
+                .length;
+            _appendSystem(
+              'Not applied: "${named.name}" is built for '
+              '${named.sizeLabel}; this plan has $hosts and that is outside '
+              'its range. The plan is exactly what you described. Name a '
+              'design that fits it and I will apply that instead.',
+            );
+          }
         }
         _understoodOk = true;
       } catch (_) {
@@ -4260,6 +4292,10 @@ class _ChatScreenState extends State<ChatScreen> {
       learnedAnswer: learned,
       // The remembered venue/scale/budget/skill, when one has been learned.
       environmentProfile: envProfile,
+      // The scale this conversation already settled - "20 employees" said
+      // two turns ago is a fact the user stated, so advice about this office
+      // must use it and the plan it offers must carry that many hosts.
+      briefScale: _briefScale,
       // Critical gaps to ask about instead of committing a plan. Empty once
       // the brief is ready or the user insisted on a build.
       clarifyingQuestions: clarifying,

@@ -65,6 +65,14 @@ class NetworkDesign {
   });
 
   bool get isEmpty => changes.isEmpty;
+
+  /// The host count this design is built for, in words a person reads.
+  String get sizeLabel {
+    if (minHosts == 0 && maxHosts >= 1000000) return 'any size of lab';
+    if (maxHosts >= 1000000) return '$minHosts+ devices';
+    if (minHosts <= 1) return 'up to $maxHosts devices';
+    return '$minHosts-$maxHosts devices';
+  }
 }
 
 /// A design matched to a brief, with why it matched.
@@ -377,6 +385,37 @@ class DesignLibrary {
 class DesignApplier {
   const DesignApplier._();
 
+  /// What applying [designId] would do to [plan], or null when the design
+  /// does not fit the plan.
+  ///
+  /// WHY THE SIZE GATE IS HERE: the catalog states each design's [minHosts]
+  /// and [maxHosts] and [suggest] honours them, but [apply] did not - so a
+  /// design matched only by NAME was applied at any size. "Plan a small
+  /// office with 20 employees, a firewall and staff VLANs" arrives with 20
+  /// PCs in it, matches the word "small office" (an alias of `soho`, which
+  /// is built for 1-15 hosts), and the one-box design was applied on top of
+  /// an office it explicitly does not fit - adding a wireless router to a
+  /// lab that already had a router, and reporting "Applied the Small office,
+  /// one box design" as if that were an improvement. Returning null leaves
+  /// the plan exactly as the user described it, which is the honest outcome.
+  ///
+  /// The host count is the same one [suggest] uses: the endpoints, not the
+  /// infrastructure - 20 PCs is 20 hosts whether they hang off one switch or
+  /// four.
+  static ({NetworkIntent plan, List<String> added, List<String> skipped})?
+  tryApply(
+    NetworkIntent plan,
+    String designId,
+  ) {
+    final design = DesignLibrary.byId(designId);
+    if (design == null) return null;
+    final hosts = plan.nodes
+        .where((n) => const {'pc', 'laptop', 'tablet', 'phone'}.contains(n.type))
+        .length;
+    if (hosts < design.minHosts || hosts > design.maxHosts) return null;
+    return apply(plan, designId);
+  }
+
   /// What applying [design] would do to [plan].
   static ({NetworkIntent plan, List<String> added, List<String> skipped}) apply(
     NetworkIntent plan,
@@ -469,12 +508,28 @@ class DesignApplier {
     List<String> added,
     List<String> skipped,
   })? applyNamed(NetworkIntent plan, String text) {
-    final design = namedIn(text);
-    if (design == null) return null;
-    final applied = apply(plan, design.id);
+    final match = namedInDetailed(text);
+    if (match == null) return null;
+    // A shorthand match is size-checked; an explicit one is honoured.
+    //
+    // WHY THE SPLIT: "rebuild it with the DMZ design" is the user naming a
+    // design from the catalog and getting it, which is the promise the
+    // review makes and what the applier tests pin. But the same adjective
+    // that is an alias - "small office" for `soho` - also appears inside an
+    // ordinary sentence the advisor writes for itself: "Plan a small office
+    // with 20 employees, a firewall, guest wifi and staff VLANs". Applied by
+    // alias alone, that laid a one-box design built for 1-15 hosts on top of
+    // a 20-PC office and reported it as an improvement.
+    //
+    // So a design named by its own name or id is applied as asked, and one
+    // reached only through shorthand has to fit the lab first.
+    final applied = match.shorthand
+        ? tryApply(plan, match.design.id)
+        : apply(plan, match.design.id);
+    if (applied == null) return null;
     return (
       plan: applied.plan,
-      design: design,
+      design: match.design,
       added: applied.added,
       skipped: applied.skipped,
     );
@@ -485,7 +540,14 @@ class DesignApplier {
   /// Deliberately narrow: a design has to be NAMED. "make it better" is the
   /// reviewer's job and must not quietly resolve to whichever design happens
   /// to be first in the catalog.
-  static NetworkDesign? namedIn(String text) {
+  static NetworkDesign? namedIn(String text) => namedInDetailed(text)?.design;
+
+  /// How [text] names a design: the design itself, and whether it was reached
+  /// through its own name or id (explicit) or only through one of the
+  /// shorthand phrases.
+  static ({NetworkDesign design, bool shorthand})? namedInDetailed(
+    String text,
+  ) {
     final lower = text.toLowerCase();
     // Longest name first, so "servers on their own subnet" is never read as
     // a shorter design that happens to be a prefix of it.
@@ -495,24 +557,25 @@ class DesignApplier {
       );
     NetworkDesign? best;
     var bestSpan = 0;
+    var bestShorthand = false;
     for (final d in ranked) {
-      final aliases = <String>[
+      final shorthand = _aliasWords[d.id] ?? const <String>[];
+      final explicit = <String>[
         d.name.toLowerCase(),
         d.id.toLowerCase(),
         d.id.toLowerCase().replaceAll('-', ' '),
-        ..._aliasWords[d.id] ?? const <String>[],
       ];
-      for (final alias in aliases) {
+      for (final alias in [...explicit, ...shorthand]) {
         if (alias.isEmpty) continue;
         if (!lower.contains(alias)) continue;
-        // Longer aliases win, so a specific design beats a generic one.
-        if (alias.length > bestSpan) {
-          best = d;
-          bestSpan = alias.length;
-        }
+        if (alias.length <= bestSpan) continue;
+        best = d;
+        bestSpan = alias.length;
+        bestShorthand = !explicit.contains(alias);
       }
     }
-    return best;
+    if (best == null) return null;
+    return (design: best, shorthand: bestShorthand);
   }
 
   /// Shorthand people actually type, so "dmz" and "redundant core" resolve

@@ -120,6 +120,12 @@ class OfflineAssistantService {
     // (see [ClarificationService]). When non-empty and the turn is
     // build-shaped, the answer asks these instead of describing a plan.
     List<ClarificationQuestion> clarifyingQuestions = const [],
+    // The scale the design brief already settled in this conversation. The
+    // advisor uses it only for advice (and for the one-tap plan that advice
+    // offers) - it never touches the plan - but without it a follow-up like
+    // "what firewall do we need for an office with guests?" advises at no
+    // scale at all, and the plan it then builds carries zero hosts.
+    int? briefScale,
   }) {
     // MEMORY: the earlier turns of this conversation are the difference
     // between a useful answer and a generic one. The offline path has no
@@ -375,6 +381,7 @@ class OfflineAssistantService {
       plan: plan,
       target: target,
       environmentProfile: environmentProfile,
+      briefScale: briefScale,
     );
     if (advice != null) {
       return AssistantReply(
