@@ -1134,12 +1134,16 @@ class OfflineAssistantService {
     }
     final b = StringBuffer();
     if (logins.isNotEmpty) {
+      // The repair now clears this one, so the advice changes with it: ask
+      // for the repair instead of dictating a sentence. The sentence used to
+      // be given as the ONLY way the finding could clear, and it cleared
+      // nothing - no phrasing with "AAA username", "aaa client name" or "add
+      // username" turns into an account, so a user who followed it exactly
+      // pressed Fix again forever.
       b.writeln(
-          'This one is a login, so it is the one thing only you can supply: '
-          'say "AAA username admin password 123" - name the server instead of '
-          'AAA when there is more than one, here ${logins.join(', ')} - and I '
-          'write that account into the server\'s Services tab. That sentence '
-          'is the whole fix; it is the only way this finding can clear.',
+          'Press "Fix the plan" below and I write a placeholder account on '
+          '${logins.join(', ')} and report it in the same answer - then change '
+          'it to a real one before you rely on it.',
         );
     }
     for (final remedy in extra) {

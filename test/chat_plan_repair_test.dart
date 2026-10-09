@@ -299,23 +299,35 @@ void main() {
       expect(reply.repairedPlan, isNull);
     });
 
-    test('a finding only the user can settle is named, not papered over', () {
-      // AAA with no account: nothing in the plan can invent the login, so it
-      // says what is left instead of claiming a clean plan. A warning the
-      // build handles BY ITSELF is a different case (below): the two must not
-      // be flattened into one "not buildable".
+    test('a login finding is repaired, not made the user\'s homework', () {
+      // This one used to be answered "cannot repair these from here" with an
+      // instruction to type "AAA username admin password 123" - a sentence
+      // the parser turns into nothing at all, so a user who followed the app's
+      // own advice pressed Fix again forever. Six phrasings of that
+      // instruction were measured to produce no account.
       final aaa = _plan('1 router 1 switch and 5 pcs with aaa on the vty lines');
       final reply = OfflineAssistantService.fixPlan(
         plan: aaa,
         target: 'packet-tracer',
       );
       expect(reply.intent, 'fix');
-      expect(reply.text, contains('cannot repair these from here'));
-      expect(reply.text, contains('holds no account'));
-      expect(reply.text, contains('AAA username admin password 123'));
-      expect(reply.text, isNot(contains('buildable now')));
-      expect(reply.repairedPlan, isNotNull);
-      expect(_blocking(reply.repairedPlan!), isNotEmpty);
+      expect(reply.text, contains('placeholder'));
+      expect(reply.text, isNot(contains('cannot repair these from here')));
+      // The account exists on the repaired plan, so the next validator run
+      // does not come back with the same finding.
+      final repaired = reply.repairedPlan!;
+      expect(
+        (repaired.security.aaaAccountPassword ?? '').isNotEmpty,
+        isTrue,
+      );
+      expect(repaired.security.aaaUsername, isNotNull);
+      expect(
+        _blocking(repaired)
+            .map((i) => i.message)
+            .where((m) => m.contains('holds no account')),
+        isEmpty,
+        reason: 'the placeholder account clears the login finding',
+      );
     });
 
     test('a note the build acts on itself no longer withholds the build', () {

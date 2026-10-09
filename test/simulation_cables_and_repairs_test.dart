@@ -276,10 +276,12 @@ void main() {
       );
     });
 
-    test('a plan that still needs the user says why it was not built', () {
-      // AAA on the vty lines with no account anywhere: the app can build the
-      // plan but cannot invent the login, so it says what is left rather than
-      // shipping a .pkt whose login can never succeed.
+    test('a login finding is repaired before the build, not begged for', () {
+      // AAA on the vty lines with no account anywhere used to answer "I did
+      // not build it" and tell the user to type "AAA username admin password
+      // 123". That sentence parses to nothing, so the build never happened no
+      // matter how it was phrased. The repair now writes the placeholder
+      // account itself, which unblocks the build in the same turn.
       final plan = _plan(
         '1 router 1 switch and 5 pcs with aaa on the vty lines',
       );
@@ -288,11 +290,14 @@ void main() {
         target: 'packet-tracer',
         andBuild: true,
       );
-      expect(reply.text, contains('I did not build it'));
-      expect(reply.text, contains('holds no account'));
-      // The one sentence that settles it, not only the topology examples.
-      expect(reply.text, contains('AAA username admin password 123'));
-      expect(reply.text, isNot(contains('I am compiling it')));
+      expect(reply.repairedPlan, isNotNull);
+      expect(
+        (reply.repairedPlan!.security.aaaAccountPassword ?? '').isNotEmpty,
+        isTrue,
+        reason: 'the placeholder account must exist for the build to proceed',
+      );
+      expect(reply.text, isNot(contains('I did not build it')));
+      expect(reply.text, contains('placeholder'));
     });
 
     test('a clean plan builds as it stands', () {

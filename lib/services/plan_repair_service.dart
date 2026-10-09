@@ -349,9 +349,10 @@ class PlanRepairService {
     }
 
     final repaired = intent.copyWith(
-      nodes: nodes,
+      nodes: _repairAccountRows(intent, changes, fixes),
       links: links,
       addressing: addressing,
+      security: _repairSecurity(intent, changes, fixes),
     );
     // The same gate the build card uses (`ValidationIssue.blocks`), so this
     // pass can never call a plan clean when the card still refuses it - or
@@ -367,8 +368,176 @@ class PlanRepairService {
     );
   }
 
-  // --- cabling ------------------------------------------------------------
+  // --- credentials the findings ask for ------------------------------------
 
+  /// Complete the account rows the brief half-specified.
+  ///
+  /// "aaa username admin password 123" leaves a server whose AAA rule names a
+  /// user and no password, and the validator stops the build on it: the row
+  /// "will not be submitted". The remedy used to tell the user to retype the
+  /// same sentence, which changes nothing - the parser already read the name
+  /// and it is the missing half it cannot know. Writing the placeholder that
+  /// pairs with the name is the repair.
+  static List<NetNode> _repairAccountRows(
+    NetworkIntent intent,
+    List<String> changes,
+    List<RepairFix> fixes,
+  ) {
+    var touched = false;
+    final out = <NetNode>[];
+    for (final node in intent.nodes) {
+      Map<String, dynamic>? rebuilt;
+      for (final role in node.serviceRules.keys) {
+        final raw = node.serviceRules[role];
+        if (raw is! Map) continue;
+        final users = raw['users'];
+        if (users is! List || users.isEmpty) continue;
+        final rows = <dynamic>[];
+        for (final user in users) {
+          if (user is! Map) {
+            rows.add(user);
+            continue;
+          }
+          final row = Map<String, dynamic>.from(user);
+          final name = (row['username'] ?? '').toString().trim();
+          final secret = (row['password'] ?? '').toString().trim();
+          if (name.isEmpty && secret.isEmpty) {
+            rows.add(row);
+            continue;
+          }
+          if (name.isNotEmpty && secret.isNotEmpty) {
+            rows.add(row);
+            continue;
+          }
+          // One half is there, so the account was meant. Fill the other.
+          row['username'] = name.isEmpty ? 'admin' : name;
+          row['password'] = secret.isEmpty ? _placeholderPassword : secret;
+          rows.add(row);
+          touched = true;
+          changes.add(
+            'completed the ${role.toString().toUpperCase()} account on '
+            '${node.name}: ${row['username']} / ${row['password']} '
+            '(placeholder - change it before you rely on it)',
+          );
+        }
+        rebuilt ??= Map<String, dynamic>.from(node.serviceRules);
+        rebuilt[role] = {...Map<String, dynamic>.from(raw), 'users': rows};
+      }
+      if (rebuilt == null) {
+        out.add(node);
+        continue;
+      }
+      out.add(
+        NetNode(
+          name: node.name,
+          type: node.type,
+          model: node.model,
+          mgmtIp: node.mgmtIp,
+          services: node.services,
+          serviceRules: rebuilt,
+        ),
+      );
+    }
+    if (!touched) return intent.nodes;
+    fixes.add(
+      const RepairFix(
+        'account_row_incomplete',
+        'An account the brief half-specified (a user and no password, or the '
+            'other way round) will not be submitted: complete it with a '
+            'placeholder and say so, rather than asking for the sentence that '
+            'cannot finish it.',
+      ),
+    );
+    return out;
+  }
+
+  /// Fill in the two lab credentials the brief leaves out, by request of the
+  /// build that is trying to compile it.
+  ///
+  /// These two findings used to be a dead end. "Fix the plan" repaired cables
+  /// and addresses but not these, so the answer was "each one needs a choice
+  /// only you can make" - and the choice it offered, 'Add one - for example
+  /// "AAA client name admin password 123"', did NOTHING when typed: no phrase
+  /// in the parser turns that sentence into an account. The user pressed Fix
+  /// again, and again, and the plan never changed.
+  ///
+  /// The remedy is to write the placeholder the app itself was suggesting, and
+  /// to say so in the same breath - a placeholder credential in a Packet
+  /// Tracer lab is not a secret, but an invented password that is never
+  /// mentioned is worse than useless, so it is reported in `changes` like every
+  /// other repair here.
+  static SecurityIntent _repairSecurity(
+    NetworkIntent intent,
+    List<String> changes,
+    List<RepairFix> fixes,
+  ) {
+    final security = intent.security;
+    if (!security.aaa && !security.ipsecVpn) return security;
+
+    var aaaUsername = security.aaaUsername;
+    var aaaAccountPassword = security.aaaAccountPassword;
+    var vpnKey = security.vpnPreSharedKey;
+    var changed = false;
+
+    if (security.aaa) {
+      final server = intent.nodes
+          .where((n) => n.name == security.aaaServer)
+          .firstOrNull;
+      final users = (server?.serviceRules['aaa'] as Map?)?['users'];
+      final hasAccount = users is List && users.isNotEmpty;
+      final hasCredential =
+          (security.aaaUsername ?? '').isNotEmpty &&
+          (security.aaaAccountPassword ?? '').isNotEmpty;
+      if (!hasAccount && !hasCredential) {
+        aaaUsername ??= 'admin';
+        aaaAccountPassword ??= _placeholderPassword;
+        changed = true;
+        changes.add(
+          'added the placeholder account $aaaUsername on '
+          '${server?.name ?? 'the AAA server'} (password $aaaAccountPassword) '
+          '- change it before you rely on it',
+        );
+        fixes.add(
+          const RepairFix(
+            'aaa_account_missing',
+            'The AAA server holds no account, so no login can be verified: '
+                'write a placeholder one and say so, rather than leaving a '
+                'finding that only a sentence the parser does not read can '
+                'clear.',
+          ),
+        );
+      }
+    }
+
+    if (security.ipsecVpn && (vpnKey ?? '').isEmpty) {
+      vpnKey = _placeholderKey;
+      changed = true;
+      changes.add(
+        'added the placeholder IPsec pre-shared key "$vpnKey" - the tunnel can '
+        'now establish; swap it for your own',
+      );
+      fixes.add(
+        const RepairFix(
+          'ipsec_psk_missing',
+          'An IPSec tunnel with no pre-shared key is staged but cannot '
+              'establish: write the documented lab default and report it, '
+              'instead of asking for a key the parser has no wording for.',
+        ),
+      );
+    }
+
+    if (!changed) return security;
+    return security.copyWith(
+      aaaUsername: aaaUsername,
+      aaaAccountPassword: aaaAccountPassword,
+      vpnPreSharedKey: vpnKey,
+    );
+  }
+
+  static const String _placeholderPassword = 'cisco123';
+  static const String _placeholderKey = 'cisco123';
+
+  // --- cabling ------------------------------------------------------------
   /// A free port that can reach [node]: a switch port while one is available,
   /// otherwise a spare routed port on a router (a two-router plan with no
   /// switch still has somewhere to plug a PC).

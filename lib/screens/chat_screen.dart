@@ -1702,6 +1702,20 @@ class _ChatScreenState extends State<ChatScreen> {
     return null;
   }
 
+  /// Would a repair run actually change the standing plan?
+  ///
+  /// The button over a blocked card promises "one tap fixes what can be
+  /// fixed". When nothing can be fixed that promise is false, and the tap
+  /// lands on the same findings - which is how "fix the plan" became a
+  /// button that did nothing no matter how often it was pressed. Repairs are
+  /// deterministic and cheap, so the question is answered honestly rather
+  /// than assumed.
+  bool _repairWouldHelp() {
+    final plan = _lastIntent;
+    if (plan == null || plan.nodes.isEmpty) return false;
+    return PlanRepairService.repair(plan, target: _target).changes.isNotEmpty;
+  }
+
   /// The "which file did you mean?" answer, shared by the online and keyless
   /// paths so the choice is offered the same way either way.
   ChatMessage _fileChoiceTurn(
@@ -7831,12 +7845,35 @@ class _ChatScreenState extends State<ChatScreen> {
                     // It now runs the repair: one tap fixes what can be fixed,
                     // reports what it could not, and answers with a fresh card
                     // stamped with the plan that stands.
-                    if (action.kind == 'pkt_generate' && blockReason != null)
+                    //
+                    // BUT the repair is only offered when it would DO
+                    // something. Offering it for findings it cannot clear is
+                    // the loop the app shipped with: the answer said "each
+                    // one needs a choice only you can make" and the button
+                    // still said "Fix the plan", so pressing it changed
+                    // nothing and the same button came back - and the choice
+                    // it suggested had no wording in the parser to make it.
+                    // A repair that repairs nothing is a lie of a button.
+                    if (action.kind == 'pkt_generate' &&
+                        blockReason != null &&
+                        _repairWouldHelp())
                       FilledButton.tonal(
                         onPressed: _busy
                             ? null
                             : () => _sendQuickReply('fix the plan'),
                         child: const Text('Fix the plan'),
+                      )
+                    else if (action.kind == 'pkt_generate' &&
+                        blockReason != null)
+                      // Blocked, and not by anything the repair can clear: say
+                      // what the finding needs instead of offering a button
+                      // that would not move it.
+                      FilledButton.tonal(
+                        onPressed: _busy
+                            ? null
+                            : () => _sendQuickReply('what do I need to change '
+                                  'to fix the plan?'),
+                        child: const Text('What should I change?'),
                       )
                     else
                       FilledButton(

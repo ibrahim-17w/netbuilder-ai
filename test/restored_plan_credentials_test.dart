@@ -134,9 +134,13 @@ void main() {
   });
 
   group('"fix the plan"', () {
-    test('names the login sentence instead of only topology examples', () {
+    test('completes the half-specified account instead of asking for it', () {
       // The account whose password the redaction dropped: this is the finding
-      // the user kept being told to fix, with no way to act on it.
+      // the user kept being told to fix, with no way to act on it. The remedy
+      // told them to retype "AAA username admin password 123" - the very
+      // sentence that produced the half-filled row - which changes nothing.
+      // The repair now pairs the name the plan already has with a placeholder
+      // password, and says it did.
       const stated =
           '2 routers 1 switch 2 servers with aaa username admin password 123';
       final plan = restored(NetworkIntent.parseSimple('chat', stated));
@@ -144,9 +148,33 @@ void main() {
         plan: plan,
         target: 'packet-tracer',
       );
-      expect(reply.text, contains('missing username or password'));
-      expect(reply.text, contains('AAA username admin password 123'));
+      expect(reply.text, contains('Fixed 1 thing'));
+      expect(reply.text, contains('placeholder'));
       expect(reply.text, contains('SRV1'));
+
+      final repaired = reply.repairedPlan!;
+      final rows =
+          (repaired.nodes.firstWhere((n) => n.name == 'SRV1')
+                      .serviceRules['aaa']
+                  as Map?)?['users']
+              as List?;
+      expect(rows, isNotNull);
+      final row = Map<String, dynamic>.from(rows!.first as Map);
+      expect(
+        (row['username'] ?? '').toString().trim(),
+        isNotEmpty,
+        reason: 'the name the brief gave must survive',
+      );
+      expect(
+        (row['password'] ?? '').toString().trim(),
+        isNotEmpty,
+        reason: 'the missing half is now filled with a placeholder',
+      );
+      expect(
+        reply.text,
+        isNot(contains('missing username or password')),
+        reason: 'the finding it clears must not still be reported',
+      );
     });
 
     test('still offers the topology examples for other findings', () {
