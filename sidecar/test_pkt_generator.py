@@ -398,10 +398,41 @@ class TestTemplateBuild:
         assert ports[0]["name"] == "FastEthernet0"
         assert not warnings
 
-    def test_port_inventory_warns_on_unnamable(self):
+    def test_port_inventory_names_every_cableable_port(self):
+        # A serial port the source save never named still has to be cableable:
+        # a serial WAN link references it by name, and an unnamed one is a
+        # dropped cable. `eSmartSerial` therefore gets Serial0 rather than
+        # staying blank - which is what used to leave 34 models (every
+        # AccessPoint, the IpPhone, the Hub, the IoT/MCU family) with ports no
+        # link could reach, and the devices floating in the workspace.
         ports, warnings = tb.port_inventory(["eSmartSerial"], [], "Router")
+        assert ports[0]["name"] == "Serial0"
+        assert ports[0]["family"] == "serial"
+        assert not warnings
+
+    def test_port_inventory_leaves_a_port_it_cannot_name_alone(self):
+        # A port whose type is not one of the named families was never
+        # cableable, so it gets no name and no warning - inventing one for a
+        # port no cable can use would be noise.
+        ports, warnings = tb.port_inventory(["eNotACable"], [], "Router")
         assert ports[0]["name"] == ""
-        assert warnings and "no name" in warnings[0]
+        assert ports[0]["family"] == ""
+        assert not warnings
+
+    def test_port_inventory_host_fallback(self):
+        ports, warnings = tb.port_inventory(["eCopperFastEthernet"], [], "pc")
+        assert ports[0]["name"] == "FastEthernet0"
+        assert not warnings
+
+    def test_a_named_port_is_never_renamed_by_the_fallback(self):
+        # The fallback is numbered around what the source DID name, so a model
+        # that names most of its ports and leaves one bare never collides.
+        ports, warnings = tb.port_inventory(
+            ["eCopperFastEthernet", "eCopperFastEthernet"],
+            ["FastEthernet0/1"], "Router")
+        assert [p["name"] for p in ports] == ["FastEthernet0/1",
+                                              "FastEthernet0"]
+        assert not warnings
 
     def test_extract_and_load(self, library):
         assert library["version"] == "9.0.0.0810"

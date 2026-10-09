@@ -1,4 +1,4 @@
-﻿"""Offline .pkt generator: turn a NetBuilder plan into a Packet Tracer save.
+"""Offline .pkt generator: turn a NetBuilder plan into a Packet Tracer save.
 
 The plan is exactly what the app already sends to the Packet Tracer executor
 (``PacketTracerAdapter.autopilotPlan``): ``create_nodes``, ``create_links``,
@@ -269,6 +269,68 @@ def load_library(directory: str = "") -> dict:
     return manifest
 
 
+def _named_variant(variant: dict) -> dict:
+    """The CHOSEN model with its cableable ports given names.
+
+    Only called after `select_variant` has picked a model - see the comment
+    there.
+
+    Deliberately NOT cached: naming a handful of ports is cheap, and a cache
+    is state that outlives the call that filled it. The first version keyed
+    entries by `id()`, which the allocator reuses once an entry is collected,
+    and one model was handed another model's port list whenever a test built
+    and discarded a library of its own. A pure function of the ports has no
+    such failure mode.
+    """
+    named = dict(variant)
+    named["ports"] = _named_ports(variant.get("ports") or [])
+    return named
+
+
+def _named_ports(ports: list) -> list:
+    """Name the cableable ports the source save could not prove a name for.
+
+    An access point's Ethernet port is one of them: Packet Tracer names it
+    from the host module and never writes it into the save, so the extractor
+    recorded ``name: ""``. An unnamed cableable port is DEAD - a LINK block
+    references its port by name, and a name that resolves to nothing drops
+    the whole cable, leaving the device placed in the workspace cabled to
+    nothing. That is what "the AP is floating" was.
+
+    ``FastEthernet0`` is what the links in a real save use (the convention
+    the extractor's HOST_FALLBACK_NAMES already applies to PCs and servers),
+    so every port gets its conventional name here, once, for every reader of
+    the library. ``sidecar/pkt_template_build.py`` does the same when the
+    library is regenerated.
+    """
+    prefixes = {
+        "fastethernet": "FastEthernet",
+        "gigabitethernet": "GigabitEthernet",
+        "ethernet": "Ethernet",
+        "serial": "Serial",
+        "fiber": "Fiber",
+        "wireless": "Wireless",
+    }
+    taken = {str(p.get("name") or "") for p in ports if p.get("name")}
+    out = []
+    for port in ports:
+        name = str(port.get("name") or "")
+        if not name:
+            prefix = prefixes.get(str(port.get("family") or ""))
+            if prefix is not None:
+                index = 0
+                while f"{prefix}{index}" in taken:
+                    index += 1
+                name = f"{prefix}{index}"
+                if name:
+                    taken.add(name)
+        if name and not port.get("name"):
+            port = dict(port)
+            port["name"] = name
+        out.append(port)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Port naming
 # ---------------------------------------------------------------------------
@@ -518,8 +580,12 @@ def select_variant(library: dict, node: dict,
     # does not exist, when the real answer is that its harvested block needs
     # to be rebuilt.
     notes = list(rejected)
+    # Missing ports are reported against the model the BUILD will use, which
+    # is the chosen entry with its cableable ports named - a port the source
+    # save never named is still cableable, and saying otherwise here would
+    # warn about a cable that is about to be laid successfully.
     missing = [port for port in wanted
-               if not resolve_port(best, port)[0]]
+               if not resolve_port(_named_variant(best), port)[0]]
     if missing:
         notes.append(f"{node.get('name')}: template {best.get('key')} has no "
                      f"port for {', '.join(missing)}")
@@ -1571,6 +1637,26 @@ def _set_tag(block: bytes, tag: str, value: str) -> bytes:
     return re.sub(pattern, replace, block, count=1)
 
 
+def _set_tag_or_insert(block: bytes, tag: str, value: str) -> bytes:
+    """Set a tag inside a PORT, creating the element when it is absent.
+
+    `_set_tag` deliberately leaves a block untouched when the tag is not
+    there: a device block's own tags are PT-authored and must not be
+    invented.  A PORT's `<NAME>` is the opposite - a port the source save
+    never named NEEDS one, or the cable that references it by name points at
+    nothing.
+    """
+    replaced = _set_tag(block, tag, value)
+    if replaced != block:
+        return replaced
+    opener = re.search(rb"<PORT(?:\s[^>]*)?>", block)
+    if opener is None:
+        return block
+    at = opener.end()
+    return (block[:at] + b"<" + tag.encode() + b">" + _esc(value)
+            + b"</" + tag.encode() + b">" + block[at:])
+
+
 def _patch_port(block: bytes, port_index: int, fields: dict) -> bytes:
     spans = template_build.iter_port_spans(block)
     if port_index < 0 or port_index >= len(spans):
@@ -1579,6 +1665,24 @@ def _patch_port(block: bytes, port_index: int, fields: dict) -> bytes:
     port = block[start:end]
     for tag, value in fields.items():
         port = _set_tag(port, tag, str(value))
+    return block[:start] + port + block[end:]
+
+
+def _stamp_port_name(block: bytes, port_index: int, port_name: str) -> bytes:
+    """Write the resolved name onto the port, creating <NAME> when absent.
+
+    Every access point is that case: Packet Tracer names the port from the
+    host module and never writes it into the save, so the block has no
+    <NAME> element at all.  A LINK block references its ports by name, so a
+    cable pointing at FastEthernet0 resolves to nothing and the whole link is
+    dropped - which is how a plan that cabled SW1 to an AP came out with the
+    AP floating in the workspace, connected to nothing.
+    """
+    spans = template_build.iter_port_spans(block)
+    if port_index < 0 or port_index >= len(spans):
+        return block
+    start, end = spans[port_index]
+    port = _set_tag_or_insert(block[start:end], "NAME", port_name)
     return block[:start] + port + block[end:]
 
 
@@ -2097,6 +2201,16 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
         warnings.extend(notes)
         if variant is None:
             continue
+        # Name the model's cableable ports only now that it is CHOSEN.
+        #
+        # Doing it to the whole library instead changes WHICH model is
+        # chosen: select_variant's last tiebreak is "fewest ports", so once a
+        # 1-port Meraki-Server gained a resolvable Ethernet port it started
+        # beating Server-PT for every generic server, and a file with no DHCP
+        # and no AAA in it came out. Selection must keep judging the library
+        # exactly as Packet Tracer wrote it; the build is what needs a name to
+        # put in a <LINK>.
+        variant = _named_variant(variant)
         block = library["_blocks"].get(variant["file"])
         if not block:
             warnings.append(f"{name}: template block {variant['file']} is "
@@ -2150,6 +2264,14 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
                 used_ports[(name, port["name"])] = True
                 if note and note not in warnings:
                     warnings.append(f"{name}: {note}")
+        # Stamp the resolved name onto the PORT element itself.  A model
+        # whose port block carries no <NAME> (every access point - the port is
+        # named from the host module and never written into the save) is
+        # addressable by name in the manifest but not in its own XML, so a
+        # LINK that says <PORT>FastEthernet0</PORT> points at a port the
+        # device block never declares.  Writing the name closes that gap.
+        for port in plan_ports.values():
+            block = _stamp_port_name(block, port["index"], port["name"])
         # Clocking: a serial DCE end needs the flag set on the port itself.
         for spec, port in plan_ports.items():
             clock = _clock_rate_for(config_lines, port["name"])

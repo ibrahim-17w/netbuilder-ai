@@ -79,7 +79,11 @@ DeviceKind(
   type: 'wireless',
   keywords: ['wireless access point', 'access point', 'wireless ap', 'ap'],
   models: ['AccessPoint-PT', 'AccessPoint-PT-A', 'AccessPoint-PT-N'],
-  port: 'port1',
+  // The AP's Ethernet port: Packet Tracer names it from the host module and
+  // never writes it into a save, so the manifest recorded it empty and every
+  // cable to an AP was dropped ("port1 not usable on AP1" - the AP floated).
+  // The library now names it FastEthernet0, which is what a real save uses.
+  port: 'FastEthernet0',
   wireless: true,
 ),
 DeviceKind(
@@ -92,7 +96,9 @@ DeviceKind(
   type: 'phone',
   keywords: ['ip phone', 'voip phone', 'phone'],
   models: ['7960', '7961', '7962'],
-  port: 'port1',
+  // Same shape as the access point: the port is named from the host module,
+  // so the library's FastEthernet0 is the name a real save uses.
+  port: 'FastEthernet0',
 ),
 DeviceKind(
   type: 'tablet',

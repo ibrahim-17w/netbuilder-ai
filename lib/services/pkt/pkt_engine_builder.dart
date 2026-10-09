@@ -510,6 +510,25 @@ bool _hasTag(String block, String tag) =>
     _tagPattern(tag).hasMatch(block);
 
 /// Replace the first TAG element's text, keeping its own attributes.
+/// Set [tag] inside [block], creating the element when it is absent.
+///
+/// [_setTag] deliberately leaves a block untouched when the tag is not there:
+/// a device block's own tags (RUNNINGCONFIG, SYSCONTACT) are PT-authored and
+/// must not be invented. A `<PORT>`'s `<NAME>` is the opposite - a port the
+/// source save never named NEEDS one, or the cable that references it points
+/// at nothing. So the insert happens only where it is asked for, never as a
+/// blanket default.
+String _setTagOrInsert(String block, String tag, String value) {
+  final out = _setTag(block, tag, value);
+  if (!identical(out, block)) return out;
+  final opener = RegExp('<PORT(?:\\s[^>]*)?>');
+  final at = opener.firstMatch(block);
+  if (at == null) return block;
+  final insertAt = at.end;
+  return '${block.substring(0, insertAt)}<$tag>${_esc(value)}</$tag>'
+      '${block.substring(insertAt)}';
+}
+
 String _setTag(String block, String tag, String value) {
   final name = RegExp.escape(tag);
   final attrs = r"((?:\s+[^>\s/]+(?:\s*=\s*(?:""[^""]*""|'[^']*'))?)*)";
@@ -680,8 +699,33 @@ String _patchPort(String block, int portIndex, Map<String, String> fields) {
   final (start, end) = spans[portIndex];
   var port = block.substring(start, end);
   fields.forEach((tag, value) {
+    // A field the block does not carry is a field Packet Tracer did not give
+    // this model, and inventing one is worse than leaving it out - so these
+    // stay replace-only. The port NAME is the one thing that must be created
+    // when missing, and it has its own stamp below.
     port = _setTag(port, tag, value);
   });
+  return block.substring(0, start) + port + block.substring(end);
+}
+
+/// Write [portName] onto the port at [portIndex], creating the `<NAME>`
+/// element when the source block has none.
+///
+/// Every access point is that case: Packet Tracer names the port from the
+/// host module and never writes it into the save, so the block has no
+/// `<NAME>` at all. A LINK block references its ports by name, so a cable
+/// pointing at `FastEthernet0` resolves to nothing and the whole link is
+/// dropped - which is how a plan that SW1plumbed to an AP came out with the
+/// AP floating, cabled to nothing.
+String _stampPortName(String block, int portIndex, String portName) {
+  final spans = iterPortSpans(block);
+  if (portIndex < 0 || portIndex >= spans.length) return block;
+  final (start, end) = spans[portIndex];
+  final port = _setTagOrInsert(
+    block.substring(start, end),
+    'NAME',
+    portName,
+  );
   return block.substring(0, start) + port + block.substring(end);
 }
 
@@ -2513,9 +2557,17 @@ Future<PktEngineBuild> buildPkt({
     final name = '${node['name'] ?? ''}';
     final nodeType = '${node['type'] ?? ''}'.trim().toLowerCase();
     var deviceReportServices = <String, dynamic>{};
-    final (variant, notes) = await selectVariant(library, node, wanted[name] ?? const <String>[]);
+    final (selected, notes) = await selectVariant(
+      library,
+      node,
+      wanted[name] ?? const <String>[],
+    );
     warnings.addAll(notes);
-    if (variant == null) continue;
+    if (selected == null) continue;
+    // Name the CHOSEN model's cableable ports only now it has won - see
+    // [PktTemplateDevice.withNamedPorts]. Judging the whole library by named
+    // ports changes which model is picked.
+    final variant = selected.withNamedPorts();
     String block;
     try {
       block = await library.blockFor(variant.file);
@@ -2575,6 +2627,17 @@ Future<PktEngineBuild> buildPkt({
           warnings.add('$name: $note');
         }
       }
+    }
+    // Stamp the resolved name onto the PORT element itself.
+    //
+    // A model whose port block carries no <NAME> (every access point - the
+    // port is named from the host module and never written into the save)
+    // is addressable by name in the manifest but not in its own XML, so a
+    // LINK that says <PORT>FastEthernet0</PORT> points at a port the device
+    // block never declares. Writing the name closes that gap: the device says
+    // "this port is called FastEthernet0" and the cable references it.
+    for (final port in planPorts.values) {
+      block = _stampPortName(block, port.index, port.name);
     }
     // Clocking: a serial DCE end needs the flag set on the port itself.
     planPorts.forEach((spec, port) {

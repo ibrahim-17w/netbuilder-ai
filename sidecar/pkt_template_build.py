@@ -205,6 +205,37 @@ HOST_FALLBACK_NAMES = {
     "smartphone": "Wireless0",
 }
 
+# The conventional Packet Tracer name for an interface the source file never
+# named, per family.  A port with no <NAME> is not cableable at all: the
+# builder writes <PORT>FastEthernet0</PORT> inside the LINK block, and a
+# name it cannot resolve means the link is dropped - which is how 34 models
+# (every AccessPoint, IpPhone, Hub, the IoT/MCU family) ended up placed in
+# the workspace but floating, cabled to nothing.
+FAMILY_PORT_NAMES = {
+    "fastethernet": "FastEthernet",
+    "gigabitethernet": "GigabitEthernet",
+    "ethernet": "Ethernet",
+    "serial": "Serial",
+    "fiber": "Fiber",
+    "wireless": "Wireless",
+}
+
+
+def _fallback_port_name(family: str, taken: set[str]) -> str:
+    """The name Packet Tracer uses for an interface the source never named.
+
+    Numbered from 0 and skipping names already in use, so a device that names
+    most of its ports from its running config but leaves one module port bare
+    never collides with the ones it does name.
+    """
+    prefix = FAMILY_PORT_NAMES.get(family)
+    if prefix is None:
+        return ""
+    index = 0
+    while f"{prefix}{index}" in taken:
+        index += 1
+    return f"{prefix}{index}"
+
 
 class TemplateError(RuntimeError):
     """The template library is missing or could not be built."""
@@ -338,11 +369,21 @@ def port_inventory(port_types: list[str], names: list[str],
     unnamed = [p for p in ports if not p["name"]]
     if unnamed:
         fallback = HOST_FALLBACK_NAMES.get(kind.strip().lower(), "")
+        taken = {p["name"] for p in ports if p["name"]}
         if fallback and not any(p["family"] == "ethernet" for p in ports):
             for entry in ports:
                 if entry["family"] in ("fastethernet", "ethernet"):
                     entry["name"] = fallback
                     break
+        # Every other cable-capable port the source left unnamed gets the
+        # conventional name for its family.  This is what makes an access
+        # point cableable: its Ethernet port is unnamed in every PT save
+        # because an AP has no running config to list it from.
+        for entry in ports:
+            if entry["name"] or not entry["family"]:
+                continue
+            entry["name"] = _fallback_port_name(entry["family"], taken)
+            taken.add(entry["name"])
         still = [p for p in ports if not p["name"] and p["family"]]
         if still:
             warnings.append(

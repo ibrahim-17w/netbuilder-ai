@@ -105,6 +105,82 @@ class PktTemplateDevice {
         hasPhysical: json['hasPhysical'] == true,
         file: '${json['file'] ?? ''}',
       );
+
+  /// This model with its cableable ports given names, for use by the BUILD.
+  ///
+  /// WHY THIS IS NOT `ports` ITSELF: `selectVariant` judges every candidate
+  /// against the ports Packet Tracer actually wrote, and its last tie-break
+  /// is "fewest ports". Naming the library's ports at load time made a
+  /// 1-port Meraki-Server look like a host for `f0` where a 2-port Server-PT
+  /// had always been chosen, and the generated file came out with the Meraki
+  /// model - a template with no DHCP and no AAA panels in it, so every server
+  /// in a plan was silently unconfigured. Selection must keep reading the
+  /// library as it was harvested; only a model that has already WON needs a
+  /// name to put in a `<LINK>`.
+  ///
+  /// The reason any of this is needed: `AccessPoint-PT-A`'s Ethernet port
+  /// carries no `<NAME>` in any Packet Tracer save (it is named from the host
+  /// module and never written out), so the manifest recorded it empty and no
+  /// cable could ever reference it - the access point was placed in the
+  /// workspace floating, cabled to nothing. 34 models were in that state.
+  PktTemplateDevice withNamedPorts() {
+    final taken = <String>{
+      for (final p in ports)
+        if (p.name.isNotEmpty) p.name,
+    };
+    final out = <PktTemplatePort>[];
+    for (final p in ports) {
+      if (p.name.isNotEmpty) {
+        out.add(p);
+        continue;
+      }
+      final name = _conventionalPortName(p.family, taken);
+      // Only a name we actually produced reserves a slot, so two unnamed
+      // ports of the same family get FastEthernet0 and FastEthernet1 rather
+      // than the same name twice.
+      if (name.isNotEmpty) taken.add(name);
+      out.add(
+        PktTemplatePort(
+          index: p.index,
+          type: p.type,
+          family: p.family,
+          name: name,
+        ),
+      );
+    }
+    return PktTemplateDevice(
+      key: key,
+      model: model,
+      kind: kind,
+      modules: modules,
+      ports: out,
+      hasConfig: hasConfig,
+      hasPhysical: hasPhysical,
+      file: file,
+    );
+  }
+}
+
+/// The conventional Packet Tracer name for an interface the source never
+/// named, per family - numbered from 0 and skipping names already in use, so
+/// a port that leaves one module port bare never collides with the ones it
+/// does name.
+String _conventionalPortName(String family, Set<String> taken) {
+  const prefixes = <String, String>{
+    'fastethernet': 'FastEthernet',
+    'gigabitethernet': 'GigabitEthernet',
+    'ethernet': 'Ethernet',
+    'serial': 'Serial',
+    'fiber': 'Fiber',
+    'wireless': 'Wireless',
+  };
+  final prefix = prefixes[family];
+  if (prefix == null) return '';
+  var n = 0;
+  while (taken.contains('$prefix$n')) {
+    n++;
+  }
+  return '$prefix$n';
 }
 
 /// One cable kind the library can clone.

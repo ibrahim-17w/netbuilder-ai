@@ -428,11 +428,22 @@ wireless access point, 2 IP phones, 1 laptop and 1 printer. 2 tablets and
       isTrue,
     );
     // phones and access points cable on their own port names, not 'f0'
+    // `FastEthernet0` is the name the template library gives the port Packet
+    // Tracer names only from the host module - the one a real save's links
+    // use - so it is what the plan asks for.
     expect(
       intent.links.any(
         (l) =>
-            (l.b == 'AP1' && l.bIf == 'port1') ||
-            (l.a == 'AP1' && l.aIf == 'port1'),
+            (l.b == 'AP1' && l.bIf == 'FastEthernet0') ||
+            (l.a == 'AP1' && l.aIf == 'FastEthernet0'),
+      ),
+      isTrue,
+    );
+    expect(
+      intent.links.any(
+        (l) =>
+            (l.b == 'PH1' && l.bIf == 'FastEthernet0') ||
+            (l.a == 'PH1' && l.aIf == 'FastEthernet0'),
       ),
       isTrue,
     );
