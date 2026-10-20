@@ -26,8 +26,9 @@
 
 ### Changed
 
-- Extracted the chat composer, typing bubble and jump-to-latest pill into
-  reusable widgets. Behavior and widget keys are unchanged.
+- Extracted the chat composer, typing bubble, jump-to-latest pill, rule,
+  slot-fix and in-conversation search widgets. Behavior and widget keys are
+  unchanged.
 - Context budgeting runs on a background isolate for real launches, keeping
   the 400-turn planning walk off the frame that sends a model request.
 - Extracted sidecar credential redaction and the Packet Tracer device catalog
