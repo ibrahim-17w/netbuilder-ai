@@ -66,6 +66,7 @@ class ChatService {
   /// Per-image cap. Real evidence screenshots are 140-300 KB, so this is a
   /// guard against someone attaching a huge export, not a working limit.
   static const maxImageBytes = 8 * 1024 * 1024;
+
   /// Cap on the base64 payload of one request (Gemini's inline limit is
   /// 20 MB including text).
   static const maxRequestBytes = 15 * 1024 * 1024;
@@ -111,7 +112,8 @@ class ChatService {
     // A caller that already planned the request (the provider facade, which
     // owns the runtime window) passes its plan in: planning twice would
     // budget an already-budgeted history and attach the memory block twice.
-    final effectivePlan = plan ??
+    final effectivePlan =
+        plan ??
         ContextBudget.plan(
           history: history,
           systemContext: systemContext,
@@ -157,19 +159,21 @@ class ChatService {
           Uri.parse(_url(model)),
           headers: _headers(key),
           body: jsonEncode({
-            'contents': contents,          'systemInstruction': {
-            'parts': [
-              {
-                'text':
-                    systemContextIsAssembled || effectivePlan.memoryBlock.isEmpty
-                    ? systemContext
-                    : '$systemContext\n\n${effectivePlan.memoryBlock}',
-              },
-            ],
-          },
-          'generationConfig': {'responseMimeType': 'application/json'},
-        }),
-      )
+            'contents': contents,
+            'systemInstruction': {
+              'parts': [
+                {
+                  'text':
+                      systemContextIsAssembled ||
+                          effectivePlan.memoryBlock.isEmpty
+                      ? systemContext
+                      : '$systemContext\n\n${effectivePlan.memoryBlock}',
+                },
+              ],
+            },
+            'generationConfig': {'responseMimeType': 'application/json'},
+          }),
+        )
         .timeout(const Duration(seconds: 90));
 
     final r = await AiRetry.fetch<http.Response>(
@@ -261,7 +265,8 @@ class ChatService {
       isAbortError: (e) => e is http.RequestAbortedException,
     );
     signal.throwIfAborted();
-    final effectivePlan = plan ??
+    final effectivePlan =
+        plan ??
         ContextBudget.plan(
           history: history,
           systemContext: systemContext,
@@ -420,7 +425,8 @@ class ChatService {
       if (salvaged != null) return salvaged;
       if (cleaned.startsWith('{') || cleaned.startsWith('[')) {
         return ChatReply(
-          text: 'The model\'s answer arrived cut off before it could be read. '
+          text:
+              'The model\'s answer arrived cut off before it could be read. '
               'Ask again to retry - or keep going offline, which needs no '
               'model.',
         );
@@ -530,8 +536,7 @@ class ChatService {
     final text = _jsonStringValue(raw, start.end).trimRight();
     if (text.trim().isEmpty) return null;
     final actions = <ChatAction>[];
-    final listMatch =
-        RegExp(r'"actions"\s*:\s*(\[[^\][]*\])').firstMatch(raw);
+    final listMatch = RegExp(r'"actions"\s*:\s*(\[[^\][]*\])').firstMatch(raw);
     if (listMatch != null) {
       try {
         final decoded = jsonDecode(listMatch.group(1)!);

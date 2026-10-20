@@ -226,9 +226,10 @@ class PlanConfigComposer {
   static List<({String iface, _Net net})> _lansOf(
     NetworkIntent plan,
     String router,
-  ) => _netsOf(plan, router)
-      .where((e) => !_onTransitLink(plan, router, e.iface))
-      .toList();
+  ) => _netsOf(
+    plan,
+    router,
+  ).where((e) => !_onTransitLink(plan, router, e.iface)).toList();
 
   /// The device and device type on the far end of [node]'s interface.
   static (String peer, String peerType)? _peerOf(
@@ -249,7 +250,10 @@ class PlanConfigComposer {
   }
 
   static String _typeOf(NetworkIntent plan, String name) => plan.nodes
-      .firstWhere((n) => n.name == name, orElse: () => const NetNode(name: '', type: ''))
+      .firstWhere(
+        (n) => n.name == name,
+        orElse: () => const NetNode(name: '', type: ''),
+      )
       .type;
 
   /// The interface of [node] that faces [peer], from the plan's links.
@@ -400,9 +404,7 @@ class PlanConfigComposer {
       step++;
     }
     final verify = ospf
-        ? (routers.length > 1
-              ? 'show ip ospf neighbor'
-              : 'show ip route ospf')
+        ? (routers.length > 1 ? 'show ip ospf neighbor' : 'show ip route ospf')
         : 'show ip eigrp neighbors';
     sb.write(
       '$step. Verify: `$verify`'
@@ -521,12 +523,12 @@ class PlanConfigComposer {
       return _gap(
         linked
             ? 'the ${routers.first.name}-${routers.last.name} link has no '
-                'addresses yet - say \'use 10.0.0.0/30\' and the static '
-                'routes will name the real next hop.'
+                  'addresses yet - say \'use 10.0.0.0/30\' and the static '
+                  'routes will name the real next hop.'
             : 'there is no router-to-router link yet - connect '
-                '${routers.first.name} to ${routers.last.name} and address '
-                'it (say \'use 10.0.0.0/30\'), then the static routes will '
-                'name the real next hop.',
+                  '${routers.first.name} to ${routers.last.name} and address '
+                  'it (say \'use 10.0.0.0/30\'), then the static routes will '
+                  'name the real next hop.',
       );
     }
     sb.write(
@@ -938,7 +940,8 @@ class PlanConfigComposer {
       // given; guessing a /24 onto a bare address would invent a fact.
       if (branch.contains('/')) {
         final branchNet = _netOf(branch);
-        if (branchNet != null) remoteLans['${branchNet.network}/${branchNet.prefix}'] = branchNet;
+        if (branchNet != null)
+          remoteLans['${branchNet.network}/${branchNet.prefix}'] = branchNet;
       }
       for (final r in routers) {
         if (r.name == owner) continue;
@@ -1002,7 +1005,9 @@ class PlanConfigComposer {
       sb.writeln('ip access-list extended PROTECTED_SERVER');
       for (final n in remoteLans.values) {
         if (webOk) {
-          sb.writeln(' permit tcp ${n.network} ${n.wildcard} host $webIp eq 80');
+          sb.writeln(
+            ' permit tcp ${n.network} ${n.wildcard} host $webIp eq 80',
+          );
         }
         sb.writeln(' deny ip ${n.network} ${n.wildcard} host $protectedIp');
       }
@@ -1077,9 +1082,10 @@ class PlanConfigComposer {
     for (final r in routers) {
       final outside = _edgeIfaceOf(plan, r.name);
       if (outside == null) continue;
-      final lans = _lansOf(plan, r.name)
-          .where((e) => _normIface(e.iface) != _normIface(outside))
-          .toList();
+      final lans = _lansOf(
+        plan,
+        r.name,
+      ).where((e) => _normIface(e.iface) != _normIface(outside)).toList();
       if (lans.isEmpty) continue;
       final peer = _peerOf(plan, r.name, outside);
       final sb = StringBuffer()

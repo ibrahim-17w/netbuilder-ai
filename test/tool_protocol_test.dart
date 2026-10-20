@@ -117,7 +117,10 @@ void main() {
           {
             'message': {
               'tool_calls': [
-                {'id': 'x', 'function': {'arguments': 'not json'}},
+                {
+                  'id': 'x',
+                  'function': {'arguments': 'not json'},
+                },
               ],
             },
           },
@@ -129,7 +132,9 @@ void main() {
 
   test('the result message carries the engine answer back', () {
     const call = ToolCall(id: 'call_1', name: 'get_devices', args: {});
-    final message = ToolProtocol.resultMessage(call, {'devices': ['R1']});
+    final message = ToolProtocol.resultMessage(call, {
+      'devices': ['R1'],
+    });
     expect(message['role'], 'tool');
     expect(message['tool_call_id'], 'call_1');
     expect(jsonDecode(message['content'] as String)['devices'], ['R1']);
@@ -145,7 +150,9 @@ void main() {
     expect(list, hasLength(2));
     expect((list.first as Map)['function']['name'], 'get_devices');
     expect(
-      jsonDecode((list.last as Map)['function']['arguments'] as String)['device'],
+      jsonDecode(
+        (list.last as Map)['function']['arguments'] as String,
+      )['device'],
       'PC1',
     );
   });
@@ -153,7 +160,11 @@ void main() {
   test('status lines are human, and never raw reasoning', () {
     expect(
       ToolProtocol.statusLine(
-        const ToolCall(id: 'a', name: 'check_connectivity', args: {'source': 'PC1'}),
+        const ToolCall(
+          id: 'a',
+          name: 'check_connectivity',
+          args: {'source': 'PC1'},
+        ),
       ),
       'Testing connectivity (PC1)...',
     );

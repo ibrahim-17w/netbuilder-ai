@@ -43,10 +43,7 @@ void main() {
       expect(r1, contains('radius-server host'));
       expect(r1, contains('group radius local'));
       final aaa = PacketTracerAdapter.serverServices(intent, 'SRV1')['aaa']!;
-      expect(
-        ((aaa['clients'] as List).first as Map)['serverType'],
-        'RADIUS',
-      );
+      expect(((aaa['clients'] as List).first as Map)['serverType'], 'RADIUS');
     });
 
     test('an explicit shared key lands on both ends identically', () {
@@ -54,7 +51,10 @@ void main() {
         'p',
         '1 router 1 switch 2 pcs, AAA with tacacs+ using key S3cret',
       );
-      expect(intent.security.aaaPassword, 's3cret'); // lowercased with the brief
+      expect(
+        intent.security.aaaPassword,
+        's3cret',
+      ); // lowercased with the brief
       final r1 = CiscoAdapter.render(intent)['R1']!;
       expect(r1, contains('tacacs-server key s3cret'));
       final aaa = PacketTracerAdapter.serverServices(intent, 'SRV1')['aaa']!;
@@ -87,23 +87,29 @@ void main() {
       expect(r1, contains('ip route 0.0.0.0 0.0.0.0'));
     });
 
-    test('firewall configs ride in the autopilot plan but outside live CLI', () {
-      final intent = NetworkIntent.parseSimple(
-        'p',
-        '1 router 1 switch 2 pcs with a firewall',
-      );
-      final plan = PacketTracerAdapter.autopilotPlan(intent);
-      final cli = plan['steps'].firstWhere(
-        (s) => (s as Map)['action'] == 'paste_cli',
-      ) as Map;
-      // Present in the saved file...
-      expect((cli['configs'] as Map).keys.any((k) => k.startsWith('FW')), isTrue);
-      // ...but the live executor must never type ASA at a firewall: its
-      // skip list comes from the node types, and the FW node stays outside
-      // cliTypes, so paste_to_device sees no FW key from deviceConfigs.
-      final iosOnly = CiscoAdapter.render(intent).keys.toList();
-      expect(iosOnly.any((k) => k.startsWith('FW')), isFalse);
-    });
+    test(
+      'firewall configs ride in the autopilot plan but outside live CLI',
+      () {
+        final intent = NetworkIntent.parseSimple(
+          'p',
+          '1 router 1 switch 2 pcs with a firewall',
+        );
+        final plan = PacketTracerAdapter.autopilotPlan(intent);
+        final cli =
+            plan['steps'].firstWhere((s) => (s as Map)['action'] == 'paste_cli')
+                as Map;
+        // Present in the saved file...
+        expect(
+          (cli['configs'] as Map).keys.any((k) => k.startsWith('FW')),
+          isTrue,
+        );
+        // ...but the live executor must never type ASA at a firewall: its
+        // skip list comes from the node types, and the FW node stays outside
+        // cliTypes, so paste_to_device sees no FW key from deviceConfigs.
+        final iosOnly = CiscoAdapter.render(intent).keys.toList();
+        expect(iosOnly.any((k) => k.startsWith('FW')), isFalse);
+      },
+    );
   });
 
   group('new server service params', () {
@@ -112,10 +118,7 @@ void main() {
         'p',
         '1 router 1 switch 2 pcs and SRV1 with dhcpv6',
       );
-      final v6 = PacketTracerAdapter.serverServices(
-        intent,
-        'SRV1',
-      )['dhcpv6']!;
+      final v6 = PacketTracerAdapter.serverServices(intent, 'SRV1')['dhcpv6']!;
       expect(v6['pools'], isNotEmpty);
       expect(((v6['pools'] as List).first as Map)['prefixLength'], '64');
     });

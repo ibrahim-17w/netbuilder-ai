@@ -132,7 +132,10 @@ class NetworkTools {
     final info = subnet(hostCidr);
     final gw = ipToInt(gateway);
     if (info == null) {
-      return {'ok': false, 'reason': 'the host address `$hostCidr` is not valid'};
+      return {
+        'ok': false,
+        'reason': 'the host address `$hostCidr` is not valid',
+      };
     }
     if (gw == null) {
       return {'ok': false, 'reason': 'the gateway `$gateway` is not valid'};
@@ -153,8 +156,13 @@ class NetworkTools {
     if (gateway == hostCidr.split('/').first) {
       return {'ok': false, 'reason': 'the gateway is the host itself'};
     }
-    return {'ok': true, 'reason': '$gateway is usable inside '
-        '${info.network}/${info.prefix}', 'subnet': info.toJson()};
+    return {
+      'ok': true,
+      'reason':
+          '$gateway is usable inside '
+          '${info.network}/${info.prefix}',
+      'subnet': info.toJson(),
+    };
   }
 
   /// Any address that appears twice on the same subnet is a real fault.
@@ -166,9 +174,9 @@ class NetworkTools {
       final cidr = (entry['ipCidr'] ?? '').toString();
       final ip = cidr.split('/').first;
       if (ip.isEmpty) continue;
-      seen.putIfAbsent(ip, () => []).add(
-        '${entry['node'] ?? '?'} ${entry['iface'] ?? ''}'.trim(),
-      );
+      seen
+          .putIfAbsent(ip, () => [])
+          .add('${entry['node'] ?? '?'} ${entry['iface'] ?? ''}'.trim());
     }
     return [
       for (final entry in seen.entries)

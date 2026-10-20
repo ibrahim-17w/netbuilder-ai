@@ -58,8 +58,7 @@ class ToolProtocol {
         'parameters': {
           'type': 'OBJECT',
           'properties': properties,
-          if (properties.isNotEmpty)
-            'required': properties.keys.toList(),
+          if (properties.isNotEmpty) 'required': properties.keys.toList(),
         },
       });
     }
@@ -122,11 +121,15 @@ class ToolProtocol {
           if (call is! Map) continue;
           final name = call['name']?.toString() ?? '';
           if (name.isEmpty) continue;
-          out.add(ToolCall(
-            id: 'gemini-$index',
-            name: name,
-            args: Map<String, dynamic>.from((call['args'] as Map?) ?? const {}),
-          ));
+          out.add(
+            ToolCall(
+              id: 'gemini-$index',
+              name: name,
+              args: Map<String, dynamic>.from(
+                (call['args'] as Map?) ?? const {},
+              ),
+            ),
+          );
           index++;
         }
       }
@@ -144,11 +147,13 @@ class ToolProtocol {
           if (fn is! Map) continue;
           final name = fn['name']?.toString() ?? '';
           if (name.isEmpty) continue;
-          out.add(ToolCall(
-            id: call['id']?.toString() ?? name,
-            name: name,
-            args: _parseArgs(fn['arguments']),
-          ));
+          out.add(
+            ToolCall(
+              id: call['id']?.toString() ?? name,
+              name: name,
+              args: _parseArgs(fn['arguments']),
+            ),
+          );
         }
       }
     }
@@ -163,10 +168,7 @@ class ToolProtocol {
         {
           'id': call.id,
           'type': 'function',
-          'function': {
-            'name': call.name,
-            'arguments': _encode(call.args),
-          },
+          'function': {'name': call.name, 'arguments': _encode(call.args)},
         },
     ],
   };

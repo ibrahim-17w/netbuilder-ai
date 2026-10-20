@@ -40,7 +40,8 @@ void main() {
       expect(
         _hosts(_plan(answer.planBrief!)),
         20,
-        reason: 'the sentence "Plan this" sends must plan the scale the '
+        reason:
+            'the sentence "Plan this" sends must plan the scale the '
             'advisor just used in its answer',
       );
     });
@@ -54,12 +55,15 @@ void main() {
         briefScale: 20,
       );
       expect(answer, isNotNull);
-      final sent = answer!.quickReplies.firstWhere((r) => r.startsWith('Plan '));
+      final sent = answer!.quickReplies.firstWhere(
+        (r) => r.startsWith('Plan '),
+      );
       final plan = _plan(sent);
       expect(
         _hosts(plan),
         20,
-        reason: 'a stated fact in an earlier turn must not be dropped by the '
+        reason:
+            'a stated fact in an earlier turn must not be dropped by the '
             'plan the advice offers',
       );
       expect(
@@ -74,7 +78,9 @@ void main() {
         'what firewall do we need for an office with guests?',
         target: 'packet-tracer',
       );
-      final sent = answer!.quickReplies.firstWhere((r) => r.startsWith('Plan '));
+      final sent = answer!.quickReplies.firstWhere(
+        (r) => r.startsWith('Plan '),
+      );
       // Count-free is the fallback for someone who never gave a number: it
       // must still plan an office with hosts, not an empty 4-device shell.
       expect(_hosts(_plan(sent)), greaterThan(0));
@@ -96,7 +102,8 @@ void main() {
       expect(
         designed,
         isNull,
-        reason: '`soho` is catalogued for 1-15 hosts; laying it on a 20-host '
+        reason:
+            '`soho` is catalogued for 1-15 hosts; laying it on a 20-host '
             'office is wrong advice, and its extra wireless router is a '
             'device the office already has a router for',
       );
@@ -119,7 +126,8 @@ void main() {
       expect(
         designed,
         isNotNull,
-        reason: '`soho` is built for 1-15 hosts, so a 6-host plan is exactly '
+        reason:
+            '`soho` is built for 1-15 hosts, so a 6-host plan is exactly '
             'its case - the size gate must not refuse everything',
       );
       expect(designed!.design.id, 'soho');

@@ -17,8 +17,12 @@ NetworkIntent _plan({
     NetNode(name: 'PC2', type: 'pc'),
   ],
   List<int> vlans = const [],
-}) =>
-    NetworkIntent(projectName: 'lab', nodes: nodes, routing: routing, vlans: vlans);
+}) => NetworkIntent(
+  projectName: 'lab',
+  nodes: nodes,
+  routing: routing,
+  vlans: vlans,
+);
 
 void main() {
   group('briefForTurn: text claims', () {
@@ -123,18 +127,22 @@ void main() {
         parsedPlan: _plan(vlans: [10, 20]),
       );
       expect(withVlan.brief.value(DesignBrief.segmentation), 'vlans');
-      expect(withVlan.brief.fact(DesignBrief.segmentation)!.display,
-          'VLANs 10, 20');
+      expect(
+        withVlan.brief.fact(DesignBrief.segmentation)!.display,
+        'VLANs 10, 20',
+      );
     });
 
     test('access points in the plan mean wireless was asked for', () {
       final turn = DesignBriefService.briefForTurn(
         normalizedText: '2 routers, 2 switches, 2 access points and 12 pcs',
-        parsedPlan: _plan(nodes: const [
-          NetNode(name: 'R1', type: 'router'),
-          NetNode(name: 'AP1', type: 'access point'),
-          NetNode(name: 'PC1', type: 'pc'),
-        ]),
+        parsedPlan: _plan(
+          nodes: const [
+            NetNode(name: 'R1', type: 'router'),
+            NetNode(name: 'AP1', type: 'access point'),
+            NetNode(name: 'PC1', type: 'pc'),
+          ],
+        ),
       );
       expect(turn.brief.value(DesignBrief.wireless), 'yes');
       expect(
@@ -143,18 +151,20 @@ void main() {
       );
     });
 
-    test('plan PCs give scale when the text mentions devices without numbers',
-        () {
-      final turn = DesignBriefService.briefForTurn(
-        normalizedText: 'a lab with routers, switches and pcs',
-        parsedPlan: _plan(),
-      );
-      expect(turn.brief.value(DesignBrief.scale), '2');
-      expect(
-        turn.brief.fact(DesignBrief.scale)!.source,
-        'from the lab you described',
-      );
-    });
+    test(
+      'plan PCs give scale when the text mentions devices without numbers',
+      () {
+        final turn = DesignBriefService.briefForTurn(
+          normalizedText: 'a lab with routers, switches and pcs',
+          parsedPlan: _plan(),
+        );
+        expect(turn.brief.value(DesignBrief.scale), '2');
+        expect(
+          turn.brief.fact(DesignBrief.scale)!.source,
+          'from the lab you described',
+        );
+      },
+    );
   });
 
   group('briefForTurn: profile and precedence', () {
@@ -216,13 +226,15 @@ void main() {
       expect(empty.ready, isFalse);
       expect(empty.missingCritical, containsAll(['scale', 'routing']));
 
-      final filled = const DesignBrief().withFact(
-        DesignBrief.scale,
-        const BriefFact(value: '40', display: '40 users'),
-      ).withFact(
-        DesignBrief.routing,
-        const BriefFact(value: 'ospf', display: 'OSPF'),
-      );
+      final filled = const DesignBrief()
+          .withFact(
+            DesignBrief.scale,
+            const BriefFact(value: '40', display: '40 users'),
+          )
+          .withFact(
+            DesignBrief.routing,
+            const BriefFact(value: 'ospf', display: 'OSPF'),
+          );
       expect(filled.ready, isTrue);
       expect(filled.missingCritical, isEmpty);
     });
@@ -238,24 +250,27 @@ void main() {
   });
 
   group('BriefCardWidget', () {
-    testWidgets('shows filled facts with provenance and open chips',
-        (tester) async {
+    testWidgets('shows filled facts with provenance and open chips', (
+      tester,
+    ) async {
       final brief = DesignBriefService.briefForTurn(
         normalizedText: 'use ospf for 40 users',
         profile: const EnvironmentProfile(venue: 'office'),
       ).brief;
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(
-            child: BriefCardWidget(brief: brief),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(child: BriefCardWidget(brief: brief)),
           ),
         ),
-      ));
+      );
 
       expect(find.byKey(const ValueKey('brief-card')), findsOneWidget);
       expect(find.textContaining('OSPF'), findsWidgets);
-      expect(find.textContaining('from your environment profile'),
-          findsOneWidget);
+      expect(
+        find.textContaining('from your environment profile'),
+        findsOneWidget,
+      );
       // Wireless and segmentation were never mentioned: open, and NOT
       // critical (only scale/routing are), so they render as muted chips.
       expect(find.byKey(const ValueKey('brief-open-wireless')), findsOneWidget);
@@ -265,19 +280,24 @@ void main() {
       );
     });
 
-    testWidgets('a brief with critical gaps says questions come first',
-        (tester) async {
+    testWidgets('a brief with critical gaps says questions come first', (
+      tester,
+    ) async {
       final brief = DesignBriefService.briefForTurn(
         normalizedText: 'use ospf',
       ).brief;
       expect(brief.ready, isFalse);
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(child: BriefCardWidget(brief: brief)),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(child: BriefCardWidget(brief: brief)),
+          ),
         ),
-      ));
-      expect(find.textContaining('I will ask about the highlighted'),
-          findsOneWidget);
+      );
+      expect(
+        find.textContaining('I will ask about the highlighted'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('a ready brief says so', (tester) async {
@@ -285,22 +305,26 @@ void main() {
         normalizedText: 'ospf for 40 users',
       ).brief;
       expect(brief.ready, isTrue);
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(child: BriefCardWidget(brief: brief)),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(child: BriefCardWidget(brief: brief)),
+          ),
         ),
-      ));
+      );
       expect(find.textContaining('Enough to build'), findsOneWidget);
     });
 
     testWidgets('an empty brief shrinks away', (tester) async {
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(
-            child: BriefCardWidget(brief: const DesignBrief()),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: BriefCardWidget(brief: const DesignBrief()),
+            ),
           ),
         ),
-      ));
+      );
       expect(find.byKey(const ValueKey('brief-card')), findsNothing);
     });
   });

@@ -38,10 +38,7 @@ class CorrectionBadges extends StatelessWidget {
   /// Compact badges for one correction row of the proposals / corrections
   /// list.  A stale row is stale *because* the engine kept missing it; that
   /// story lives in the badge tooltip, not a separate chip.
-  factory CorrectionBadges.fromRow(
-    CorrectionRow row, {
-    double fontSize = 10,
-  }) {
+  factory CorrectionBadges.fromRow(CorrectionRow row, {double fontSize = 10}) {
     return CorrectionBadges(
       stale: row.stale && row.status == 'verified',
       rejected: row.status == 'rejected',
@@ -62,33 +59,24 @@ class CorrectionBadges extends StatelessWidget {
           'STALE',
           AppPalette.warning(scheme),
           'User-taught, but the screen stopped verifying it. '
-          'Re-teach it or un-teach it from the corrections list.',
+              'Re-teach it or un-teach it from the corrections list.',
         ),
       if (rejected)
         _badge(
           'REJECTED',
           AppPalette.danger(scheme),
           'A teach run tried this and the screen disagreed; '
-          'nothing was written to memory.',
+              'nothing was written to memory.',
         ),
-      if (pending)
-        _badge(
-          'PENDING',
-          scheme.primary,
-          'Awaiting a teach run',
-        ),
+      if (pending) _badge('PENDING', scheme.primary, 'Awaiting a teach run'),
       if (verified)
-        _badge(
-          'VERIFIED',
-          AppPalette.success(scheme),
-          'Promoted to memory',
-        ),
+        _badge('VERIFIED', AppPalette.success(scheme), 'Promoted to memory'),
       if (thrash && !pending)
         _badge(
           'x$thrashCount',
           scheme.tertiary,
           'Corrected $thrashCount time(s) before - a repeated edit on the '
-          'same element is a sign the wrong thing is being blamed.',
+              'same element is a sign the wrong thing is being blamed.',
         ),
     ];
     if (chips.isEmpty) return const SizedBox.shrink();
@@ -269,8 +257,7 @@ Widget _rowTile(
                                 'teach',
                                 style: TextStyle(
                                   fontSize: 10,
-                                  color:
-                                      Theme.of(context).colorScheme.primary,
+                                  color: Theme.of(context).colorScheme.primary,
                                 ),
                               ),
                             ],

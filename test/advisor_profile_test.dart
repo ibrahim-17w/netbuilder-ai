@@ -10,10 +10,7 @@ import 'package:net_builder/services/offline_assistant_service.dart';
 /// this file pins the profile MERGE: what a stored venue/scale/budget does
 /// to an answer whose message leaves that fact unsaid.
 void main() {
-  AssistantReply ask(
-    String q, {
-    EnvironmentProfile? profile,
-  }) =>
+  AssistantReply ask(String q, {EnvironmentProfile? profile}) =>
       OfflineAssistantService.reply(
         rawText: q,
         normalized: q.toLowerCase(),
@@ -21,8 +18,7 @@ void main() {
         environmentProfile: profile,
       );
 
-  test('a remembered scale sizes the answer when the message states none',
-      () {
+  test('a remembered scale sizes the answer when the message states none', () {
     final r = ask(
       'how many access points do i need?',
       profile: const EnvironmentProfile(scale: 40),

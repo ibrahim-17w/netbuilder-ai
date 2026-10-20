@@ -167,8 +167,11 @@ void main() {
       final r = ask('how do I set up an email marketing campaign');
       expect(r.intent, 'missing');
       expect(r.text.toLowerCase(), contains('not in my offline material'));
-      expect(r.quickReplies, isEmpty,
-          reason: 'nothing nearby, so nothing is offered');
+      expect(
+        r.quickReplies,
+        isEmpty,
+        reason: 'nothing nearby, so nothing is offered',
+      );
     });
 
     test('a near question is pointed at ground the offline path covers', () {

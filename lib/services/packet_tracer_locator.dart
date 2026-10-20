@@ -152,8 +152,8 @@ class PacketTracerLocator {
   }
 
   /// The default existence check, injected out of the way in tests.
-  static bool defaultExists(String path) => FileSystemEntity.typeSync(path) !=
-      FileSystemEntityType.notFound;
+  static bool defaultExists(String path) =>
+      FileSystemEntity.typeSync(path) != FileSystemEntityType.notFound;
 
   /// One subprocess, never throwing: a missing `reg` or a shell that will
   /// not start is "not found", not a crash.

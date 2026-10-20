@@ -127,8 +127,10 @@ class PktBuilder {
     }
 
     for (final spec in devices) {
-      final template =
-          seed.templateFor(spec.type, model: spec.model.isEmpty ? null : spec.model);
+      final template = seed.templateFor(
+        spec.type,
+        model: spec.model.isEmpty ? null : spec.model,
+      );
       if (template == null) {
         warnings.add(
           'No template for ${spec.name}: the seed save has no '
@@ -188,8 +190,7 @@ class PktBuilder {
         RegExp(r'<NAME\b[^>]*>.*?</NAME>', dotAll: true),
         (_) => '<NAME translate="true">${_escapeXml(name)}</NAME>',
       );
-      out = out.substring(0, engineStart) + renamed +
-          out.substring(engineEnd);
+      out = out.substring(0, engineStart) + renamed + out.substring(engineEnd);
     }
     out = out.replaceAll(
       RegExp(r'<SAVE_REF_ID>[^<]*</SAVE_REF_ID>'),
@@ -264,10 +265,7 @@ class PktBuilder {
             RegExp(r'<FROM>[^<]*</FROM>'),
             '<FROM>save-ref-id:$from</FROM>',
           )
-          .replaceAll(
-            RegExp(r'<TO>[^<]*</TO>'),
-            '<TO>save-ref-id:$to</TO>',
-          );
+          .replaceAll(RegExp(r'<TO>[^<]*</TO>'), '<TO>save-ref-id:$to</TO>');
       // Each end owns the <PORT> that follows its reference. Retargeting by
       // position (rather than replacing every PORT) is what keeps the two
       // ends from swapping each other's port.
@@ -306,8 +304,9 @@ class PktBuilder {
   ) {
     final markerAt = block.indexOf(marker);
     if (markerAt < 0) return block;
-    final match =
-        RegExp(r'<PORT>[^<]*</PORT>').firstMatch(block.substring(markerAt));
+    final match = RegExp(
+      r'<PORT>[^<]*</PORT>',
+    ).firstMatch(block.substring(markerAt));
     if (match == null) return block;
     final at = markerAt + match.start;
     return block.replaceRange(
@@ -342,8 +341,7 @@ class PktBuilder {
   static String _num(num v) =>
       v == v.roundToDouble() ? v.toInt().toString() : v.toString();
 
-  static String _escapeXml(String value) => const HtmlEscape(HtmlEscapeMode.attribute)
-      .convert(value)
-      .replaceAll('&#39;', "'")
-      .replaceAll('&quot;', '"');
+  static String _escapeXml(String value) => const HtmlEscape(
+    HtmlEscapeMode.attribute,
+  ).convert(value).replaceAll('&#39;', "'").replaceAll('&quot;', '"');
 }

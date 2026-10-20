@@ -135,40 +135,46 @@ void main() {
     expect(events.last.text, contains('avoid a loop'));
   });
 
-  test('a failing tool is reported to the model instead of killing the turn',
-      () async {
-    final scripted = _Scripted([
-      _geminiCall('get_device', {'device': 'GHOST'}),
-      _geminiText('That device is not in the capture.'),
-    ]);
-    final loop = ToolLoop(
-      send: scripted.send,
-      execute: (_) async => throw Exception('there is no device GHOST'),
-      extractText: _text,
-    );
-    final events = await loop.run(const [
-      {'role': 'user', 'content': 'check GHOST'},
-    ]).toList();
+  test(
+    'a failing tool is reported to the model instead of killing the turn',
+    () async {
+      final scripted = _Scripted([
+        _geminiCall('get_device', {'device': 'GHOST'}),
+        _geminiText('That device is not in the capture.'),
+      ]);
+      final loop = ToolLoop(
+        send: scripted.send,
+        execute: (_) async => throw Exception('there is no device GHOST'),
+        extractText: _text,
+      );
+      final events = await loop.run(const [
+        {'role': 'user', 'content': 'check GHOST'},
+      ]).toList();
 
-    expect(events.map((e) => e.kind).toList(), ['status', 'result', 'final']);
-    expect(events[1].text, contains('no device GHOST'));
-    final toolMessage = scripted.seen.last
-        .firstWhere((m) => m['role'] == 'tool');
-    expect(toolMessage['content'].toString(), contains('GHOST'));
-    expect(events.last.kind, 'final');
-  });
+      expect(events.map((e) => e.kind).toList(), ['status', 'result', 'final']);
+      expect(events[1].text, contains('no device GHOST'));
+      final toolMessage = scripted.seen.last.firstWhere(
+        (m) => m['role'] == 'tool',
+      );
+      expect(toolMessage['content'].toString(), contains('GHOST'));
+      expect(events.last.kind, 'final');
+    },
+  );
 
-  test('a provider failure ends the turn with the reason, not a crash',
-      () async {
-    final loop = ToolLoop(
-      send: (_) async => throw Exception('Rate limited or out of quota (429)'),
-      execute: (_) async => null,
-      extractText: _text,
-    );
-    final events = await loop.run(const [
-      {'role': 'user', 'content': 'hi'},
-    ]).toList();
-    expect(events.single.kind, 'error');
-    expect(events.single.text, contains('Rate limited'));
-  });
+  test(
+    'a provider failure ends the turn with the reason, not a crash',
+    () async {
+      final loop = ToolLoop(
+        send: (_) async =>
+            throw Exception('Rate limited or out of quota (429)'),
+        execute: (_) async => null,
+        extractText: _text,
+      );
+      final events = await loop.run(const [
+        {'role': 'user', 'content': 'hi'},
+      ]).toList();
+      expect(events.single.kind, 'error');
+      expect(events.single.text, contains('Rate limited'));
+    },
+  );
 }

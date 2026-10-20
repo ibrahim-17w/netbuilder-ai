@@ -84,22 +84,28 @@ void main() {
       expect(back.revision, plan.revision);
     });
 
-    test('is repaired from the whole conversation, not only the first turn', () {
-      final plan = NetworkIntent.parseSimple('chat', brief);
-      const follow = 'the aaa username: admin and password 123';
-      final recovered = NetworkIntent.recoverRedactedSecrets(
-        restored(plan),
-        '$brief\n$follow',
-      );
-      expect(blocking(recovered), isEmpty);
-    });
+    test(
+      'is repaired from the whole conversation, not only the first turn',
+      () {
+        final plan = NetworkIntent.parseSimple('chat', brief);
+        const follow = 'the aaa username: admin and password 123';
+        final recovered = NetworkIntent.recoverRedactedSecrets(
+          restored(plan),
+          '$brief\n$follow',
+        );
+        expect(blocking(recovered), isEmpty);
+      },
+    );
 
     test('keeps a genuinely missing password missing', () {
       // The brief never states a password for the account, so nothing may be
       // recovered and the finding stands - that one really is the user's call.
       const bare = '2 routers 1 switch aaa server with username bob';
       final plan = NetworkIntent.parseSimple('chat', bare);
-      final recovered = NetworkIntent.recoverRedactedSecrets(restored(plan), bare);
+      final recovered = NetworkIntent.recoverRedactedSecrets(
+        restored(plan),
+        bare,
+      );
       expect(recovered.security.aaaAccountPassword, isNull);
     });
 
@@ -154,7 +160,8 @@ void main() {
 
       final repaired = reply.repairedPlan!;
       final rows =
-          (repaired.nodes.firstWhere((n) => n.name == 'SRV1')
+          (repaired.nodes
+                      .firstWhere((n) => n.name == 'SRV1')
                       .serviceRules['aaa']
                   as Map?)?['users']
               as List?;
@@ -179,10 +186,11 @@ void main() {
 
     test('still offers the topology examples for other findings', () {
       final plan = NetworkIntent.parseSimple('chat', '1 router 1 switch 2 pcs');
-      final broken = plan.copyWith(
-        vlans: const [70000],
+      final broken = plan.copyWith(vlans: const [70000]);
+      final reply = OfflineAssistantService.fixPlan(
+        plan: broken,
+        target: 'packet-tracer',
       );
-      final reply = OfflineAssistantService.fixPlan(plan: broken, target: 'packet-tracer');
       expect(reply.text, isNot(contains('AAA username')));
     });
   });

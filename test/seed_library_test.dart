@@ -25,8 +25,11 @@ void main() {
       test('$name yields devices, not module fragments', () {
         final lib = SeedLibrary.fromPkt(File(path).readAsBytesSync());
 
-        expect(lib.isEmpty, isFalse,
-            reason: '$name must supply at least one device to clone');
+        expect(
+          lib.isEmpty,
+          isFalse,
+          reason: '$name must supply at least one device to clone',
+        );
 
         // Every entry must be a real device kind. A `<TYPE>` read from deep
         // in the module tree would file a router as 'eNonRemovableModule',
@@ -34,8 +37,11 @@ void main() {
         for (final d in lib.devices) {
           // Every module type in the format starts with 'e' (eNonRemovable-
           // Module, eInterfaceCard, eSmartSerial). A device kind never does.
-          expect(d.type.startsWith('e'), isFalse,
-              reason: '$name: "${d.type}" is a module type, not a device');
+          expect(
+            d.type.startsWith('e'),
+            isFalse,
+            reason: '$name: "${d.type}" is a module type, not a device',
+          );
           expect(d.type.trim(), isNotEmpty);
         }
 
@@ -58,8 +64,11 @@ void main() {
         final text = String.fromCharCodes(xml);
         final expected = '<DEVICE>'.allMatches(text).length;
         final lib = SeedLibrary.fromPkt(File(path).readAsBytesSync());
-        expect(lib.devices.length, expected,
-            reason: '$path: the save has $expected devices');
+        expect(
+          lib.devices.length,
+          expected,
+          reason: '$path: the save has $expected devices',
+        );
       }
     });
 
@@ -67,16 +76,20 @@ void main() {
       for (final path in realSaves) {
         final lib = SeedLibrary.fromPkt(File(path).readAsBytesSync());
         final joined = lib.devices.map((d) => d.xml).join();
-        expect('<DEVICE>'.allMatches(joined).length, lib.devices.length,
-            reason: '$path: a block swallowed another');
+        expect(
+          '<DEVICE>'.allMatches(joined).length,
+          lib.devices.length,
+          reason: '$path: a block swallowed another',
+        );
       }
     });
   });
 
   group('the catalogue describes what can be built', () {
     test('reports kind, model and how many are available', () {
-      final lib = SeedLibrary.fromPkt(File('sidecar/demo-lab.pkt')
-          .readAsBytesSync());
+      final lib = SeedLibrary.fromPkt(
+        File('sidecar/demo-lab.pkt').readAsBytesSync(),
+      );
 
       final cat = lib.catalogue;
       expect(cat, isNotEmpty);
@@ -90,41 +103,47 @@ void main() {
     });
 
     test('the inventory counts every device it found', () {
-      final lib = SeedLibrary.fromPkt(File('sidecar/demo-lab.pkt')
-          .readAsBytesSync());
-      final counted =
-          lib.inventory.values.fold<int>(0, (sum, n) => sum + n);
+      final lib = SeedLibrary.fromPkt(
+        File('sidecar/demo-lab.pkt').readAsBytesSync(),
+      );
+      final counted = lib.inventory.values.fold<int>(0, (sum, n) => sum + n);
       expect(counted, lib.devices.length);
     });
   });
 
   group('choosing a template', () {
     test('an exact model match is returned', () {
-      final lib = SeedLibrary.fromPkt(File('sidecar/demo-lab.pkt')
-          .readAsBytesSync());
+      final lib = SeedLibrary.fromPkt(
+        File('sidecar/demo-lab.pkt').readAsBytesSync(),
+      );
       final routers = lib.devices.where((d) => d.type == 'Router');
       expect(routers, isNotEmpty);
       final target = routers.first;
-      expect(lib.templateFor('Router', model: target.model)?.model,
-          target.model);
+      expect(
+        lib.templateFor('Router', model: target.model)?.model,
+        target.model,
+      );
     });
 
     test('without a model, the first device of that kind is returned', () {
-      final lib = SeedLibrary.fromPkt(File('sidecar/demo-lab.pkt')
-          .readAsBytesSync());
+      final lib = SeedLibrary.fromPkt(
+        File('sidecar/demo-lab.pkt').readAsBytesSync(),
+      );
       expect(lib.templateFor('Router')?.type, 'Router');
     });
 
     test('the kind is matched loosely, as users say it', () {
-      final lib = SeedLibrary.fromPkt(File('sidecar/demo-lab.pkt')
-          .readAsBytesSync());
+      final lib = SeedLibrary.fromPkt(
+        File('sidecar/demo-lab.pkt').readAsBytesSync(),
+      );
       expect(lib.templateFor('router')?.type, 'Router');
       expect(lib.templateFor('  SWITCH ')?.type, 'Switch');
     });
 
     test('a model the seed does not have is refused, not approximated', () {
-      final lib = SeedLibrary.fromPkt(File('sidecar/demo-lab.pkt')
-          .readAsBytesSync());
+      final lib = SeedLibrary.fromPkt(
+        File('sidecar/demo-lab.pkt').readAsBytesSync(),
+      );
       // Substituting a nearby model would build a lab that opens but teaches
       // the wrong hardware - the quiet failure this whole class of bug is.
       expect(lib.templateFor('Router', model: 'no-such-model'), isNull);

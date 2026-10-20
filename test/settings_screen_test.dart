@@ -23,10 +23,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Settings'), findsOneWidget);
-    expect(find.text('MODEL ACCESS (BYOK)'), findsOneWidget);
-    expect(find.text('WHERE BUILDS GO'), findsOneWidget);
-    expect(find.text('PRIVACY AND AUTOMATION'), findsOneWidget);
-    expect(find.text('APPEARANCE'), findsOneWidget);
+      expect(find.text('MODEL ACCESS (BYOK)'), findsOneWidget);
+      expect(find.text('WHERE BUILDS GO'), findsOneWidget);
+      expect(find.text('PRIVACY AND AUTOMATION'), findsOneWidget);
+      expect(find.text('APPEARANCE'), findsOneWidget);
       expect(
         find.widgetWithText(FilledButton, 'Save + test provider'),
         findsOneWidget,

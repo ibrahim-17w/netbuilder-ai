@@ -65,10 +65,19 @@ void main() {
       // These are what the whole pipeline is built on. A "helpful" rewrite
       // here breaks every correctly-phrased brief in the app.
       for (final word in const [
-        'server', 'router', 'switch', 'firewall', 'cloud', 'pc', 'laptop',
+        'server',
+        'router',
+        'switch',
+        'firewall',
+        'cloud',
+        'pc',
+        'laptop',
       ]) {
-        expect(DomainVocabulary.learn(word, 'printer'), isFalse,
-            reason: '$word must not be teachable');
+        expect(
+          DomainVocabulary.learn(word, 'printer'),
+          isFalse,
+          reason: '$word must not be teachable',
+        );
       }
     });
 
@@ -120,8 +129,11 @@ void main() {
     test('a taught word starts counting devices', () {
       DomainVocabulary.learn('kiosk', 'tablet');
       final slots = BriefSlotPipeline.extract('lab', 'a shop with 6 kiosks');
-      expect(slots.count('tablet'), 6,
-          reason: 'a word taught once should count from then on');
+      expect(
+        slots.count('tablet'),
+        6,
+        reason: 'a word taught once should count from then on',
+      );
     });
   });
 
@@ -132,10 +144,16 @@ void main() {
         'Build an office with 15 staff and 4 guest laptops.',
       );
       final names = plan.nodes.map((n) => '${n.name}:${n.type}').toSet();
-      expect(plan.nodes.where((n) => n.type == 'pc'), hasLength(15),
-          reason: 'the 15 staff should be 15 computers, got $names');
-      expect(plan.nodes.where((n) => n.type == 'laptop'), hasLength(4),
-          reason: 'the 4 guest laptops should be 4 laptops, got $names');
+      expect(
+        plan.nodes.where((n) => n.type == 'pc'),
+        hasLength(15),
+        reason: 'the 15 staff should be 15 computers, got $names',
+      );
+      expect(
+        plan.nodes.where((n) => n.type == 'laptop'),
+        hasLength(4),
+        reason: 'the 4 guest laptops should be 4 laptops, got $names',
+      );
     });
 
     test('"a website and shared folders" become server roles', () {
@@ -151,8 +169,11 @@ void main() {
         'office',
         'A small office that needs a website.',
       );
-      expect(slots.count('server'), greaterThan(0),
-          reason: 'a website with nothing to serve it is a dropped requirement');
+      expect(
+        slots.count('server'),
+        greaterThan(0),
+        reason: 'a website with nothing to serve it is a dropped requirement',
+      );
     });
 
     test('a negated everyday count is rejected, not counted', () {

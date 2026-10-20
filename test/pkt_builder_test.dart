@@ -18,9 +18,7 @@ void main() {
   late SeedLibrary seed;
 
   setUp(() {
-    seed = SeedLibrary.fromPkt(
-      File('sidecar/demo-lab.pkt').readAsBytesSync(),
-    );
+    seed = SeedLibrary.fromPkt(File('sidecar/demo-lab.pkt').readAsBytesSync());
   });
 
   String xmlOf(PktBuildResult r) => utf8.decode(decryptPkt(r.bytes));
@@ -54,8 +52,11 @@ void main() {
       expect(result.warnings, isEmpty);
       final xml = xmlOf(result);
       for (final name in ['Edge1', 'Core1', 'Desk1']) {
-        expect(xml, contains('<NAME translate="true">$name</NAME>'),
-            reason: '$name is missing from the built save');
+        expect(
+          xml,
+          contains('<NAME translate="true">$name</NAME>'),
+          reason: '$name is missing from the built save',
+        );
       }
     });
 
@@ -69,8 +70,11 @@ void main() {
         ],
       );
       expect(result.refIds.keys, containsAll(['R1', 'R2', 'R3']));
-      expect(result.refIds.values.toSet(), hasLength(3),
-          reason: 'two devices sharing a ref id binds every cable to one box');
+      expect(
+        result.refIds.values.toSet(),
+        hasLength(3),
+        reason: 'two devices sharing a ref id binds every cable to one box',
+      );
 
       final xml = xmlOf(result);
       for (final id in result.refIds.values) {
@@ -82,8 +86,13 @@ void main() {
       final result = PktBuilder.build(
         seed: seed,
         devices: const [
-          PktDeviceSpec(name: 'Placed', type: 'Router', model: '2811',
-              x: 640, y: 480),
+          PktDeviceSpec(
+            name: 'Placed',
+            type: 'Router',
+            model: '2811',
+            x: 640,
+            y: 480,
+          ),
         ],
       );
       final xml = xmlOf(result);
@@ -100,8 +109,9 @@ void main() {
       final original = seed.devices.first.name;
       final result = PktBuilder.build(
         seed: seed,
-        devices: const [PktDeviceSpec(name: 'Fresh', type: 'Router',
-            model: '2811')],
+        devices: const [
+          PktDeviceSpec(name: 'Fresh', type: 'Router', model: '2811'),
+        ],
       );
       final xml = xmlOf(result);
       final start = xml.indexOf('<NAME translate="true">Fresh</NAME>');
@@ -116,8 +126,11 @@ void main() {
       ];
       final a = PktBuilder.build(seed: seed, devices: devices);
       final b = PktBuilder.build(seed: seed, devices: devices);
-      expect(a.bytes, b.bytes,
-          reason: 'a build that changes on every run cannot be trusted');
+      expect(
+        a.bytes,
+        b.bytes,
+        reason: 'a build that changes on every run cannot be trusted',
+      );
     });
   });
 
@@ -177,8 +190,9 @@ void main() {
     test('a link with a missing end is reported, not half-written', () {
       final result = PktBuilder.build(
         seed: seed,
-        devices: const [PktDeviceSpec(name: 'R1', type: 'Router',
-            model: '2811')],
+        devices: const [
+          PktDeviceSpec(name: 'R1', type: 'Router', model: '2811'),
+        ],
         links: const [
           PktLinkSpec(
             fromDevice: 'R1',
@@ -196,8 +210,9 @@ void main() {
     test('the document keeps its options and scenarios', () {
       final result = PktBuilder.build(
         seed: seed,
-        devices: const [PktDeviceSpec(name: 'R1', type: 'Router',
-            model: '2811')],
+        devices: const [
+          PktDeviceSpec(name: 'R1', type: 'Router', model: '2811'),
+        ],
       );
       final xml = xmlOf(result);
       // These are the sections the app does not model. Dropping them is how a
@@ -210,15 +225,18 @@ void main() {
     test('no XML-illegal control character survives into the file', () {
       final result = PktBuilder.build(
         seed: seed,
-        devices: const [PktDeviceSpec(name: 'R1', type: 'Router',
-            model: '2811')],
+        devices: const [
+          PktDeviceSpec(name: 'R1', type: 'Router', model: '2811'),
+        ],
       );
       final xml = xmlOf(result);
       for (var i = 0; i < xml.length; i++) {
         final c = xml.codeUnitAt(i);
-        expect(c <= 0x08 || c == 0x0B || c == 0x0C || (c >= 0x0E && c <= 0x1F),
-            isFalse,
-            reason: 'control character 0x${c.toRadixString(16)} at $i');
+        expect(
+          c <= 0x08 || c == 0x0B || c == 0x0C || (c >= 0x0E && c <= 0x1F),
+          isFalse,
+          reason: 'control character 0x${c.toRadixString(16)} at $i',
+        );
       }
     });
   });

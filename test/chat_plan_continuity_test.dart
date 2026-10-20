@@ -80,7 +80,11 @@ void main() {
       );
       expect(count(p, 'router'), 2, reason: 'one router per described site');
       expect(count(p, 'switch'), greaterThanOrEqualTo(2));
-      expect(p.links, isNotEmpty, reason: 'a described network is wired, not a PC farm');
+      expect(
+        p.links,
+        isNotEmpty,
+        reason: 'a described network is wired, not a PC farm',
+      );
       expect(
         p.questions.where((q) => q.toLowerCase().contains('how many phones')),
         isNotEmpty,
@@ -174,7 +178,8 @@ void main() {
       expect(
         reply.quickReplies,
         isNot(contains('Build the .pkt')),
-        reason: 'a 50-PC plan is refused by the validator, so its build must '
+        reason:
+            'a 50-PC plan is refused by the validator, so its build must '
             'not be advertised as ready',
       );
       expect(reply.text, contains('cannot build this one yet'));
@@ -187,9 +192,11 @@ void main() {
   });
 
   group('the smaller twin is buildable end to end', () {
-    test('two sites and 20 PCs cable every device and pass the validator',
-        () {
-      final p = NetworkIntent.parseSimple('chat', 'two physical sites and 20 PCs');
+    test('two sites and 20 PCs cable every device and pass the validator', () {
+      final p = NetworkIntent.parseSimple(
+        'chat',
+        'two physical sites and 20 PCs',
+      );
       expect(count(p, 'pc'), 20);
       expect(count(p, 'router'), 2);
       expect(count(p, 'switch'), 2);
@@ -217,28 +224,32 @@ void main() {
       expect(
         issues.any((i) => i.message.contains('more than 50 devices')),
         isTrue,
-        reason: 'a 50-PC lab exceeds the autopilot device limit; the app '
+        reason:
+            'a 50-PC lab exceeds the autopilot device limit; the app '
             'must say so rather than stay silent',
       );
     });
   });
 
   group('the new reading rules, in isolation', () {
-    test('"more than 1 router and 1 switch and 1 server" plans the minimums',
-        () {
-      final p = NetworkIntent.parseSimple(
-        'p',
-        'we will need more than 1 router and 1 switch and 1 server',
-      );
-      expect(count(p, 'router'), 2);
-      expect(count(p, 'switch'), 1);
-      expect(count(p, 'server'), 1);
-      expect(
-        p.assumptions
-            .any((a) => a.contains('more than 1 router') && a.contains('2')),
-        isTrue,
-      );
-    });
+    test(
+      '"more than 1 router and 1 switch and 1 server" plans the minimums',
+      () {
+        final p = NetworkIntent.parseSimple(
+          'p',
+          'we will need more than 1 router and 1 switch and 1 server',
+        );
+        expect(count(p, 'router'), 2);
+        expect(count(p, 'switch'), 1);
+        expect(count(p, 'server'), 1);
+        expect(
+          p.assumptions.any(
+            (a) => a.contains('more than 1 router') && a.contains('2'),
+          ),
+          isTrue,
+        );
+      },
+    );
 
     test('"at least 2 switches" keeps reading as written', () {
       final p = NetworkIntent.parseSimple('p', 'at least 2 switches');

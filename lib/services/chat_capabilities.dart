@@ -82,38 +82,81 @@ class ChatCapabilities {
   /// (duplicates, overlaps) run before the general ones.
   static const Map<ChatCapability, List<String>> aliases = {
     ChatCapability.duplicateAddresses: [
-      'duplicate address', 'duplicate ip', 'any duplicate', 'duplicates',
-      'same ip twice', 'ip conflict', 'address conflict',
+      'duplicate address',
+      'duplicate ip',
+      'any duplicate',
+      'duplicates',
+      'same ip twice',
+      'ip conflict',
+      'address conflict',
     ],
     ChatCapability.subnetOverlaps: [
-      'do the subnets overlap', 'overlapping subnet', 'subnet overlap',
-      'network overlap', 'any overlap', 'check for overlap',
+      'do the subnets overlap',
+      'overlapping subnet',
+      'subnet overlap',
+      'network overlap',
+      'any overlap',
+      'check for overlap',
     ],
     ChatCapability.validatePlan: [
-      'validate', 'lint', 'sanity check', 'check for errors',
-      'check for mistakes', 'find errors', 'find the errors',
-      'check the plan', 'check my plan', 'check the network',
-      'is the plan ok', 'is the plan okay', "what's wrong with the plan",
+      'validate',
+      'lint',
+      'sanity check',
+      'check for errors',
+      'check for mistakes',
+      'find errors',
+      'find the errors',
+      'check the plan',
+      'check my plan',
+      'check the network',
+      'is the plan ok',
+      'is the plan okay',
+      "what's wrong with the plan",
       'what is wrong with the plan',
     ],
     ChatCapability.improvePlan: [
-      'improve the plan', 'improve my plan', 'improve this plan',
-      'improve the network', 'what to improve', 'what should i fix',
-      'what to fix', 'any suggestions', 'best practices',
-      'review the plan', 'make it better',
+      'improve the plan',
+      'improve my plan',
+      'improve this plan',
+      'improve the network',
+      'what to improve',
+      'what should i fix',
+      'what to fix',
+      'any suggestions',
+      'best practices',
+      'review the plan',
+      'make it better',
     ],
     ChatCapability.savedNetworks: [
-      'saved networks', 'saved files', 'saved labs', 'saved projects',
-      'show my files', 'list the files', 'list files', 'list saved',
-      'show saved', 'what files do i have', 'which files do i have',
+      'saved networks',
+      'saved files',
+      'saved labs',
+      'saved projects',
+      'show my files',
+      'list the files',
+      'list files',
+      'list saved',
+      'show saved',
+      'what files do i have',
+      'which files do i have',
     ],
     ChatCapability.exportGns3: [
-      'export for gns3', 'export to gns3', 'gns3 export',
-      'export the gns3', 'gns3 project', 'gns3 file', 'for gns3',
+      'export for gns3',
+      'export to gns3',
+      'gns3 export',
+      'export the gns3',
+      'gns3 project',
+      'gns3 file',
+      'for gns3',
     ],
     ChatCapability.exportHelp: [
-      'export this', 'export the plan', 'export the network', 'export it',
-      'export options', 'export formats', 'how do i export',
+      'export this',
+      'export the plan',
+      'export the network',
+      'export it',
+      'export options',
+      'export formats',
+      'how do i export',
     ],
   };
 
@@ -141,7 +184,8 @@ class ChatCapabilities {
         if (t.contains(alias)) return entry.key;
       }
     }
-    final aboutPlan = t.contains('plan') ||
+    final aboutPlan =
+        t.contains('plan') ||
         t.contains('network') ||
         t.contains('lab') ||
         t.contains('design') ||
@@ -233,7 +277,8 @@ class ChatCapabilities {
       return _noPlan('check for errors');
     }
     final issues = ValidatorService.validate(plan, target: target);
-    final head = 'Checked "${plan.projectName}" '
+    final head =
+        'Checked "${plan.projectName}" '
         '(${plan.nodes.length} device(s), ${plan.links.length} link(s)) with '
         'the same validator a build runs - read-only, nothing was changed.';
     if (issues.isEmpty) {
@@ -243,18 +288,24 @@ class ChatCapabilities {
     final b = StringBuffer()
       ..writeln(head)
       ..writeln()
-      ..writeln('${issues.length} finding(s): ${errors.length} error(s), '
-          '${issues.length - errors.length} warning(s).');
+      ..writeln(
+        '${issues.length} finding(s): ${errors.length} error(s), '
+        '${issues.length - errors.length} warning(s).',
+      );
     for (final issue in issues.take(10)) {
       b.writeln('- [${issue.severity}] ${issue.message}');
     }
     if (issues.length > 10) {
-      b.writeln('... and ${issues.length - 10} more - "${hubButton[ChatCapability.validatePlan]}" '
-          'in the Action Hub shows the full list.');
+      b.writeln(
+        '... and ${issues.length - 10} more - "${hubButton[ChatCapability.validatePlan]}" '
+        'in the Action Hub shows the full list.',
+      );
     }
     if (errors.isNotEmpty) {
-      b.write('Fix the errors before building. Changes to the lab still go '
-          'through the usual approval - I never change a device on my own.');
+      b.write(
+        'Fix the errors before building. Changes to the lab still go '
+        'through the usual approval - I never change a device on my own.',
+      );
     }
     return b.toString().trimRight();
   }
@@ -272,14 +323,20 @@ class ChatCapabilities {
           'is claimed once (read-only check, nothing changed).';
     }
     final b = StringBuffer()
-      ..writeln('${rows.length} duplicate address(es) in '
-          '"${plan.projectName}" (read-only check, nothing changed):');
+      ..writeln(
+        '${rows.length} duplicate address(es) in '
+        '"${plan.projectName}" (read-only check, nothing changed):',
+      );
     for (final d in rows.take(10)) {
-      b.writeln('- ${d['address']} is claimed by '
-          '${(d['usedBy'] as List?)?.join(' and ') ?? '?'}');
+      b.writeln(
+        '- ${d['address']} is claimed by '
+        '${(d['usedBy'] as List?)?.join(' and ') ?? '?'}',
+      );
     }
-    b.write('Give the second device the next free host on its LAN to clear '
-        'it.');
+    b.write(
+      'Give the second device the next free host on its LAN to clear '
+      'it.',
+    );
     return b.toString();
   }
 
@@ -299,14 +356,20 @@ class ChatCapabilities {
           'changed).';
     }
     final b = StringBuffer()
-      ..writeln('${pairs.length} overlapping subnet pair(s) in '
-          '"${plan.projectName}" (read-only check, nothing changed):');
+      ..writeln(
+        '${pairs.length} overlapping subnet pair(s) in '
+        '"${plan.projectName}" (read-only check, nothing changed):',
+      );
     for (final pair in pairs.take(10)) {
-      b.writeln('- ${pair.$1} and ${pair.$2} share addresses '
-          '(${NetworkMath.coveringPrefix(pair.$1, pair.$2) ?? '?'})');
+      b.writeln(
+        '- ${pair.$1} and ${pair.$2} share addresses '
+        '(${NetworkMath.coveringPrefix(pair.$1, pair.$2) ?? '?'})',
+      );
     }
-    b.write('Overlaps like this are a routing fault waiting to happen - '
-        'the fix normally moves one subnet to a free range.');
+    b.write(
+      'Overlaps like this are a routing fault waiting to happen - '
+      'the fix normally moves one subnet to a free range.',
+    );
     return b.toString();
   }
 
@@ -314,22 +377,28 @@ class ChatCapabilities {
     if (plan == null || plan.nodes.isEmpty || _looksLikeFallback(plan)) {
       return _noPlan('review');
     }
-    final suggestions =
-        PlannerSuggestionsService.forIntent(plan, target: target);
+    final suggestions = PlannerSuggestionsService.forIntent(
+      plan,
+      target: target,
+    );
     if (suggestions.isEmpty) {
       return '"${plan.projectName}" reads complete - nothing to add. This is '
           'the same review as the Action Hub button '
           '"${hubButton[ChatCapability.improvePlan]}".';
     }
     final b = StringBuffer()
-      ..writeln('${suggestions.length} suggestion(s) for '
-          '"${plan.projectName}" (read-only review, nothing changed):');
+      ..writeln(
+        '${suggestions.length} suggestion(s) for '
+        '"${plan.projectName}" (read-only review, nothing changed):',
+      );
     for (final s in suggestions.take(8)) {
       b.writeln('- $s');
     }
     if (suggestions.length > 8) {
-      b.writeln('... and ${suggestions.length - 8} more in the Action Hub '
-          'button "${hubButton[ChatCapability.improvePlan]}".');
+      b.writeln(
+        '... and ${suggestions.length - 8} more in the Action Hub '
+        'button "${hubButton[ChatCapability.improvePlan]}".',
+      );
     }
     return b.toString().trimRight();
   }

@@ -37,8 +37,9 @@ Future<void> _send(WidgetTester tester, String text) async {
 }
 
 void main() {
-  testWidgets('a parsed turn shows what was understood, as chips',
-      (tester) async {
+  testWidgets('a parsed turn shows what was understood, as chips', (
+    tester,
+  ) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
@@ -51,8 +52,9 @@ void main() {
     expect(find.textContaining('%'), findsWidgets);
   });
 
-  testWidgets('a sized brief shows its VLANs and its open questions',
-      (tester) async {
+  testWidgets('a sized brief shows its VLANs and its open questions', (
+    tester,
+  ) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
@@ -65,8 +67,9 @@ void main() {
     expect(find.text('Worth confirming:'), findsOneWidget);
   });
 
-  testWidgets('a question chip fills the composer and does not send',
-      (tester) async {
+  testWidgets('a question chip fills the composer and does not send', (
+    tester,
+  ) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
@@ -85,8 +88,9 @@ void main() {
     expect(composer.controller!.text, question);
   });
 
-  testWidgets('a declined turn never wears an older turn\'s plan',
-      (tester) async {
+  testWidgets('a declined turn never wears an older turn\'s plan', (
+    tester,
+  ) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 

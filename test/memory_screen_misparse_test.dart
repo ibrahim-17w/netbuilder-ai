@@ -27,9 +27,9 @@ void main() {
   tearDown(PhrasingMemoryService.clearIndex);
 
   Widget screen(MemoryService memory) => MultiProvider(
-        providers: [ChangeNotifierProvider<MemoryService>.value(value: memory)],
-        child: const MaterialApp(home: Scaffold(body: MemoryScreen())),
-      );
+    providers: [ChangeNotifierProvider<MemoryService>.value(value: memory)],
+    child: const MaterialApp(home: Scaffold(body: MemoryScreen())),
+  );
 
   /// Bounded pumping, never pumpAndSettle: the screen polls the sidecar on a
   /// three-second timer, so a settle that waits for silence would run until
@@ -93,8 +93,8 @@ void main() {
   }
 
   Finder rate() => find.byWidgetPredicate(
-        (w) => w is AppMetric && w.label == 'Misparse rate',
-      );
+    (w) => w is AppMetric && w.label == 'Misparse rate',
+  );
 
   /// One correction the user had to make three times - the threshold at
   /// which the ledger proposes it for review.
@@ -111,8 +111,9 @@ void main() {
     }
   }
 
-  testWidgets('the misparse rate reads n/a until a turn has been parsed',
-      (tester) async {
+  testWidgets('the misparse rate reads n/a until a turn has been parsed', (
+    tester,
+  ) async {
     tall(tester);
     final memory = await freshMemory(tester);
     await tester.pumpWidget(screen(memory));
@@ -135,8 +136,9 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('the rate is corrections per parsed turn, to one decimal',
-      (tester) async {
+  testWidgets('the rate is corrections per parsed turn, to one decimal', (
+    tester,
+  ) async {
     tall(tester);
     final memory = await freshMemory(tester);
     // Eight turns parsed, one correction made: 12.5%, counted rather than
@@ -164,8 +166,9 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('nothing to review says so instead of showing an empty box',
-      (tester) async {
+  testWidgets('nothing to review says so instead of showing an empty box', (
+    tester,
+  ) async {
     tall(tester);
     final memory = await freshMemory(tester);
     await tester.pumpWidget(screen(memory));
@@ -222,16 +225,20 @@ void main() {
       reason: 'a taught row leaves the review list',
     );
     final phrasings = (await tester.runAsync(() => memory.allPhrasings()))!;
-    expect(phrasings, hasLength(1),
-        reason: 'the lesson must be listable, not only marked');
+    expect(
+      phrasings,
+      hasLength(1),
+      reason: 'the lesson must be listable, not only marked',
+    );
     expect(phrasings.first['rewrite'], '50 PCs, 2 switches, 2 routers');
     final ledger = (await tester.runAsync(() => memory.misparseLedger()))!;
     expect(ledger.single.status, 'taught');
     await unmount(tester);
   });
 
-  testWidgets('dismissing a correction keeps it out of the phrasings',
-      (tester) async {
+  testWidgets('dismissing a correction keeps it out of the phrasings', (
+    tester,
+  ) async {
     tall(tester);
     final memory = await freshMemory(tester);
     await tester.runAsync(() => seedProposed(memory));
@@ -244,11 +251,17 @@ void main() {
 
     expect(find.widgetWithText(FilledButton, 'Teach'), findsNothing);
     final phrasings = (await tester.runAsync(() => memory.allPhrasings()))!;
-    expect(phrasings, isEmpty,
-        reason: 'a rejected guess must never reach the replay index');
+    expect(
+      phrasings,
+      isEmpty,
+      reason: 'a rejected guess must never reach the replay index',
+    );
     final ledger = (await tester.runAsync(() => memory.misparseLedger()))!;
-    expect(ledger.single.status, 'dismissed',
-        reason: 'it stays in the ledger as evidence for the rate');
+    expect(
+      ledger.single.status,
+      'dismissed',
+      reason: 'it stays in the ledger as evidence for the rate',
+    );
     expect(find.textContaining('Reviewed (1)'), findsOneWidget);
     await unmount(tester);
   });

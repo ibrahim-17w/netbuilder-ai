@@ -92,13 +92,14 @@ String _ok(String content) => jsonEncode({
   ],
 });
 
-String _chunk(String delta) => 'data: ${jsonEncode({
-  'choices': [
-    {
-      'delta': {'content': delta},
-    },
-  ],
-})}\n\n';
+String _chunk(String delta) =>
+    'data: ${jsonEncode({
+      'choices': [
+        {
+          'delta': {'content': delta},
+        },
+      ],
+    })}\n\n';
 
 /// A 1x1 PNG, written to disk so the attachment path is a real file.
 Future<ChatImage> _shot({String name = 'shot.png'}) async {
@@ -122,53 +123,58 @@ List<List<Map<String, dynamic>>> _imageTurns(String body) {
   return [
     for (final message in messages)
       if (message['content'] is List)
-        List<Map<String, dynamic>>.from(message['content'] as List)
+        List<Map<String, dynamic>>.from(message['content'] as List),
   ].where((parts) => parts.any((p) => p['type'] == 'image_url')).toList();
 }
 
 void main() {
-  test('a non-streaming call hits <base>/chat/completions with the model',
-      () async {
-    final fake = _FakeEndpoint(body: _ok('ready'));
-    final service = OpenAiChatService(
-      config: _cfg(org: 'org-1', headers: {'X-Title': 'netbuilder'}),
-      apiKey: 'sk-test',
-      client: fake,
-    );
-    final text = await service.complete(const [
-      {'role': 'user', 'content': 'ping'},
-    ]);
+  test(
+    'a non-streaming call hits <base>/chat/completions with the model',
+    () async {
+      final fake = _FakeEndpoint(body: _ok('ready'));
+      final service = OpenAiChatService(
+        config: _cfg(org: 'org-1', headers: {'X-Title': 'netbuilder'}),
+        apiKey: 'sk-test',
+        client: fake,
+      );
+      final text = await service.complete(const [
+        {'role': 'user', 'content': 'ping'},
+      ]);
 
-    expect(text, 'ready');
-    expect(fake.last!.url.toString(),
-        'https://api.groq.com/openai/v1/chat/completions');
-    expect(fake.lastHeaders!['Authorization'], 'Bearer sk-test');
-    expect(fake.lastHeaders!['OpenAI-Organization'], 'org-1');
-    expect(fake.lastHeaders!['X-Title'], 'netbuilder');
-    expect(fake.lastBody, contains('llama-3.3-70b-versatile'));
-  });
+      expect(text, 'ready');
+      expect(
+        fake.last!.url.toString(),
+        'https://api.groq.com/openai/v1/chat/completions',
+      );
+      expect(fake.lastHeaders!['Authorization'], 'Bearer sk-test');
+      expect(fake.lastHeaders!['OpenAI-Organization'], 'org-1');
+      expect(fake.lastHeaders!['X-Title'], 'netbuilder');
+      expect(fake.lastBody, contains('llama-3.3-70b-versatile'));
+    },
+  );
 
-  test('streaming yields the answer as it arrives, even split mid-line',
-      () async {
-    final fullBody = '${_chunk('Two-')}${_chunk('site OSPF')}data: [DONE]\n\n';
-    final cut = fullBody.length ~/ 2;
-    final fake = _FakeEndpoint(
-      pieces: [fullBody.substring(0, cut), fullBody.substring(cut)],
-    );
-    final service = OpenAiChatService(
-      config: _cfg(),
-      apiKey: 'sk-test',
-      client: fake,
-    );
-    final pieces = await service
-        .stream(const [
-          {'role': 'user', 'content': 'hi'},
-        ])
-        .toList();
+  test(
+    'streaming yields the answer as it arrives, even split mid-line',
+    () async {
+      final fullBody =
+          '${_chunk('Two-')}${_chunk('site OSPF')}data: [DONE]\n\n';
+      final cut = fullBody.length ~/ 2;
+      final fake = _FakeEndpoint(
+        pieces: [fullBody.substring(0, cut), fullBody.substring(cut)],
+      );
+      final service = OpenAiChatService(
+        config: _cfg(),
+        apiKey: 'sk-test',
+        client: fake,
+      );
+      final pieces = await service.stream(const [
+        {'role': 'user', 'content': 'hi'},
+      ]).toList();
 
-    expect(pieces.join(), 'Two-site OSPF');
-    expect(fake.lastBody, contains('"stream":true'));
-  });
+      expect(pieces.join(), 'Two-site OSPF');
+      expect(fake.lastBody, contains('"stream":true'));
+    },
+  );
 
   group('every failure says what to fix', () {
     Future<String> failure(int status, {String model = 'm'}) async {
@@ -259,7 +265,9 @@ void main() {
   });
 
   test('headers are parsed from the textarea shape', () {
-    final parsed = SettingsService.parseHeaders('X-Title: mine\nX-Beta: 1\nbadline');
+    final parsed = SettingsService.parseHeaders(
+      'X-Title: mine\nX-Beta: 1\nbadline',
+    );
     expect(parsed['X-Title'], 'mine');
     expect(parsed['X-Beta'], '1');
     expect(parsed.length, 2);
@@ -295,15 +303,21 @@ void main() {
       );
       final system = messages.first['content']!;
       expect(system, startsWith('you are a network engineer'));
-      expect(system, contains('ORIGINAL request'),
-          reason: 'the dropped turns are summarized into memory');
+      expect(
+        system,
+        contains('ORIGINAL request'),
+        reason: 'the dropped turns are summarized into memory',
+      );
       expect(system, contains('ask 0'));
       // Only what fits is sent word-for-word (the pending turn is last).
       final kept = messages.skip(1).toList();
       expect(kept.length, lessThan(history.length + 1));
       expect(sentRoles(kept).first, anyOf('user', 'assistant'));
-      expect(kept.last['content'], contains('remind me'),
-          reason: 'the pending turn is sent last');
+      expect(
+        kept.last['content'],
+        contains('remind me'),
+        reason: 'the pending turn is sent last',
+      );
       // And the newest history turn survives just before it.
       expect(kept[kept.length - 2]['content'], contains('reply 9'));
     });
@@ -348,16 +362,19 @@ void main() {
         client: MockClient((request) async {
           final url = request.url.toString();
           if (url.endsWith('/tools/list')) {
-            return http.Response(jsonEncode({
-              'tools': [
-                {
-                  'name': 'get_devices',
-                  'kind': 'read',
-                  'summary': 'd',
-                  'args': <String, dynamic>{},
-                },
-              ],
-            }), 200);
+            return http.Response(
+              jsonEncode({
+                'tools': [
+                  {
+                    'name': 'get_devices',
+                    'kind': 'read',
+                    'summary': 'd',
+                    'args': <String, dynamic>{},
+                  },
+                ],
+              }),
+              200,
+            );
           }
           requests.add(request);
           return http.Response(
@@ -379,8 +396,7 @@ void main() {
       expect(await service.toolRuntime!.load(), isTrue);
 
       final history = [
-        for (var i = 0; i < 10; i++)
-          turn('user', 'ask $i ${'x' * 1800}'),
+        for (var i = 0; i < 10; i++) turn('user', 'ask $i ${'x' * 1800}'),
       ];
       await service
           .streamWithTools(
@@ -434,20 +450,22 @@ void main() {
       expect(url.length, greaterThan('data:image/png;base64,'.length));
     });
 
-    test('an image-only turn still sends text to sit next to the picture',
-        () async {
-      final shot = await _shot();
-      final service = ProviderChatService(config: _cfg(), openaiKey: 'k');
-      final messages = await service.openAiRichMessages(
-        history: const [],
-        text: '   ',
-        systemContext: 'sys',
-        attachments: [shot],
-      );
-      final parts = messages.last['content'] as List;
-      expect((parts.first as Map)['type'], 'text');
-      expect((parts.first as Map)['text'], '(look at the attached image)');
-    });
+    test(
+      'an image-only turn still sends text to sit next to the picture',
+      () async {
+        final shot = await _shot();
+        final service = ProviderChatService(config: _cfg(), openaiKey: 'k');
+        final messages = await service.openAiRichMessages(
+          history: const [],
+          text: '   ',
+          systemContext: 'sys',
+          attachments: [shot],
+        );
+        final parts = messages.last['content'] as List;
+        expect((parts.first as Map)['type'], 'text');
+        expect((parts.first as Map)['text'], '(look at the attached image)');
+      },
+    );
 
     test('a text-only turn keeps the plain string shape', () async {
       final service = ProviderChatService(config: _cfg(), openaiKey: 'k');
@@ -543,12 +561,9 @@ void main() {
 
       final collected = <String>[];
       final run = () async {
-        await for (final piece in service.streamMessages(
-          const [
-            {'role': 'user', 'content': 'hi'},
-          ],
-          abortTrigger: control.abortTrigger,
-        )) {
+        await for (final piece in service.streamMessages(const [
+          {'role': 'user', 'content': 'hi'},
+        ], abortTrigger: control.abortTrigger)) {
           collected.add(piece);
           if (collected.length == 1) control.cancel();
         }
@@ -560,36 +575,39 @@ void main() {
       controller.close();
 
       await expectLater(run, throwsA(isA<AbortedException>()));
-      expect(collected, ['one'],
-          reason: 'the answer stops where the user stopped it');
+      expect(collected, [
+        'one',
+      ], reason: 'the answer stops where the user stopped it');
     });
 
-    test('a turn stopped before it starts never reaches the provider',
-        () async {
-      final control = GenerationControl()..begin();
-      control.cancel();
-      final fake = _FakeEndpoint(pieces: [_chunk('never mind')]);
-      final service = OpenAiChatService(
-        config: _cfg(),
-        apiKey: 'sk-test',
-        client: fake,
-      );
-      await expectLater(
-        service
-            .streamMessages(
-              const [
-                {'role': 'user', 'content': 'hi'},
-              ],
-              abortTrigger: control.abortTrigger,
-              // A cancel that happened before this request existed is only
-              // visible synchronously, which is what the chat passes too.
-              abortProbe: () => control.cancelled,
-            )
-            .toList(),
-        throwsA(isA<AbortedException>()),
-      );
-      expect(fake.last, isNull, reason: 'nothing was sent at all');
-    });
+    test(
+      'a turn stopped before it starts never reaches the provider',
+      () async {
+        final control = GenerationControl()..begin();
+        control.cancel();
+        final fake = _FakeEndpoint(pieces: [_chunk('never mind')]);
+        final service = OpenAiChatService(
+          config: _cfg(),
+          apiKey: 'sk-test',
+          client: fake,
+        );
+        await expectLater(
+          service
+              .streamMessages(
+                const [
+                  {'role': 'user', 'content': 'hi'},
+                ],
+                abortTrigger: control.abortTrigger,
+                // A cancel that happened before this request existed is only
+                // visible synchronously, which is what the chat passes too.
+                abortProbe: () => control.cancelled,
+              )
+              .toList(),
+          throwsA(isA<AbortedException>()),
+        );
+        expect(fake.last, isNull, reason: 'nothing was sent at all');
+      },
+    );
   });
 
   group('a provider that stops talking is stopped', () {
@@ -600,14 +618,9 @@ void main() {
         client: _SilentClient(),
       );
       await expectLater(
-        service
-            .streamMessages(
-              const [
-                {'role': 'user', 'content': 'hi'},
-              ],
-              firstByteTimeout: const Duration(milliseconds: 60),
-            )
-            .toList(),
+        service.streamMessages(const [
+          {'role': 'user', 'content': 'hi'},
+        ], firstByteTimeout: const Duration(milliseconds: 60)).toList(),
         throwsA(predicate((e) => e.toString().contains('timed out'))),
       );
     });

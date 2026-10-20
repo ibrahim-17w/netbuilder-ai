@@ -30,10 +30,7 @@ void main() {
         NetworkMath.binary('192.168.1.0'),
         '11000000.10101000.00000001.00000000',
       );
-      expect(
-        NetworkMath.binaryMask(24),
-        '11111111.11111111.11111111.00000000',
-      );
+      expect(NetworkMath.binaryMask(24), '11111111.11111111.11111111.00000000');
       expect(NetworkMath.binary('not an address'), '');
     });
   });
@@ -146,9 +143,10 @@ void main() {
     });
 
     test('an invalid base block produces nothing rather than nonsense', () {
-      expect(NetworkMath.vlsm('not-a-network', const [
-        (name: 'a', hosts: 10),
-      ]), isEmpty);
+      expect(
+        NetworkMath.vlsm('not-a-network', const [(name: 'a', hosts: 10)]),
+        isEmpty,
+      );
       expect(NetworkMath.vlsm('10.0.0.0/24', const []), isEmpty);
     });
   });
@@ -206,30 +204,27 @@ void main() {
     });
 
     test('duplicates collapse and invalid input is ignored', () {
-      expect(
-        NetworkMath.summarize(['10.0.0.0/24', '10.0.0.5/24', 'junk']),
-        ['10.0.0.0/24'],
-      );
+      expect(NetworkMath.summarize(['10.0.0.0/24', '10.0.0.5/24', 'junk']), [
+        '10.0.0.0/24',
+      ]);
       expect(NetworkMath.summarize(const []), isEmpty);
     });
   });
 
   group('ranges', () {
     test('a range becomes the fewest prefixes that cover it', () {
-      expect(
-        NetworkMath.rangeToCidrs('192.168.1.0', '192.168.1.255'),
-        ['192.168.1.0/24'],
-      );
+      expect(NetworkMath.rangeToCidrs('192.168.1.0', '192.168.1.255'), [
+        '192.168.1.0/24',
+      ]);
       expect(NetworkMath.rangeToCidrs('10.0.0.1', '10.0.0.6'), [
         '10.0.0.1/32',
         '10.0.0.2/31',
         '10.0.0.4/31',
         '10.0.0.6/32',
       ]);
-      expect(
-        NetworkMath.rangeToCidrs('10.0.0.0', '10.0.3.255'),
-        ['10.0.0.0/22'],
-      );
+      expect(NetworkMath.rangeToCidrs('10.0.0.0', '10.0.3.255'), [
+        '10.0.0.0/22',
+      ]);
     });
 
     test('the covered prefixes really do cover the range', () {
@@ -264,10 +259,7 @@ void main() {
 
   group('DNS names and neighbours', () {
     test('the reverse name is the address reversed', () {
-      expect(
-        NetworkMath.reverseDnsName('10.0.0.5'),
-        '5.0.0.10.in-addr.arpa',
-      );
+      expect(NetworkMath.reverseDnsName('10.0.0.5'), '5.0.0.10.in-addr.arpa');
       expect(
         NetworkMath.reverseDnsName('192.168.1.20/24'),
         '20.1.168.192.in-addr.arpa',
@@ -276,7 +268,10 @@ void main() {
     });
 
     test('the reverse zone follows the delegation point', () {
-      expect(NetworkMath.reverseZone('192.168.1.0/24'), '1.168.192.in-addr.arpa');
+      expect(
+        NetworkMath.reverseZone('192.168.1.0/24'),
+        '1.168.192.in-addr.arpa',
+      );
       expect(NetworkMath.reverseZone('172.16.0.0/16'), '16.172.in-addr.arpa');
       expect(NetworkMath.reverseZone('10.0.0.0/25'), '0.0.10.in-addr.arpa');
     });
@@ -289,7 +284,10 @@ void main() {
     });
 
     test('two addresses share the prefix that covers both', () {
-      expect(NetworkMath.coveringPrefix('10.0.0.5', '10.0.0.200'), '10.0.0.0/24');
+      expect(
+        NetworkMath.coveringPrefix('10.0.0.5', '10.0.0.200'),
+        '10.0.0.0/24',
+      );
       expect(
         NetworkMath.coveringPrefix('10.0.0.5', '10.0.1.200'),
         '10.0.0.0/23',

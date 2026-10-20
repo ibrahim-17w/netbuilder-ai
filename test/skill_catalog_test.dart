@@ -55,23 +55,32 @@ void main() {
         SkillCatalog.all.any((s) => s.send.contains('router should I use')),
         isTrue,
       );
-      expect(
-        SkillCatalog.all.any((s) => s.send.contains('slow')),
-        isTrue,
-      );
+      expect(SkillCatalog.all.any((s) => s.send.contains('slow')), isTrue);
     });
 
     test('the menu opens on "/" and narrows with the token', () {
       expect(SkillCatalog.match('/').length, SkillCatalog.all.length);
-      expect(SkillCatalog.match('/bu').map((s) => s.command), contains('/build'));
-      expect(SkillCatalog.match('/t').length, greaterThan(1),
-          reason: 'the four targets share the token');
+      expect(
+        SkillCatalog.match('/bu').map((s) => s.command),
+        contains('/build'),
+      );
+      expect(
+        SkillCatalog.match('/t').length,
+        greaterThan(1),
+        reason: 'the four targets share the token',
+      );
       expect(SkillCatalog.match('/zzz'), isEmpty);
-      expect(SkillCatalog.match('/scan '), isEmpty,
-          reason: 'a space means the argument started - the menu steps aside');
+      expect(
+        SkillCatalog.match('/scan '),
+        isEmpty,
+        reason: 'a space means the argument started - the menu steps aside',
+      );
       expect(SkillCatalog.match('hello'), isEmpty);
-      expect(SkillCatalog.match('/bu\nnext line'), isEmpty,
-          reason: 'Enter means send, never more menu');
+      expect(
+        SkillCatalog.match('/bu\nnext line'),
+        isEmpty,
+        reason: 'Enter means send, never more menu',
+      );
     });
 
     test('the chat list names every category and command', () {

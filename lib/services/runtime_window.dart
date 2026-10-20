@@ -93,8 +93,10 @@ class RuntimeWindow {
   }) {
     final ceiling = configured <= 0 ? remoteAssumed : configured;
     final usable = window.tokens;
-    return (usable < ceiling ? usable : ceiling)
-        .clamp(floorTokens, 8 * 1024 * 1024);
+    return (usable < ceiling ? usable : ceiling).clamp(
+      floorTokens,
+      8 * 1024 * 1024,
+    );
   }
 }
 
@@ -130,7 +132,9 @@ class RuntimeWindowProbe {
   /// real window of its own and no local probe to make.
   static bool isLocal(String baseUrl) {
     final uri = Uri.tryParse(
-      baseUrl.trim().contains('://') ? baseUrl.trim() : 'http://${baseUrl.trim()}',
+      baseUrl.trim().contains('://')
+          ? baseUrl.trim()
+          : 'http://${baseUrl.trim()}',
     );
     if (uri == null) return false;
     final host = uri.host.toLowerCase();
@@ -153,7 +157,11 @@ class RuntimeWindowProbe {
     final http.Client c = client ?? http.Client();
     try {
       // 1. llama.cpp / LM Studio server: /props publishes the allocated n_ctx.
-      final props = await _getJson(c, root.replace(path: '${root.path}/props'), timeout);
+      final props = await _getJson(
+        c,
+        root.replace(path: '${root.path}/props'),
+        timeout,
+      );
       final fromProps = parse('props', props, model);
       if (fromProps != null) return fromProps;
 
@@ -200,7 +208,8 @@ class RuntimeWindowProbe {
     if (body == null) return null;
     switch (endpoint) {
       case 'props':
-        final nCtx = _intAt(body, ['n_ctx']) ??
+        final nCtx =
+            _intAt(body, ['n_ctx']) ??
             _intAt(body, ['default_generation_settings', 'n_ctx']) ??
             _intAt(body, ['default_generation_settings', 'n_ctx_per_seq']);
         if (nCtx == null || !_plausible(nCtx)) return null;
@@ -219,7 +228,8 @@ class RuntimeWindowProbe {
           if (model.isNotEmpty && name.isNotEmpty && !_sameModel(name, model)) {
             continue;
           }
-          final allocated = _intAt(entry, ['context_length']) ??
+          final allocated =
+              _intAt(entry, ['context_length']) ??
               _intAt(entry, ['context_window']);
           if (allocated == null || !_plausible(allocated)) continue;
           return RuntimeWindow(
@@ -335,10 +345,12 @@ class RuntimeWindowProbe {
   static bool _sameModel(String loaded, String wanted) {
     String norm(String s) =>
         s.toLowerCase().split(':').first.trim().replaceAll('.gguf', '');
-    return norm(loaded) == norm(wanted) || loaded.toLowerCase() == wanted.toLowerCase();
+    return norm(loaded) == norm(wanted) ||
+        loaded.toLowerCase() == wanted.toLowerCase();
   }
 
-  static bool _plausible(int tokens) => tokens >= 512 && tokens <= 8 * 1024 * 1024;
+  static bool _plausible(int tokens) =>
+      tokens >= 512 && tokens <= 8 * 1024 * 1024;
 
   static int _min(int a, int b) => a < b ? a : b;
 

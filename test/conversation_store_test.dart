@@ -40,8 +40,10 @@ void main() {
   group('conversation records', () {
     test('a conversation keeps its title, project and summary', () async {
       final mem = await fresh();
-      await mem.logChat(_turn('user', 'can PC1 reach Server0?'),
-          conversation: 'chi');
+      await mem.logChat(
+        _turn('user', 'can PC1 reach Server0?'),
+        conversation: 'chi',
+      );
       await mem.ensureConversation('chi', project: 'office-network.pkt');
       await mem.renameConversation('chi', 'PC1 Gateway Problem');
       await mem.setConversationSummary('chi', 'the user asked about PC1');
@@ -59,10 +61,14 @@ void main() {
 
     test('without a stored title the first thing said is the title', () async {
       final mem = await fresh();
-      await mem.logChat(_turn('user', 'why is the trunk down?'),
-          conversation: 'beta');
-      expect((await mem.conversations()).single['title'],
-          'why is the trunk down?');
+      await mem.logChat(
+        _turn('user', 'why is the trunk down?'),
+        conversation: 'beta',
+      );
+      expect(
+        (await mem.conversations()).single['title'],
+        'why is the trunk down?',
+      );
     });
 
     test('a rename is not overwritten by a later automatic title', () async {
@@ -76,8 +82,10 @@ void main() {
     test('search finds a chat by a device named mid-conversation', () async {
       final mem = await fresh();
       await mem.logChat(_turn('user', 'hello there'), conversation: 'alpha');
-      await mem.logChat(_turn('user', 'R7 has no route to the core'),
-          conversation: 'beta');
+      await mem.logChat(
+        _turn('user', 'R7 has no route to the core'),
+        conversation: 'beta',
+      );
 
       final hits = await mem.conversations(query: 'R7');
       expect(hits.map((c) => c['id']).toList(), ['beta']);
@@ -96,29 +104,30 @@ void main() {
       expect(chat['at'], greaterThan(0));
     });
 
-    test('deleting a conversation takes its state and its change log',
-        () async {
-      final mem = await fresh();
-      await mem.logChat(_turn('user', 'x'), conversation: 'alpha');
-      await mem.setSessionState('alpha', '{"project":"lab"}');
-      await mem.logChange(
-        conversation: 'alpha',
-        device: 'R1',
-        interface: 'g0/0',
-        field: 'ipAddress',
-        oldValue: '10.0.0.1/30',
-        newValue: '10.0.0.9/30',
-      );
+    test(
+      'deleting a conversation takes its state and its change log',
+      () async {
+        final mem = await fresh();
+        await mem.logChat(_turn('user', 'x'), conversation: 'alpha');
+        await mem.setSessionState('alpha', '{"project":"lab"}');
+        await mem.logChange(
+          conversation: 'alpha',
+          device: 'R1',
+          interface: 'g0/0',
+          field: 'ipAddress',
+          oldValue: '10.0.0.1/30',
+          newValue: '10.0.0.9/30',
+        );
 
-      await mem.clearChat(conversation: 'alpha');
-      expect(await mem.recentChat(conversation: 'alpha'), isEmpty);
-      expect(await mem.conversationMeta('alpha'), isNull);
-      expect(await mem.recentChanges(conversation: 'alpha'), isEmpty);
-      expect(await mem.conversations(), isEmpty);
-    });
+        await mem.clearChat(conversation: 'alpha');
+        expect(await mem.recentChat(conversation: 'alpha'), isEmpty);
+        expect(await mem.conversationMeta('alpha'), isNull);
+        expect(await mem.recentChanges(conversation: 'alpha'), isEmpty);
+        expect(await mem.conversations(), isEmpty);
+      },
+    );
 
-    test('a corrupt state blob reads as an empty state, not a crash',
-        () async {
+    test('a corrupt state blob reads as an empty state, not a crash', () async {
       final mem = await fresh();
       await mem.setSessionState('alpha', '{not json');
       expect(await mem.sessionStateJson('alpha'), '{not json');
@@ -138,72 +147,93 @@ void main() {
     // The store side of "Answer again" / "Edit and resend": the turn a
     // rewrite starts from and everything after it must be gone from SQLite,
     // or the next reload grows the abandoned branch straight back.
-    test('cuts a turn and everything after it, in that conversation only',
-        () async {
-      final mem = await fresh();
-      final first = await mem.logChat(_turn('user', 'why is the trunk down?'),
-          conversation: 'chi');
-      await mem.logChat(_turn('model', 'SW1 f0/1 is not trunking.'),
-          conversation: 'chi');
-      await mem.logChat(_turn('user', 'a different chat'),
-          conversation: 'other');
+    test(
+      'cuts a turn and everything after it, in that conversation only',
+      () async {
+        final mem = await fresh();
+        final first = await mem.logChat(
+          _turn('user', 'why is the trunk down?'),
+          conversation: 'chi',
+        );
+        await mem.logChat(
+          _turn('model', 'SW1 f0/1 is not trunking.'),
+          conversation: 'chi',
+        );
+        await mem.logChat(
+          _turn('user', 'a different chat'),
+          conversation: 'other',
+        );
 
-      final removed = await mem.deleteChatFrom('chi', fromId: first);
-      expect(removed, 2);
-      expect(await mem.recentChat(conversation: 'chi'), isEmpty);
-      expect((await mem.recentChat(conversation: 'other')).single.text,
-          'a different chat');
-    });
+        final removed = await mem.deleteChatFrom('chi', fromId: first);
+        expect(removed, 2);
+        expect(await mem.recentChat(conversation: 'chi'), isEmpty);
+        expect(
+          (await mem.recentChat(conversation: 'other')).single.text,
+          'a different chat',
+        );
+      },
+    );
 
     test('a mid-transcript cut keeps the turns before it', () async {
       final mem = await fresh();
       await mem.logChat(_turn('user', 'kept'), conversation: 'chi');
-      final second = await mem.logChat(_turn('user', 'cut from here'),
-          conversation: 'chi');
+      final second = await mem.logChat(
+        _turn('user', 'cut from here'),
+        conversation: 'chi',
+      );
       await mem.logChat(_turn('model', 'and its answer'), conversation: 'chi');
 
       final removed = await mem.deleteChatFrom('chi', fromId: second);
       expect(removed, 2);
-      expect((await mem.recentChat(conversation: 'chi')).map((m) => m.text),
-          ['kept']);
+      expect((await mem.recentChat(conversation: 'chi')).map((m) => m.text), [
+        'kept',
+      ]);
     });
 
-    test('a fromId that is not a row of this conversation deletes nothing',
-        () async {
-      final mem = await fresh();
-      final foreign = await mem.logChat(_turn('user', 'mine'),
-          conversation: 'other');
-      await mem.logChat(_turn('user', 'a'), conversation: 'chi');
-      await mem.logChat(_turn('model', 'b'), conversation: 'chi');
+    test(
+      'a fromId that is not a row of this conversation deletes nothing',
+      () async {
+        final mem = await fresh();
+        final foreign = await mem.logChat(
+          _turn('user', 'mine'),
+          conversation: 'other',
+        );
+        await mem.logChat(_turn('user', 'a'), conversation: 'chi');
+        await mem.logChat(_turn('model', 'b'), conversation: 'chi');
 
-      // id >= ? across conversations would cut into whatever was logged
-      // after it; a foreign id must be a no-op, not a wipe.
-      expect(await mem.deleteChatFrom('chi', fromId: foreign), 0);
-      expect(await mem.recentChat(conversation: 'chi'), hasLength(2));
-      expect(await mem.recentChat(conversation: 'other'), hasLength(1));
-    });
+        // id >= ? across conversations would cut into whatever was logged
+        // after it; a foreign id must be a no-op, not a wipe.
+        expect(await mem.deleteChatFrom('chi', fromId: foreign), 0);
+        expect(await mem.recentChat(conversation: 'chi'), hasLength(2));
+        expect(await mem.recentChat(conversation: 'other'), hasLength(1));
+      },
+    );
 
-    test('a turn created this session (no row id) is cut by what was written',
-        () async {
-      final mem = await fresh();
-      await mem.logChat(_turn('user', 'kept'), conversation: 'chi');
-      final stamp = DateTime.now().toIso8601String();
-      await mem.logChat(
+    test(
+      'a turn created this session (no row id) is cut by what was written',
+      () async {
+        final mem = await fresh();
+        await mem.logChat(_turn('user', 'kept'), conversation: 'chi');
+        final stamp = DateTime.now().toIso8601String();
+        await mem.logChat(
           ChatMessage(role: 'user', text: 'edited turn', createdAt: stamp),
-          conversation: 'chi');
-      await mem.logChat(
+          conversation: 'chi',
+        );
+        await mem.logChat(
           ChatMessage(role: 'model', text: 'answer', createdAt: stamp),
-          conversation: 'chi');
+          conversation: 'chi',
+        );
 
-      final removed = await mem.deleteChatFrom(
-        'chi',
-        fromCreatedAt: stamp,
-        fromRole: 'user',
-        fromText: 'edited turn',
-      );
-      expect(removed, 2);
-      expect((await mem.recentChat(conversation: 'chi')).single.text, 'kept');
-    });
+        final removed = await mem.deleteChatFrom(
+          'chi',
+          fromCreatedAt: stamp,
+          fromRole: 'user',
+          fromText: 'edited turn',
+        );
+        expect(removed, 2);
+        expect((await mem.recentChat(conversation: 'chi')).single.text, 'kept');
+      },
+    );
 
     test('an empty conversation name deletes nothing at all', () async {
       final mem = await fresh();
@@ -236,45 +266,50 @@ void main() {
   });
 
   group('the change log makes undo a lookup', () {
-    test('TEST 5: the newest change to a named device is found exactly',
-        () async {
-      final mem = await fresh();
-      await mem.logChange(
-        conversation: 'chi',
-        device: 'R1',
-        interface: 'g0/0',
-        field: 'ipAddress',
-        oldValue: '10.0.0.1/30',
-        newValue: '10.0.0.2/30',
-      );
-      final id = await mem.logChange(
-        conversation: 'chi',
-        device: 'R1',
-        interface: 'g0/0',
-        field: 'ipAddress',
-        oldValue: '10.0.0.2/30',
-        newValue: '10.0.0.254/24',
-      );
-      await mem.logChange(
-        conversation: 'chi',
-        device: 'R2',
-        interface: 'g0/0',
-        field: 'ipAddress',
-        oldValue: '10.0.1.1/30',
-        newValue: '10.0.1.2/30',
-      );
+    test(
+      'TEST 5: the newest change to a named device is found exactly',
+      () async {
+        final mem = await fresh();
+        await mem.logChange(
+          conversation: 'chi',
+          device: 'R1',
+          interface: 'g0/0',
+          field: 'ipAddress',
+          oldValue: '10.0.0.1/30',
+          newValue: '10.0.0.2/30',
+        );
+        final id = await mem.logChange(
+          conversation: 'chi',
+          device: 'R1',
+          interface: 'g0/0',
+          field: 'ipAddress',
+          oldValue: '10.0.0.2/30',
+          newValue: '10.0.0.254/24',
+        );
+        await mem.logChange(
+          conversation: 'chi',
+          device: 'R2',
+          interface: 'g0/0',
+          field: 'ipAddress',
+          oldValue: '10.0.1.1/30',
+          newValue: '10.0.1.2/30',
+        );
 
-      final aboutR1 = await mem.lastChange(conversation: 'chi', device: 'R1');
-      expect(aboutR1!['actionId'], id,
-          reason: 'the newest change to R1, not the newest change overall');
-      expect(aboutR1['oldValue'], '10.0.0.2/30');
-      expect(aboutR1['newValue'], '10.0.0.254/24');
-      expect(aboutR1['interface'], 'g0/0');
+        final aboutR1 = await mem.lastChange(conversation: 'chi', device: 'R1');
+        expect(
+          aboutR1!['actionId'],
+          id,
+          reason: 'the newest change to R1, not the newest change overall',
+        );
+        expect(aboutR1['oldValue'], '10.0.0.2/30');
+        expect(aboutR1['newValue'], '10.0.0.254/24');
+        expect(aboutR1['interface'], 'g0/0');
 
-      // "undo that" with no device named means the most recent change.
-      final last = await mem.lastChange(conversation: 'chi');
-      expect(last!['device'], 'R2');
-    });
+        // "undo that" with no device named means the most recent change.
+        final last = await mem.lastChange(conversation: 'chi');
+        expect(last!['device'], 'R2');
+      },
+    );
 
     test('an undone change is not offered again', () async {
       final mem = await fresh();
@@ -295,7 +330,10 @@ void main() {
       await mem.markChangeUndone(first);
       final next = await mem.lastChange(conversation: 'chi', device: 'R1');
       expect(next!['newValue'], 'c');
-      final restored = await mem.recentChanges(conversation: 'chi', device: 'R1');
+      final restored = await mem.recentChanges(
+        conversation: 'chi',
+        device: 'R1',
+      );
       expect((restored.last['undoneAt'] ?? '').toString(), isNotEmpty);
     });
 
@@ -315,10 +353,14 @@ void main() {
 
   group('generated titles say what the chat is about', () {
     test('a topic dominates', () {
-      expect(ConversationTitles.generate('why is OSPF not forming?'),
-          'OSPF Troubleshooting');
-      expect(ConversationTitles.generate('the VLAN trunk is down'),
-          'VLAN Troubleshooting');
+      expect(
+        ConversationTitles.generate('why is OSPF not forming?'),
+        'OSPF Troubleshooting',
+      );
+      expect(
+        ConversationTitles.generate('the VLAN trunk is down'),
+        'VLAN Troubleshooting',
+      );
     });
 
     test('a device and a topic together read like a problem', () {

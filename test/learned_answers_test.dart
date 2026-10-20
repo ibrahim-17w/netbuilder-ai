@@ -27,14 +27,17 @@ void main() {
     });
 
     test('requests, commands and off-topic asks are not', () {
-      expect(LearnedAnswers.isLearnableQuestion('2 routers and 4 PCs'),
-          isFalse);
-      expect(LearnedAnswers.isLearnableQuestion('add another switch'),
-          isFalse);
+      expect(
+        LearnedAnswers.isLearnableQuestion('2 routers and 4 PCs'),
+        isFalse,
+      );
+      expect(LearnedAnswers.isLearnableQuestion('add another switch'), isFalse);
       expect(LearnedAnswers.isLearnableQuestion('fix the plan'), isFalse);
       expect(LearnedAnswers.isLearnableQuestion('/skills'), isFalse);
-      expect(LearnedAnswers.isLearnableQuestion('what is the weather today'),
-          isFalse);
+      expect(
+        LearnedAnswers.isLearnableQuestion('what is the weather today'),
+        isFalse,
+      );
       expect(LearnedAnswers.isLearnableQuestion('build a lab'), isFalse);
     });
   });
@@ -44,14 +47,13 @@ void main() {
       String answer =
           'IP is the Internet Protocol - the addressing layer that gives '
           'every device an address and moves packets between them.',
-    }) =>
-      LearnedAnswer(
-        qkey: LearnedAnswers.keyFor('what is ip'),
-        question: 'what is ip',
-        answer: answer,
-        createdAt: '2026-01-01T00:00:00',
-        lastSeenAt: '2026-01-01T00:00:00',
-      );
+    }) => LearnedAnswer(
+      qkey: LearnedAnswers.keyFor('what is ip'),
+      question: 'what is ip',
+      answer: answer,
+      createdAt: '2026-01-01T00:00:00',
+      lastSeenAt: '2026-01-01T00:00:00',
+    );
 
     test('a good answer is learned', () {
       final c = LearnedAnswers.capture(
@@ -83,32 +85,40 @@ void main() {
       }
     });
 
-    test('a computable fact conflict is rejected, an agreeing one is not',
-        () {
+    test('a computable fact conflict is rejected, an agreeing one is not', () {
       const q = 'how many usable hosts does 192.168.1.0/26 have';
       final right = LearnedAnswers.capture(
         question: q,
-        answer: 'A /26 has 62 usable hosts: 64 total minus the network and '
+        answer:
+            'A /26 has 62 usable hosts: 64 total minus the network and '
             'broadcast addresses.',
         source: 'gemini',
         existing: const [],
       );
-      expect(right.action, LearnedCapture.learned,
-          reason: '62 matches the computed count');
-      expect(right.candidate!.confirmed, isTrue,
-          reason: 'a CIDR answer that survived the fact check is confirmed');
+      expect(
+        right.action,
+        LearnedCapture.learned,
+        reason: '62 matches the computed count',
+      );
+      expect(
+        right.candidate!.confirmed,
+        isTrue,
+        reason: 'a CIDR answer that survived the fact check is confirmed',
+      );
       final wrong = LearnedAnswers.capture(
         question: q,
         answer: 'A /26 has 126 usable hosts for your devices and addresses.',
         source: 'gemini',
         existing: const [],
       );
-      expect(wrong.action, LearnedCapture.rejected,
-          reason: '126 contradicts the computed 62');
+      expect(
+        wrong.action,
+        LearnedCapture.rejected,
+        reason: '126 contradicts the computed 62',
+      );
     });
 
-    test('agreement bumps the existing candidate instead of duplicating',
-        () {
+    test('agreement bumps the existing candidate instead of duplicating', () {
       final existing = [candidate()];
       final c = LearnedAnswers.capture(
         question: 'what is ip',
@@ -187,10 +197,10 @@ void main() {
       expect(
         LearnedAnswers.answersAgree(
           'OSPF is a link-state routing protocol that uses Dijkstra\'s '
-          'shortest path first algorithm within an area.',
+              'shortest path first algorithm within an area.',
           'OSPF (Open Shortest Path First) is a link-state routing '
-          'protocol; it computes routes with the shortest path first '
-          'algorithm.',
+              'protocol; it computes routes with the shortest path first '
+              'algorithm.',
         ),
         isTrue,
       );
@@ -201,7 +211,7 @@ void main() {
         LearnedAnswers.answersAgree(
           'OSPF is a link-state routing protocol using areas and LSAs.',
           'A switch forwards frames by MAC address table lookups at '
-          'layer two.',
+              'layer two.',
         ),
         isFalse,
       );
@@ -283,7 +293,8 @@ void main() {
         learnedAnswer: const LearnedAnswer(
           qkey: 'what is ip',
           question: 'what is ip',
-          answer: 'IP is the Internet Protocol - the app learned this from '
+          answer:
+              'IP is the Internet Protocol - the app learned this from '
               'your model key earlier.',
           source: 'gemini',
           createdAt: '2026-01-01T00:00:00',

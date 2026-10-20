@@ -56,13 +56,15 @@ void main() {
     expect(probe.existsSync(), isTrue);
   });
 
-  test('a path that is a file, not a folder, is refused with the reason',
-      () async {
-    final file = write('not-a-folder');
-    final folder = await PktExportService.resolveFolder(file.path);
-    expect(folder.dir, isNull);
-    expect(folder.why, isNotEmpty);
-  });
+  test(
+    'a path that is a file, not a folder, is refused with the reason',
+    () async {
+      final file = write('not-a-folder');
+      final folder = await PktExportService.resolveFolder(file.path);
+      expect(folder.dir, isNull);
+      expect(folder.why, isNotEmpty);
+    },
+  );
 
   test('a copy does not silently overwrite a different lab', () async {
     final source = write('lab.pkt', 'first');
@@ -72,38 +74,44 @@ void main() {
       ..writeAsStringSync('a different lab');
     final out = await PktExportService.copyInto(source, target);
     expect(out.path, isNot(existing.path));
-    expect(existing.readAsStringSync(), 'a different lab',
-        reason: 'the other lab must survive untouched');
+    expect(
+      existing.readAsStringSync(),
+      'a different lab',
+      reason: 'the other lab must survive untouched',
+    );
     expect(out.readAsStringSync(), 'first');
   });
 
-  test('the save dialog path reports the folder it really wrote to',
-      () async {
+  test('the save dialog path reports the folder it really wrote to', () async {
     final file = write('netbuilder-1.pkt', 'pkt bytes');
     final manifest = write('netbuilder-1.pkt.netbuilder.json', '{}');
     final asked = <String>[];
     final result = await PktExportService.saveToChosenFolder(
       file,
       companion: manifest,
-      saveBytes: ({
-        required String fileName,
-        required Uint8List bytes,
-        String? type,
-        String? dialogTitle,
-      }) async {
-        asked.add(fileName);
-        // What the plugin does: write the bytes where the user pointed, and
-        // report back a path.
-        final out = File('${tmp.path}${Platform.pathSeparator}$fileName');
-        out.writeAsBytesSync(bytes);
-        return out.path;
-      },
+      saveBytes:
+          ({
+            required String fileName,
+            required Uint8List bytes,
+            String? type,
+            String? dialogTitle,
+          }) async {
+            asked.add(fileName);
+            // What the plugin does: write the bytes where the user pointed, and
+            // report back a path.
+            final out = File('${tmp.path}${Platform.pathSeparator}$fileName');
+            out.writeAsBytesSync(bytes);
+            return out.path;
+          },
     );
     expect(result.prompted, isTrue);
     expect(result.path, isNotEmpty);
     expect(File(result.path).readAsStringSync(), 'pkt bytes');
-    expect(asked, ['netbuilder-1.pkt', 'netbuilder-1.pkt.netbuilder.json'],
-        reason: 'the manifest must go out too - it is what identifies the file');
+    expect(
+      asked,
+      ['netbuilder-1.pkt', 'netbuilder-1.pkt.netbuilder.json'],
+      reason: 'the manifest must go out too - it is what identifies the file',
+    );
     expect(result.companionPath, isNotNull);
   });
 
@@ -111,17 +119,20 @@ void main() {
     final file = write('netbuilder-2.pkt', 'pkt bytes');
     final result = await PktExportService.saveToChosenFolder(
       file,
-      saveBytes: ({
-        required String fileName,
-        required Uint8List bytes,
-        String? type,
-        String? dialogTitle,
-      }) async =>
-          null,
+      saveBytes:
+          ({
+            required String fileName,
+            required Uint8List bytes,
+            String? type,
+            String? dialogTitle,
+          }) async => null,
     );
     expect(result.cancelled, isTrue);
-    expect(result.path, isEmpty,
-        reason: 'a cancelled save must not report a location');
+    expect(
+      result.path,
+      isEmpty,
+      reason: 'a cancelled save must not report a location',
+    );
     expect(result.message, contains('still on this device'));
   });
 
@@ -129,20 +140,19 @@ void main() {
     final file = write('netbuilder-3.pkt', 'pkt bytes');
     final result = await PktExportService.saveToChosenFolder(
       file,
-      saveBytes: ({
-        required String fileName,
-        required Uint8List bytes,
-        String? type,
-        String? dialogTitle,
-      }) async =>
-          throw StateError('no space left'),
+      saveBytes:
+          ({
+            required String fileName,
+            required Uint8List bytes,
+            String? type,
+            String? dialogTitle,
+          }) async => throw StateError('no space left'),
     );
     expect(result.path, isEmpty);
     expect(result.message, contains('no space left'));
   });
 
-  test('a phone build lands in the chosen folder, manifest included',
-      () async {
+  test('a phone build lands in the chosen folder, manifest included', () async {
     TestWidgetsFlutterBinding.ensureInitialized();
     final chosen = Directory('${tmp.path}${Platform.pathSeparator}chosen')
       ..createSync();
@@ -156,15 +166,17 @@ void main() {
       filename: 'lab.pkt',
     );
     expect(built, isNotNull);
-    expect(built!.file.parent.path, chosen.path,
-        reason: 'the chosen folder IS the destination');
+    expect(
+      built!.file.parent.path,
+      chosen.path,
+      reason: 'the chosen folder IS the destination',
+    );
     expect(built.file.existsSync(), isTrue);
     expect(built.manifest.existsSync(), isTrue);
     expect(built.manifest.parent.path, chosen.path);
     // Nothing was left behind in app-private storage.
     expect(
-      Directory('${privateDir.path}${Platform.pathSeparator}pkt')
-          .existsSync(),
+      Directory('${privateDir.path}${Platform.pathSeparator}pkt').existsSync(),
       isFalse,
     );
     final manifest = jsonDecode(built.manifest.readAsStringSync());

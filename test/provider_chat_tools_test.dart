@@ -26,19 +26,35 @@ ToolRuntime _runtime(
       final url = request.url.toString();
       if (url.endsWith('/tools/list')) {
         if (engineDown) return http.Response('nope', 500);
-        return http.Response(jsonEncode({
-          'tools': [
-            {'name': 'get_devices', 'kind': 'read', 'summary': 'd', 'args': {}},
-          ],
-        }), 200);
-      }
-      if (url.endsWith('/tools/call')) {
         return http.Response(
-          jsonEncode({'ok': true, 'result': {'devices': ['R1']}}),
+          jsonEncode({
+            'tools': [
+              {
+                'name': 'get_devices',
+                'kind': 'read',
+                'summary': 'd',
+                'args': {},
+              },
+            ],
+          }),
           200,
         );
       }
-      final reply = geminiReplies[index < geminiReplies.length ? index : geminiReplies.length - 1];
+      if (url.endsWith('/tools/call')) {
+        return http.Response(
+          jsonEncode({
+            'ok': true,
+            'result': {
+              'devices': ['R1'],
+            },
+          }),
+          200,
+        );
+      }
+      final reply =
+          geminiReplies[index < geminiReplies.length
+              ? index
+              : geminiReplies.length - 1];
       index++;
       return http.Response(jsonEncode(reply), 200);
     }),
@@ -51,7 +67,10 @@ Map<String, dynamic> _askForTool() => {
       'content': {
         'parts': [
           {
-            'functionCall': {'name': 'get_devices', 'args': <String, dynamic>{}},
+            'functionCall': {
+              'name': 'get_devices',
+              'args': <String, dynamic>{},
+            },
           },
         ],
       },
@@ -72,8 +91,7 @@ Map<String, dynamic> _say(String text) => {
 };
 
 void main() {
-  test('without a runtime, tools are off and the old path is used',
-      () async {
+  test('without a runtime, tools are off and the old path is used', () async {
     final service = ProviderChatService(
       config: AiProviderConfig(kind: AiProviderKind.gemini, model: 'm'),
     );
@@ -94,96 +112,114 @@ void main() {
     expect(service.usesTools, isFalse);
   });
 
-  test('with tools loaded, the turn shows what ran and then the answer',
-      () async {
-    final log = <http.Request>[];
-    final service = ProviderChatService(
-      config: const AiProviderConfig(
-        kind: AiProviderKind.gemini,
-        model: 'gemini-2.0-flash',
-      ),
-      geminiKey: 'k',
-    );
-    service.toolRuntime = _runtime(
-      [_askForTool(), _say('R1 is the only device.')],
-      log: log,
-    );
-    expect(await service.toolRuntime!.load(), isTrue);
-    expect(service.usesTools, isTrue);
+  test(
+    'with tools loaded, the turn shows what ran and then the answer',
+    () async {
+      final log = <http.Request>[];
+      final service = ProviderChatService(
+        config: const AiProviderConfig(
+          kind: AiProviderKind.gemini,
+          model: 'gemini-2.0-flash',
+        ),
+        geminiKey: 'k',
+      );
+      service.toolRuntime = _runtime([
+        _askForTool(),
+        _say('R1 is the only device.'),
+      ], log: log);
+      expect(await service.toolRuntime!.load(), isTrue);
+      expect(service.usesTools, isTrue);
 
-    final pieces = await service
-        .streamWithTools(
-          history: const [],
-          text: 'what devices are there?',
-          systemContext: 'you are a network engineer',
-        )
-        .toList();
-    final whole = pieces.join();
-
-    // the user sees the tool line, and the answer
-    expect(whole, contains('\u25b8 Listing the devices...'));
-    expect(whole, contains('R1 is the only device.'));
-
-    // and the tool really ran against the engine
-    expect(
-      log.where((r) => r.url.toString().endsWith('/tools/call')),
-      hasLength(1),
-    );
-    // the system prompt was carried to the model
-    final providerCall = log.lastWhere(
-      (r) => r.url.toString().contains('generateContent'),
-    );
-    expect(providerCall.body, contains('network engineer'));
-  });
-
-  test('a tool-loop provider failure surfaces as an error, not a blank reply',
-      () async {
-    final service = ProviderChatService(
-      config: const AiProviderConfig(
-        kind: AiProviderKind.gemini,
-        model: 'gemini-2.0-flash',
-      ),
-      geminiKey: 'k',
-    );
-    final runtime = _runtime([_say('hi')]);
-    service.toolRuntime = runtime;
-    await runtime.load();
-
-    // force the provider leg to fail
-    service.toolRuntime = ToolRuntime(
-      config: const AiProviderConfig(
-        kind: AiProviderKind.gemini,
-        model: 'gemini-2.0-flash',
-      ),
-      geminiKey: 'k',
-      sidecarBase: 'http://127.0.0.1:8765',
-      client: MockClient((request) async {
-        if (request.url.toString().endsWith('/tools/list')) {
-          return http.Response(jsonEncode({
-            'tools': [
-              {'name': 'get_devices', 'kind': 'read', 'summary': 'd', 'args': {}},
-            ],
-          }), 200);
-        }
-        return http.Response(
-          jsonEncode({'error': {'message': 'Rate limited or out of quota'}}),
-          429,
-        );
-      }),
-    );
-    await service.toolRuntime!.load();
-
-    await expectLater(
-      service
+      final pieces = await service
           .streamWithTools(
             history: const [],
-            text: 'list them',
-            systemContext: '',
+            text: 'what devices are there?',
+            systemContext: 'you are a network engineer',
           )
-          .toList(),
-      throwsA(predicate((e) =>
-          e.toString().contains('Rate limited') ||
-          e.toString().contains('quota'))),
-    );
-  });
+          .toList();
+      final whole = pieces.join();
+
+      // the user sees the tool line, and the answer
+      expect(whole, contains('\u25b8 Listing the devices...'));
+      expect(whole, contains('R1 is the only device.'));
+
+      // and the tool really ran against the engine
+      expect(
+        log.where((r) => r.url.toString().endsWith('/tools/call')),
+        hasLength(1),
+      );
+      // the system prompt was carried to the model
+      final providerCall = log.lastWhere(
+        (r) => r.url.toString().contains('generateContent'),
+      );
+      expect(providerCall.body, contains('network engineer'));
+    },
+  );
+
+  test(
+    'a tool-loop provider failure surfaces as an error, not a blank reply',
+    () async {
+      final service = ProviderChatService(
+        config: const AiProviderConfig(
+          kind: AiProviderKind.gemini,
+          model: 'gemini-2.0-flash',
+        ),
+        geminiKey: 'k',
+      );
+      final runtime = _runtime([_say('hi')]);
+      service.toolRuntime = runtime;
+      await runtime.load();
+
+      // force the provider leg to fail
+      service.toolRuntime = ToolRuntime(
+        config: const AiProviderConfig(
+          kind: AiProviderKind.gemini,
+          model: 'gemini-2.0-flash',
+        ),
+        geminiKey: 'k',
+        sidecarBase: 'http://127.0.0.1:8765',
+        client: MockClient((request) async {
+          if (request.url.toString().endsWith('/tools/list')) {
+            return http.Response(
+              jsonEncode({
+                'tools': [
+                  {
+                    'name': 'get_devices',
+                    'kind': 'read',
+                    'summary': 'd',
+                    'args': {},
+                  },
+                ],
+              }),
+              200,
+            );
+          }
+          return http.Response(
+            jsonEncode({
+              'error': {'message': 'Rate limited or out of quota'},
+            }),
+            429,
+          );
+        }),
+      );
+      await service.toolRuntime!.load();
+
+      await expectLater(
+        service
+            .streamWithTools(
+              history: const [],
+              text: 'list them',
+              systemContext: '',
+            )
+            .toList(),
+        throwsA(
+          predicate(
+            (e) =>
+                e.toString().contains('Rate limited') ||
+                e.toString().contains('quota'),
+          ),
+        ),
+      );
+    },
+  );
 }

@@ -12,19 +12,32 @@ TentativeVerdict verdictOf(String raw) =>
 
 void expectTentative(String raw) {
   final v = verdictOf(raw);
-  expect(v.tentative, isTrue,
-      reason: '"$raw" should read as exploration; cues: ${v.cues}');
-  expect(v.cues, isNotEmpty,
-      reason: 'a tentative verdict should name the cue that fired');
+  expect(
+    v.tentative,
+    isTrue,
+    reason: '"$raw" should read as exploration; cues: ${v.cues}',
+  );
+  expect(
+    v.cues,
+    isNotEmpty,
+    reason: 'a tentative verdict should name the cue that fired',
+  );
 }
 
 void expectDefinite(String raw) {
   final v = verdictOf(raw);
-  expect(v.tentative, isFalse,
-      reason: '"$raw" is a request and must stay free to mutate the plan; '
-          'cues: ${v.cues}');
-  expect(v.cues, isNotEmpty,
-      reason: 'a definite verdict should name the signal that decided it');
+  expect(
+    v.tentative,
+    isFalse,
+    reason:
+        '"$raw" is a request and must stay free to mutate the plan; '
+        'cues: ${v.cues}',
+  );
+  expect(
+    v.cues,
+    isNotEmpty,
+    reason: 'a definite verdict should name the signal that decided it',
+  );
 }
 
 void main() {

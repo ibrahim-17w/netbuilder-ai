@@ -35,7 +35,8 @@ void main() {
       expect(
         unnamed,
         isEmpty,
-        reason: 'an unnamed cableable port can never be cabled - that device '
+        reason:
+            'an unnamed cableable port can never be cabled - that device '
             'would be placed floating in the workspace',
       );
     });
@@ -79,7 +80,8 @@ void main() {
         expect(
           names.toSet().length,
           names.length,
-          reason: '${device.model} carries the same port name twice, so a '
+          reason:
+              '${device.model} carries the same port name twice, so a '
               'cable could be attached to either',
         );
       }
@@ -107,7 +109,8 @@ void main() {
       expect(
         models,
         contains(kind.port),
-        reason: 'the wireless kind asks for "${kind.port}", which no port in '
+        reason:
+            'the wireless kind asks for "${kind.port}", which no port in '
             'the library carries - the cable then needs the spare-port remap '
             'to survive at all',
       );

@@ -64,8 +64,10 @@ void main() {
 
     test('skill: advanced wording wins over beginner wording', () {
       expect(
-        EnvironmentProfileService.statedIn('I am no longer a beginner, I am '
-            'an experienced network engineer').skill,
+        EnvironmentProfileService.statedIn(
+          'I am no longer a beginner, I am '
+          'an experienced network engineer',
+        ).skill,
         'advanced',
       );
     });
@@ -157,11 +159,13 @@ void main() {
     test('set, read, forget', () async {
       final mem = await fresh();
       expect(await mem.environmentProfile(), isNull);
-      await mem.setEnvironmentProfile(const EnvironmentProfile(
-        venue: 'office',
-        scale: 20,
-        source: 'this is for the office, 20 users',
-      ));
+      await mem.setEnvironmentProfile(
+        const EnvironmentProfile(
+          venue: 'office',
+          scale: 20,
+          source: 'this is for the office, 20 users',
+        ),
+      );
       final stored = await mem.environmentProfile();
       expect(stored, isNotNull);
       expect(stored!.venue, 'office');
@@ -172,20 +176,21 @@ void main() {
       expect(await mem.environmentProfile(), isNull);
     });
 
-    test('set writes the profile it is given: merging is the caller\'s job',
-        () async {
-      // The chat hook merges before writing ([EnvironmentProfile.merge]);
-      // the Memory screen writes the whole edited profile. A raw partial
-      // write therefore replaces wholesale - the store never invents facts.
-      final mem = await fresh();
-      await mem.setEnvironmentProfile(const EnvironmentProfile(
-        venue: 'office',
-        scale: 50,
-      ));
-      final stored = await mem.environmentProfile();
-      expect(stored!.venue, 'office');
-      expect(stored.scale, 50);
-    });
+    test(
+      'set writes the profile it is given: merging is the caller\'s job',
+      () async {
+        // The chat hook merges before writing ([EnvironmentProfile.merge]);
+        // the Memory screen writes the whole edited profile. A raw partial
+        // write therefore replaces wholesale - the store never invents facts.
+        final mem = await fresh();
+        await mem.setEnvironmentProfile(
+          const EnvironmentProfile(venue: 'office', scale: 50),
+        );
+        final stored = await mem.environmentProfile();
+        expect(stored!.venue, 'office');
+        expect(stored.scale, 50);
+      },
+    );
 
     test('a corrupt stored row reads as nothing learned', () async {
       final mem = await fresh();
@@ -201,8 +206,7 @@ void main() {
     test('export carries the profile and a bumped schema version', () async {
       final mem = await fresh();
       await mem.setEnvironmentProfile(const EnvironmentProfile(venue: 'home'));
-      final doc =
-          jsonDecode(await mem.exportJson()) as Map<String, dynamic>;
+      final doc = jsonDecode(await mem.exportJson()) as Map<String, dynamic>;
       // v3 introduced the profile; v4 added the clarification answers.
       expect(doc['schemaVersion'], greaterThanOrEqualTo(3));
       expect((doc['environmentProfile'] as Map)['venue'], 'home');

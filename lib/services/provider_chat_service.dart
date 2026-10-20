@@ -66,10 +66,8 @@ class ProviderChatService {
     RequestLog.record(report.numbered(RequestLog.nextSequence()));
   }
 
-  ChatService get _gemini => ChatService(
-    contextTokens: contextTokens,
-    client: client,
-  );
+  ChatService get _gemini =>
+      ChatService(contextTokens: contextTokens, client: client);
 
   /// The tool loop, when the engine offered tools.
   ///
@@ -136,16 +134,18 @@ class ProviderChatService {
       return;
     }
 
-    final effective = plan ?? planContext(
-      history: history,
-      text: text,
-      systemContext: systemContext,
-      networkContext: networkContext,
-      sessionState: sessionState,
-      memories: memories,
-      storedSummary: storedSummary,
-      attachmentCount: attachments.length,
-    );
+    final effective =
+        plan ??
+        planContext(
+          history: history,
+          text: text,
+          systemContext: systemContext,
+          networkContext: networkContext,
+          sessionState: sessionState,
+          memories: memories,
+          storedSummary: storedSummary,
+          attachmentCount: attachments.length,
+        );
     lastPlan = effective;
     _record(effective);
 
@@ -199,16 +199,18 @@ class ProviderChatService {
       return;
     }
 
-    final effective = plan ?? planContext(
-      history: history,
-      text: text,
-      systemContext: systemContext,
-      networkContext: networkContext,
-      sessionState: sessionState,
-      memories: memories,
-      storedSummary: storedSummary,
-      attachmentCount: attachments.length,
-    );
+    final effective =
+        plan ??
+        planContext(
+          history: history,
+          text: text,
+          systemContext: systemContext,
+          networkContext: networkContext,
+          sessionState: sessionState,
+          memories: memories,
+          storedSummary: storedSummary,
+          attachmentCount: attachments.length,
+        );
     lastPlan = effective;
     _record(effective);
 
@@ -221,9 +223,10 @@ class ProviderChatService {
       attachments: attachments,
     );
 
-    await for (final event in runtime
-        .loop(abortTrigger: abortTrigger, abortProbe: abortProbe)
-        .run(messages)) {
+    await for (final event
+        in runtime
+            .loop(abortTrigger: abortTrigger, abortProbe: abortProbe)
+            .run(messages)) {
       signal.throwIfAborted();
       switch (event.kind) {
         case ToolLoopEventKind.status:
@@ -277,7 +280,8 @@ class ProviderChatService {
     int attachmentCount = 0,
     ContextPlan? plan,
   }) {
-    final effective = plan ??
+    final effective =
+        plan ??
         planContext(
           history: history,
           text: text,
@@ -330,7 +334,8 @@ class ProviderChatService {
     int attachmentCount = 0,
     ContextPlan? plan,
   }) async {
-    final effective = plan ??
+    final effective =
+        plan ??
         planContext(
           history: history,
           text: text,
@@ -432,23 +437,22 @@ class ProviderChatService {
     String memories = '',
     String storedSummary = '',
     int attachmentCount = 0,
-  }) =>
-      ContextBudget.plan(
-        history: history,
-        systemContext: systemContext,
-        pendingText: text,
-        networkContext: networkContext,
-        sessionState: sessionState,
-        memories: memories,
-        storedSummary: storedSummary,
-        attachmentCount: attachmentCount,
-        budgetTokens: contextTokens,
-        runtimeWindowTokens: runtimeWindowTokens,
-        runtimeWindowSource: runtimeWindowSource,
-        runtimeWindowAssumed: runtimeWindowAssumed,
-        model: config.model,
-        provider: _providerLabel,
-      );
+  }) => ContextBudget.plan(
+    history: history,
+    systemContext: systemContext,
+    pendingText: text,
+    networkContext: networkContext,
+    sessionState: sessionState,
+    memories: memories,
+    storedSummary: storedSummary,
+    attachmentCount: attachmentCount,
+    budgetTokens: contextTokens,
+    runtimeWindowTokens: runtimeWindowTokens,
+    runtimeWindowSource: runtimeWindowSource,
+    runtimeWindowAssumed: runtimeWindowAssumed,
+    model: config.model,
+    provider: _providerLabel,
+  );
 
   Stream<String> stream({
     required List<ChatMessage> history,
@@ -540,11 +544,8 @@ class ProviderChatService {
     required List<int> bytes,
     required String name,
     String mimeType = 'image/png',
-  }) => ChatService().persistImage(
-    bytes: bytes,
-    name: name,
-    mimeType: mimeType,
-  );
+  }) =>
+      ChatService().persistImage(bytes: bytes, name: name, mimeType: mimeType);
 
   /// A one-shot call, used by "Test connection" and by the planner.
   Future<String> complete({
@@ -569,14 +570,13 @@ class ProviderChatService {
       pendingText: text,
       budgetTokens: contextTokens,
     );
-    return OpenAiChatService(
-      config: config,
-      apiKey: openaiKey,
-    ).complete(openAiMessages(
-      history: const [],
-      text: text,
-      systemContext: systemContext,
-    ));
+    return OpenAiChatService(config: config, apiKey: openaiKey).complete(
+      openAiMessages(
+        history: const [],
+        text: text,
+        systemContext: systemContext,
+      ),
+    );
   }
 
   /// A real round trip whose only job is to say whether the settings work.
@@ -593,20 +593,17 @@ class ProviderChatService {
         return {
           'ok': err == null,
           'ms': ms,
-          'message': err ??
-              'Gemini answered with `${config.model}` in $ms ms.',
+          'message': err ?? 'Gemini answered with `${config.model}` in $ms ms.',
         };
       }
       final bad = AiErrors.badBaseUrl(config.effectiveBaseUrl());
       if (bad.isNotEmpty) {
         return {'ok': false, 'ms': 0, 'message': bad};
       }
-      final text = await OpenAiChatService(
-        config: config,
-        apiKey: openaiKey,
-      ).complete(const [
-        {'role': 'user', 'content': 'Reply with the single word: ready'},
-      ]);
+      final text = await OpenAiChatService(config: config, apiKey: openaiKey)
+          .complete(const [
+            {'role': 'user', 'content': 'Reply with the single word: ready'},
+          ]);
       final ms = DateTime.now().difference(started).inMilliseconds;
       final where = config.effectiveBaseUrl();
       return {

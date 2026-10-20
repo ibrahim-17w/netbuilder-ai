@@ -194,10 +194,7 @@ void main() {
       expect(section, contains('ip route 192.168.1.0 255.255.255.0 10.0.0.1'));
       // The transit subnet itself is a next hop, never a destination.
       expect(section, isNot(contains('ip route 10.0.0.0 ')));
-      expect(
-        section.trimRight().split('\n').last,
-        contains('show ip route'),
-      );
+      expect(section.trimRight().split('\n').last, contains('show ip route'));
       expect(section.split('\n').length, lessThan(31));
     });
 
@@ -223,32 +220,31 @@ void main() {
   });
 
   group('ssh', () {
-    test('per-router block on the plan hostnames, placeholders for secrets',
-        () {
-      final section = PlanConfigComposer.compose(
-        plan: twoRouterLab(),
-        topic: 'ssh',
-        target: 'pt',
-      );
-      expect(section, isNotNull);
-      expect(section!.startsWith('Your lab:'), isTrue);
-      expect(section, contains('hostname R1'));
-      expect(section, contains('hostname R2'));
-      // The hostname-derived domain the adapters write.
-      expect(section, contains('ip domain-name r1.lab.local'));
-      expect(section, contains('crypto key generate rsa'));
-      expect(section, contains('1024'));
-      // A secret the plan does not carry stays a placeholder.
-      expect(section, contains('username admin secret 0 <password>'));
-      expect(section, contains('transport input ssh'));
-      expect(section, contains('login local'));
-      expect(
-        section.trimRight().split('\n').last,
-        contains('show ip ssh'),
-      );
-      // The login target is the router's real LAN address.
-      expect(section, contains('ssh -l admin 192.168.1.1'));
-    });
+    test(
+      'per-router block on the plan hostnames, placeholders for secrets',
+      () {
+        final section = PlanConfigComposer.compose(
+          plan: twoRouterLab(),
+          topic: 'ssh',
+          target: 'pt',
+        );
+        expect(section, isNotNull);
+        expect(section!.startsWith('Your lab:'), isTrue);
+        expect(section, contains('hostname R1'));
+        expect(section, contains('hostname R2'));
+        // The hostname-derived domain the adapters write.
+        expect(section, contains('ip domain-name r1.lab.local'));
+        expect(section, contains('crypto key generate rsa'));
+        expect(section, contains('1024'));
+        // A secret the plan does not carry stays a placeholder.
+        expect(section, contains('username admin secret 0 <password>'));
+        expect(section, contains('transport input ssh'));
+        expect(section, contains('login local'));
+        expect(section.trimRight().split('\n').last, contains('show ip ssh'));
+        // The login target is the router's real LAN address.
+        expect(section, contains('ssh -l admin 192.168.1.1'));
+      },
+    );
 
     test('the plan AAA account is used when the brief stated one', () {
       final plan = twoRouterLab().copyWith(
@@ -300,7 +296,8 @@ void main() {
         '2 routers, 2 switches, 1 DNS server and 4 PCs',
       );
       final dnsServer = plan.nodes.firstWhere(
-        (n) => n.type == 'server' &&
+        (n) =>
+            n.type == 'server' &&
             n.services.any((s) => s.toLowerCase() == 'dns'),
       );
       final dnsIp = plan.addressing
@@ -375,12 +372,10 @@ void main() {
       // The parser spread the PCs round-robin and addressed VLAN N in its
       // own subnet - the section must repeat the plan, not re-decide it.
       final pc10 = plan.addressing.any(
-        (a) =>
-            a.node.startsWith('PC') && a.ipCidr.startsWith('192.168.10.10'),
+        (a) => a.node.startsWith('PC') && a.ipCidr.startsWith('192.168.10.10'),
       );
       final pc20 = plan.addressing.any(
-        (a) =>
-            a.node.startsWith('PC') && a.ipCidr.startsWith('192.168.20.10'),
+        (a) => a.node.startsWith('PC') && a.ipCidr.startsWith('192.168.20.10'),
       );
       expect(pc10, isTrue, reason: 'a PC sits in VLAN 10');
       expect(pc20, isTrue, reason: 'a PC sits in VLAN 20');
@@ -439,8 +434,8 @@ void main() {
       final plan = NetworkIntent.parseSimple(
         'sec-chat',
         'Harden the user ports on the HQ switch and stop rogue DHCP servers '
-        'from the branch site. Centralized authentication with TACACS+ for '
-        'router logins during business hours 09:00 to 17:00.',
+            'from the branch site. Centralized authentication with TACACS+ for '
+            'router logins during business hours 09:00 to 17:00.',
       );
       expect(plan.security.protectedServerIp, '192.168.1.100');
       final section = PlanConfigComposer.compose(
@@ -553,10 +548,7 @@ void main() {
       // The edge link carries no address, so the route rides the exit
       // interface - the plan's real edge interface.
       expect(section, contains('ip route 0.0.0.0 0.0.0.0 g0/2'));
-      expect(
-        section.trimRight().split('\n').last,
-        contains('show ip route'),
-      );
+      expect(section.trimRight().split('\n').last, contains('show ip route'));
     });
 
     test('a plan with no edge gets the gap line for both topics', () {

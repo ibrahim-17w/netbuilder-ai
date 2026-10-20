@@ -27,11 +27,8 @@ List<ChatMessage> convo({int turns = 8, int chars = 400}) => [
   ],
 ];
 
-RuntimeWindow get ollama4k => const RuntimeWindow(
-  tokens: 4096,
-  source: 'Ollama /api/ps',
-  certain: true,
-);
+RuntimeWindow get ollama4k =>
+    const RuntimeWindow(tokens: 4096, source: 'Ollama /api/ps', certain: true);
 
 void main() {
   group('the runtime window is what the request is fitted to', () {
@@ -40,8 +37,7 @@ void main() {
         configured: 1048576,
         window: ollama4k,
       );
-      expect(budget, 4096,
-          reason: 'the setting is a ceiling, never a promise');
+      expect(budget, 4096, reason: 'the setting is a ceiling, never a promise');
     });
 
     test('a smaller setting still wins over a big runtime', () {
@@ -54,13 +50,17 @@ void main() {
       );
     });
 
-    test('a runtime that will not say falls back conservatively when local',
-        () {
-      final window = RuntimeWindowProbe.resolve(baseUrl: 'http://127.0.0.1:11434/v1');
-      expect(window.tokens, RuntimeWindow.conservativeLocal);
-      expect(window.isAssumed, isTrue);
-      expect(window.hint, isNotEmpty);
-    });
+    test(
+      'a runtime that will not say falls back conservatively when local',
+      () {
+        final window = RuntimeWindowProbe.resolve(
+          baseUrl: 'http://127.0.0.1:11434/v1',
+        );
+        expect(window.tokens, RuntimeWindow.conservativeLocal);
+        expect(window.isAssumed, isTrue);
+        expect(window.hint, isNotEmpty);
+      },
+    );
 
     test('a remote provider is assumed to have a real window', () {
       final window = RuntimeWindowProbe.resolve(
@@ -122,8 +122,7 @@ void main() {
       expect(window, isNull);
     });
 
-    test('a baked num_ctx is honoured, and the model ceiling is reported',
-        () {
+    test('a baked num_ctx is honoured, and the model ceiling is reported', () {
       final window = RuntimeWindowProbe.parse('show', {
         'parameters': 'stop "<|eot_id|>"\nnum_ctx 32768',
         'model_info': {'llama.context_length': 131072},
@@ -137,8 +136,11 @@ void main() {
       final window = RuntimeWindowProbe.parse('show', {
         'model_info': {'qwen2.context_length': 131072},
       }, 'qwen2.5:3b');
-      expect(window?.certain, isFalse,
-          reason: 'Ollama allocates its own default unless num_ctx is baked in');
+      expect(
+        window?.certain,
+        isFalse,
+        reason: 'Ollama allocates its own default unless num_ctx is baked in',
+      );
       expect(window?.modelMax, 131072);
       expect(window!.tokens, lessThanOrEqualTo(4096));
       expect(window.hint, contains('OLLAMA_CONTEXT_LENGTH'));
@@ -165,8 +167,11 @@ void main() {
         runtimeWindowSource: 'Ollama /api/ps',
       );
       expect(plan.windowTokens, 4096);
-      expect(plan.budgetTokens, 1048576,
-          reason: 'the setting is still reported, it is just not what fits');
+      expect(
+        plan.budgetTokens,
+        1048576,
+        reason: 'the setting is still reported, it is just not what fits',
+      );
       expect(plan.tokensUsed, lessThanOrEqualTo(4096));
       expect(plan.limitedByWindow, isTrue);
     });
@@ -179,30 +184,37 @@ void main() {
         budgetTokens: 1048576,
         runtimeWindowTokens: 4096,
       );
-      expect(plan.recentTurns, isNotEmpty,
-          reason: 'a runtime window must never leave the model with no history');
+      expect(
+        plan.recentTurns,
+        isNotEmpty,
+        reason: 'a runtime window must never leave the model with no history',
+      );
       expect(plan.recentTurns.last.text, contains('reply 7'));
     });
 
-    test('turns that did not fit are summarized and the reason is recorded',
-        () {
-      final plan = ContextBudget.plan(
-        history: convo(turns: 40),
-        systemContext: 'you are a network engineer',
-        pendingText: 'remind me what i asked first',
-        budgetTokens: 1048576,
-        runtimeWindowTokens: 4096,
-      );
-      expect(plan.turnsSummarized, greaterThan(0));
-      expect(plan.memoryBlock, contains('ORIGINAL request'));
-      expect(plan.memoryBlock, contains('ask 0'),
-          reason: 'the first thing the user asked is preserved');
-      expect(plan.report!.notes.join(' | '), contains('summarized'));
-      expect(plan.report!.notes.join(' | '), contains('4,096'));
-    });
+    test(
+      'turns that did not fit are summarized and the reason is recorded',
+      () {
+        final plan = ContextBudget.plan(
+          history: convo(turns: 40),
+          systemContext: 'you are a network engineer',
+          pendingText: 'remind me what i asked first',
+          budgetTokens: 1048576,
+          runtimeWindowTokens: 4096,
+        );
+        expect(plan.turnsSummarized, greaterThan(0));
+        expect(plan.memoryBlock, contains('ORIGINAL request'));
+        expect(
+          plan.memoryBlock,
+          contains('ask 0'),
+          reason: 'the first thing the user asked is preserved',
+        );
+        expect(plan.report!.notes.join(' | '), contains('summarized'));
+        expect(plan.report!.notes.join(' | '), contains('4,096'));
+      },
+    );
 
-    test('a huge system prompt is trimmed and said so, never silently cut',
-        () {
+    test('a huge system prompt is trimmed and said so, never silently cut', () {
       final plan = ContextBudget.plan(
         history: const [],
         systemContext: 'x' * 60000,
@@ -211,7 +223,10 @@ void main() {
         runtimeWindowTokens: 4096,
       );
       expect(plan.tokensUsed, lessThanOrEqualTo(4096));
-      expect(plan.report!.notes.join(' | '), contains('system prompt was trimmed'));
+      expect(
+        plan.report!.notes.join(' | '),
+        contains('system prompt was trimmed'),
+      );
     });
   });
 
@@ -221,7 +236,8 @@ void main() {
         history: convo(turns: 6),
         systemContext: 'instructions here',
         networkContext: 'project: office\n- R1 g0/0=10.0.0.1/30',
-        sessionState: '## Session state\n- Current problem: PC1 cannot reach SRV1',
+        sessionState:
+            '## Session state\n- Current problem: PC1 cannot reach SRV1',
         memories: '## Relevant memories\n- past build: office',
         pendingText: 'why?',
         budgetTokens: 8192,
@@ -255,8 +271,11 @@ void main() {
       );
       final labels = plan.report!.sections.map((s) => s.label).toList();
       expect(labels, contains('network context'));
-      expect(labels, contains('conversation summary'),
-          reason: 'the compacted turns have their own line');
+      expect(
+        labels,
+        contains('conversation summary'),
+        reason: 'the compacted turns have their own line',
+      );
     });
 
     test('the log numbers real requests and keeps them bounded', () {
@@ -270,8 +289,7 @@ void main() {
         RequestLog.record(plan.report!.numbered(RequestLog.nextSequence()));
       }
       expect(RequestLog.last!.sequence, 3);
-      expect(RequestLog.reports.first.sequence, 3,
-          reason: 'newest first');
+      expect(RequestLog.reports.first.sequence, 3, reason: 'newest first');
       expect(RequestLog.reports.length, 3);
       RequestLog.clear();
       expect(RequestLog.last, isNull);
@@ -333,12 +351,18 @@ void main() {
       int costOf(String label) =>
           report.sections.firstWhere((s) => s.label == label).tokens;
 
-      expect(costOf('session state'),
-          ContextBudget.estimateTokens(plan.sessionStateBlock));
-      expect(costOf('retrieved memory'),
-          ContextBudget.estimateTokens(plan.memoriesBlock));
-      expect(costOf('network context'),
-          ContextBudget.estimateTokens(plan.networkBlock));
+      expect(
+        costOf('session state'),
+        ContextBudget.estimateTokens(plan.sessionStateBlock),
+      );
+      expect(
+        costOf('retrieved memory'),
+        ContextBudget.estimateTokens(plan.memoriesBlock),
+      );
+      expect(
+        costOf('network context'),
+        ContextBudget.estimateTokens(plan.networkBlock),
+      );
       // Every listed section is a block the plan actually holds: a report line
       // with no block behind it is how the log started lying.
       expect(plan.sessionStateBlock, isNotEmpty);
@@ -403,8 +427,11 @@ void main() {
       expect(state.destination, 'Server0');
       state.observe(turn('user', 'What about PC3?'));
       expect(state.focus.first, 'PC3');
-      expect(state.destination, 'Server0',
-          reason: 'the question moved, the destination did not');
+      expect(
+        state.destination,
+        'Server0',
+        reason: 'the question moved, the destination did not',
+      );
       expect(state.source, 'PC3');
     });
 
@@ -413,22 +440,29 @@ void main() {
       state.observe(turn('user', 'PC4 cannot reach the file server.'));
       expect(state.problem, contains('PC4 cannot reach'));
       state.observe(turn('user', 'it still does not work'));
-      expect(state.problem, contains('PC4 cannot reach'),
-          reason: 'an unanchored complaint does not erase the question');
+      expect(
+        state.problem,
+        contains('PC4 cannot reach'),
+        reason: 'an unanchored complaint does not erase the question',
+      );
     });
 
-    test('findings come from the app, and only relevant ones are injected',
-        () {
+    test('findings come from the app, and only relevant ones are injected', () {
       final state = SessionState();
       state
         ..observe(turn('user', 'Check R1.'))
         ..addFinding('error: gateway 10.0.0.9 is outside 10.0.0.0/30')
         ..addFinding('warning: VLAN 20 has no access ports');
-      final aboutR1 = state.promptBlock(userText: 'explain the gateway problem on R1');
+      final aboutR1 = state.promptBlock(
+        userText: 'explain the gateway problem on R1',
+      );
       expect(aboutR1, contains('gateway 10.0.0.9'));
       final aboutSomethingElse = state.promptBlock(userText: 'write a summary');
-      expect(aboutSomethingElse, isNot(contains('gateway 10.0.0.9')),
-          reason: 'irrelevant state is not pasted into every prompt');
+      expect(
+        aboutSomethingElse,
+        isNot(contains('gateway 10.0.0.9')),
+        reason: 'irrelevant state is not pasted into every prompt',
+      );
     });
 
     test('the last recorded change always rides along for "undo that"', () {
@@ -456,8 +490,11 @@ void main() {
       final restored = SessionState.decode(state.encode());
       expect(restored.focus, state.focus);
       expect(restored.confirmedFindings, state.confirmedFindings);
-      expect(SessionState.decode('{').isEmpty, isTrue,
-          reason: 'a corrupt state must not crash the chat');
+      expect(
+        SessionState.decode('{').isEmpty,
+        isTrue,
+        reason: 'a corrupt state must not crash the chat',
+      );
     });
 
     test('switching network resets what belonged to the old one', () {
@@ -484,14 +521,19 @@ void main() {
 
     test('it is bounded, however long the conversation was', () {
       final long = [
-        for (var i = 0; i < 200; i++)
-          turn('user', 'request $i ${'z' * 300}'),
+        for (var i = 0; i < 200; i++) turn('user', 'request $i ${'z' * 300}'),
       ];
       final summary = ConversationMemory.summarize(long);
-      expect(summary.length, lessThan(4000),
-          reason: 'a summary that grows without limit crowds out the chat');
-      expect(summary, contains('request 0'),
-          reason: 'the original request is always kept');
+      expect(
+        summary.length,
+        lessThan(4000),
+        reason: 'a summary that grows without limit crowds out the chat',
+      );
+      expect(
+        summary,
+        contains('request 0'),
+        reason: 'the original request is always kept',
+      );
       // The middle of a long session is not paraphrased into the prompt: the
       // model is told plainly that asks were left out, so it cannot assume the
       // short list it sees is the whole conversation.
@@ -499,5 +541,3 @@ void main() {
     });
   });
 }
-
-

@@ -22,7 +22,9 @@ class _CapturingClient extends http.BaseClient {
                 'content': {
                   'parts': [
                     {
-                      'text': jsonEncode({'reply': 'you asked for the OSPF lab'}),
+                      'text': jsonEncode({
+                        'reply': 'you asked for the OSPF lab',
+                      }),
                     },
                   ],
                 },
@@ -74,8 +76,10 @@ void main() {
 
       expect(reply.text, contains('OSPF lab'));
 
-      final systemInstruction = ((client.sent!['systemInstruction'] as Map)
-          ['parts'] as List).first['text'] as String;
+      final systemInstruction =
+          ((client.sent!['systemInstruction'] as Map)['parts'] as List)
+                  .first['text']
+              as String;
       // The whole point: the opening request is still in the request.
       expect(systemInstruction, contains('OPENING-ASK'));
       expect(systemInstruction, contains('Conversation memory'));
@@ -92,24 +96,28 @@ void main() {
     },
   );
 
-  test('a short conversation keeps every turn and adds no memory block',
-      () async {
-    final client = _CapturingClient();
-    final service = ChatService(client: client);
-    await service.send(
-      apiKey: 'k',
-      model: 'gemini-3.8-flash',
-      history: [
-        const ChatMessage(role: 'user', text: 'hi'),
-        const ChatMessage(role: 'model', text: 'hello'),
-      ],
-      text: 'continue',
-      systemContext: 'SYS',
-    );
-    final instruction = ((client.sent!['systemInstruction'] as Map)['parts']
-        as List).first['text'] as String;
-    expect(instruction, isNot(contains('Conversation memory')));
-    expect(service.lastPlan!.turnsSummarized, 0);
-    expect((client.sent!['contents'] as List).length, 3);
-  });
+  test(
+    'a short conversation keeps every turn and adds no memory block',
+    () async {
+      final client = _CapturingClient();
+      final service = ChatService(client: client);
+      await service.send(
+        apiKey: 'k',
+        model: 'gemini-3.8-flash',
+        history: [
+          const ChatMessage(role: 'user', text: 'hi'),
+          const ChatMessage(role: 'model', text: 'hello'),
+        ],
+        text: 'continue',
+        systemContext: 'SYS',
+      );
+      final instruction =
+          ((client.sent!['systemInstruction'] as Map)['parts'] as List)
+                  .first['text']
+              as String;
+      expect(instruction, isNot(contains('Conversation memory')));
+      expect(service.lastPlan!.turnsSummarized, 0);
+      expect((client.sent!['contents'] as List).length, 3);
+    },
+  );
 }

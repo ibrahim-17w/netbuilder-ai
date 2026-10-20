@@ -36,18 +36,12 @@ void main() {
   group('requests that are about the drawing', () {
     test('a named style is honoured', () {
       expect(LayoutRequest.read('make the layout compact')?.style, 'compact');
-      expect(
-        LayoutRequest.read('spread the devices out')?.style,
-        'wide',
-      );
+      expect(LayoutRequest.read('spread the devices out')?.style, 'wide');
       expect(
         LayoutRequest.read('put each kind of device on its own row')?.style,
         'rows',
       );
-      expect(
-        LayoutRequest.read('draw it as site trees again')?.style,
-        'tree',
-      );
+      expect(LayoutRequest.read('draw it as site trees again')?.style, 'tree');
     });
 
     test('a vague request still changes the drawing', () {
@@ -62,7 +56,10 @@ void main() {
     });
 
     test('a vague request after a compact build picks something else', () {
-      final request = LayoutRequest.read('it looks ugly', currentStyle: 'compact');
+      final request = LayoutRequest.read(
+        'it looks ugly',
+        currentStyle: 'compact',
+      );
       expect(request, isNotNull);
       expect(request!.style, isNot('compact'));
     });
@@ -110,8 +107,10 @@ void main() {
     });
 
     test('the style survives a note round-trip', () {
-      expect(LayoutRequest.styleFromNote('built from the plan; layout: wide'),
-          'wide');
+      expect(
+        LayoutRequest.styleFromNote('built from the plan; layout: wide'),
+        'wide',
+      );
       expect(LayoutRequest.styleFromNote('layout: compact'), 'compact');
       expect(LayoutRequest.styleFromNote('no note here'), '');
       expect(LayoutRequest.styleFromNote('layout: nonsense'), '');
@@ -135,10 +134,7 @@ void main() {
       // NAMED-style patterns but the gate rejected the sentence before any of
       // them was read, so the most ordinary redraw requests did nothing.
       expect(LayoutRequest.read('make it wider')?.style, 'wide');
-      expect(
-        LayoutRequest.read('more space between devices')?.style,
-        'wide',
-      );
+      expect(LayoutRequest.read('more space between devices')?.style, 'wide');
       expect(LayoutRequest.read('make it wider')?.explicitStyle, isTrue);
       expect(LayoutRequest.read('make it normal')?.style, 'tree');
       expect(LayoutRequest.read('reset the layout')?.style, 'tree');
@@ -161,23 +157,24 @@ void main() {
     });
 
     test('the edge is read from the sentence', () {
-      expect(zoneEdges(LayoutRequest.read('move the servers to the right')),
-          ['server@right']);
-      expect(
-        zoneEdges(LayoutRequest.read('group the routers on the right')),
-        ['router@right'],
-      );
-      expect(zoneEdges(LayoutRequest.read('move the servers to the left')),
-          ['server@left']);
-      expect(zoneEdges(LayoutRequest.read('move the servers aside')),
-          ['server@left']);
+      expect(zoneEdges(LayoutRequest.read('move the servers to the right')), [
+        'server@right',
+      ]);
+      expect(zoneEdges(LayoutRequest.read('group the routers on the right')), [
+        'router@right',
+      ]);
+      expect(zoneEdges(LayoutRequest.read('move the servers to the left')), [
+        'server@left',
+      ]);
+      expect(zoneEdges(LayoutRequest.read('move the servers aside')), [
+        'server@left',
+      ]);
     });
 
     test('the devices named are the ones that move', () {
-      expect(
-        movedKinds(LayoutRequest.read('move the routers to the right')),
-        ['router'],
-      );
+      expect(movedKinds(LayoutRequest.read('move the routers to the right')), [
+        'router',
+      ]);
     });
 
     test('devices named only as the ones to move away from stay put', () {
@@ -197,10 +194,9 @@ void main() {
     });
 
     test('a device named after the separation is not the one that moves', () {
-      expect(
-        movedNames(LayoutRequest.read('move SRV1 away from SRV2')),
-        ['SRV1'],
-      );
+      expect(movedNames(LayoutRequest.read('move SRV1 away from SRV2')), [
+        'SRV1',
+      ]);
     });
 
     test('naming one device does not move every device of its kind', () {
@@ -239,7 +235,9 @@ void main() {
 
     test('"here and there" is two groups', () {
       expect(
-        zoneEdges(LayoutRequest.read('move the servers here and the routers there')),
+        zoneEdges(
+          LayoutRequest.read('move the servers here and the routers there'),
+        ),
         ['server@left', 'router@right'],
       );
     });
@@ -247,13 +245,17 @@ void main() {
     test('left and right named outright is two groups', () {
       expect(
         zoneEdges(
-          LayoutRequest.read('move the servers to the left and the routers to the right'),
+          LayoutRequest.read(
+            'move the servers to the left and the routers to the right',
+          ),
         ),
         ['server@left', 'router@right'],
       );
       expect(
         zoneEdges(
-          LayoutRequest.read('put the pcs on the right and the servers on the left'),
+          LayoutRequest.read(
+            'put the pcs on the right and the servers on the left',
+          ),
         ),
         ['host@right', 'server@left'],
       );
@@ -359,7 +361,10 @@ void main() {
     });
 
     test('a note written by an older build still reads', () {
-      expect(LayoutRequest.styleFromNote('build verified; layout: wide'), 'wide');
+      expect(
+        LayoutRequest.styleFromNote('build verified; layout: wide'),
+        'wide',
+      );
       expect(LayoutRequest.styleFromNote('layout: banana'), '');
     });
   });

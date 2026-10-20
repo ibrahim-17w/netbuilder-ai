@@ -41,27 +41,29 @@ void main() {
     expect(ChatService.sseText(raw), 'Hello');
   });
 
-  test('a chunk that splits a line mid-payload is buffered, not lost',
-      () async {
-    final body = _sse('{"reply":"Hello from the model"}');
-    final cut = body.length ~/ 2;
-    final client = _SseClient([body.substring(0, cut), body.substring(cut)]);
-    final service = ChatService(client: client);
+  test(
+    'a chunk that splits a line mid-payload is buffered, not lost',
+    () async {
+      final body = _sse('{"reply":"Hello from the model"}');
+      final cut = body.length ~/ 2;
+      final client = _SseClient([body.substring(0, cut), body.substring(cut)]);
+      final service = ChatService(client: client);
 
-    final pieces = await service
-        .stream(
-          apiKey: 'k',
-          model: 'gemini-3.8-flash',
-          history: const [],
-          text: 'hi',
-          systemContext: 'SYS',
-        )
-        .toList();
+      final pieces = await service
+          .stream(
+            apiKey: 'k',
+            model: 'gemini-3.8-flash',
+            history: const [],
+            text: 'hi',
+            systemContext: 'SYS',
+          )
+          .toList();
 
-    // Whatever the split, the whole answer arrives exactly once.
-    expect(pieces.join(), '{"reply":"Hello from the model"}');
-    expect(service.lastPlan, isNotNull);
-  });
+      // Whatever the split, the whole answer arrives exactly once.
+      expect(pieces.join(), '{"reply":"Hello from the model"}');
+      expect(service.lastPlan, isNotNull);
+    },
+  );
 
   test('stream() surfaces a failure instead of returning nothing', () async {
     final client = _SseClient(const []);

@@ -32,9 +32,7 @@ class TurnAbort {
 class AbortedException implements Exception {
   final String message;
 
-  const AbortedException([
-    this.message = 'That answer was cancelled.',
-  ]);
+  const AbortedException([this.message = 'That answer was cancelled.']);
 
   @override
   String toString() => 'AbortedException: $message';
@@ -51,8 +49,8 @@ class AbortSignal {
     Future<void>? trigger, {
     bool Function(Object error)? isAbortError,
     bool Function()? isAbortedNow,
-  })  : _matchesError = isAbortError,
-        _probe = isAbortedNow {
+  }) : _matchesError = isAbortError,
+       _probe = isAbortedNow {
     if (trigger == null) return;
     // A trigger that fails must not take the answer down with it.
     trigger.then<void>((_) => _aborted = true, onError: (Object _) {});

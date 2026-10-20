@@ -29,20 +29,8 @@ class DomainVocabulary {
   /// Only one-directional aliases live here - `pc` is a device, but the word
   /// `staff` is not a device, it is a group of them (see [_groupWords]).
   static const Map<String, List<String>> _deviceWords = <String, List<String>>{
-    'pc': <String>[
-      'desktop',
-      'workstation',
-      'computer',
-      'pc',
-      'tower',
-      'imac',
-    ],
-    'laptop': <String>[
-      'laptop',
-      'notebook',
-      'macbook',
-      'thinkpad',
-    ],
+    'pc': <String>['desktop', 'workstation', 'computer', 'pc', 'tower', 'imac'],
+    'laptop': <String>['laptop', 'notebook', 'macbook', 'thinkpad'],
     'tablet': <String>['tablet', 'ipad'],
     'phone': <String>[
       'phone',
@@ -282,15 +270,16 @@ class DomainVocabulary {
   static void reset() => _learned.clear();
 
   /// Every learned word, for the screen that shows and clears them.
-  static Map<String, String> get learned => Map<String, String>.unmodifiable(_learned);
+  static Map<String, String> get learned =>
+      Map<String, String>.unmodifiable(_learned);
 
   /// The learned table as one JSON-ready map, for persistence.
   static Map<String, String> snapshot() => Map<String, String>.from(_learned);
 
   /// Put learned words back, dropping anything that no longer makes sense.
-///
-/// Takes a raw map because it comes straight out of storage: a non-string key
-/// or a non-string value is skipped, never coerced.
+  ///
+  /// Takes a raw map because it comes straight out of storage: a non-string key
+  /// or a non-string value is skipped, never coerced.
   static void restore(Map<dynamic, dynamic>? raw) {
     _learned.clear();
     if (raw == null) return;
@@ -304,8 +293,20 @@ class DomainVocabulary {
   /// says "web server", and "switch" means a switch even in a sentence that
   /// also mentions power.
   static const Set<String> _protectedWords = <String>{
-    'server', 'router', 'switch', 'firewall', 'cloud', 'printer', 'tablet',
-    'phone', 'camera', 'pc', 'laptop', 'ap', 'gateway', 'host',
+    'server',
+    'router',
+    'switch',
+    'firewall',
+    'cloud',
+    'printer',
+    'tablet',
+    'phone',
+    'camera',
+    'pc',
+    'laptop',
+    'ap',
+    'gateway',
+    'host',
   };
 
   static String _key(String raw) =>
@@ -433,7 +434,9 @@ class DomainVocabulary {
   }
 
   /// The site kinds named anywhere in [text], in the order they appear.
-  static List<({String word, String kind, int offset})> siteKindsIn(String text) {
+  static List<({String word, String kind, int offset})> siteKindsIn(
+    String text,
+  ) {
     final lower = text.toLowerCase();
     final found = <({String word, String kind, int offset})>[];
     for (final entry in _siteWords.entries) {
@@ -443,7 +446,8 @@ class DomainVocabulary {
       }
     }
     for (final entry in _learned.entries) {
-      final kind = _siteWords.values.contains(entry.value) ||
+      final kind =
+          _siteWords.values.contains(entry.value) ||
               _groupWords.containsKey(entry.key)
           ? entry.value
           : '';

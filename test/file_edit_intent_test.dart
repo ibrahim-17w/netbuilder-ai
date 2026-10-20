@@ -148,10 +148,10 @@ void main() {
       expect(text.toLowerCase(), contains('create a new'));
       expect(text, contains('20 device(s)'));
 
-      expect(
-        FileEditIntentReader.choiceReplies('serial-lab.pkt'),
-        ['Edit serial-lab.pkt', 'Create a new file instead'],
-      );
+      expect(FileEditIntentReader.choiceReplies('serial-lab.pkt'), [
+        'Edit serial-lab.pkt',
+        'Create a new file instead',
+      ]);
     });
   });
 
@@ -175,14 +175,14 @@ void main() {
 
     test('the model is told that "it" means that file', () {
       final state = SessionState()
-        .observe(
-          ChatMessage(
-            role: 'user',
-            text: 'build me a 2 router lab',
-            createdAt: '2026-09-26T10:00:00',
-          ),
-        )
-        .withArtifact('C:/out/lab.pkt', name: 'lab.pkt');
+          .observe(
+            ChatMessage(
+              role: 'user',
+              text: 'build me a 2 router lab',
+              createdAt: '2026-09-26T10:00:00',
+            ),
+          )
+          .withArtifact('C:/out/lab.pkt', name: 'lab.pkt');
       final block = state.promptBlock(userText: 'edit it');
       expect(block, contains('lab.pkt'));
       expect(block, contains('C:/out/lab.pkt'));
@@ -199,11 +199,8 @@ void main() {
   });
 
   group('nothing said two messages ago is forgotten', () {
-    ChatMessage ask(String text) => ChatMessage(
-          role: 'user',
-          text: text,
-          createdAt: '2026-09-26T10:00:00',
-        );
+    ChatMessage ask(String text) =>
+        ChatMessage(role: 'user', text: text, createdAt: '2026-09-26T10:00:00');
 
     test('newly compacted turns are folded into the saved summary', () {
       final first = ConversationMemory.summarize([
@@ -217,12 +214,21 @@ void main() {
         ask('use 10.20.0.0/24 for the LANs'),
         ask('add an AAA server with user netadmin'),
       ]);
-      expect(merged, contains('2 routers and 4 PCs'),
-          reason: 'the original request survives');
-      expect(merged, contains('10.20.0.0/24'),
-          reason: 'and so does what was said since');
-      expect(merged, contains('AAA server'),
-          reason: 'including the most recent turns');
+      expect(
+        merged,
+        contains('2 routers and 4 PCs'),
+        reason: 'the original request survives',
+      );
+      expect(
+        merged,
+        contains('10.20.0.0/24'),
+        reason: 'and so does what was said since',
+      );
+      expect(
+        merged,
+        contains('AAA server'),
+        reason: 'including the most recent turns',
+      );
     });
 
     test('a summary written by an older build is kept, not dropped', () {
@@ -247,8 +253,11 @@ void main() {
         storedSummary: ConversationMemory.summarize([ask('original request')]),
       );
       expect(plan.turnsSummarized, greaterThan(0));
-      expect(plan.recentTurns, isNotEmpty,
-          reason: 'the live conversation is worth more than the summary');
+      expect(
+        plan.recentTurns,
+        isNotEmpty,
+        reason: 'the live conversation is worth more than the summary',
+      );
       expect(plan.tokensUsed, lessThanOrEqualTo(plan.windowTokens));
     });
   });

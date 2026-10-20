@@ -46,40 +46,54 @@ void main() {
       const brief = 'branch office with 2 routers 2 switches 1 server 6 pcs';
       final a = NetworkIntent.parseSimple('det', brief);
       final b = NetworkIntent.parseSimple('det', brief);
-      expect(a.nodes.map((n) => '${n.name}:${n.type}').join(','),
-          b.nodes.map((n) => '${n.name}:${n.type}').join(','));
+      expect(
+        a.nodes.map((n) => '${n.name}:${n.type}').join(','),
+        b.nodes.map((n) => '${n.name}:${n.type}').join(','),
+      );
       expect(a.links.length, b.links.length);
-      expect(a.addressing.map((x) => x.ipCidr).join(','),
-          b.addressing.map((x) => x.ipCidr).join(','));
+      expect(
+        a.addressing.map((x) => x.ipCidr).join(','),
+        b.addressing.map((x) => x.ipCidr).join(','),
+      );
     });
 
-    test('chat with an empty key fails closed and never hits the network',
-        () async {
-      final client = _ExplodingClient();
-      final chat = ChatService(client: client);
-      await expectLater(
-        chat.send(
-          apiKey: '',
-          model: 'gemini-3.8-flash',
-          history: const [],
-          text: 'what should I build?',
-          systemContext: 'ctx',
-        ),
-        throwsA(isA<Exception>()),
-      );
-      expect(client.calls, 0, reason: 'no request may leave the device');
-    });
+    test(
+      'chat with an empty key fails closed and never hits the network',
+      () async {
+        final client = _ExplodingClient();
+        final chat = ChatService(client: client);
+        await expectLater(
+          chat.send(
+            apiKey: '',
+            model: 'gemini-3.8-flash',
+            history: const [],
+            text: 'what should I build?',
+            systemContext: 'ctx',
+          ),
+          throwsA(isA<Exception>()),
+        );
+        expect(client.calls, 0, reason: 'no request may leave the device');
+      },
+    );
 
     test('GeminiService reports an empty key instead of throwing', () async {
-      final err =
-          await GeminiService().testKey(apiKey: '   ', model: 'gemini-3.8-flash');
+      final err = await GeminiService().testKey(
+        apiKey: '   ',
+        model: 'gemini-3.8-flash',
+      );
       expect(err, isNotNull);
     });
 
     test('a thin brief still yields user-facing suggestions, not a crash', () {
-      final intent = NetworkIntent.parseSimple('thin', 'just a server and 3 pcs');
+      final intent = NetworkIntent.parseSimple(
+        'thin',
+        'just a server and 3 pcs',
+      );
       expect(intent.nodes, isNotEmpty);
-      final suggestions = PlannerSuggestionsService.forIntent(intent, target: 'pt');
+      final suggestions = PlannerSuggestionsService.forIntent(
+        intent,
+        target: 'pt',
+      );
       expect(suggestions, isNotEmpty);
     });
 

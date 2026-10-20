@@ -130,7 +130,8 @@ void main() {
       List<MisparseEntry> entries,
       MisparseEntry? entry,
       MisparseEntry? proposed,
-    }) log(
+    })
+    log(
       List<MisparseEntry> entries, {
       String original = 'make me a lab for fifty pcs',
       String corrected = '50 PCs, 2 switches, 2 routers',

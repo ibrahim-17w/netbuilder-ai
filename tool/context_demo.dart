@@ -17,12 +17,16 @@ import 'package:net_builder/services/context_budget.dart';
 import 'package:net_builder/services/conversation_memory.dart';
 
 void main() {
-  const opening = 'OPENING-ASK: build a two-site OSPF lab, serial WAN '
+  const opening =
+      'OPENING-ASK: build a two-site OSPF lab, serial WAN '
       '10.1.1.0/30, LANs 192.168.1.0/24 and 192.168.2.0/24, one server '
       'per site';
   final history = <ChatMessage>[
     const ChatMessage(role: 'user', text: opening),
-    const ChatMessage(role: 'model', text: 'Noted: two sites, OSPF, serial WAN.'),
+    const ChatMessage(
+      role: 'model',
+      text: 'Noted: two sites, OSPF, serial WAN.',
+    ),
   ];
 
   var i = 0;
@@ -40,8 +44,10 @@ void main() {
   final total = ContextBudget.estimateMessages(history);
 
   print('conversation  : ${history.length} turns, ~$total tokens (uncapped)');
-  print('ceiling       : ${ContextBudget.defaultContextTokens} tokens '
-      '(ContextBudget.defaultContextTokens)');
+  print(
+    'ceiling       : ${ContextBudget.defaultContextTokens} tokens '
+    '(ContextBudget.defaultContextTokens)',
+  );
   print('sending       : "$pending"');
   print('');
 
@@ -53,14 +59,22 @@ void main() {
   );
 
   print('--- result ---');
-  print('turns sent word-for-word   : ${plan.recentTurns.length} of '
-      '${history.length}');
+  print(
+    'turns sent word-for-word   : ${plan.recentTurns.length} of '
+    '${history.length}',
+  );
   print('turns summarized into memory: ${plan.turnsSummarized}');
-  print('tokens used / budget        : ${plan.tokensUsed} / '
-      '${plan.budgetTokens} (${(plan.usedFraction * 100).toStringAsFixed(2)}%)');
-  print('request <= budget           : '
-      '${plan.tokensUsed <= plan.budgetTokens}');
-  print('original ask kept           : ${plan.memoryBlock.contains('OPENING-ASK')}');
+  print(
+    'tokens used / budget        : ${plan.tokensUsed} / '
+    '${plan.budgetTokens} (${(plan.usedFraction * 100).toStringAsFixed(2)}%)',
+  );
+  print(
+    'request <= budget           : '
+    '${plan.tokensUsed <= plan.budgetTokens}',
+  );
+  print(
+    'original ask kept           : ${plan.memoryBlock.contains('OPENING-ASK')}',
+  );
   print('');
   print('--- the memory block the model receives (first 12 lines) ---');
   print(plan.memoryBlock.split('\n').take(12).join('\n'));
@@ -74,9 +88,13 @@ void main() {
     systemContext: 'SYS',
     pendingText: 'continue',
   );
-  print('turns sent: ${short.recentTurns.length}, summarized: '
-      '${short.turnsSummarized}, memory block empty: '
-      '${short.memoryBlock.isEmpty}');
-  print('facts pinned from user turns: '
-      '${ConversationMemory.pinnedFacts(history).join(' | ')}');
+  print(
+    'turns sent: ${short.recentTurns.length}, summarized: '
+    '${short.turnsSummarized}, memory block empty: '
+    '${short.memoryBlock.isEmpty}',
+  );
+  print(
+    'facts pinned from user turns: '
+    '${ConversationMemory.pinnedFacts(history).join(' | ')}',
+  );
 }

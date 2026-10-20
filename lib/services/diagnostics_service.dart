@@ -96,7 +96,8 @@ class ShellResult {
 
   bool get ok => exitCode == 0 && output.trim().isNotEmpty;
 
-  String get summary => ok ? output.trim() : (error.isEmpty ? 'no output' : error);
+  String get summary =>
+      ok ? output.trim() : (error.isEmpty ? 'no output' : error);
 
   Map<String, dynamic> toMap() => {
     'command': command,
@@ -132,8 +133,7 @@ class PingSummary {
 
   int get lost => transmitted - received;
 
-  double get lossPercent =>
-      transmitted == 0 ? 0 : (lost / transmitted) * 100;
+  double get lossPercent => transmitted == 0 ? 0 : (lost / transmitted) * 100;
 
   bool get ok => received > 0;
 
@@ -176,9 +176,7 @@ class PingSummary {
     final winTimes = RegExp(
       r'Minimum\s*=\s*(\d+)ms,\s*Maximum\s*=\s*(\d+)ms,\s*Average\s*=\s*(\d+)ms',
     ).firstMatch(text);
-    final nixTimes = RegExp(
-      r'=\s*([\d.]+)/([\d.]+)/([\d.]+)',
-    ).firstMatch(text);
+    final nixTimes = RegExp(r'=\s*([\d.]+)/([\d.]+)/([\d.]+)').firstMatch(text);
     if (winTimes != null) {
       minMs = int.tryParse(winTimes.group(1)!) ?? 0;
       maxMs = int.tryParse(winTimes.group(2)!) ?? 0;
@@ -191,7 +189,8 @@ class PingSummary {
     }
 
     // A single ping that only printed the reply line still counts.
-    if (transmitted == 0 && RegExp(r'ttl[=\s]', caseSensitive: false).hasMatch(text)) {
+    if (transmitted == 0 &&
+        RegExp(r'ttl[=\s]', caseSensitive: false).hasMatch(text)) {
       transmitted = 1;
       received = 1;
     }
@@ -370,7 +369,11 @@ class DiagnosticsService {
     try {
       final resolved = await InternetAddress(host).reverse().timeout(timeout);
       watch.stop();
-      return DnsLookup(host: host, addresses: [resolved.host], elapsedMs: watch.elapsedMilliseconds);
+      return DnsLookup(
+        host: host,
+        addresses: [resolved.host],
+        elapsedMs: watch.elapsedMilliseconds,
+      );
     } catch (e) {
       watch.stop();
       return DnsLookup(
@@ -383,7 +386,11 @@ class DiagnosticsService {
 
   /// Is one TCP port answering? A refused connection and a filtered one are
   /// different faults, so the error text is kept rather than flattened.
-  Future<PortProbe> checkPort(String host, int port, {String service = ''}) async {
+  Future<PortProbe> checkPort(
+    String host,
+    int port, {
+    String service = '',
+  }) async {
     final name = service.isEmpty ? (commonPorts[port] ?? '') : service;
     final target = normalizeHost(host);
     final watch = Stopwatch()..start();
@@ -460,7 +467,9 @@ class DiagnosticsService {
     final watch = Stopwatch()..start();
     final client = HttpClient()..connectionTimeout = timeout;
     try {
-      final request = await client.getUrl(Uri.parse(normalized)).timeout(timeout);
+      final request = await client
+          .getUrl(Uri.parse(normalized))
+          .timeout(timeout);
       request.followRedirects = false;
       final response = await request.close().timeout(timeout);
       await response.drain<void>().timeout(timeout);
@@ -488,10 +497,7 @@ class DiagnosticsService {
   Future<PingSummary> ping(String host, {int count = 4}) async {
     final target = normalizeHost(host);
     if (target == null) {
-      return PingSummary(
-        target: host.trim(),
-        error: _unusableHost(host),
-      );
+      return PingSummary(target: host.trim(), error: _unusableHost(host));
     }
     final (executable, arguments) = _pingCommand(target, count);
     final result = await _shell(executable, arguments);
@@ -583,9 +589,9 @@ class DiagnosticsService {
           : hardware.group(0)!.toLowerCase().replaceAll('-', ':');
       // A subnet broadcast shows up as a real address with an all-ff MAC.
       if (hardwareText == 'ff:ff:ff:ff:ff:ff') continue;
-      final iface = RegExp(r'(?:on|interface:)\s+([\w./:-]+)')
-          .firstMatch(line)
-          ?.group(1);
+      final iface = RegExp(
+        r'(?:on|interface:)\s+([\w./:-]+)',
+      ).firstMatch(line)?.group(1);
       out.add(
         ArpEntry(
           address: address,
@@ -637,13 +643,13 @@ class DiagnosticsService {
   /// part is one argument and never part of a command line.
   static (String, List<String>) _pingCommand(String host, int count) =>
       Platform.isWindows
-          ? ('ping', ['-n', '$count', host])
-          : ('ping', ['-c', '$count', host]);
+      ? ('ping', ['-n', '$count', host])
+      : ('ping', ['-c', '$count', host]);
 
   static (String, List<String>) _traceCommand(String host, int maxHops) =>
       Platform.isWindows
-          ? ('tracert', ['-h', '$maxHops', '-w', '1000', host])
-          : ('traceroute', ['-m', '$maxHops', host]);
+      ? ('tracert', ['-h', '$maxHops', '-w', '1000', host])
+      : ('traceroute', ['-m', '$maxHops', host]);
 
   static (String, List<String>) _arpCommand() =>
       Platform.isWindows ? ('arp', ['-a']) : ('arp', ['-an']);

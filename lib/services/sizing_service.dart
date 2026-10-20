@@ -124,30 +124,88 @@ class SizingService {
 
   static final _orgWords = <OrgKind, List<String>>{
     OrgKind.school: [
-      'school', 'college', 'university', 'academy', 'kindergarten', 'campus',
-      'institute', 'library', 'training centre', 'training center',
+      'school',
+      'college',
+      'university',
+      'academy',
+      'kindergarten',
+      'campus',
+      'institute',
+      'library',
+      'training centre',
+      'training center',
     ],
     OrgKind.clinic: [
-      'clinic', 'hospital', 'medical centre', 'medical center',
-      'health centre', 'health center', 'pharmacy', 'dentist', 'dental',
-      'surgery', 'care home', 'nursing home',
+      'clinic',
+      'hospital',
+      'medical centre',
+      'medical center',
+      'health centre',
+      'health center',
+      'pharmacy',
+      'dentist',
+      'dental',
+      'surgery',
+      'care home',
+      'nursing home',
     ],
     OrgKind.guest: [
-      'cafe', 'coffee shop', 'coffee', 'restaurant', 'bar', 'pub', 'hotel',
-      'motel', 'hostel', 'b&b', 'guest house', 'shop', 'store', 'boutique',
-      'supermarket', 'salon', 'barber', 'gym', 'fitness', 'retail',
+      'cafe',
+      'coffee shop',
+      'coffee',
+      'restaurant',
+      'bar',
+      'pub',
+      'hotel',
+      'motel',
+      'hostel',
+      'b&b',
+      'guest house',
+      'shop',
+      'store',
+      'boutique',
+      'supermarket',
+      'salon',
+      'barber',
+      'gym',
+      'fitness',
+      'retail',
     ],
     OrgKind.home: [
-      'home', 'apartment', 'flat', 'villa', 'house', 'residence', 'studio',
+      'home',
+      'apartment',
+      'flat',
+      'villa',
+      'house',
+      'residence',
+      'studio',
     ],
     OrgKind.industrial: [
-      'warehouse', 'factory', 'workshop', 'industrial', 'plant', 'depot',
-      'logistics', 'farm',
+      'warehouse',
+      'factory',
+      'workshop',
+      'industrial',
+      'plant',
+      'depot',
+      'logistics',
+      'farm',
     ],
     OrgKind.office: [
-      'office', 'company', 'business', 'firm', 'agency', 'startup',
-      'enterprise', 'coworking', 'co-working', 'bank', 'insurance',
-      'call centre', 'call center', 'law office', 'accounting',
+      'office',
+      'company',
+      'business',
+      'firm',
+      'agency',
+      'startup',
+      'enterprise',
+      'coworking',
+      'co-working',
+      'bank',
+      'insurance',
+      'call centre',
+      'call center',
+      'law office',
+      'accounting',
     ],
   };
 
@@ -161,7 +219,9 @@ class SizingService {
     caseSensitive: false,
   );
 
-  static final _deviceLabels = RegExp(r'\b(?:R|SW|PC|SRV|FW|AP|PH|LT)\d{1,3}\b');
+  static final _deviceLabels = RegExp(
+    r'\b(?:R|SW|PC|SRV|FW|AP|PH|LT)\d{1,3}\b',
+  );
 
   /// The user ruled wifi (or the edge) out; respect it rather than sizing it.
   static final _noWifi = RegExp(
@@ -182,7 +242,10 @@ class SizingService {
     r'\b(wi[- ]?fi|wireless|wlan|mobiles?|phones?|laptops?|tablets?)\b',
     caseSensitive: false,
   );
-  static final _voice = RegExp(r'\b(ip phones?|voip|voice)\b', caseSensitive: false);
+  static final _voice = RegExp(
+    r'\b(ip phones?|voip|voice)\b',
+    caseSensitive: false,
+  );
   static final _printer = RegExp(r'\bprinters?\b', caseSensitive: false);
 
   // --- the entry point ----------------------------------------------------
@@ -284,7 +347,9 @@ class SizingService {
 
     final services = <String>{
       ...switch (kind) {
-        OrgKind.office || OrgKind.clinic || OrgKind.industrial => ['dhcp', 'dns'],
+        OrgKind.office ||
+        OrgKind.clinic ||
+        OrgKind.industrial => ['dhcp', 'dns'],
         OrgKind.school => ['dhcp', 'dns', 'http'],
         _ => const <String>[],
       },
@@ -313,17 +378,15 @@ class SizingService {
     final switches = byPorts > zonesCount ? byPorts : zonesCount;
 
     final servers = services.isEmpty ? 0 : 1;
-    final firewalls =
-        edge && kind != OrgKind.home && kind != OrgKind.guest ? 1 : 0;
+    final firewalls = edge && kind != OrgKind.home && kind != OrgKind.guest
+        ? 1
+        : 0;
     final clouds = edge ? 1 : 0;
 
     // --- VLANs: staff and guest separated whenever there is both a wired
     //     LAN and wifi to keep off it.
-    final guestSafe = !guestFacing &&
-        wifi &&
-        !flat &&
-        pcs > 0 &&
-        kind != OrgKind.home;
+    final guestSafe =
+        !guestFacing && wifi && !flat && pcs > 0 && kind != OrgKind.home;
     final vlans = guestSafe ? <int>[10, 20] : <int>[];
 
     // --- the reasons, in the user's own terms.
@@ -434,7 +497,8 @@ class SizingService {
       original: original,
     );
 
-    final coverage = 0.55 +
+    final coverage =
+        0.55 +
         (people > 0 ? 0.1 : 0) +
         (zones > 1 ? 0.05 : 0) +
         (org != null ? 0.05 : 0) +

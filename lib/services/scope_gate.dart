@@ -55,15 +55,40 @@ class ScopeGate {
   /// substrings after lowercasing - a phrase cannot accidentally hit inside
   /// one unrelated word.
   static const List<String> networkingPhrases = [
-    'access point', 'access points', 'wireless router', 'patch panel',
-    'ip address', 'mac address', 'static route', 'inter-vlan',
-    'router-on-a-stick', 'spanning tree', 'port forwarding', 'port forward',
-    'packet tracer', 'running-config', 'startup-config', 'show run',
-    'palo alto', 'tp-link', 'wi-fi', '802.11', 'load balancer',
-    'intrusion detection', '.pkt', '802.1x',
-    'power over ethernet', 'client isolation', 'guest wifi', 'guest wi-fi',
-    'guest network', 'captive portal', 'site-to-site', 'fixed wireless',
-    'fibre to the home', 'fiber to the home',
+    'access point',
+    'access points',
+    'wireless router',
+    'patch panel',
+    'ip address',
+    'mac address',
+    'static route',
+    'inter-vlan',
+    'router-on-a-stick',
+    'spanning tree',
+    'port forwarding',
+    'port forward',
+    'packet tracer',
+    'running-config',
+    'startup-config',
+    'show run',
+    'palo alto',
+    'tp-link',
+    'wi-fi',
+    '802.11',
+    'load balancer',
+    'intrusion detection',
+    '.pkt',
+    '802.1x',
+    'power over ethernet',
+    'client isolation',
+    'guest wifi',
+    'guest wi-fi',
+    'guest network',
+    'captive portal',
+    'site-to-site',
+    'fixed wireless',
+    'fibre to the home',
+    'fiber to the home',
   ];
 
   /// True when the message carries networking vocabulary (or looks like a
@@ -188,11 +213,13 @@ class ScopeGate {
     if (!_smallTalk.hasMatch(t)) return false;
     final withoutOpener = t.replaceFirst(_smallTalk, '').trim();
     return withoutOpener.isEmpty ||
-        RegExp(r'^[\s,.!?:;-]*(there|you|netbuilder|again|all|everyone|'
-                r'ok|okay|sure|thanks?|thank you|cheers)?'
-                r'([\s,.!?:;-]*(there|you|netbuilder|again|all|everyone|'
-                r'ok|okay|sure|thanks?|thank you|cheers))?'
-                r'[\s,.!?:;-]*$').hasMatch(withoutOpener);
+        RegExp(
+          r'^[\s,.!?:;-]*(there|you|netbuilder|again|all|everyone|'
+          r'ok|okay|sure|thanks?|thank you|cheers)?'
+          r'([\s,.!?:;-]*(there|you|netbuilder|again|all|everyone|'
+          r'ok|okay|sure|thanks?|thank you|cheers))?'
+          r'[\s,.!?:;-]*$',
+        ).hasMatch(withoutOpener);
   }
 
   /// True when the message is clearly NOT about networking and must be

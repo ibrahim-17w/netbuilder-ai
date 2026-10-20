@@ -51,12 +51,12 @@ class _FakeStore extends MemoryService {
 
   @override
   Future<Map<String, dynamic>?> conversationMeta(String id) async => {
-        'id': id,
-        'title': 'Lab',
-        'project': 'lab',
-        'summary': '',
-        'stateJson': state[id] ?? '{}',
-      };
+    'id': id,
+    'title': 'Lab',
+    'project': 'lab',
+    'summary': '',
+    'stateJson': state[id] ?? '{}',
+  };
 
   @override
   Future<List<Map<String, dynamic>>> recentChanges({
@@ -96,8 +96,8 @@ class _FakeStore extends MemoryService {
 }
 
 Finder _composer() => find.byWidgetPredicate(
-      (w) => w is TextField && w.decoration?.labelText == 'Message',
-    );
+  (w) => w is TextField && w.decoration?.labelText == 'Message',
+);
 
 Future<void> _wide(WidgetTester tester) async {
   tester.view.physicalSize = const Size(1500, 950);
@@ -183,12 +183,11 @@ void main() {
     final store = _withArtifact();
     // A second build in the same conversation: now the target really could be
     // either file, and the named one decides.
-    final state = SessionState.decode(store.state['default']!)
-        .withArtifact(
-          'C:/out/two-router-lab.pkt',
-          name: 'two-router-lab.pkt',
-          updatedAt: '2026-09-27T10:00:00',
-        );
+    final state = SessionState.decode(store.state['default']!).withArtifact(
+      'C:/out/two-router-lab.pkt',
+      name: 'two-router-lab.pkt',
+      updatedAt: '2026-09-27T10:00:00',
+    );
     store.state['default'] = state.encode();
     await tester.pumpWidget(_chat(store));
     await tester.pumpAndSettle();
@@ -205,12 +204,11 @@ void main() {
   ) async {
     await _wide(tester);
     final store = _withArtifact();
-    final state = SessionState.decode(store.state['default']!)
-        .withArtifact(
-          'C:/out/two-router-lab.pkt',
-          name: 'two-router-lab.pkt',
-          updatedAt: '2026-09-27T10:00:00',
-        );
+    final state = SessionState.decode(store.state['default']!).withArtifact(
+      'C:/out/two-router-lab.pkt',
+      name: 'two-router-lab.pkt',
+      updatedAt: '2026-09-27T10:00:00',
+    );
     store.state['default'] = state.encode();
     await tester.pumpWidget(_chat(store));
     await tester.pumpAndSettle();
@@ -222,9 +220,7 @@ void main() {
     expect(find.textContaining('Built a .pkt from your plan'), findsNothing);
   });
 
-  testWidgets('"a new file instead" is not a request to edit', (
-    tester,
-  ) async {
+  testWidgets('"a new file instead" is not a request to edit', (tester) async {
     await _wide(tester);
     await tester.pumpWidget(_chat(_withArtifact()));
     await tester.pumpAndSettle();
@@ -234,10 +230,7 @@ void main() {
     await _send(tester, 'make a new file with 3 routers');
 
     expect(find.textContaining('not going to quietly build a'), findsNothing);
-    expect(
-      find.textContaining('Edit serial-lab.pkt in place'),
-      findsNothing,
-    );
+    expect(find.textContaining('Edit serial-lab.pkt in place'), findsNothing);
   });
 
   testWidgets('a file with no saved plan is named, and not overwritten', (

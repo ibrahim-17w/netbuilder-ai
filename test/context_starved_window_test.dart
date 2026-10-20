@@ -30,19 +30,37 @@ void main() {
     );
 
     expect(plan.windowTokens, 3000);
-    expect(plan.recentTurns, isNotEmpty,
-        reason: 'the newest turn outranks the summary reserve');
+    expect(
+      plan.recentTurns,
+      isNotEmpty,
+      reason: 'the newest turn outranks the summary reserve',
+    );
     expect(plan.recentTurns.last.text, contains('turn 7'));
-    expect(plan.recentTurns.last.text, contains('w7w7w7w7'),
-        reason: 'whole, not a quote: the turn is sent word-for-word');
-    expect(plan.turnsSummarized, greaterThan(0),
-        reason: 'the older turns are compacted, never silently lost');
-    expect(plan.memoryBlock, contains('10 PCs and 2 routers'),
-        reason: 'the saved summary still rides along with what fits');
-    expect(plan.memoryBlock, contains('turn 0'),
-        reason: 'the compacted turns are still represented');
-    expect(plan.tokensUsed, lessThanOrEqualTo(plan.windowTokens),
-        reason: 'the plan never hands the runtime more than its window');
+    expect(
+      plan.recentTurns.last.text,
+      contains('w7w7w7w7'),
+      reason: 'whole, not a quote: the turn is sent word-for-word',
+    );
+    expect(
+      plan.turnsSummarized,
+      greaterThan(0),
+      reason: 'the older turns are compacted, never silently lost',
+    );
+    expect(
+      plan.memoryBlock,
+      contains('10 PCs and 2 routers'),
+      reason: 'the saved summary still rides along with what fits',
+    );
+    expect(
+      plan.memoryBlock,
+      contains('turn 0'),
+      reason: 'the compacted turns are still represented',
+    );
+    expect(
+      plan.tokensUsed,
+      lessThanOrEqualTo(plan.windowTokens),
+      reason: 'the plan never hands the runtime more than its window',
+    );
     expect(plan.report, isNotNull);
     expect(plan.notes, isNotEmpty, reason: 'the compaction is said out loud');
   });

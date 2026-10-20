@@ -7,8 +7,9 @@ import 'package:net_builder/models/chat_message.dart';
 /// The shell is one screen. These replace the old tab-based tests: there are
 /// no tabs, no floating controls and no separate settings page any more.
 void main() {
-  testWidgets('App boots to the single chat screen',
-      (WidgetTester tester) async {
+  testWidgets('App boots to the single chat screen', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const NetBuilderApp());
     await tester.pumpAndSettle();
 
@@ -19,16 +20,19 @@ void main() {
     expect(find.byType(TextField), findsWidgets);
   });
 
-  testWidgets('the composer offers one media picker, with every option',
-      (tester) async {
+  testWidgets('the composer offers one media picker, with every option', (
+    tester,
+  ) async {
     await tester.pumpWidget(const NetBuilderApp());
     await tester.pumpAndSettle();
 
     // One picker instead of a row of icons: this is the ChatGPT-shaped
     // composer the redesign asked for.
     expect(find.byTooltip('Attach'), findsOneWidget);
-    expect(find.byTooltip('Tools: run, capture, and integrations'),
-        findsOneWidget);
+    expect(
+      find.byTooltip('Tools: run, capture, and integrations'),
+      findsOneWidget,
+    );
     expect(find.byIcon(Icons.send), findsOneWidget);
 
     // Every way of attaching something is still reachable, by name.

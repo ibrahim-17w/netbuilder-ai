@@ -8,7 +8,8 @@ import 'package:net_builder/services/sidecar_supervisor.dart';
 /// notice, and the parsing that finds the stray process.
 void main() {
   group('the engine answering is compared with the one this app ships', () {
-    const bundled = r'C:\netbuilder\build\windows\x64\runner\Release\sidecar\pt_autopilot.exe';
+    const bundled =
+        r'C:\netbuilder\build\windows\x64\runner\Release\sidecar\pt_autopilot.exe';
     const newer = 1790800000000;
     const older = 1780000000000;
 
@@ -76,7 +77,8 @@ void main() {
           bundledBuiltAt: newer,
         ),
         isFalse,
-        reason: 'same build time or not, that process belongs to the person '
+        reason:
+            'same build time or not, that process belongs to the person '
             'who started it from a terminal',
       );
     });
@@ -120,8 +122,11 @@ void main() {
 
     test('nothing listening means no pid to kill', () {
       expect(
-        SidecarSupervisor.listeningPid('  TCP    0.0.0.0:5040  0.0.0.0:0  '
-            'LISTENING  9304', 5999),
+        SidecarSupervisor.listeningPid(
+          '  TCP    0.0.0.0:5040  0.0.0.0:0  '
+          'LISTENING  9304',
+          5999,
+        ),
         isNull,
       );
       expect(SidecarSupervisor.listeningPid('', 5005), isNull);

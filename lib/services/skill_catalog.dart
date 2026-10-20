@@ -37,7 +37,8 @@ class SkillCatalog {
     Skill(
       command: '/scan ',
       title: 'Read a .pkt',
-      detail: 'Decrypt and audit a Packet Tracer save offline - no '
+      detail:
+          'Decrypt and audit a Packet Tracer save offline - no '
           'Packet Tracer needed.',
       category: 'Packet Tracer: read',
       send: '/scan ',
@@ -45,7 +46,8 @@ class SkillCatalog {
     Skill(
       command: '',
       title: 'Audit and fix a .pkt',
-      detail: 'Propose repairs for the capture on the table; each fix is '
+      detail:
+          'Propose repairs for the capture on the table; each fix is '
           'approved before anything changes.',
       category: 'Packet Tracer: read',
       send: 'fix the plan',
@@ -54,7 +56,8 @@ class SkillCatalog {
     Skill(
       command: '/build',
       title: 'Write a .pkt',
-      detail: 'Compile the current plan into a real, openable .pkt file - '
+      detail:
+          'Compile the current plan into a real, openable .pkt file - '
           'offline, with or without a key.',
       category: 'Packet Tracer: write',
       send: '/build',
@@ -63,7 +66,8 @@ class SkillCatalog {
     Skill(
       command: '',
       title: 'Edit the .pkt',
-      detail: 'Change a file this conversation built; a backup is kept '
+      detail:
+          'Change a file this conversation built; a backup is kept '
           'before anything is rewritten.',
       category: 'Packet Tracer: write',
       send: 'edit the file and ',
@@ -78,7 +82,8 @@ class SkillCatalog {
     Skill(
       command: '',
       title: 'Show the drawing',
-      detail: 'See the layout the plan would be built with, before it is '
+      detail:
+          'See the layout the plan would be built with, before it is '
           'built.',
       category: 'Packet Tracer: write',
       send: 'show the drawing',
@@ -95,7 +100,8 @@ class SkillCatalog {
     Skill(
       command: '/target packet-tracer',
       title: 'Drive the real Packet Tracer',
-      detail: 'Target the Packet Tracer window the autopilot clicks and '
+      detail:
+          'Target the Packet Tracer window the autopilot clicks and '
           'verifies.',
       category: 'Targets: GNS3, real gear, AWS',
       send: '/target packet-tracer',
@@ -104,7 +110,8 @@ class SkillCatalog {
     Skill(
       command: '/target cisco-ssh',
       title: 'Real Cisco gear over SSH',
-      detail: 'Target a real switch or router over SSH instead of a '
+      detail:
+          'Target a real switch or router over SSH instead of a '
           'simulator.',
       category: 'Targets: GNS3, real gear, AWS',
       send: '/target cisco-ssh',
@@ -122,7 +129,8 @@ class SkillCatalog {
     Skill(
       command: '',
       title: 'Which router / firewall should I use?',
-      detail: 'An offline recommendation with options, trade-offs and '
+      detail:
+          'An offline recommendation with options, trade-offs and '
           'reasons grounded in your numbers.',
       category: 'Design advice',
       send: 'what router should I use in this case?',
@@ -130,7 +138,8 @@ class SkillCatalog {
     Skill(
       command: '',
       title: 'Review my design',
-      detail: 'A layered review of the plan on the table: edge, '
+      detail:
+          'A layered review of the plan on the table: edge, '
           'addressing, services, security, wireless.',
       category: 'Design advice',
       send: 'review my design for a small office',
@@ -146,7 +155,8 @@ class SkillCatalog {
     Skill(
       command: '',
       title: 'Subnet facts',
-      detail: 'Broadcast, hosts, wildcard and network of any prefix - '
+      detail:
+          'Broadcast, hosts, wildcard and network of any prefix - '
           'computed, not recited.',
       category: 'Addressing',
       send: 'how many hosts does a /26 subnet support?',
@@ -177,7 +187,8 @@ class SkillCatalog {
     Skill(
       command: '',
       title: 'Explain a concept',
-      detail: 'VLANs, OSPF, DHCP, ACLs, STP and the rest of the corpus, '
+      detail:
+          'VLANs, OSPF, DHCP, ACLs, STP and the rest of the corpus, '
           'answered offline.',
       category: 'Learn',
       send: 'explain what a VLAN is',
@@ -210,7 +221,8 @@ class SkillCatalog {
     Skill(
       command: '/models',
       title: 'Detect available models',
-      detail: 'Ask the key which models it can use, and pick the '
+      detail:
+          'Ask the key which models it can use, and pick the '
           'recommendation.',
       category: 'App',
       send: '/models',

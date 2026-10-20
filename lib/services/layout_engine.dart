@@ -444,13 +444,10 @@ LayoutSnapshot computeLayoutSnapshot(
       zones.isEmpty
           ? <LayoutZone>[
               if (side.isNotEmpty)
-                LayoutZone(
-                  <String>[
-                    for (final name in side)
-                      if (spots.containsKey(name.trim())) name.trim(),
-                  ],
-                  edge: sideEdge,
-                ),
+                LayoutZone(<String>[
+                  for (final name in side)
+                    if (spots.containsKey(name.trim())) name.trim(),
+                ], edge: sideEdge),
             ]
           : zones.toList(),
       pitch,
@@ -476,7 +473,13 @@ LayoutSnapshot computeLayoutSnapshot(
     }
     taken.add('${px.toInt()},${py.toInt()}');
     resolved.add(
-      LayoutSpot(name, _kindOf(entries, name), px, py, tier[name] ?? kTierHosts),
+      LayoutSpot(
+        name,
+        _kindOf(entries, name),
+        px,
+        py,
+        tier[name] ?? kTierHosts,
+      ),
     );
   }
 
@@ -549,19 +552,13 @@ Map<String, List<double>> _flatPositions(
     // An evenly spaced box, core first. Reads top-to-bottom like a table of
     // contents and stays inside the visible canvas no matter how many hosts a
     // plan has.
-    final columns = math.max(
-      1,
-      math.min(_ceilSqrt(entries.length), 12),
-    );
+    final columns = math.max(1, math.min(_ceilSqrt(entries.length), 12));
     final step = pitch + gap;
     final ordered = _byRole(entries, tier);
     for (var index = 0; index < ordered.length; index++) {
       final row = index ~/ columns;
       final column = index % columns;
-      spots[ordered[index]] = [
-        kXStart + column * step,
-        kRowTop + row * step,
-      ];
+      spots[ordered[index]] = [kXStart + column * step, kRowTop + row * step];
     }
     return spots;
   }
@@ -1090,10 +1087,7 @@ Map<String, List<double>> _campusPositions(
   // each other, so a wide column field below never pushes them around.
   final centreX = cursor + total / 2;
   for (var i = 0; i < cores.length; i++) {
-    spots[cores[i]] = [
-      centreX + (i - (cores.length - 1) / 2) * pitch,
-      yTop,
-    ];
+    spots[cores[i]] = [centreX + (i - (cores.length - 1) / 2) * pitch, yTop];
   }
 
   var block = 0;
@@ -1200,10 +1194,7 @@ Map<String, List<double>> _layeredPositions(
   for (var index = 0; index < levels.length; index++) {
     final group = ranks[levels[index]]!;
     for (var row = 0; row < group.length; row++) {
-      spots[group[row]] = [
-        kXStart + index * bandStep,
-        kRowTop + row * rowStep,
-      ];
+      spots[group[row]] = [kXStart + index * bandStep, kRowTop + row * rowStep];
     }
   }
   return spots;
@@ -1364,7 +1355,8 @@ List<String> resolveSideNames(
     final wanted = kSideKindTypes[raw.trim().toLowerCase()];
     if (wanted == null) continue;
     for (final n in intent.nodes) {
-      if (wanted.contains(n.type.trim().toLowerCase()) && !out.contains(n.name)) {
+      if (wanted.contains(n.type.trim().toLowerCase()) &&
+          !out.contains(n.name)) {
         out.add(n.name);
       }
     }

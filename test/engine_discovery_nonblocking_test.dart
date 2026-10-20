@@ -45,16 +45,22 @@ void main() {
       final sync = SidecarSupervisor.pathInterpreters();
       final async = await SidecarSupervisor.pathInterpretersAsync();
 
-      expect(async, sync, reason: '''
+      expect(
+        async,
+        sync,
+        reason: '''
         The two lookups must produce the SAME ordered list.
         Order decides which interpreter candidateTargets offers first, and
         _start takes the first one that verifies, so a reordering here is a
         silent change of which Python the engine runs under.
-      ''');
+      ''',
+      );
     });
 
     test('the Store shim is dropped even when it is the only hit', () async {
-      const raw = [r'C:\Users\L\AppData\Local\Microsoft\WindowsApps\python.exe'];
+      const raw = [
+        r'C:\Users\L\AppData\Local\Microsoft\WindowsApps\python.exe',
+      ];
       expect(await SidecarSupervisor.pathInterpretersAsync(raw), isEmpty);
       expect(SidecarSupervisor.pathInterpreters(raw), isEmpty);
     });
@@ -65,26 +71,35 @@ void main() {
       // Read the source rather than trusting the symbol names: the point is
       // that the BLOCKING call is gone from the code the app actually runs,
       // not merely that a new async function exists somewhere nearby.
-      final source = File('lib/services/sidecar_supervisor.dart').readAsStringSync();
+      final source = File(
+        'lib/services/sidecar_supervisor.dart',
+      ).readAsStringSync();
 
       // Every remaining `Process.runSync` must sit inside the sync `_where`,
       // which is now reachable only from the synchronous, test-facing
       // `pathInterpreters`. Count the CALL FORM, not the bare name: the
       // prose around these functions names `Process.runSync` while explaining
       // why it is gone, and a naive count matches the explanation too.
-      final syncCalls =
-          RegExp(r"Process\.runSync\(\s*'where\.exe'").allMatches(source).length;
-      expect(syncCalls, lessThanOrEqualTo(1),
-          reason: 'a new blocking process call was added');
+      final syncCalls = RegExp(
+        r"Process\.runSync\(\s*'where\.exe'",
+      ).allMatches(source).length;
+      expect(
+        syncCalls,
+        lessThanOrEqualTo(1),
+        reason: 'a new blocking process call was added',
+      );
 
       // The launch path must resolve PATH asynchronously.
-      expect(source, contains('pythonsOnPath ?? await pathInterpretersAsync()'),
-          reason: '''
+      expect(
+        source,
+        contains('pythonsOnPath ?? await pathInterpretersAsync()'),
+        reason: '''
         `_start` must resolve PATH with the async lookup before discovery.
         If it passed `pythonsOnPath` through as null, `candidateTargets`
         would fall back to the blocking sync path on the UI isolate - which is
         the exact regression this file exists to prevent.
-      ''');
+      ''',
+      );
     });
 
     test('concurrent launches share ONE PATH scan', () async {
@@ -111,35 +126,45 @@ void main() {
 
       expect(results[1], results[0]);
       expect(results[2], results[0]);
-      expect(scans, 1,
-          reason: '''
+      expect(
+        scans,
+        1,
+        reason:
+            '''
         Three concurrent callers ran $scans PATH scans. Each scan spawns four
         `where.exe` processes, so an unshared memo turns one lookup into
         twelve process spawns on the startup path.
-      ''');
+      ''',
+      );
     });
 
-    test('the memo is cleared, so a LATER scan is not served a stale answer',
-        () async {
-      // The memo is in-flight only. If it were cached forever, an
-      // interpreter installed after the first launch would never be found -
-      // a bug that would look like "the app cannot find Python any more".
-      if (!Platform.isWindows) {
-        markTestSkipped('where.exe is a Windows lookup');
-        return;
-      }
-      final before = SidecarSupervisor.pathScanCount;
-      await SidecarSupervisor.pathInterpretersAsync();
-      await SidecarSupervisor.pathInterpretersAsync();
-      final scans = SidecarSupervisor.pathScanCount - before;
+    test(
+      'the memo is cleared, so a LATER scan is not served a stale answer',
+      () async {
+        // The memo is in-flight only. If it were cached forever, an
+        // interpreter installed after the first launch would never be found -
+        // a bug that would look like "the app cannot find Python any more".
+        if (!Platform.isWindows) {
+          markTestSkipped('where.exe is a Windows lookup');
+          return;
+        }
+        final before = SidecarSupervisor.pathScanCount;
+        await SidecarSupervisor.pathInterpretersAsync();
+        await SidecarSupervisor.pathInterpretersAsync();
+        final scans = SidecarSupervisor.pathScanCount - before;
 
-      expect(scans, 2,
-          reason: '''
+        expect(
+          scans,
+          2,
+          reason:
+              '''
         Two SEQUENTIAL calls ran $scans scans. The memo must dedupe only
         concurrent work; holding onto the result forever would mean an
         interpreter installed after startup is never discovered.
-      ''');
-    });
+      ''',
+        );
+      },
+    );
   });
 
   group('candidateTargets still builds the same candidate list', () {
@@ -151,8 +176,11 @@ void main() {
         roots: const [],
         pythonsOnPath: const [r'C:\Python314\python.exe'],
       );
-      expect(targets, isEmpty,
-          reason: 'no roots means no sidecar script to launch against');
+      expect(
+        targets,
+        isEmpty,
+        reason: 'no roots means no sidecar script to launch against',
+      );
     });
   });
 }

@@ -1,4 +1,4 @@
-﻿import '../models/network_intent.dart';
+import '../models/network_intent.dart';
 import 'phrasing_memory_service.dart';
 
 /// One correction the user made to a parse, counted.
@@ -56,30 +56,30 @@ class MisparseEntry {
   bool get isReviewable => status == 'proposed';
 
   Map<String, dynamic> toMap() => {
-        'key': key,
-        'original': original,
-        'understood': understood,
-        'corrected': corrected,
-        'slot': slot,
-        'source': source,
-        'status': status,
-        'count': count,
-        'createdAt': createdAt,
-        'updatedAt': updatedAt,
-      };
+    'key': key,
+    'original': original,
+    'understood': understood,
+    'corrected': corrected,
+    'slot': slot,
+    'source': source,
+    'status': status,
+    'count': count,
+    'createdAt': createdAt,
+    'updatedAt': updatedAt,
+  };
 
   factory MisparseEntry.fromMap(Map<String, dynamic> m) => MisparseEntry(
-        key: (m['key'] ?? '').toString(),
-        original: (m['original'] ?? '').toString(),
-        understood: (m['understood'] ?? '').toString(),
-        corrected: (m['corrected'] ?? '').toString(),
-        slot: (m['slot'] ?? 'free').toString(),
-        source: (m['source'] ?? 'typed').toString(),
-        status: (m['status'] ?? 'ledger').toString(),
-        count: (m['count'] as num?)?.toInt() ?? 1,
-        createdAt: (m['createdAt'] ?? '').toString(),
-        updatedAt: (m['updatedAt'] ?? '').toString(),
-      );
+    key: (m['key'] ?? '').toString(),
+    original: (m['original'] ?? '').toString(),
+    understood: (m['understood'] ?? '').toString(),
+    corrected: (m['corrected'] ?? '').toString(),
+    slot: (m['slot'] ?? 'free').toString(),
+    source: (m['source'] ?? 'typed').toString(),
+    status: (m['status'] ?? 'ledger').toString(),
+    count: (m['count'] as num?)?.toInt() ?? 1,
+    createdAt: (m['createdAt'] ?? '').toString(),
+    updatedAt: (m['updatedAt'] ?? '').toString(),
+  );
 }
 
 /// The misparse ledger: a conversation-side twin of the build side's
@@ -108,7 +108,8 @@ class MisparseLedger {
     List<MisparseEntry> entries,
     MisparseEntry? entry,
     MisparseEntry? proposed,
-  }) record({
+  })
+  record({
     required List<MisparseEntry> entries,
     required String original,
     required String understood,
@@ -129,8 +130,8 @@ class MisparseLedger {
       final status = was.status == 'dismissed' || was.status == 'taught'
           ? was.status
           : count >= promoteAfter
-              ? 'proposed'
-              : was.status;
+          ? 'proposed'
+          : was.status;
       next[at] = MisparseEntry(
         key: was.key,
         original: was.original,
@@ -187,8 +188,18 @@ class MisparseLedger {
       counts[n.type] = (counts[n.type] ?? 0) + 1;
     }
     final order = <String>[
-      'router', 'switch', 'pc', 'server', 'firewall', 'wireless', 'laptop',
-      'printer', 'phone', 'cloud', 'modem', 'wireless-router',
+      'router',
+      'switch',
+      'pc',
+      'server',
+      'firewall',
+      'wireless',
+      'laptop',
+      'printer',
+      'phone',
+      'cloud',
+      'modem',
+      'wireless-router',
     ];
     final parts = <String>[
       for (final t in order)
@@ -244,7 +255,8 @@ class MisparseLedger {
     }
     if (slot == 'routing') {
       final proto = v.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
-      if (!const ['static', 'ospf', 'eigrp', 'bgp'].contains(proto)) return null;
+      if (!const ['static', 'ospf', 'eigrp', 'bgp'].contains(proto))
+        return null;
       final hit = RegExp(
         r'\b(?:ospf|eigrp|bgp|static)\b',
         caseSensitive: false,

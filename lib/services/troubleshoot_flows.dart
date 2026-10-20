@@ -127,8 +127,7 @@ class TroubleshootFlows {
     r'server|laptop)\s*\d+\b',
   );
 
-  static bool _any(String t, List<String> phrases) =>
-      phrases.any(t.contains);
+  static bool _any(String t, List<String> phrases) => phrases.any(t.contains);
 
   /// Initial state for a flow, or null for an unknown id.
   static Map<String, dynamic>? start(String flowId) {
@@ -167,7 +166,8 @@ class TroubleshootFlowEngine {
     final step = flow?.steps[stepId];
     if (flow == null || step == null) {
       return FlowTurn(
-        prompt: 'I lost the thread of that diagnosis - say the symptom '
+        prompt:
+            'I lost the thread of that diagnosis - say the symptom '
             'again (for example "PC1 cannot ping PC2") and I will start '
             'it fresh.',
         done: true,
@@ -180,7 +180,8 @@ class TroubleshootFlowEngine {
     final value = _matchOption(step.options, userText);
     if (value == null) {
       return FlowTurn(
-        prompt: '${step.prompt}\n\n'
+        prompt:
+            '${step.prompt}\n\n'
             '(Tap one of the options, or say what you see in your own '
             'words.)',
         options: step.options,
@@ -204,7 +205,8 @@ class TroubleshootFlowEngine {
       // A flow-definition bug (a value with no hop): fail closed to an
       // honest dead-end rather than an empty message.
       return FlowTurn(
-        prompt: 'That branch of the diagnosis ran out of road - tell me '
+        prompt:
+            'That branch of the diagnosis ran out of road - tell me '
             'what you are seeing and I will pick the ladder up from '
             'there.',
         done: true,
@@ -279,7 +281,8 @@ class _Flow {
   const _Flow(this.first, this.steps);
 }
 
-const String _updown = 'The port shows up/down - the switch sees the cable '
+const String _updown =
+    'The port shows up/down - the switch sees the cable '
     'but the line protocol is down. That is a speed/duplex mismatch or a '
     'dead neighbor side, not addressing:\n'
     '1. `show run interface <port>` - if it is hard-set (for example '
@@ -290,7 +293,8 @@ const String _updown = 'The port shows up/down - the switch sees the cable '
     'Verify with `show ip interface brief` - the port must read up/up '
     'before addressing matters.';
 
-const String _downdown = 'The port shows down/down - layer 1 is dead, so '
+const String _downdown =
+    'The port shows down/down - layer 1 is dead, so '
     'nothing above it can work. No IP change will fix this:\n'
     '1. Reseat both cable ends; try a known-good cable.\n'
     '2. `show cdp neighbors` - if the neighbor is not listed at all, the '
@@ -298,7 +302,8 @@ const String _downdown = 'The port shows down/down - layer 1 is dead, so '
     '3. Move the cable to a spare switch port and re-check.\n'
     'Verify with `show ip interface brief` - the port must read up/up.';
 
-const String _admindown = 'The port reads administratively down - someone '
+const String _admindown =
+    'The port reads administratively down - someone '
     '(or a port-security err-disable) shut it:\n'
     '1. `show run interface <port>` - look for `shutdown`.\n'
     '2. In the interface config: `no shutdown`.\n'
@@ -307,7 +312,8 @@ const String _admindown = 'The port reads administratively down - someone '
     '`shutdown` + `no shutdown` after fixing the violation.\n'
     'Verify with `show ip interface brief` - up/up.';
 
-const String _apipa = 'The PC self-assigned a 169.254.x.x address - that is '
+const String _apipa =
+    'The PC self-assigned a 169.254.x.x address - that is '
     'APIPA, and it means DHCP never answered:\n'
     '1. On the DHCP server (or router pool): `show ip dhcp binding` - is '
     'the pool handing out leases at all?\n'
@@ -319,7 +325,8 @@ const String _apipa = 'The PC self-assigned a 169.254.x.x address - that is '
     'Verify with `ipconfig` on the PC after `ipconfig /renew` - a real '
     'address in the pool range, with the right gateway.';
 
-const String _gatewayTimeout = 'The PC cannot ping its own gateway, so the '
+const String _gatewayTimeout =
+    'The PC cannot ping its own gateway, so the '
     'fault is still local - do not chase routing yet:\n'
     '1. `ipconfig` - is the default gateway in the SAME subnet as the PC '
     '(a 192.168.2.x PC needs a 192.168.2.x gateway, not .1.x)?\n'
@@ -330,7 +337,8 @@ const String _gatewayTimeout = 'The PC cannot ping its own gateway, so the '
     'Verify with `ping <gateway>` from the PC - it must answer before any '
     'further test means anything.';
 
-const String _routingUnreachable = 'The reply is "destination host '
+const String _routingUnreachable =
+    'The reply is "destination host '
     'unreachable" - that is a ROUTER saying it has no route. Local '
     'addressing is fine; routing is the fault:\n'
     '1. On the last router in the path: `show ip route` - the far subnet '
@@ -342,7 +350,8 @@ const String _routingUnreachable = 'The reply is "destination host '
     'Verify with `show ip route` (far subnet listed) and then the original '
     'ping.';
 
-const String _aclTimeout = 'The ping times out silently with addressing and '
+const String _aclTimeout =
+    'The ping times out silently with addressing and '
     'routes in place - that shape is filtering, not routing:\n'
     '1. `show access-lists` on every router in the path - look for a '
     'permit/deny that matches this traffic.\n'
@@ -353,20 +362,23 @@ const String _aclTimeout = 'The ping times out silently with addressing and '
     'Verify by re-running the ping after each ACL removal - the one that '
     'changes the result is the guilty one.';
 
-const String _allGood = 'Every rung checked out: link up/up, real address, '
+const String _allGood =
+    'Every rung checked out: link up/up, real address, '
     'gateway answers, far end replies. The path works NOW - re-run your '
     'original test. If the fault comes back intermittently, say '
     '"the network keeps dropping" and I will run the intermittent-drop '
     'ladder instead.';
 
-const String _noGateway = 'The PC cannot even reach its own gateway, so the '
+const String _noGateway =
+    'The PC cannot even reach its own gateway, so the '
     'internet is not the problem yet - the local LAN is. Run the local '
     'ladder first: check the switch port (`show ip interface brief`), then '
     '`ipconfig` on the PC (a 169.254.x.x address means DHCP never '
     'answered), then `ping <gateway>`. Say "PC cannot ping anything" and I '
     'will walk it with you step by step.';
 
-const String _wanDown = 'The router itself cannot reach the ISP edge, so '
+const String _wanDown =
+    'The router itself cannot reach the ISP edge, so '
     'nothing downstream matters yet:\n'
     '1. `show ip interface brief` - the WAN interface must be up/up with '
     'the right address.\n'
@@ -376,7 +388,8 @@ const String _wanDown = 'The router itself cannot reach the ISP edge, so '
     'still fail, NAT is next, not the WAN.\n'
     'Verify with `ping <isp-ip>` from the router itself.';
 
-const String _noNat = 'No translations in `show ip nat translations` - the '
+const String _noNat =
+    'No translations in `show ip nat translations` - the '
     'PCs\' private addresses are reaching the router but never leave as a '
     'public one. Configure PAT overload:\n'
     '1. On the LAN interfaces: `ip nat inside`.\n'
@@ -386,7 +399,8 @@ const String _noNat = 'No translations in `show ip nat translations` - the '
     'Verify with a PC browsing while you run `show ip nat translations` - '
     'entries must appear.';
 
-const String _natOkDns = 'NAT is translating, so routing and address '
+const String _natOkDns =
+    'NAT is translating, so routing and address '
     'translation work - DNS is the usual last suspect:\n'
     '1. From the PC: `nslookup cisco.com` - if names fail but '
     '`ping 8.8.8.8` works, DNS is the fault.\n'
@@ -397,7 +411,8 @@ const String _natOkDns = 'NAT is translating, so routing and address '
     'Verify with `nslookup cisco.com` from the PC - a resolved address, '
     'then the original browse.';
 
-const String _wifiDrops = 'Wifi drops are usually RF, not config:\n'
+const String _wifiDrops =
+    'Wifi drops are usually RF, not config:\n'
     '1. Same SSID on all APs with roaming in mind - check channels do not '
     'overlap (1/6/11 on 2.4 GHz).\n'
     '2. Signal strength at the drop spot - a client clinging to a far AP '
@@ -408,7 +423,8 @@ const String _wifiDrops = 'Wifi drops are usually RF, not config:\n'
     'Verify by watching the client - it should roam between APs without '
     'losing the association.';
 
-const String _crcErrors = 'Climbing input errors / CRCs on a switch port is '
+const String _crcErrors =
+    'Climbing input errors / CRCs on a switch port is '
     'a physical-layer fault dressed as an intermittent one:\n'
     '1. Replace the cable first - marginal cables CRC exactly like this.\n'
     '2. Match speed/duplex: auto on BOTH ends, or the same fixed value on '
@@ -418,7 +434,8 @@ const String _crcErrors = 'Climbing input errors / CRCs on a switch port is '
     'Verify with `show interfaces <port>` after the swap - counters stay '
     'flat under load.';
 
-const String _duplicateIp = 'It drops when another device joins - that is '
+const String _duplicateIp =
+    'It drops when another device joins - that is '
     'the classic duplicate-address signature: two hosts answer ARP for one '
     'address, and which one wins changes per reply:\n'
     '1. `show arp` on the switch/router - look for one MAC flapping '
@@ -429,7 +446,8 @@ const String _duplicateIp = 'It drops when another device joins - that is '
     'or give it a reserved lease.\n'
     'Verify with `show arp` - one IP, one MAC, stable.';
 
-const String _tcnLoop = 'Topology changes in the logs mean a link is '
+const String _tcnLoop =
+    'Topology changes in the logs mean a link is '
     'flapping or a loop is being pruned - STP is doing its job, badly for '
     'you:\n'
     '1. `show spanning-tree` - which port keeps going through listening/'
@@ -441,7 +459,8 @@ const String _tcnLoop = 'Topology changes in the logs mean a link is '
     'Verify with `show spanning-tree` over a few minutes - one stable '
     'root, no repeated topology changes.';
 
-const String _idleDrops = 'Random idle drops with clean counters and no '
+const String _idleDrops =
+    'Random idle drops with clean counters and no '
     'topology changes point away from the LAN itself:\n'
     '1. Power saving: NIC power management and PoE budget '
     '(`show power inline`) - a port that brownouts drops exactly like '
@@ -458,7 +477,7 @@ final Map<String, _Flow> _flows = {
     's1': _Step(
       's1',
       'Start at the switch port the PC uses: run `show ip interface '
-      'brief` (or read the port lights). What does that port show?',
+          'brief` (or read the port lights). What does that port show?',
       const [
         FlowOption('up/up', 'upup'),
         FlowOption('up/down', 'updown'),
@@ -478,7 +497,7 @@ final Map<String, _Flow> _flows = {
     's2': _Step(
       's2',
       'Layer 1 is good. On the PC run `ipconfig`: does it hold a real '
-      'address in its LAN, or a 169.254.x.x one?',
+          'address in its LAN, or a 169.254.x.x one?',
       const [
         FlowOption('a 169.254.x.x address', 'apipa'),
         FlowOption('a real address', 'realip'),
@@ -489,23 +508,18 @@ final Map<String, _Flow> _flows = {
     's3': _Step(
       's3',
       'Addressing looks right. Can the PC ping its own gateway '
-      '(`ping <gateway>`)?',
+          '(`ping <gateway>`)?',
       const [
         FlowOption('it replies', 'yes'),
         FlowOption('timed out', 'timeout'),
       ],
       next: {'yes': 's4', 'timeout': 'fix_gwtimeout'},
     ),
-    'fix_gwtimeout': _Step(
-      'fix_gwtimeout',
-      '',
-      const [],
-      fix: _gatewayTimeout,
-    ),
+    'fix_gwtimeout': _Step('fix_gwtimeout', '', const [], fix: _gatewayTimeout),
     's4': _Step(
       's4',
       'The local LAN is healthy - the PC reaches its gateway. Now ping '
-      'the far device from the PC. What comes back?',
+          'the far device from the PC. What comes back?',
       const [
         FlowOption('it replies', 'replies'),
         FlowOption('destination host unreachable', 'unreachable'),
@@ -525,29 +539,23 @@ final Map<String, _Flow> _flows = {
     's1': _Step(
       's1',
       'First, can the PC ping its own LAN gateway (for example '
-      '`ping 192.168.1.1`)?',
-      const [
-        FlowOption('yes', 'yes'),
-        FlowOption('no', 'no'),
-      ],
+          '`ping 192.168.1.1`)?',
+      const [FlowOption('yes', 'yes'), FlowOption('no', 'no')],
       next: {'yes': 's2', 'no': 'fix_local'},
     ),
     'fix_local': _Step('fix_local', '', const [], fix: _noGateway),
     's2': _Step(
       's2',
       'The LAN is fine. On the edge router, can it reach the ISP side '
-      '(`ping <isp-next-hop>` from the router)?',
-      const [
-        FlowOption('yes', 'yes'),
-        FlowOption('timed out', 'timeout'),
-      ],
+          '(`ping <isp-next-hop>` from the router)?',
+      const [FlowOption('yes', 'yes'), FlowOption('timed out', 'timeout')],
       next: {'yes': 's3', 'timeout': 'fix_wan'},
     ),
     'fix_wan': _Step('fix_wan', '', const [], fix: _wanDown),
     's3': _Step(
       's3',
       'Routing reaches the ISP. Is NAT actually translating? Run '
-      '`show ip nat translations` while a PC tries to browse.',
+          '`show ip nat translations` while a PC tries to browse.',
       const [
         FlowOption('it shows translations', 'entries'),
         FlowOption('it is empty', 'empty'),
@@ -558,11 +566,8 @@ final Map<String, _Flow> _flows = {
     's4': _Step(
       's4',
       'NAT works. Last rung: does DNS resolve? `nslookup cisco.com` on '
-      'the PC.',
-      const [
-        FlowOption('it resolves', 'yes'),
-        FlowOption('it fails', 'no'),
-      ],
+          'the PC.',
+      const [FlowOption('it resolves', 'yes'), FlowOption('it fails', 'no')],
       next: {'yes': 'fix_done', 'no': 'fix_dns'},
     ),
     'fix_done': _Step('fix_done', '', const [], fix: _allGood),
@@ -572,17 +577,14 @@ final Map<String, _Flow> _flows = {
     's1': _Step(
       's1',
       'Is the device that drops wired, or on wifi?',
-      const [
-        FlowOption('wired', 'wired'),
-        FlowOption('wifi', 'wifi'),
-      ],
+      const [FlowOption('wired', 'wired'), FlowOption('wifi', 'wifi')],
       next: {'wired': 's2', 'wifi': 'fix_wifi'},
     ),
     'fix_wifi': _Step('fix_wifi', '', const [], fix: _wifiDrops),
     's2': _Step(
       's2',
       'On its switch port: do the error counters climb? '
-      '(`show interfaces <port>` - watch input errors and CRCs.)',
+          '(`show interfaces <port>` - watch input errors and CRCs.)',
       const [
         FlowOption('errors climbing', 'errors'),
         FlowOption('counters clean', 'clean'),
@@ -598,19 +600,15 @@ final Map<String, _Flow> _flows = {
         FlowOption('at random idle moments', 'idle'),
         FlowOption('when another device joins', 'joins'),
       ],
-      next: {
-        'load': 'fix_crc',
-        'idle': 's4',
-        'joins': 'fix_dupip',
-      },
+      next: {'load': 'fix_crc', 'idle': 's4', 'joins': 'fix_dupip'},
     ),
     'fix_idle': _Step('fix_idle', '', const [], fix: _idleDrops),
     'fix_dupip': _Step('fix_dupip', '', const [], fix: _duplicateIp),
     's4': _Step(
       's4',
       'One more check before the physical hunt: do the logs show '
-      'spanning-tree topology changes? (`show spanning-tree`, and watch '
-      'for "topology changed" lines.)',
+          'spanning-tree topology changes? (`show spanning-tree`, and watch '
+          'for "topology changed" lines.)',
       const [
         FlowOption('yes, topology changes', 'tcn'),
         FlowOption('no changes', 'clean'),

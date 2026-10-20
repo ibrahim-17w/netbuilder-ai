@@ -64,8 +64,8 @@ class PhrasingMemoryService {
 
   /// The index as data, for tests and the Memory screen.
   static List<({String phrasing, String rewrite})> get indexView => [
-        for (final e in _index) (phrasing: e.phrasing, rewrite: e.rewrite),
-      ];
+    for (final e in _index) (phrasing: e.phrasing, rewrite: e.rewrite),
+  ];
 
   /// Replace the live index (called by MemoryService after any change).
   static void setIndex(Iterable<({String phrasing, String rewrite})> rows) {
@@ -99,22 +99,98 @@ class PhrasingMemoryService {
   );
 
   static final Set<String> _stopwords = {
-    'a', 'an', 'the', 'and', 'or', 'of', 'to', 'in', 'on', 'for', 'with',
-    'at', 'by', 'is', 'are', 'be', 'do', 'does', 'did', 'i', 'we', 'you',
-    'my', 'our', 'your', 'it', 'this', 'that', 'these', 'those', 'please',
-    'can', 'could', 'would', 'will', 'want', 'need', 'build', 'make',
-    'me', 'us', 'so', 'up', 'out', 'if', 'then', 'from', 'into', 'just',
-    'really', 'very', 'well', 'okay', 'ok', 'yeah', 'yes', 'no', 'not',
-    'now', 'here', 'there', 'what', 'which', 'why', 'how', 'when', 'also',
-    'pls', 'thanks', 'thank', 'hi', 'hello', 'let', 'lets', 'get', 'got',
-    'like', 'about', 'over', 'all', 'any', 'some', 'one', 'thing', 'things',
+    'a',
+    'an',
+    'the',
+    'and',
+    'or',
+    'of',
+    'to',
+    'in',
+    'on',
+    'for',
+    'with',
+    'at',
+    'by',
+    'is',
+    'are',
+    'be',
+    'do',
+    'does',
+    'did',
+    'i',
+    'we',
+    'you',
+    'my',
+    'our',
+    'your',
+    'it',
+    'this',
+    'that',
+    'these',
+    'those',
+    'please',
+    'can',
+    'could',
+    'would',
+    'will',
+    'want',
+    'need',
+    'build',
+    'make',
+    'me',
+    'us',
+    'so',
+    'up',
+    'out',
+    'if',
+    'then',
+    'from',
+    'into',
+    'just',
+    'really',
+    'very',
+    'well',
+    'okay',
+    'ok',
+    'yeah',
+    'yes',
+    'no',
+    'not',
+    'now',
+    'here',
+    'there',
+    'what',
+    'which',
+    'why',
+    'how',
+    'when',
+    'also',
+    'pls',
+    'thanks',
+    'thank',
+    'hi',
+    'hello',
+    'let',
+    'lets',
+    'get',
+    'got',
+    'like',
+    'about',
+    'over',
+    'all',
+    'any',
+    'some',
+    'one',
+    'thing',
+    'things',
   };
 
   /// Content tokens: meaningful words only, length >= 2.
   static Set<String> contentTokens(String normalizedKey) => {
-        for (final w in normalizedKey.split(' '))
-          if (w.length >= 2 && !_stopwords.contains(w)) w,
-      };
+    for (final w in normalizedKey.split(' '))
+      if (w.length >= 2 && !_stopwords.contains(w)) w,
+  };
 
   /// The stored rewrite for this brief, or null (see [lookupMatch]).
   static String? lookup(String bridged) => lookupMatch(bridged)?.rewrite;
@@ -155,8 +231,9 @@ class PhrasingMemoryService {
       if (other.length < 3) continue;
       final shared = keyTokens.intersection(other).length;
       if (shared < 3) continue;
-      final smaller =
-          keyTokens.length < other.length ? keyTokens.length : other.length;
+      final smaller = keyTokens.length < other.length
+          ? keyTokens.length
+          : other.length;
       final score = shared / smaller;
       if (score > bestScore) {
         bestScore = score;

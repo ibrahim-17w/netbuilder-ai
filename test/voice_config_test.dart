@@ -10,11 +10,7 @@ void main() {
       nodes: [
         NetNode(name: 'R1', type: 'router'),
         NetNode(name: 'SW1', type: 'switch'),
-        NetNode(
-          name: 'CME1',
-          type: 'server',
-          services: ['cme'],
-        ),
+        NetNode(name: 'CME1', type: 'server', services: ['cme']),
         NetNode(name: 'PH1', type: 'phone'),
         NetNode(name: 'PH2', type: 'phone'),
       ],

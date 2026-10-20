@@ -43,8 +43,11 @@ class DesignBriefService {
     // them FIRST means this turn's fresh statement still wins a same-rank
     // tie, and the app never asks about something it has already been told.
     for (final rule in standingRules) {
-      brief = _applyText(brief, rule.trim().toLowerCase(),
-          source: 'your standing rule');
+      brief = _applyText(
+        brief,
+        rule.trim().toLowerCase(),
+        source: 'your standing rule',
+      );
     }
 
     // Applied lowest precedence first: each later claim wins only when its
@@ -160,19 +163,18 @@ class DesignBriefService {
         announced.add('${_slotLabel(id)}: no longer set');
       }
     }
-    return BriefTurn(
-      brief: brief,
-      changed: changed,
-      announced: announced,
-    );
+    return BriefTurn(brief: brief, changed: changed, announced: announced);
   }
 
   // --- text claims ---------------------------------------------------------
 
   /// [source] names where the words came from - this turn's message or a
   /// standing rule - so the card and the announced lines can say so.
-  static DesignBrief _applyText(DesignBrief brief, String t,
-      {String source = 'from your words'}) {
+  static DesignBrief _applyText(
+    DesignBrief brief,
+    String t, {
+    String source = 'from your words',
+  }) {
     if (t.isEmpty) return brief;
 
     // Scale: a number attached to a count-of-people/devices noun.
@@ -341,9 +343,7 @@ class DesignBriefService {
     r'|wireless routers?|laptops?|phones?)\b',
   );
 
-  static final RegExp _protocol = RegExp(
-    r'\b(ospf|eigrp|rip|bgp)\b',
-  );
+  static final RegExp _protocol = RegExp(r'\b(ospf|eigrp|rip|bgp)\b');
 
   /// The text was ABOUT routing - the gate for trusting the plan's routing
   /// value as a user decision rather than a planner default.

@@ -14,8 +14,7 @@ import 'package:net_builder/services/validator_service.dart';
 /// English and Arabic into.  Nothing here touches Gemini, Packet Tracer or the
 /// network - the whole point is that this path needs none of them.
 void main() {
-  String fixture(String name) =>
-      File('test/fixtures/$name').readAsStringSync();
+  String fixture(String name) => File('test/fixtures/$name').readAsStringSync();
 
   group('brief bridge', () {
     test('Arabic-Indic digits become ASCII', () {
@@ -62,10 +61,7 @@ void main() {
       expect(bridged, contains('server'));
       expect(bridged, contains('pc'));
       // 'جهاز التوجيه' is a router, not a PC: the longer phrase wins.
-      expect(
-        NetworkIntent.bridgeBrief('جهاز التوجيه'),
-        isNot(contains('pc')),
-      );
+      expect(NetworkIntent.bridgeBrief('جهاز التوجيه'), isNot(contains('pc')));
     });
   });
 
@@ -91,7 +87,10 @@ void main() {
       expect(s.aaa, isTrue);
       expect(s.officeHours, contains('8:00-16:00'));
       expect(intent.links.any((l) => l.isSerial), isTrue);
-      expect(ValidatorService.hasErrors(ValidatorService.validate(intent)), isFalse);
+      expect(
+        ValidatorService.hasErrors(ValidatorService.validate(intent)),
+        isFalse,
+      );
     });
 
     test('English synonyms trigger the same controls', () {
@@ -179,17 +178,20 @@ void main() {
       );
     });
 
-    test('uses the credentials and pre-shared key when the brief states them', () {
-      final stated = NetworkIntent.parseSimple('security-project', '''
+    test(
+      'uses the credentials and pre-shared key when the brief states them',
+      () {
+        final stated = NetworkIntent.parseSimple('security-project', '''
 Security project for the branch and headquarters. TACACS+ username labadmin
 with password LabAdmin2026, office hours 08:00 to 17:00, port security and
 DHCP snooping on the user ports, IPSec with pre-shared key NetBuilderLab2026,
 AES and SHA.
 ''');
-      expect(stated.security.aaaUsername, 'labadmin');
-      expect(stated.security.aaaPassword, 'LabAdmin2026');
-      expect(stated.security.vpnPreSharedKey, 'NetBuilderLab2026');
-    });
+        expect(stated.security.aaaUsername, 'labadmin');
+        expect(stated.security.aaaPassword, 'LabAdmin2026');
+        expect(stated.security.vpnPreSharedKey, 'NetBuilderLab2026');
+      },
+    );
 
     test('reads credentials written in Arabic', () {
       final stated = NetworkIntent.parseSimple('amn', '''
@@ -274,9 +276,8 @@ LabAdmin2026.
       expect(intent.nodes.length, 9);
       // One LAN per router, so the two switches are not stacked on one side.
       final uplinks = intent.links.where((l) {
-        bool kind(String name, String type) => intent.nodes.any(
-          (n) => n.name == name && n.type == type,
-        );
+        bool kind(String name, String type) =>
+            intent.nodes.any((n) => n.name == name && n.type == type);
         return (kind(l.a, 'router') && kind(l.b, 'switch')) ||
             (kind(l.b, 'router') && kind(l.a, 'switch'));
       }).toList();
@@ -286,9 +287,7 @@ LabAdmin2026.
           .where((l) => l.a == 'SW1' || l.b == 'SW1')
           .expand(
             (l) => intent.addressing.where(
-              (a) =>
-                  a.node == 'R1' &&
-                  a.iface == (l.a == 'R1' ? l.aIf : l.bIf),
+              (a) => a.node == 'R1' && a.iface == (l.a == 'R1' ? l.aIf : l.bIf),
             ),
           )
           .map((a) => a.ipCidr)
@@ -315,11 +314,10 @@ LabAdmin2026.
       final subnets = intent.nodes
           .where((n) => n.type == 'pc')
           .map(
-            (n) =>
-                PacketTracerAdapter.endpointIpConfig(intent, n.name)['ip']!
-                    .split('.')
-                    .sublist(0, 3)
-                    .join('.'),
+            (n) => PacketTracerAdapter.endpointIpConfig(
+              intent,
+              n.name,
+            )['ip']!.split('.').sublist(0, 3).join('.'),
           )
           .toSet();
       expect(subnets.length, 3, reason: 'three switches, three LANs');
@@ -372,8 +370,10 @@ LabAdmin2026.
       // link); R2 announces the far LAN, EIGRP exchanges the rest.
       expect(cfg, contains(' network 192.168.1.0 0.0.0.255'));
       expect(cfg, contains(' network 10.0.0.0 0.0.0.3'));
-      expect(CiscoAdapter.render(intent)['R2']!,
-          contains(' network 192.168.2.0 0.0.0.255'));
+      expect(
+        CiscoAdapter.render(intent)['R2']!,
+        contains(' network 192.168.2.0 0.0.0.255'),
+      );
       // The protocol replaces the static routes, not stacks on them.
       expect(cfg, isNot(contains('ip route ')));
     });
@@ -460,10 +460,16 @@ LabAdmin2026.
           .where((a) => a.node.startsWith('PC'))
           .map((a) => a.ipCidr)
           .toSet();
-      expect(pcAddrs.any((c) => c.startsWith('192.168.10.')), isTrue,
-          reason: 'a PC sits in VLAN 10');
-      expect(pcAddrs.any((c) => c.startsWith('192.168.20.')), isTrue,
-          reason: 'a PC sits in VLAN 20');
+      expect(
+        pcAddrs.any((c) => c.startsWith('192.168.10.')),
+        isTrue,
+        reason: 'a PC sits in VLAN 10',
+      );
+      expect(
+        pcAddrs.any((c) => c.startsWith('192.168.20.')),
+        isTrue,
+        reason: 'a PC sits in VLAN 20',
+      );
       final switchCfg = CiscoAdapter.render(intent)['SW1']!;
       // The uplink is a trunk carrying both VLANs.
       expect(switchCfg, contains(' switchport mode trunk'));

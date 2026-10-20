@@ -41,8 +41,11 @@ void main() {
 
       final after = next(lab, 'can we add AAA server to it as well ?');
 
-      expect(after.plan.nodes.length, lab.plan.nodes.length + 1,
-          reason: 'the 13 devices survive, and the AAA server is added');
+      expect(
+        after.plan.nodes.length,
+        lab.plan.nodes.length + 1,
+        reason: 'the 13 devices survive, and the AAA server is added',
+      );
       expect(after.plan.security.aaa, isTrue, reason: 'AAA is the addition');
       expect(
         after.plan.nodes.map((n) => n.name),
@@ -57,15 +60,21 @@ void main() {
       final after = next(lab, 'can we add AAA server to it as well ?');
       final delta = NetworkIntent.planChangeSummary(lab.plan, after.plan);
       expect(delta, contains('AAA'));
-      expect(delta, isNot(contains('Telnet')),
-          reason: 'AAA is one decision, not two');
+      expect(
+        delta,
+        isNot(contains('Telnet')),
+        reason: 'AAA is one decision, not two',
+      );
     });
 
     test('"add" means plus, for counted and uncounted kinds alike', () {
       final lab = start('1 router 2 switches 4 pcs');
       final after = next(lab, 'add 6 pcs and a server too');
-      expect(after.plan.nodes.where((n) => n.type == 'pc').length, 10,
-          reason: 'four PCs plus the six the user asked for');
+      expect(
+        after.plan.nodes.where((n) => n.type == 'pc').length,
+        10,
+        reason: 'four PCs plus the six the user asked for',
+      );
       expect(after.plan.nodes.where((n) => n.type == 'server').length, 1);
       expect(after.plan.nodes.where((n) => n.type == 'router').length, 1);
       expect(after.plan.nodes.where((n) => n.type == 'switch').length, 2);
@@ -103,24 +112,32 @@ void main() {
       // ...and it is remembered for a later addition.
       final withServer = next(after, 'add a web server too');
       expect(withServer.plan.routing, 'ospf');
-      expect(withServer.plan.nodes.length, greaterThan(after.plan.nodes.length));
+      expect(
+        withServer.plan.nodes.length,
+        greaterThan(after.plan.nodes.length),
+      );
     });
   });
 
   group('"want" is not a WAN', () {
-    test('a brief that asks for AAA is not read as a two-site security lab', () {
-      final plan = NetworkIntent.parseSimple(
-        'x',
-        'I want 1 router 2 switches 10 pcs and a server with AAA',
-      );
-      expect(plan.security.aaa, isTrue);
-      expect(plan.nodes.length, 14);
-      expect(
-        plan.nodes.any((n) => n.name.startsWith('HQ_') || n.name.startsWith('BR_')),
-        isFalse,
-        reason: 'the branch-profile devices are a different lab',
-      );
-    });
+    test(
+      'a brief that asks for AAA is not read as a two-site security lab',
+      () {
+        final plan = NetworkIntent.parseSimple(
+          'x',
+          'I want 1 router 2 switches 10 pcs and a server with AAA',
+        );
+        expect(plan.security.aaa, isTrue);
+        expect(plan.nodes.length, 14);
+        expect(
+          plan.nodes.any(
+            (n) => n.name.startsWith('HQ_') || n.name.startsWith('BR_'),
+          ),
+          isFalse,
+          reason: 'the branch-profile devices are a different lab',
+        );
+      },
+    );
 
     test('the site wording itself still selects that profile', () {
       final plan = NetworkIntent.parseSimple(
@@ -149,13 +166,22 @@ void main() {
 
     test('"actually 8 pcs" corrects the PC count and keeps the rest', () {
       final after = next(base, 'actually 8 pcs');
-      expect(after.plan.nodes.where((n) => n.type == 'pc').length, 8,
-          reason: 'the correction replaces the 50');
-      expect(after.plan.nodes.where((n) => n.type == 'router').length, 2,
-          reason: 'the routers were not part of the correction');
+      expect(
+        after.plan.nodes.where((n) => n.type == 'pc').length,
+        8,
+        reason: 'the correction replaces the 50',
+      );
+      expect(
+        after.plan.nodes.where((n) => n.type == 'router').length,
+        2,
+        reason: 'the routers were not part of the correction',
+      );
       expect(after.plan.nodes.where((n) => n.type == 'switch').length, 2);
-      expect(after.plan.routing, 'ospf',
-          reason: 'the routing the original brief asked for stays');
+      expect(
+        after.plan.routing,
+        'ospf',
+        reason: 'the routing the original brief asked for stays',
+      );
       expect(after.plan.nodes.length, 12);
     });
 
@@ -177,16 +203,22 @@ void main() {
       expect(first.plan.nodes.where((n) => n.type == 'pc').length, 8);
       final second = next(first, 'actually 60 pcs');
       expect(second.plan.nodes.where((n) => n.type == 'pc').length, 60);
-      expect(second.plan.nodes.where((n) => n.type == 'router').length, 2,
-          reason: 'the earlier correction did not loosen the lab');
+      expect(
+        second.plan.nodes.where((n) => n.type == 'router').length,
+        2,
+        reason: 'the earlier correction did not loosen the lab',
+      );
     });
 
     test('several kinds can be corrected in one breath', () {
       final after = next(base, 'actually 2 routers and 4 pcs');
       expect(after.plan.nodes.where((n) => n.type == 'router').length, 2);
       expect(after.plan.nodes.where((n) => n.type == 'pc').length, 4);
-      expect(after.plan.nodes.where((n) => n.type == 'switch').length, 2,
-          reason: 'the switches were not part of the correction');
+      expect(
+        after.plan.nodes.where((n) => n.type == 'switch').length,
+        2,
+        reason: 'the switches were not part of the correction',
+      );
     });
 
     test('correcting a kind the lab does not have yet adds it', () {
@@ -200,8 +232,11 @@ void main() {
     test('a correction may carry a service of its own', () {
       final after = next(base, 'actually 8 pcs with a web server');
       expect(after.plan.nodes.where((n) => n.type == 'pc').length, 8);
-      expect(after.plan.nodes.where((n) => n.type == 'server').length, 1,
-          reason: 'the server the correction names is part of the lab');
+      expect(
+        after.plan.nodes.where((n) => n.type == 'server').length,
+        1,
+        reason: 'the server the correction names is part of the lab',
+      );
       expect(after.plan.nodes.where((n) => n.type == 'switch').length, 2);
     });
 
@@ -211,12 +246,14 @@ void main() {
         after.plan,
         target: 'packet-tracer',
       ).where((issue) => issue.blocks);
-      expect(blocking, isEmpty,
-          reason: 'a correction must never leave the plan unbuildable');
+      expect(
+        blocking,
+        isEmpty,
+        reason: 'a correction must never leave the plan unbuildable',
+      );
     });
 
-    test('the corrected count survives the normalize step the chat runs',
-        () {
+    test('the corrected count survives the normalize step the chat runs', () {
       final normalized = CasualEnglish.normalize('Actually, 8 pcs');
       final after = NetworkIntent.followUp(
         previous: base.plan,
@@ -231,23 +268,32 @@ void main() {
 
     test('an addition is still an addition, not a correction', () {
       final after = next(base, 'add 2 more pcs');
-      expect(after.plan.nodes.where((n) => n.type == 'pc').length, 52,
-          reason: '"add" means plus on the standing lab');
+      expect(
+        after.plan.nodes.where((n) => n.type == 'pc').length,
+        52,
+        reason: '"add" means plus on the standing lab',
+      );
     });
 
     test('a rebuild that names devices still re-plans on purpose', () {
       final after = next(base, 'make it 2 routers and 4 pcs');
       expect(after.plan.nodes.where((n) => n.type == 'pc').length, 4);
       expect(after.plan.nodes.where((n) => n.type == 'router').length, 2);
-      expect(after.plan.nodes.where((n) => n.type == 'switch').length, 0,
-          reason: 'the documented re-plan reading is unchanged');
+      expect(
+        after.plan.nodes.where((n) => n.type == 'switch').length,
+        0,
+        reason: 'the documented re-plan reading is unchanged',
+      );
     });
 
     test('a corrected floor restates the bound instead of growing to it', () {
       final floored = start('more than 100 pcs');
       final after = next(floored, 'no wait, actually more than 8 pcs');
-      expect(after.plan.nodes.where((n) => n.type == 'pc').length, 9,
-          reason: 'the new bound replaces the old one');
+      expect(
+        after.plan.nodes.where((n) => n.type == 'pc').length,
+        9,
+        reason: 'the new bound replaces the old one',
+      );
     });
   });
 }

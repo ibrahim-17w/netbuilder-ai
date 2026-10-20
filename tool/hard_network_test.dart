@@ -48,11 +48,15 @@ void describe(String label, NetworkIntent i) {
   print(label);
   print('   devices      : ${i.nodes.length}  $byType');
   print('   links        : ${i.links.length}   vlans: ${i.vlans}');
-  print('   routing      : ${i.routing}   security requested: '
-      '${i.security.requested}');
+  print(
+    '   routing      : ${i.routing}   security requested: '
+    '${i.security.requested}',
+  );
   print('   addressing   : ${i.addressing.length} interfaces');
   print('   validator    : $errors error(s), $warnings warning(s)');
-  print('   suggestions  : ${PlannerSuggestionsService.forIntent(i, target: 'pt').length}');
+  print(
+    '   suggestions  : ${PlannerSuggestionsService.forIntent(i, target: 'pt').length}',
+  );
 }
 
 void main() {
@@ -80,10 +84,7 @@ void main() {
   }
 
   line('C. AUTO-LEARNING: SAME BRIEF, TAUGHT CORRECTIONS, 3 ROUNDS');
-  const rules = <String>[
-    'always use OSPF',
-    'always add a DNS server',
-  ];
+  const rules = <String>['always use OSPF', 'always add a DNS server'];
   const prefs = <String, String>{
     'base_subnet': '10.10.0.0/24',
     'router_model': '4331',
@@ -106,15 +107,21 @@ void main() {
         .map((a) => a.ipCidr)
         .toList();
     final onBase = lans.every((a) => a.startsWith('10.10.'));
-    print('round $round: routing=${taught.routing}  router models=$threads  '
-        'dns service=$dns  LANs on 10.10.x=$onBase (${lans.length} LANs)  '
-        'switches=${taught.nodes.where((n) => n.type == 'switch').map((n) => n.model).toSet()}');
+    print(
+      'round $round: routing=${taught.routing}  router models=$threads  '
+      'dns service=$dns  LANs on 10.10.x=$onBase (${lans.length} LANs)  '
+      'switches=${taught.nodes.where((n) => n.type == 'switch').map((n) => n.model).toSet()}',
+    );
   }
 
   line('D. IS IT DETERMINISTIC? (same brief twice)');
   final a = plan(hardBrief);
   final b = plan(hardBrief);
-  print('same devices : ${a.nodes.map((n) => n.name).join(',') == b.nodes.map((n) => n.name).join(',')}');
+  print(
+    'same devices : ${a.nodes.map((n) => n.name).join(',') == b.nodes.map((n) => n.name).join(',')}',
+  );
   print('same links   : ${a.links.length == b.links.length}');
-  print('same addrs   : ${a.addressing.map((x) => x.ipCidr).join(',') == b.addressing.map((x) => x.ipCidr).join(',')}');
+  print(
+    'same addrs   : ${a.addressing.map((x) => x.ipCidr).join(',') == b.addressing.map((x) => x.ipCidr).join(',')}',
+  );
 }

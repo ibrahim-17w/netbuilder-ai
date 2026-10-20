@@ -30,8 +30,9 @@ class BuildPreflight {
       '- Plan: ${describeDevices(intent)}; routing ${intent.routing}; '
           '${intent.links.length} link(s).',
     ];
-    final assumptions =
-        intent.assumptions.where((a) => a.trim().isNotEmpty).toList();
+    final assumptions = intent.assumptions
+        .where((a) => a.trim().isNotEmpty)
+        .toList();
     if (assumptions.isNotEmpty) {
       final shown = assumptions.take(3).join(' ');
       lines.add(
@@ -39,7 +40,9 @@ class BuildPreflight {
         '${assumptions.length > 3 ? ' (and ${assumptions.length - 3} more)' : ''}',
       );
     }
-    final questions = intent.questions.where((q) => q.trim().isNotEmpty).toList();
+    final questions = intent.questions
+        .where((q) => q.trim().isNotEmpty)
+        .toList();
     if (questions.isNotEmpty) {
       lines.add(
         '- Open questions (${questions.length}): ${questions.first}'
@@ -146,8 +149,9 @@ class BuildPreflight {
       final name = '${d['name'] ?? ''}'.trim();
       final svcs = d['services'];
       if (name.isEmpty || svcs is! List) continue;
-      servicesByName[name] =
-          svcs.map<String>((e) => '$e'.toLowerCase()).toSet();
+      servicesByName[name] = svcs
+          .map<String>((e) => '$e'.toLowerCase())
+          .toSet();
     }
     final roleGaps = <String>[];
     for (final n in intent.nodes) {
@@ -199,8 +203,8 @@ class BuildPreflight {
     if (doubled.isNotEmpty) {
       out.add(
         '    - one interface carries more than one cable: '
-            '${_cap(doubled)} - Packet Tracer cannot load a second cable on '
-            'a port, and the extra interface config overwrites the first',
+        '${_cap(doubled)} - Packet Tracer cannot load a second cable on '
+        'a port, and the extra interface config overwrites the first',
       );
     }
     if (semantic.isNotEmpty) {
@@ -217,11 +221,13 @@ class BuildPreflight {
     if (!linksChecked) {
       out.add(
         '    - the links were not compared: the audit carries no link data and '
-            'no generator report was collected',
+        'no generator report was collected',
       );
     }
-    out.add('    - Do not trust the file until this is resolved: rebuild, or '
-        'analyze the file and inspect the differences.');
+    out.add(
+      '    - Do not trust the file until this is resolved: rebuild, or '
+      'analyze the file and inspect the differences.',
+    );
     return (verified: false, lines: out);
   }
 
@@ -272,8 +278,7 @@ class BuildPreflight {
     }
   }
 
-  static List<String> _sortedCopy(List<String> items) =>
-      items.toList()..sort();
+  static List<String> _sortedCopy(List<String> items) => items.toList()..sort();
 
   static String _cap(List<String> items, [int n = 8]) => items.length <= n
       ? items.join(', ')

@@ -122,11 +122,13 @@ class LearnedAnswers {
     ).hasMatch(t)) {
       return false;
     }
-    if (RegExp(r'^(add|remove|delete|fix|repair|change|set|use|build|make)\b')
-        .hasMatch(t)) {
+    if (RegExp(
+      r'^(add|remove|delete|fix|repair|change|set|use|build|make)\b',
+    ).hasMatch(t)) {
       return false;
     }
-    final questionShaped = t.startsWith('how ') ||
+    final questionShaped =
+        t.startsWith('how ') ||
         t.startsWith('what ') ||
         t.startsWith('why ') ||
         t.startsWith('when ') ||
@@ -175,7 +177,9 @@ class LearnedAnswers {
     }
     final refusal = _refusal.firstMatch(text.toLowerCase());
     if (refusal != null) {
-      return LearnedCapture.reject('refusal-shaped answer: ${refusal.group(0)}');
+      return LearnedCapture.reject(
+        'refusal-shaped answer: ${refusal.group(0)}',
+      );
     }
     final conflict = _factConflict(question, text);
     if (conflict != null) {
@@ -254,7 +258,8 @@ class LearnedAnswers {
   /// to any repeated answer.
   static LearnedAnswer? pickBest(List<LearnedAnswer> candidates) {
     if (candidates.isEmpty) return null;
-    final sorted = [...candidates]..sort((a, b) {
+    final sorted = [...candidates]
+      ..sort((a, b) {
         if (a.confirmed != b.confirmed) return a.confirmed ? -1 : 1;
         if (a.seenCount != b.seenCount) return b.seenCount - a.seenCount;
         final bySeen = b.lastSeenAt.compareTo(a.lastSeenAt);
@@ -281,13 +286,75 @@ class LearnedAnswers {
   }
 
   static const Set<String> _stopwords = {
-    'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'to', 'of', 'and',
-    'or', 'in', 'on', 'at', 'for', 'with', 'as', 'by', 'it', 'its', 'this',
-    'that', 'you', 'your', 'can', 'will', 'do', 'does', 'not', 'if', 'when',
-    'use', 'used', 'using', 'set', 'get', 'have', 'has', 'had', 'so', 'than',
-    'then', 'there', 'here', 'which', 'what', 'how', 'why', 'from', 'into',
-    'also', 'about', 'up', 'out', 'one', 'two', 'each', 'all', 'any', 'may',
-    'should', 'would', 'could', 'must', 'need', 'want', 'make', 'made',
+    'the',
+    'a',
+    'an',
+    'is',
+    'are',
+    'was',
+    'were',
+    'be',
+    'to',
+    'of',
+    'and',
+    'or',
+    'in',
+    'on',
+    'at',
+    'for',
+    'with',
+    'as',
+    'by',
+    'it',
+    'its',
+    'this',
+    'that',
+    'you',
+    'your',
+    'can',
+    'will',
+    'do',
+    'does',
+    'not',
+    'if',
+    'when',
+    'use',
+    'used',
+    'using',
+    'set',
+    'get',
+    'have',
+    'has',
+    'had',
+    'so',
+    'than',
+    'then',
+    'there',
+    'here',
+    'which',
+    'what',
+    'how',
+    'why',
+    'from',
+    'into',
+    'also',
+    'about',
+    'up',
+    'out',
+    'one',
+    'two',
+    'each',
+    'all',
+    'any',
+    'may',
+    'should',
+    'would',
+    'could',
+    'must',
+    'need',
+    'want',
+    'make',
+    'made',
   };
 
   static Set<String> _contentTokens(String text) {
@@ -312,7 +379,13 @@ class LearnedAnswers {
   /// collapsed, so "What is IP?" and "what is ip" land on the same row.
   static String keyFor(String question) {
     var t = question.trim().toLowerCase();
-    t = t.replaceAll(RegExp(r'[?!.,;:"'']'), ' ');
+    t = t.replaceAll(
+      RegExp(
+        r'[?!.,;:"'
+        ']',
+      ),
+      ' ',
+    );
     t = t.replaceAll(RegExp(r'\s+'), ' ').trim();
     return t;
   }

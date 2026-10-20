@@ -181,7 +181,11 @@ void main() {
           const InterfaceAddr(node: 'R1', iface: 'g0/0', ipCidr: '10.9.0.1/24'),
           const InterfaceAddr(node: 'R1', iface: 'g0/1', ipCidr: '10.9.1.1/24'),
           for (var i = 1; i <= 30; i++)
-            InterfaceAddr(node: 'PC$i', iface: 'f0', ipCidr: '10.9.0.${i + 9}/24'),
+            InterfaceAddr(
+              node: 'PC$i',
+              iface: 'f0',
+              ipCidr: '10.9.0.${i + 9}/24',
+            ),
         ],
       );
       final before = ValidatorService.validate(

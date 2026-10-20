@@ -34,14 +34,27 @@ NetworkIntent _asaIntent() {
 void main() {
   test('ASA writes named inside policy from security intent', () {
     final cfg = CiscoAdapter.firewallConfigs(_asaIntent())['ASA1']!;
-    expect(cfg, contains('access-list INSIDE_POLICY extended permit tcp any host 10.0.10.80 eq www'));
-    expect(cfg, contains('access-list INSIDE_POLICY extended deny ip any host 10.0.10.50'));
+    expect(
+      cfg,
+      contains(
+        'access-list INSIDE_POLICY extended permit tcp any host 10.0.10.80 eq www',
+      ),
+    );
+    expect(
+      cfg,
+      contains(
+        'access-list INSIDE_POLICY extended deny ip any host 10.0.10.50',
+      ),
+    );
     expect(cfg, contains('access-group INSIDE_POLICY in interface inside'));
   });
 
   test('ASA restricts management to the plan manager address', () {
     final cfg = CiscoAdapter.firewallConfigs(_asaIntent())['ASA1']!;
-    expect(cfg, contains('access-list MGMT_ONLY extended permit ip host 172.16.9.9 any'));
+    expect(
+      cfg,
+      contains('access-list MGMT_ONLY extended permit ip host 172.16.9.9 any'),
+    );
     expect(cfg, contains('access-group MGMT_ONLY in interface outside'));
   });
 
@@ -64,7 +77,10 @@ void main() {
         InterfaceAddr(node: 'ASA1', iface: 'g0/1', ipCidr: '192.168.1.254/24'),
         InterfaceAddr(node: 'R1', iface: 'g0/0', ipCidr: '192.168.1.1/24'),
       ],
-      security: const SecurityIntent(extendedAcl: true, protectedServerIp: '192.168.1.9'),
+      security: const SecurityIntent(
+        extendedAcl: true,
+        protectedServerIp: '192.168.1.9',
+      ),
     );
     final cfg = CiscoAdapter.firewallConfigs(noCloud)['ASA1']!;
     expect(cfg, isNot(contains('object network')));
@@ -90,7 +106,10 @@ void main() {
     final cfg = CiscoAdapter.render(intent)['R1']!;
     expect(cfg, contains('ip access-list standard NAT_LANS'));
     expect(cfg, contains(' permit 10.0.0.0 0.0.0.255'));
-    expect(cfg, contains('ip nat inside source list NAT_LANS interface g0/1 overload'));
+    expect(
+      cfg,
+      contains('ip nat inside source list NAT_LANS interface g0/1 overload'),
+    );
     expect(cfg, contains('interface g0/0'));
     expect(cfg, contains(' ip nat inside'));
     expect(cfg, contains('interface g0/1'));

@@ -21,47 +21,61 @@ void main() {
     expect(action.touchesPacketTracer, isFalse);
   });
 
-  test('the keyless planner produces a plan the generator can compile',
-      () async {
-    // No API key is involved anywhere in this path: this is exactly what
-    // happens when the user has never entered one.
-    final intent = NetworkIntent.parseSimple('chat', '2 routers and 4 switches');
-    final plan = PacketTracerAdapter.autopilotPlan(intent);
+  test(
+    'the keyless planner produces a plan the generator can compile',
+    () async {
+      // No API key is involved anywhere in this path: this is exactly what
+      // happens when the user has never entered one.
+      final intent = NetworkIntent.parseSimple(
+        'chat',
+        '2 routers and 4 switches',
+      );
+      final plan = PacketTracerAdapter.autopilotPlan(intent);
 
-    expect(plan.containsKey('project'), isTrue);
-    final steps = plan['steps'];
-    expect(steps, isA<List>());
-    expect((steps as List), isNotEmpty,
-        reason: 'a plan with no steps would generate an empty file');
-  });
+      expect(plan.containsKey('project'), isTrue);
+      final steps = plan['steps'];
+      expect(steps, isA<List>());
+      expect(
+        (steps as List),
+        isNotEmpty,
+        reason: 'a plan with no steps would generate an empty file',
+      );
+    },
+  );
 
-  test('a generator failure is a thrown message, not a silent success',
-      () async {
-    final svc = AutopilotService(
-      base: 'http://127.0.0.1:5005',
-      c: MockClient((_) async => http.Response(
+  test(
+    'a generator failure is a thrown message, not a silent success',
+    () async {
+      final svc = AutopilotService(
+        base: 'http://127.0.0.1:5005',
+        c: MockClient(
+          (_) async => http.Response(
             jsonEncode({'ok': false, 'error': 'no device library found'}),
             200,
-          )),
-    );
+          ),
+        ),
+      );
 
-    await expectLater(
-      svc.pktGenerate({'project': 'x', 'steps': <dynamic>[]}),
-      throwsA(predicate((e) => e.toString().contains('no device library'))),
-    );
-  });
+      await expectLater(
+        svc.pktGenerate({'project': 'x', 'steps': <dynamic>[]}),
+        throwsA(predicate((e) => e.toString().contains('no device library'))),
+      );
+    },
+  );
 
-  test('a sidecar that is down is unhealthy, and the hint says how to start it',
-      () async {
-    final svc = AutopilotService(
-      base: 'http://127.0.0.1:5005',
-      c: MockClient((_) async => throw Exception('connection refused')),
-    );
+  test(
+    'a sidecar that is down is unhealthy, and the hint says how to start it',
+    () async {
+      final svc = AutopilotService(
+        base: 'http://127.0.0.1:5005',
+        c: MockClient((_) async => throw Exception('connection refused')),
+      );
 
-    // This is the branch `_compilePkt` takes, and it answers with the hint
-    // rather than an exception.
-    expect(await svc.healthy, isFalse);
-    expect(AutopilotService.startHint, contains('Sidecar not running'));
-    expect(AutopilotService.startHint, contains('5005'));
-  });
+      // This is the branch `_compilePkt` takes, and it answers with the hint
+      // rather than an exception.
+      expect(await svc.healthy, isFalse);
+      expect(AutopilotService.startHint, contains('Sidecar not running'));
+      expect(AutopilotService.startHint, contains('5005'));
+    },
+  );
 }

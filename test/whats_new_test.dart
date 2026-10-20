@@ -20,17 +20,24 @@ void main() {
     }
   });
 
-  testWidgets('the changelog card appears until its version is seen',
-      (tester) async {
+  testWidgets('the changelog card appears until its version is seen', (
+    tester,
+  ) async {
     final settings = SettingsService();
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: ChangelogCard(settings: settings))),
+      MaterialApp(
+        home: Scaffold(body: ChangelogCard(settings: settings)),
+      ),
     );
 
-    expect(find.textContaining('New in ${kChangelogEntries.first.version}'),
-        findsOneWidget);
-    expect(find.textContaining(kChangelogEntries.first.changes.first),
-        findsOneWidget);
+    expect(
+      find.textContaining('New in ${kChangelogEntries.first.version}'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(kChangelogEntries.first.changes.first),
+      findsOneWidget,
+    );
 
     // Dismissing it records the version and the card disappears for good.
     await tester.tap(find.byTooltip('Dismiss'));

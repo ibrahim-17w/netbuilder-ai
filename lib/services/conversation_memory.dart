@@ -243,7 +243,9 @@ class ConversationMemory {
       b.writeln('- Technical values from these turns: ${facts.join(' | ')}');
     }
     if (proposals.isNotEmpty) {
-      b.writeln('- Proposals already shown to the user: ${proposals.join(', ')}');
+      b.writeln(
+        '- Proposals already shown to the user: ${proposals.join(', ')}',
+      );
     }
     b.writeln(
       '- When the user says "it", "that", "the first thing" or "as I asked", '
@@ -289,10 +291,12 @@ class ConversationMemory {
       .where((s) => s.isNotEmpty)
       .toList();
 
-  static Set<String> _proposalWords(String text) => RegExp(
-        r'^- Proposals already shown to the user: (.+)$',
-        multiLine: true,
-      ).allMatches(text).expand((m) => m.group(1)!.split(',')).map((s) => s.trim()).toSet();
+  static Set<String> _proposalWords(String text) =>
+      RegExp(r'^- Proposals already shown to the user: (.+)$', multiLine: true)
+          .allMatches(text)
+          .expand((m) => m.group(1)!.split(','))
+          .map((s) => s.trim())
+          .toSet();
 
   static String _tidy(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();
 

@@ -11,16 +11,24 @@ import 'package:net_builder/widgets/chat_markdown.dart';
 void main() {
   group('isPktFilePath', () {
     test('a full path to a .pkt is tappable', () {
-      expect(ChatMarkdown.isPktFilePath(r'C:\Users\me\labs\office.pkt'), isTrue);
+      expect(
+        ChatMarkdown.isPktFilePath(r'C:\Users\me\labs\office.pkt'),
+        isTrue,
+      );
       expect(ChatMarkdown.isPktFilePath('/home/me/labs/office.pkt'), isTrue);
       expect(ChatMarkdown.isPktFilePath(r'C:\PROGRA~1\LAB.PKT'), isTrue);
     });
 
     test('bare names, non-pkt code and noise stay inert', () {
-      expect(ChatMarkdown.isPktFilePath('office.pkt'), isFalse,
-          reason: 'no separator: a backup name in prose is not a control');
-      expect(ChatMarkdown.isPktFilePath('spanning-tree mode rapid-pvst'),
-          isFalse);
+      expect(
+        ChatMarkdown.isPktFilePath('office.pkt'),
+        isFalse,
+        reason: 'no separator: a backup name in prose is not a control',
+      );
+      expect(
+        ChatMarkdown.isPktFilePath('spanning-tree mode rapid-pvst'),
+        isFalse,
+      );
       expect(ChatMarkdown.isPktFilePath('192.168.1.0/24'), isFalse);
       expect(ChatMarkdown.isPktFilePath(''), isFalse);
       expect(ChatMarkdown.isPktFilePath(r'C:\dir\'), isFalse);
@@ -60,14 +68,16 @@ void main() {
 
     testWidgets('tapping the rendered span fires the callback', (tester) async {
       String? tapped;
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: ChatMarkdownView(
-            source: 'Built. File: `C:\\labs\\office.pkt`',
-            onFilePathTap: (p) => tapped = p,
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ChatMarkdownView(
+              source: 'Built. File: `C:\\labs\\office.pkt`',
+              onFilePathTap: (p) => tapped = p,
+            ),
           ),
         ),
-      ));
+      );
       expect(find.text(r'C:\labs\office.pkt'), findsOneWidget);
       await tester.tap(find.text(r'C:\labs\office.pkt'));
       expect(tapped, r'C:\labs\office.pkt');
@@ -98,26 +108,30 @@ void main() {
       expect(await locator.isInstalled(), isFalse);
     });
 
-    test('a .pkt file association alone counts: the OS can open the file',
-        () async {
-      final locator = PacketTracerLocator(
-        forcePlatform: 'windows',
-        runProcess: (exe, args) async =>
-            exe == 'cmd' ? ok('.pkt=PacketTracer8') : fail(),
-        exists: (path) => false,
-        listDir: (path) => const <FileSystemEntity>[],
-      );
-      expect(await locator.isInstalled(), isTrue);
-    });
+    test(
+      'a .pkt file association alone counts: the OS can open the file',
+      () async {
+        final locator = PacketTracerLocator(
+          forcePlatform: 'windows',
+          runProcess: (exe, args) async =>
+              exe == 'cmd' ? ok('.pkt=PacketTracer8') : fail(),
+          exists: (path) => false,
+          listDir: (path) => const <FileSystemEntity>[],
+        );
+        expect(await locator.isInstalled(), isTrue);
+      },
+    );
 
     test('the installer directory layout counts', () async {
-      final dir = Directory.systemTemp
-          .createTempSync('Cisco Packet Tracer 8.2');
+      final dir = Directory.systemTemp.createTempSync(
+        'Cisco Packet Tracer 8.2',
+      );
       addTearDown(() => dir.deleteSync(recursive: true));
       final bin = Directory('${dir.path}${Platform.pathSeparator}bin')
         ..createSync();
-      File('${bin.path}${Platform.pathSeparator}PacketTracer.exe')
-          .writeAsStringSync('');
+      File(
+        '${bin.path}${Platform.pathSeparator}PacketTracer.exe',
+      ).writeAsStringSync('');
       final locator = PacketTracerLocator(
         forcePlatform: 'windows',
         runProcess: (exe, args) async => fail(),

@@ -79,9 +79,18 @@ void main() {
     test('drops embeddings, image models, gemma, and non-chat verbs', () {
       final models = GeminiModelCatalog.parseListModels(body);
       final byName = {for (final m in models) m.name: m};
-      expect(GeminiModelCatalog.isChatModel(byName['text-embedding-004']!), isFalse);
-      expect(GeminiModelCatalog.isChatModel(byName['imagen-3.0-generate-002']!), isFalse);
-      expect(GeminiModelCatalog.isChatModel(byName['gemma-3-27b-it']!), isFalse);
+      expect(
+        GeminiModelCatalog.isChatModel(byName['text-embedding-004']!),
+        isFalse,
+      );
+      expect(
+        GeminiModelCatalog.isChatModel(byName['imagen-3.0-generate-002']!),
+        isFalse,
+      );
+      expect(
+        GeminiModelCatalog.isChatModel(byName['gemma-3-27b-it']!),
+        isFalse,
+      );
     });
   });
 
@@ -91,9 +100,10 @@ void main() {
       expect(GeminiModelCatalog.recommend(models)!.name, 'gemini-2.5-pro');
     });
 
-    test('never recommends an experimental model while a stable one exists',
-        () {
-      final models = GeminiModelCatalog.parseListModels('''
+    test(
+      'never recommends an experimental model while a stable one exists',
+      () {
+        final models = GeminiModelCatalog.parseListModels('''
 {
   "models": [
     {
@@ -109,8 +119,9 @@ void main() {
   ]
 }
 ''');
-      expect(GeminiModelCatalog.recommend(models)!.name, 'gemini-2.5-flash');
-    });
+        expect(GeminiModelCatalog.recommend(models)!.name, 'gemini-2.5-flash');
+      },
+    );
 
     test('returns null for an empty list', () {
       expect(GeminiModelCatalog.recommend(const []), isNull);

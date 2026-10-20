@@ -45,7 +45,9 @@ class ChatMarkdown {
   static bool _isRule(String line) {
     final t = line.trim();
     if (t.length < 3) return false;
-    return t.split('').every((c) => c == '-' || c == ':' || c == '|' || c == ' ');
+    return t
+        .split('')
+        .every((c) => c == '-' || c == ':' || c == '|' || c == ' ');
   }
 
   static bool _isTableRow(String line) {
@@ -111,11 +113,9 @@ class ChatMarkdown {
           i++;
         }
         if (i < lines.length) i++; // closing fence
-        blocks.add(MdBlock(
-          kind: MdKind.code,
-          text: body.join('\n'),
-          language: language,
-        ));
+        blocks.add(
+          MdBlock(kind: MdKind.code, text: body.join('\n'), language: language),
+        );
         continue;
       }
 
@@ -138,11 +138,13 @@ class ChatMarkdown {
       // heading
       final heading = _headingPattern.firstMatch(line);
       if (heading != null) {
-        blocks.add(MdBlock(
-          kind: MdKind.heading,
-          level: heading.group(1)!.length,
-          text: heading.group(2)!.trim(),
-        ));
+        blocks.add(
+          MdBlock(
+            kind: MdKind.heading,
+            level: heading.group(1)!.length,
+            text: heading.group(2)!.trim(),
+          ),
+        );
         i++;
         continue;
       }
@@ -167,10 +169,7 @@ class ChatMarkdown {
         paragraph.add(lines[i].trim());
         i++;
       }
-      blocks.add(MdBlock(
-        kind: MdKind.paragraph,
-        text: paragraph.join(' '),
-      ));
+      blocks.add(MdBlock(kind: MdKind.paragraph, text: paragraph.join(' ')));
     }
     return blocks;
   }
@@ -251,15 +250,19 @@ class ChatMarkdown {
           ),
         );
       } else if (bold != null) {
-        spans.add(TextSpan(
-          text: bold,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ));
+        spans.add(
+          TextSpan(
+            text: bold,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        );
       } else if (italic != null) {
-        spans.add(TextSpan(
-          text: italic,
-          style: const TextStyle(fontStyle: FontStyle.italic),
-        ));
+        spans.add(
+          TextSpan(
+            text: italic,
+            style: const TextStyle(fontStyle: FontStyle.italic),
+          ),
+        );
       } else if (code != null && onFilePathTap != null && isPktFilePath(code)) {
         // A built file's path is a control, not just text: the chat that
         // wrote it is the direct way to look at it. Rendered as a widget so
@@ -283,13 +286,15 @@ class ChatMarkdown {
           ),
         );
       } else if (code != null) {
-        spans.add(TextSpan(
-          text: code,
-          style: TextStyle(
-            fontFamily: 'monospace',
-            backgroundColor: base.color?.withValues(alpha: 0.10),
+        spans.add(
+          TextSpan(
+            text: code,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              backgroundColor: base.color?.withValues(alpha: 0.10),
+            ),
           ),
-        ));
+        );
       }
       cursor = match.end;
     }
@@ -395,7 +400,12 @@ class ChatMarkdownView extends StatelessWidget {
         };
         return Text.rich(
           TextSpan(
-            children: ChatMarkdown.inline(block.text, base, linkColor: linkColor, onFilePathTap: onFilePathTap),
+            children: ChatMarkdown.inline(
+              block.text,
+              base,
+              linkColor: linkColor,
+              onFilePathTap: onFilePathTap,
+            ),
             style: base.copyWith(
               fontSize: (base.fontSize ?? 14) * size,
               fontWeight: FontWeight.w700,
@@ -520,9 +530,7 @@ class _CodeBlock extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(AppTheme.rMd),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.7),
-        ),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.7)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -549,7 +557,8 @@ class _CodeBlock extends StatelessWidget {
                 onPressed: () => copyText(
                   context,
                   block.text,
-                  message: 'Copied the ${block.language.isEmpty ? 'block' : block.language} '
+                  message:
+                      'Copied the ${block.language.isEmpty ? 'block' : block.language} '
                       'commands',
                 ),
                 icon: const Icon(Icons.copy_all_outlined, size: 14),
@@ -564,7 +573,10 @@ class _CodeBlock extends StatelessWidget {
               const SizedBox(width: AppTheme.s6),
             ],
           ),
-          Divider(height: 1, color: scheme.outlineVariant.withValues(alpha: 0.6)),
+          Divider(
+            height: 1,
+            color: scheme.outlineVariant.withValues(alpha: 0.6),
+          ),
           Padding(
             padding: const EdgeInsets.all(AppTheme.s12),
             child: SingleChildScrollView(

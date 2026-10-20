@@ -302,11 +302,13 @@ class AiErrors {
 
   static String network(Object error) {
     final text = error.toString();
-    if (text.contains('TimeoutException') || text.toLowerCase().contains('timeout')) {
+    if (text.contains('TimeoutException') ||
+        text.toLowerCase().contains('timeout')) {
       return 'The request timed out. The endpoint may be slow, blocked by a '
           'firewall, or unreachable - test the connection again.';
     }
-    if (text.contains('SocketException') || text.contains('Failed host lookup')) {
+    if (text.contains('SocketException') ||
+        text.contains('Failed host lookup')) {
       return 'Could not reach that address. Check the base URL, your internet '
           'connection, and any proxy.';
     }
@@ -323,9 +325,7 @@ class AiErrors {
       return 'No base URL set. An OpenAI-compatible endpoint needs one, e.g. '
           '`https://api.groq.com/openai/v1`.';
     }
-    final uri = Uri.tryParse(
-      value.contains('://') ? value : 'https://$value',
-    );
+    final uri = Uri.tryParse(value.contains('://') ? value : 'https://$value');
     if (uri == null || uri.host.isEmpty) {
       return 'That base URL is not a valid address: `$value`.';
     }

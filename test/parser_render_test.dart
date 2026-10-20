@@ -340,53 +340,58 @@ FtpTest2026. Email domain all-features.lab. Office hours weekdays
     );
   });
 
-  test('a serial WAN plan carries the cable, the DCE end and the clock rate',
-      () {
-    const instr = '''
+  test(
+    'a serial WAN plan carries the cable, the DCE end and the clock rate',
+    () {
+      const instr = '''
 Build a network with 2 routers, 2 switches and 2 PCs. The routers are joined
 by a back-to-back serial WAN. Use 10.1.1.0/30 on the WAN, 192.168.1.0/24
 for R1 and 192.168.2.0/24 for R2.''';
 
-    final intent = NetworkIntent.parseSimple('wan', instr);
-    final wan = intent.links.firstWhere((l) => l.isSerial);
-    expect(wan.aIf, 's0/0/0');
-    expect(wan.bIf, 's0/0/0');
-    expect(wan.cable, 'serial');
-    expect(wan.dceEnd, 'a');
-    expect(
-      intent.addressing
-          .map((a) => '${a.node}:${a.iface}=${a.ipCidr}')
-          .toList(),
-      containsAll([
-        'R1:s0/0/0=10.1.1.1/30',
-        'R2:s0/0/0=10.1.1.2/30',
-      ]),
-    );
+      final intent = NetworkIntent.parseSimple('wan', instr);
+      final wan = intent.links.firstWhere((l) => l.isSerial);
+      expect(wan.aIf, 's0/0/0');
+      expect(wan.bIf, 's0/0/0');
+      expect(wan.cable, 'serial');
+      expect(wan.dceEnd, 'a');
+      expect(
+        intent.addressing
+            .map((a) => '${a.node}:${a.iface}=${a.ipCidr}')
+            .toList(),
+        containsAll(['R1:s0/0/0=10.1.1.1/30', 'R2:s0/0/0=10.1.1.2/30']),
+      );
 
-    // the plan tells the executor which cable and which clocking end
-    final plan = PacketTracerAdapter.autopilotPlan(intent);
-    final linksStep = (plan['steps'] as List)
-        .firstWhere((s) => (s as Map)['action'] == 'create_links') as Map;
-    final wanJson = (linksStep['links'] as List)
-        .cast<Map>()
-        .firstWhere((l) => l['aIf'] == 's0/0/0');
-    expect(wanJson['cable'], 'serial');
-    expect(wanJson['dce'], 'a');
+      // the plan tells the executor which cable and which clocking end
+      final plan = PacketTracerAdapter.autopilotPlan(intent);
+      final linksStep =
+          (plan['steps'] as List).firstWhere(
+                (s) => (s as Map)['action'] == 'create_links',
+              )
+              as Map;
+      final wanJson = (linksStep['links'] as List).cast<Map>().firstWhere(
+        (l) => l['aIf'] == 's0/0/0',
+      );
+      expect(wanJson['cable'], 'serial');
+      expect(wanJson['dce'], 'a');
 
-    // ONE clock rate, on the DCE side only: PT rejects it on the DTE end
-    final r1 = CiscoAdapter.render(intent)['R1']!;
-    final r2 = CiscoAdapter.render(intent)['R2']!;
-    expect(r1, contains('interface s0/0/0'));
-    expect(r1, contains('clock rate 64000'));
-    expect(r2, contains('interface s0/0/0'));
-    expect(r2, isNot(contains('clock rate')),
-        reason: 'the DTE end must not carry a clock rate');
-    expect(
-      intent.assumptions.any((a) => a.contains('clocking (DCE) end')),
-      isTrue,
-      reason: 'the serial WAN assumption must be stated',
-    );
-  });
+      // ONE clock rate, on the DCE side only: PT rejects it on the DTE end
+      final r1 = CiscoAdapter.render(intent)['R1']!;
+      final r2 = CiscoAdapter.render(intent)['R2']!;
+      expect(r1, contains('interface s0/0/0'));
+      expect(r1, contains('clock rate 64000'));
+      expect(r2, contains('interface s0/0/0'));
+      expect(
+        r2,
+        isNot(contains('clock rate')),
+        reason: 'the DTE end must not carry a clock rate',
+      );
+      expect(
+        intent.assumptions.any((a) => a.contains('clocking (DCE) end')),
+        isTrue,
+        reason: 'the serial WAN assumption must be stated',
+      );
+    },
+  );
 
   test('the device catalog adds edge, wireless and telephony devices', () {
     const instr = '''
@@ -396,22 +401,23 @@ wireless access point, 2 IP phones, 1 laptop and 1 printer. 2 tablets and
 
     final intent = NetworkIntent.parseSimple('office', instr);
     final types = intent.nodes.map((n) => n.type).toSet();
-    expect(types.containsAll([
-      'router',
-      'switch',
-      'firewall',
-      'cloud',
-      'wireless',
-      'phone',
-      'laptop',
-      'printer',
-      'tablet',
-      'smartphone',
-    ]), isTrue, reason: types.toString());
     expect(
-      intent.nodes.firstWhere((n) => n.type == 'firewall').model,
-      '5506',
+      types.containsAll([
+        'router',
+        'switch',
+        'firewall',
+        'cloud',
+        'wireless',
+        'phone',
+        'laptop',
+        'printer',
+        'tablet',
+        'smartphone',
+      ]),
+      isTrue,
+      reason: types.toString(),
     );
+    expect(intent.nodes.firstWhere((n) => n.type == 'firewall').model, '5506');
     expect(
       intent.nodes.firstWhere((n) => n.type == 'wireless').model,
       'AccessPoint-PT',
@@ -423,10 +429,7 @@ wireless access point, 2 IP phones, 1 laptop and 1 printer. 2 tablets and
       isTrue,
       reason: intent.links.map((l) => '${l.a}<->${l.b}').toString(),
     );
-    expect(
-      intent.links.any((l) => l.a == 'FW1' && l.b == 'CLOUD1'),
-      isTrue,
-    );
+    expect(intent.links.any((l) => l.a == 'FW1' && l.b == 'CLOUD1'), isTrue);
     // phones and access points cable on their own port names, not 'f0'
     // `FastEthernet0` is the name the template library gives the port Packet
     // Tracer names only from the host module - the one a real save's links
@@ -466,12 +469,12 @@ wireless access point, 2 IP phones, 1 laptop and 1 printer. 2 tablets and
 
     // ...while the IP-configured kinds reach Desktop > IP Configuration
     final plan = PacketTracerAdapter.autopilotPlan(intent);
-    final pcsStep = (plan['steps'] as List)
-        .firstWhere((s) => (s as Map)['action'] == 'config_pcs') as Map;
-    expect(
-      (pcsStep['pcs'] as Map).keys,
-      containsAll(['LT1', 'PRN1']),
-    );
+    final pcsStep =
+        (plan['steps'] as List).firstWhere(
+              (s) => (s as Map)['action'] == 'config_pcs',
+            )
+            as Map;
+    expect((pcsStep['pcs'] as Map).keys, containsAll(['LT1', 'PRN1']));
     expect((pcsStep['pcs'] as Map).containsKey('PH1'), isFalse);
     expect((pcsStep['pcs'] as Map).containsKey('AP1'), isFalse);
     expect(
@@ -481,10 +484,8 @@ wireless access point, 2 IP phones, 1 laptop and 1 printer. 2 tablets and
     );
   });
 
-  test('device keywords are word-bounded: a laptop is not an access point',
-      () {
-    const instr =
-        'Build 1 router, 1 switch and 1 laptop on 192.168.5.0/24.';
+  test('device keywords are word-bounded: a laptop is not an access point', () {
+    const instr = 'Build 1 router, 1 switch and 1 laptop on 192.168.5.0/24.';
     final intent = NetworkIntent.parseSimple('kw', instr);
     final types = intent.nodes.map((n) => n.type).toList();
     expect(types, contains('laptop'));
@@ -548,15 +549,27 @@ wireless access point, 2 IP phones, 1 laptop and 1 printer. 2 tablets and
     }
     // IOS family: hardening, VTY, ports/trunking, ACL, NAT, DHCP, inter-VLAN.
     for (final id in [
-      'cisco-04', 'cisco-05', 'cisco-06', 'cisco-09',
-      'cisco-10', 'cisco-11', 'cisco-12',
+      'cisco-04',
+      'cisco-05',
+      'cisco-06',
+      'cisco-09',
+      'cisco-10',
+      'cisco-11',
+      'cisco-12',
     ]) {
       expect(byId, contains(id), reason: 'missing IOS rule $id');
     }
     // PT executor reality: cabling kinds, port roles, security placement,
     // ASA security levels, IPSec symmetry, AP/VLAN, evidence rule.
     for (final id in [
-      'pt-06', 'pt-07', 'pt-08', 'pt-09', 'pt-10', 'pt-11', 'pt-12', 'pt-13',
+      'pt-06',
+      'pt-07',
+      'pt-08',
+      'pt-09',
+      'pt-10',
+      'pt-11',
+      'pt-12',
+      'pt-13',
     ]) {
       expect(
         byId[id]!.targets,
@@ -583,10 +596,9 @@ wireless access point, 2 IP phones, 1 laptop and 1 printer. 2 tablets and
         .where((f) => f.path.endsWith('.yaml'))
         .map((f) => f.readAsStringSync())
         .join('\n');
-    final assetIds = RegExp(r'- id:\s*(\S+)')
-        .allMatches(yamlText)
-        .map((m) => m.group(1)!)
-        .toSet();
+    final assetIds = RegExp(
+      r'- id:\s*(\S+)',
+    ).allMatches(yamlText).map((m) => m.group(1)!).toSet();
     final dartIds = RulePacksService.packs.map((p) => p.id).toSet();
     expect(
       assetIds.containsAll(dartIds),

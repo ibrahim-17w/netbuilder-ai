@@ -5,8 +5,9 @@ import 'package:net_builder/main.dart';
 
 /// The capture flow lives IN the chat: there is no other screen to open.
 void main() {
-  testWidgets('the capture flow is part of the single chat screen',
-      (tester) async {
+  testWidgets('the capture flow is part of the single chat screen', (
+    tester,
+  ) async {
     await tester.pumpWidget(const NetBuilderApp());
     await tester.pumpAndSettle();
 

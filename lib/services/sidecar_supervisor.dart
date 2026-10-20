@@ -45,7 +45,8 @@ class SidecarLaunchResult {
   });
 
   @override
-  String toString() => 'SidecarLaunchResult(ok=$ok, method=$method, '
+  String toString() =>
+      'SidecarLaunchResult(ok=$ok, method=$method, '
       'message=$message)';
 }
 
@@ -108,13 +109,15 @@ class SidecarSupervisor {
       final sidecar = p.join(root, 'sidecar');
       final bundledExe = p.join(sidecar, 'pt_autopilot.exe');
       if (File(bundledExe).existsSync()) {
-        targets.add(SidecarTarget(
-          command: bundledExe,
-          arguments: const [],
-          workingDirectory: sidecar,
-          method: 'bundled exe',
-          tesseract: _bundledTesseract(root),
-        ));
+        targets.add(
+          SidecarTarget(
+            command: bundledExe,
+            arguments: const [],
+            workingDirectory: sidecar,
+            method: 'bundled exe',
+            tesseract: _bundledTesseract(root),
+          ),
+        );
       }
       // A virtualenv beside or inside the project is the recommended dev
       // setup, and its interpreter already has the dependencies.
@@ -123,28 +126,33 @@ class SidecarSupervisor {
           for (final exe in const ['pythonw.exe', 'python.exe', 'python']) {
             final candidate = p.join(root, venv, script, exe);
             if (File(candidate).existsSync()) {
-              targets.add(SidecarTarget(
-                command: candidate,
-                arguments: [p.join(sidecar, 'pt_autopilot.py')],
-                workingDirectory: sidecar,
-                method: 'virtualenv',
-                tesseract: _bundledTesseract(root),
-              ));
+              targets.add(
+                SidecarTarget(
+                  command: candidate,
+                  arguments: [p.join(sidecar, 'pt_autopilot.py')],
+                  workingDirectory: sidecar,
+                  method: 'virtualenv',
+                  tesseract: _bundledTesseract(root),
+                ),
+              );
             }
           }
         }
       }
       // The `py` launcher always points at a real CPython on Windows.
-      if (Platform.isWindows && File(p.join(sidecar, 'pt_autopilot.py')).existsSync()) {
+      if (Platform.isWindows &&
+          File(p.join(sidecar, 'pt_autopilot.py')).existsSync()) {
         for (final flag in const ['-3.13', '-3.12', '-3.11', '-3']) {
-          targets.add(SidecarTarget(
-            command: 'py',
-            arguments: [flag, p.join(sidecar, 'pt_autopilot.py')],
-            workingDirectory: sidecar,
-            method: 'py launcher',
-            tesseract: _bundledTesseract(root),
-            isWindowsLauncher: true,
-          ));
+          targets.add(
+            SidecarTarget(
+              command: 'py',
+              arguments: [flag, p.join(sidecar, 'pt_autopilot.py')],
+              workingDirectory: sidecar,
+              method: 'py launcher',
+              tesseract: _bundledTesseract(root),
+              isWindowsLauncher: true,
+            ),
+          );
         }
       }
     }
@@ -153,13 +161,15 @@ class SidecarSupervisor {
         final sidecar = p.join(root, 'sidecar');
         final script = p.join(sidecar, 'pt_autopilot.py');
         if (!File(script).existsSync()) continue;
-        targets.add(SidecarTarget(
-          command: python,
-          arguments: [script],
-          workingDirectory: sidecar,
-          method: p.basenameWithoutExtension(python),
-          tesseract: _bundledTesseract(root),
-        ));
+        targets.add(
+          SidecarTarget(
+            command: python,
+            arguments: [script],
+            workingDirectory: sidecar,
+            method: p.basenameWithoutExtension(python),
+            tesseract: _bundledTesseract(root),
+          ),
+        );
       }
     }
     for (final python in _installedInterpreters()) {
@@ -167,13 +177,15 @@ class SidecarSupervisor {
         final sidecar = p.join(root, 'sidecar');
         final script = p.join(sidecar, 'pt_autopilot.py');
         if (!File(script).existsSync()) continue;
-        targets.add(SidecarTarget(
-          command: python,
-          arguments: [script],
-          workingDirectory: sidecar,
-          method: 'install dir',
-          tesseract: _bundledTesseract(root),
-        ));
+        targets.add(
+          SidecarTarget(
+            command: python,
+            arguments: [script],
+            workingDirectory: sidecar,
+            method: 'install dir',
+            tesseract: _bundledTesseract(root),
+          ),
+        );
       }
     }
     return targets;
@@ -281,16 +293,19 @@ class SidecarSupervisor {
   /// rather than an error worth surfacing.
   static Future<List<String>> _whereAsync(List<String> names) async {
     pathScanCount++;
-    final perName = await Future.wait(names.map((name) async {
-      try {
-        final r = await Process.run('where.exe', [name], runInShell: false)
-            .timeout(const Duration(seconds: 5));
-        if (r.exitCode != 0) return <String>[];
-        return _lines(r.stdout);
-      } catch (_) {
-        return <String>[];
-      }
-    }));
+    final perName = await Future.wait(
+      names.map((name) async {
+        try {
+          final r = await Process.run('where.exe', [
+            name,
+          ], runInShell: false).timeout(const Duration(seconds: 5));
+          if (r.exitCode != 0) return <String>[];
+          return _lines(r.stdout);
+        } catch (_) {
+          return <String>[];
+        }
+      }),
+    );
     return [for (final group in perName) ...group];
   }
 
@@ -309,12 +324,9 @@ class SidecarSupervisor {
     if (base == null) return const [];
     final root = Directory(p.join(base, 'Programs', 'Python'));
     if (!root.existsSync()) return const [];
-    final dirs = root
-        .listSync()
-        .whereType<Directory>()
-        .map((d) => d.path)
-        .toList()
-      ..sort((a, b) => b.compareTo(a));
+    final dirs =
+        root.listSync().whereType<Directory>().map((d) => d.path).toList()
+          ..sort((a, b) => b.compareTo(a));
     final found = <String>[];
     for (final dir in dirs) {
       for (final exe in const ['pythonw.exe', 'python.exe']) {
@@ -327,19 +339,24 @@ class SidecarSupervisor {
 
   /// Proves a candidate is a working Python 3 before we trust it: the Store
   /// shim, a broken install and Python 2 all fail here.
-  static Future<bool> verify(SidecarTarget target,
-      {Duration timeout = const Duration(seconds: 10)}) async {
+  static Future<bool> verify(
+    SidecarTarget target, {
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
     try {
       final args = <String>[
         ...target.argumentsForProbe,
         '-c',
         'import sys; print(sys.version_info[0])',
       ];
-      final r = await Process.run(target.command, args,
-          workingDirectory: target.workingDirectory.isEmpty
-              ? null
-              : target.workingDirectory,
-          runInShell: false).timeout(timeout);
+      final r = await Process.run(
+        target.command,
+        args,
+        workingDirectory: target.workingDirectory.isEmpty
+            ? null
+            : target.workingDirectory,
+        runInShell: false,
+      ).timeout(timeout);
       if (r.exitCode != 0) return false;
       return r.stdout.toString().trim().startsWith('3');
     } catch (_) {
@@ -408,9 +425,13 @@ class SidecarSupervisor {
       );
     }
     if (!force && _process != null) {
-      return Future.value(lastResult ??
-          const SidecarLaunchResult(
-              ok: true, message: 'The local engine is already running.'));
+      return Future.value(
+        lastResult ??
+            const SidecarLaunchResult(
+              ok: true,
+              message: 'The local engine is already running.',
+            ),
+      );
     }
     return _inFlight ??= _start(
       pythonsOnPath: pythonsOnPath,
@@ -439,7 +460,8 @@ class SidecarSupervisor {
     if (targets.isEmpty) {
       return lastResult = SidecarLaunchResult(
         ok: false,
-        message: 'No sidecar script and no Python were found. Install '
+        message:
+            'No sidecar script and no Python were found. Install '
             'Python 3 (python.org) or use a packaged build with the engine '
             'included.',
       );
@@ -455,7 +477,8 @@ class SidecarSupervisor {
       // The bundled exe needs no verification: it IS the engine.
       if (target.method != 'bundled exe') {
         if (!await verify(target)) {
-          lastReason = '"${target.command}" is not a working Python 3 '
+          lastReason =
+              '"${target.command}" is not a working Python 3 '
               '(the Windows Store placeholder does not count).';
           continue;
         }
@@ -472,7 +495,9 @@ class SidecarSupervisor {
         lastReason = 'Could not start "${target.command}".';
         continue;
       }
-      final warning = warnings.isEmpty ? '' : ' GUI runs need: ${warnings.first}';
+      final warning = warnings.isEmpty
+          ? ''
+          : ' GUI runs need: ${warnings.first}';
       return lastResult = SidecarLaunchResult(
         ok: true,
         method: target.method,
@@ -485,7 +510,8 @@ class SidecarSupervisor {
 
     return lastResult = SidecarLaunchResult(
       ok: false,
-      message: lastReason ??
+      message:
+          lastReason ??
           'No Python interpreter could be started. Install Python 3 from '
               'python.org and tick "Add python.exe to PATH".',
       logPath: log,
@@ -514,16 +540,8 @@ class SidecarSupervisor {
         runInShell: false,
       );
       _process = process;
-      await _pump(
-        process.stdout,
-        logPath,
-        tag: 'out',
-      );
-      await _pump(
-        process.stderr,
-        logPath,
-        tag: 'err',
-      );
+      await _pump(process.stdout, logPath, tag: 'out');
+      await _pump(process.stderr, logPath, tag: 'err');
       unawaited(process.exitCode.then(_onExit));
       return process.pid;
     } catch (e) {
@@ -576,11 +594,13 @@ class SidecarSupervisor {
       final log = _logPath;
       if (log != null) _appendLog(log, '\n[stopping the engine]\n');
       process.kill();
-      await process.exitCode.timeout(const Duration(seconds: 5),
-          onTimeout: () {
-        process.kill(ProcessSignal.sigkill);
-        return -1;
-      });
+      await process.exitCode.timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          process.kill(ProcessSignal.sigkill);
+          return -1;
+        },
+      );
     } catch (_) {}
   }
 
@@ -593,7 +613,8 @@ class SidecarSupervisor {
   /// Where the engine's output goes. Always a real path: "the log is
   /// somewhere else" is not a useful answer when a start has just failed.
   static String _logFilePath() {
-    final home = Platform.environment['LOCALAPPDATA'] ??
+    final home =
+        Platform.environment['LOCALAPPDATA'] ??
         Platform.environment['HOME'] ??
         Directory.systemTemp.path;
     final fallback = p.join(Directory.systemTemp.path, 'netbuilder-engine.log');
@@ -661,13 +682,16 @@ class SidecarSupervisor {
   static Future<int?> pidListeningOnPort(int port) async {
     try {
       if (Platform.isWindows) {
-        final r = await Process.run('netstat.exe', ['-ano'], runInShell: false)
-            .timeout(const Duration(seconds: 5));
+        final r = await Process.run('netstat.exe', [
+          '-ano',
+        ], runInShell: false).timeout(const Duration(seconds: 5));
         if (r.exitCode != 0) return null;
         return listeningPid('${r.stdout}', port);
       }
-      final r = await Process.run('lsof', ['-ti', 'tcp:$port'],
-          runInShell: false).timeout(const Duration(seconds: 5));
+      final r = await Process.run('lsof', [
+        '-ti',
+        'tcp:$port',
+      ], runInShell: false).timeout(const Duration(seconds: 5));
       if (r.exitCode != 0) return null;
       return int.tryParse('${r.stdout}'.trim().split(RegExp(r'\s+')).first);
     } catch (_) {

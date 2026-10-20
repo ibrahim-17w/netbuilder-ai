@@ -29,14 +29,12 @@ void main() {
   /// main() is what installs the providers, and a widget test does not call
   /// it - so the providers are installed here, with the store the test owns.
   Widget app(MemoryService memory) => MultiProvider(
-        providers: [
-          ChangeNotifierProvider<SettingsService>(
-            create: (_) => SettingsService(),
-          ),
-          ChangeNotifierProvider<MemoryService>.value(value: memory),
-        ],
-        child: const NetBuilderApp(),
-      );
+    providers: [
+      ChangeNotifierProvider<SettingsService>(create: (_) => SettingsService()),
+      ChangeNotifierProvider<MemoryService>.value(value: memory),
+    ],
+    child: const NetBuilderApp(),
+  );
 
   /// Bounded pumping, never pumpAndSettle: with a real store behind it the
   /// screen always has one more scheduled frame (status chips, sidebar
@@ -93,9 +91,9 @@ void main() {
       final state = jsonDecode(raw) as Map<dynamic, dynamic>;
       final intentJson = (state['intentJson'] ?? '').toString();
       if (intentJson.isEmpty) return;
-        out = NetworkIntent.fromJson(
-          Map<String, dynamic>.from(jsonDecode(intentJson) as Map),
-        );
+      out = NetworkIntent.fromJson(
+        Map<String, dynamic>.from(jsonDecode(intentJson) as Map),
+      );
     });
     return out;
   }
@@ -109,8 +107,9 @@ void main() {
     await settle(tester);
   }
 
-  testWidgets('the offline answer shows and records the same plan',
-      (tester) async {
+  testWidgets('the offline answer shows and records the same plan', (
+    tester,
+  ) async {
     final memory = await freshMemory(tester);
     // A rule the user taught the app. The offline planner applies it to the
     // plan it answers with, so the recorded plan must carry it too.
@@ -127,17 +126,25 @@ void main() {
     // The record the reopen path restores from (conversationMeta ->
     // stateJson -> intentJson -> NetworkIntent) is the SAME plan.
     final recorded = await recordedPlan(tester, memory);
-    expect(recorded, isNotNull,
-        reason: 'a planned turn must leave a plan behind');
-    expect(recorded!.routing, 'ospf',
-        reason: 'the plan the reply showed must be the plan that is kept - '
-            'the first parse of the turn ran without the taught rule');
+    expect(
+      recorded,
+      isNotNull,
+      reason: 'a planned turn must leave a plan behind',
+    );
+    expect(
+      recorded!.routing,
+      'ospf',
+      reason:
+          'the plan the reply showed must be the plan that is kept - '
+          'the first parse of the turn ran without the taught rule',
+    );
     expect(recorded.nodes.where((n) => n.type == 'router').length, 2);
     expect(recorded.nodes.where((n) => n.type == 'switch').length, 4);
   });
 
-  testWidgets('without a taught rule the record still matches the reply',
-      (tester) async {
+  testWidgets('without a taught rule the record still matches the reply', (
+    tester,
+  ) async {
     final memory = await freshMemory(tester);
     await tester.pumpWidget(app(memory));
     await settle(tester);

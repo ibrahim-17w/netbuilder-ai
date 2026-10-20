@@ -22,8 +22,11 @@ void main() {
       expect(r.advice!.topic, 'ap_selection');
       expect(r.advice!.recommendation, isNotEmpty);
       expect(r.advice!.options, isNotEmpty);
-      expect(r.advice!.planBrief, isNull,
-          reason: 'the message names no lab, so there is nothing to re-plan');
+      expect(
+        r.advice!.planBrief,
+        isNull,
+        reason: 'the message names no lab, so there is nothing to re-plan',
+      );
     });
   });
 
@@ -36,7 +39,11 @@ void main() {
           'topic': 'ap_selection',
           'recommendation': 'Use wired APs.',
           'options': [
-            {'label': 'Wired APs', 'chooseWhen': 'cable can be run', 'tradeOff': 'cabling cost'},
+            {
+              'label': 'Wired APs',
+              'chooseWhen': 'cable can be run',
+              'tradeOff': 'cabling cost',
+            },
           ],
           'reasons': ['40 devices is past one AP'],
           'nextStep': 'Tell me the floor count',
@@ -52,13 +59,17 @@ void main() {
       // The round trip is what a conversation reopen does: toMap -> JSON ->
       // parseList. A kind missing from `supported` is dropped here, which is
       // how the open card used to silently vanish.
-      final encoded =
-          jsonEncode([advice.toMap(), open.toMap()]);
+      final encoded = jsonEncode([advice.toMap(), open.toMap()]);
       final decoded = ChatAction.parseList(jsonDecode(encoded));
-      expect(decoded.map((a) => a.kind), containsAll(['advice_card', 'pkt_open']));
+      expect(
+        decoded.map((a) => a.kind),
+        containsAll(['advice_card', 'pkt_open']),
+      );
       expect(decoded.length, 2);
-      expect(decoded.where((a) => a.kind == 'advice_card').first.label,
-          contains('Design advice'));
+      expect(
+        decoded.where((a) => a.kind == 'advice_card').first.label,
+        contains('Design advice'),
+      );
       expect(
         decoded.where((a) => a.kind == 'advice_card').first.payload['options'],
         isA<List>(),
@@ -68,44 +79,47 @@ void main() {
 
   group('widget', () {
     Map<String, dynamic> payload({
-      String planBrief = 'Build a home network with 1 wireless router and 4 PCs',
-    }) =>
+      String planBrief =
+          'Build a home network with 1 wireless router and 4 PCs',
+    }) => {
+      'topic': 'ap_selection',
+      'kind': 'sizing',
+      'recommendation':
+          'Wired access points beat mesh for anything larger than a flat.',
+      'options': [
         {
-          'topic': 'ap_selection',
-          'kind': 'sizing',
-          'recommendation':
-              'Wired access points beat mesh for anything larger than a flat.',
-          'options': [
-            {
-              'label': 'Wired ceiling APs + PoE switch',
-              'chooseWhen': 'more than ~30 devices',
-              'tradeOff': 'needs cabling to each AP',
-            },
-            {
-              'label': 'Mesh kit (wireless backhaul)',
-              'chooseWhen': 'no way to run cable',
-              'tradeOff': 'each hop loses roughly half the throughput',
-            },
-          ],
-          'reasons': ['About 40 active devices: that is 2 AP(s) at the dense end.'],
-          'nextStep': 'Give me the floor count.',
-          'planBrief': planBrief,
-          'basis': 'the lab on the table, and the way the simulators behave',
-        };
+          'label': 'Wired ceiling APs + PoE switch',
+          'chooseWhen': 'more than ~30 devices',
+          'tradeOff': 'needs cabling to each AP',
+        },
+        {
+          'label': 'Mesh kit (wireless backhaul)',
+          'chooseWhen': 'no way to run cable',
+          'tradeOff': 'each hop loses roughly half the throughput',
+        },
+      ],
+      'reasons': ['About 40 active devices: that is 2 AP(s) at the dense end.'],
+      'nextStep': 'Give me the floor count.',
+      'planBrief': planBrief,
+      'basis': 'the lab on the table, and the way the simulators behave',
+    };
 
-    testWidgets('renders the recommendation highlighted with a Plan this',
-        (tester) async {
+    testWidgets('renders the recommendation highlighted with a Plan this', (
+      tester,
+    ) async {
       var planTapped = 0;
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(
-            child: AdviceCardWidget(
-              payload: payload(),
-              onPlanThis: () => planTapped++,
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: AdviceCardWidget(
+                payload: payload(),
+                onPlanThis: () => planTapped++,
+              ),
             ),
           ),
         ),
-      ));
+      );
 
       expect(find.byKey(const ValueKey('advice-card')), findsOneWidget);
       // The card is the ACTION surface: the recommendation as the takeaway
@@ -126,13 +140,15 @@ void main() {
     });
 
     testWidgets('no planBrief, no button', (tester) async {
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(
-            child: AdviceCardWidget(payload: payload(planBrief: '')),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: AdviceCardWidget(payload: payload(planBrief: '')),
+            ),
           ),
         ),
-      ));
+      );
       expect(find.byKey(const ValueKey('advice-plan-this')), findsNothing);
     });
   });

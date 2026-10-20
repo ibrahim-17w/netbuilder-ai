@@ -38,11 +38,10 @@ class OpenAiChatService {
     ...config.extraHeaders,
   };
 
-  Map<String, dynamic> _body(List<Map<String, dynamic>> messages, bool stream) => {
-    'model': config.model,
-    'messages': messages,
-    'stream': stream,
-  };
+  Map<String, dynamic> _body(
+    List<Map<String, dynamic>> messages,
+    bool stream,
+  ) => {'model': config.model, 'messages': messages, 'stream': stream};
 
   void _requireKey() {
     final key = apiKey.trim();
@@ -90,9 +89,8 @@ class OpenAiChatService {
   ///
   /// Text-only turns. [streamMessages] is the same call for a turn that also
   /// carries images.
-  Stream<String> stream(List<Map<String, String>> messages) => streamMessages([
-    for (final m in messages) Map<String, dynamic>.from(m),
-  ]);
+  Stream<String> stream(List<Map<String, String>> messages) =>
+      streamMessages([for (final m in messages) Map<String, dynamic>.from(m)]);
 
   /// The answer as it arrives, for a conversation that may carry images.
   ///
@@ -241,7 +239,9 @@ class OpenAiChatService {
   /// A local server (Ollama, llama.cpp, LM Studio) usually needs no key.
   bool _isLocal() {
     final host = Uri.tryParse(config.effectiveBaseUrl())?.host ?? '';
-    return host == '127.0.0.1' || host == 'localhost' || host == '::1' ||
+    return host == '127.0.0.1' ||
+        host == 'localhost' ||
+        host == '::1' ||
         host == '10.0.2.2';
   }
 }

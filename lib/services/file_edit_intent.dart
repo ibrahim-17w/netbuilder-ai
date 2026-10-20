@@ -121,9 +121,9 @@ class FileEditIntentReader {
 
   /// The two choices offered for [FileEditIntent.ambiguous], as quick replies.
   static List<String> choiceReplies(String artifactName) => [
-        'Edit $artifactName',
-        'Create a new file instead',
-      ];
+    'Edit $artifactName',
+    'Create a new file instead',
+  ];
 
   /// The first pointer at the existing artifact ("it", "that file", "the
   /// same project") with its position in [text], or null. The
@@ -149,33 +149,33 @@ class FileEditIntentReader {
     String project = '',
     int blocking = 0,
   }) => [
-        ChatAction(
-          kind: 'pkt_edit',
-          summary: 'Edit $name in place (a timestamped backup is kept first)',
-          payload: <String, dynamic>{
-            'path': path,
-            'name': name,
-            'mode': 'in-place',
-            if (devices > 0) 'devices': devices,
-            if (links > 0) 'links': links,
-            // The plan version this choice was written against, so the edit
-            // cannot be run against a plan the user never saw.
-            if (revision.isNotEmpty) 'revision': revision,
-          },
-        ),
-        ChatAction(
-          kind: 'pkt_generate',
-          summary: 'Create a new .pkt from the same plan instead',
-          payload: <String, dynamic>{
-            'mode': 'new',
-            if (revision.isNotEmpty) 'revision': revision,
-            if (project.isNotEmpty) 'project': project,
-            'devices': devices,
-            'links': links,
-            'blocking': blocking,
-          },
-        ),
-      ];
+    ChatAction(
+      kind: 'pkt_edit',
+      summary: 'Edit $name in place (a timestamped backup is kept first)',
+      payload: <String, dynamic>{
+        'path': path,
+        'name': name,
+        'mode': 'in-place',
+        if (devices > 0) 'devices': devices,
+        if (links > 0) 'links': links,
+        // The plan version this choice was written against, so the edit
+        // cannot be run against a plan the user never saw.
+        if (revision.isNotEmpty) 'revision': revision,
+      },
+    ),
+    ChatAction(
+      kind: 'pkt_generate',
+      summary: 'Create a new .pkt from the same plan instead',
+      payload: <String, dynamic>{
+        'mode': 'new',
+        if (revision.isNotEmpty) 'revision': revision,
+        if (project.isNotEmpty) 'project': project,
+        'devices': devices,
+        'links': links,
+        'blocking': blocking,
+      },
+    ),
+  ];
 
   /// The answer when the user points at a file the app can see but cannot
   /// re-create.

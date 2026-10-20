@@ -78,8 +78,11 @@ void main() {
       );
 
       expect(result, isNotNull);
-      expect(result!.file.existsSync(), isTrue,
-          reason: 'the .pkt must actually be written to disk');
+      expect(
+        result!.file.existsSync(),
+        isTrue,
+        reason: 'the .pkt must actually be written to disk',
+      );
 
       // Read the FILE back, not the in-memory result: this is the artifact
       // the user takes to Packet Tracer.
@@ -90,11 +93,14 @@ void main() {
       // EVERY device is accounted for: either built, or named in a warning.
       // A device that quietly vanished would be a lab that does not do what
       // the user asked, and nothing would say so.
-      final unbuilt = result.warnings.where((w) => w.startsWith('No template for'));
+      final unbuilt = result.warnings.where(
+        (w) => w.startsWith('No template for'),
+      );
       expect(
         result.refIds.length + unbuilt.length,
         intent.nodes.length,
-        reason: 'built ${result.refIds.length}, could not build '
+        reason:
+            'built ${result.refIds.length}, could not build '
             '${unbuilt.length}, requested ${intent.nodes.length}',
       );
     });
@@ -108,28 +114,34 @@ void main() {
         seed: seed,
         outDir: tmp,
       )!;
-      expect(result.warnings.join(), contains('no server'),
-          reason: 'a kind the seed has never seen must be named');
+      expect(
+        result.warnings.join(),
+        contains('no server'),
+        reason: 'a kind the seed has never seen must be named',
+      );
       // Whether the router itself builds depends on whether the seed carries
       // the exact model the planner picked - so that is asserted by the
       // accounting test above, not here.
     });
 
-    test('the manifest is written beside the file, as the desktop route does',
-        () {
-      final result = OnDevicePktBuilder.build(
-        intent: plan('2 routers and 4 PCs'),
-        seed: seed,
-        outDir: tmp,
-        filename: 'lab.pkt',
-      )!;
-      expect(result.manifest.existsSync(), isTrue);
+    test(
+      'the manifest is written beside the file, as the desktop route does',
+      () {
+        final result = OnDevicePktBuilder.build(
+          intent: plan('2 routers and 4 PCs'),
+          seed: seed,
+          outDir: tmp,
+          filename: 'lab.pkt',
+        )!;
+        expect(result.manifest.existsSync(), isTrue);
 
-      final manifest =
-          jsonDecode(result.manifest.readAsStringSync()) as Map<String, dynamic>;
-      expect(manifest['generator'], 'on-device');
-      expect(manifest['devices'], greaterThan(0));
-    });
+        final manifest =
+            jsonDecode(result.manifest.readAsStringSync())
+                as Map<String, dynamic>;
+        expect(manifest['generator'], 'on-device');
+        expect(manifest['devices'], greaterThan(0));
+      },
+    );
 
     test('an intent with no devices produces no file at all', () {
       // The rule the chat enforces for greetings must hold here too: an
@@ -138,11 +150,7 @@ void main() {
       const empty = NetworkIntent(projectName: 'empty');
       expect(empty.nodes, isEmpty);
       expect(
-        OnDevicePktBuilder.build(
-          intent: empty,
-          seed: seed,
-          outDir: tmp,
-        ),
+        OnDevicePktBuilder.build(intent: empty, seed: seed, outDir: tmp),
         isNull,
       );
     });
@@ -151,9 +159,11 @@ void main() {
       final intent = plan('2 routers, 3 switches, 4 servers and 10 PCs');
       final specs = OnDevicePktBuilder.specsFor(intent).devices;
       expect(specs.length, intent.nodes.length);
-      expect(specs.map((d) => '${d.x},${d.y}').toSet().length,
-          specs.length,
-          reason: 'two devices at one coordinate render as an unreadable pile');
+      expect(
+        specs.map((d) => '${d.x},${d.y}').toSet().length,
+        specs.length,
+        reason: 'two devices at one coordinate render as an unreadable pile',
+      );
     });
 
     test('links are only written between devices that were built', () {
@@ -171,27 +181,38 @@ void main() {
     test('two builds of the same plan produce the same bytes', () {
       final intent = plan('1 router, 1 switch and 4 PCs');
       final a = OnDevicePktBuilder.build(
-        intent: intent, seed: seed, outDir: tmp, filename: 'a.pkt')!;
-      final b = OnDevicePktBuilder.build(
-        intent: intent, seed: seed, outDir: tmp, filename: 'b.pkt')!;
-      expect(a.file.readAsBytesSync(), b.file.readAsBytesSync());
-    });
-
-    test('a model the seed lacks is warned about, and the rest still build',
-        () {
-      final intent = NetworkIntent.parseSimple('chat', '1 router and 1 PC');
-      final result = OnDevicePktBuilder.build(
         intent: intent,
         seed: seed,
         outDir: tmp,
-      );
-      expect(result, isNotNull);
-      // Whatever happened, the manifest records every warning: a lab missing
-      // a device must never be a silent surprise.
-      final manifest =
-          jsonDecode(result!.manifest.readAsStringSync()) as Map<String, dynamic>;
-      expect(manifest['warnings'], isA<List>());
+        filename: 'a.pkt',
+      )!;
+      final b = OnDevicePktBuilder.build(
+        intent: intent,
+        seed: seed,
+        outDir: tmp,
+        filename: 'b.pkt',
+      )!;
+      expect(a.file.readAsBytesSync(), b.file.readAsBytesSync());
     });
+
+    test(
+      'a model the seed lacks is warned about, and the rest still build',
+      () {
+        final intent = NetworkIntent.parseSimple('chat', '1 router and 1 PC');
+        final result = OnDevicePktBuilder.build(
+          intent: intent,
+          seed: seed,
+          outDir: tmp,
+        );
+        expect(result, isNotNull);
+        // Whatever happened, the manifest records every warning: a lab missing
+        // a device must never be a silent surprise.
+        final manifest =
+            jsonDecode(result!.manifest.readAsStringSync())
+                as Map<String, dynamic>;
+        expect(manifest['warnings'], isA<List>());
+      },
+    );
 
     test('a built file survives being read as bytes and decoded again', () {
       final result = OnDevicePktBuilder.build(

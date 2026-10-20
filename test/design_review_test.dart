@@ -30,7 +30,11 @@ void main() {
         '2 routers with OSPF area 0, 2 switches, 3 servers, 20 PCs, DHCP, '
         'DNS, AAA, a firewall and a cloud',
       );
-      expect(review.score, 100, reason: review.findings.map((f) => f.message).join(' | '));
+      expect(
+        review.score,
+        100,
+        reason: review.findings.map((f) => f.message).join(' | '),
+      );
       expect(review.verdict, 'solid');
     });
 
@@ -52,15 +56,18 @@ void main() {
       expect(_hasArea(review, 'services', DesignSeverity.gap), isTrue);
     });
 
-    test('one router carrying a big site is called a single point of failure', () {
-      final review = _review('a warehouse with 60 staff');
-      expect(
-        review.findings.any(
-          (f) => f.area == 'redundancy' && f.message.contains('single point'),
-        ),
-        isTrue,
-      );
-    });
+    test(
+      'one router carrying a big site is called a single point of failure',
+      () {
+        final review = _review('a warehouse with 60 staff');
+        expect(
+          review.findings.any(
+            (f) => f.area == 'redundancy' && f.message.contains('single point'),
+          ),
+          isTrue,
+        );
+      },
+    );
 
     test('an internet-connected lab with no firewall is flagged', () {
       final plan = _plan('1 router, 1 switch, 1 cloud and 20 PCs');

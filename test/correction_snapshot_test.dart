@@ -4,66 +4,63 @@ import 'package:net_builder/services/autopilot_service.dart';
 
 void main() {
   group('CorrectionSnapshot parsing', () {
-    test('reads stale, rejected, pending and thrash rows from /corrections', () {
-      final snap = CorrectionSnapshot.fromJson({
-        'ok': true,
-        'summary': {
-          'count': 4,
-          'proposed': 1,
-          'verified': 2,
-          'rejected': 1,
-          'stale': 1,
-          'hits': 7,
+    test(
+      'reads stale, rejected, pending and thrash rows from /corrections',
+      () {
+        final snap = CorrectionSnapshot.fromJson({
+          'ok': true,
+          'summary': {
+            'count': 4,
+            'proposed': 1,
+            'verified': 2,
+            'rejected': 1,
+            'stale': 1,
+            'hits': 7,
+            'corrections': [],
+          },
           'corrections': [],
-        },
-        'corrections': [],
-        'pending': [
-          {
-            'id': 'c3',
-            'status': 'proposed',
-            'failureKind': 'model_click_missed',
-            'project': 'lab1',
-            'device': 'R1',
-            'dtype': 'router',
-            'thrash': 0,
-            'hits': 0,
-            'misses': 0,
-          },
-        ],
-        'stale': [
-          {
-            'id': 'c1',
-            'status': 'verified',
-            'stale': true,
-            'failureKind': 'pc_spot',
-            'device': 'PC0',
-            'hits': 5,
-            'misses': 3,
-            'thrash': 2,
-          },
-        ],
-        'thrash': [
-          {
-            'id': 'c1',
-            'status': 'verified',
-            'stale': true,
-            'thrash': 2,
-          },
-        ],
-      });
+          'pending': [
+            {
+              'id': 'c3',
+              'status': 'proposed',
+              'failureKind': 'model_click_missed',
+              'project': 'lab1',
+              'device': 'R1',
+              'dtype': 'router',
+              'thrash': 0,
+              'hits': 0,
+              'misses': 0,
+            },
+          ],
+          'stale': [
+            {
+              'id': 'c1',
+              'status': 'verified',
+              'stale': true,
+              'failureKind': 'pc_spot',
+              'device': 'PC0',
+              'hits': 5,
+              'misses': 3,
+              'thrash': 2,
+            },
+          ],
+          'thrash': [
+            {'id': 'c1', 'status': 'verified', 'stale': true, 'thrash': 2},
+          ],
+        });
 
-      expect(snap.hasStale, isTrue);
-      expect(snap.stale.single.id, 'c1');
-      expect(snap.stale.single.summaryLine, contains('PC0'));
-      expect(snap.pending.single.status, 'proposed');
-      expect(snap.thrash.single.thrash, 2);
-      expect(snap.proposedCount, 1);
-      expect(snap.verifiedCount, 2);
-      expect(snap.hits, 7);
-    });
+        expect(snap.hasStale, isTrue);
+        expect(snap.stale.single.id, 'c1');
+        expect(snap.stale.single.summaryLine, contains('PC0'));
+        expect(snap.pending.single.status, 'proposed');
+        expect(snap.thrash.single.thrash, 2);
+        expect(snap.proposedCount, 1);
+        expect(snap.verifiedCount, 2);
+        expect(snap.hits, 7);
+      },
+    );
 
-    test('falls back to the listing for rejected rows on an older sidecar',
-        () {
+    test('falls back to the listing for rejected rows on an older sidecar', () {
       final snap = CorrectionSnapshot.fromJson({
         'ok': true,
         'summary': {

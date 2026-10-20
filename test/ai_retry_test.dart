@@ -44,20 +44,22 @@ void main() {
       expect(waits, [1, 2], reason: 'backed off before each retry');
     });
 
-    test('it gives up after the bounded attempts and returns the failure',
-        () async {
-      var sent = 0;
-      final response = await AiRetry.fetch<http.Response>(
-        send: () async {
-          sent++;
-          return http.Response('{}', 503);
-        },
-        status: (r) => r.statusCode,
-        wait: (_) async {},
-      );
-      expect(sent, AiRetry.maxAttempts);
-      expect(response.statusCode, 503, reason: 'the caller still reports it');
-    });
+    test(
+      'it gives up after the bounded attempts and returns the failure',
+      () async {
+        var sent = 0;
+        final response = await AiRetry.fetch<http.Response>(
+          send: () async {
+            sent++;
+            return http.Response('{}', 503);
+          },
+          status: (r) => r.statusCode,
+          wait: (_) async {},
+        );
+        expect(sent, AiRetry.maxAttempts);
+        expect(response.statusCode, 503, reason: 'the caller still reports it');
+      },
+    );
 
     test('a rejected request is handed back without a retry', () async {
       var sent = 0;
@@ -133,11 +135,9 @@ void main() {
         apiKey: 'test-key',
         client: client,
       );
-      final pieces = await service
-          .stream(const [
-            {'role': 'user', 'content': 'hi'},
-          ])
-          .toList();
+      final pieces = await service.stream(const [
+        {'role': 'user', 'content': 'hi'},
+      ]).toList();
       expect(calls, 2);
       expect(pieces.join(), contains('Hello from the gateway'));
     });

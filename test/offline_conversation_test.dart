@@ -77,10 +77,7 @@ void main() {
         normalized: 'hi',
         target: 'pt',
         modelError: 'HTTP 429: rate limited',
-        history: [
-          turn('user', 'hello'),
-          turn('model', failed.text),
-        ],
+        history: [turn('user', 'hello'), turn('model', failed.text)],
       );
       expect(later.text, isNot(contains('429')));
       expect(later.text, failed.text);
@@ -101,10 +98,7 @@ void main() {
         normalized: 'hi',
         target: 'pt',
         privateMode: true,
-        history: [
-          turn('user', 'hello'),
-          turn('model', reply.text),
-        ],
+        history: [turn('user', 'hello'), turn('model', reply.text)],
       );
       expect(later.text, isNot(contains('Private mode')));
     });
@@ -168,8 +162,11 @@ void main() {
       );
       expect(changed, isNotNull);
       expect(changed!.routing, 'ospf');
-      expect(changed.nodes.length, statics.nodes.length,
-          reason: 'a routing change must not re-plan the topology');
+      expect(
+        changed.nodes.length,
+        statics.nodes.length,
+        reason: 'a routing change must not re-plan the topology',
+      );
     });
 
     test('the offline advice and the offline action agree', () {

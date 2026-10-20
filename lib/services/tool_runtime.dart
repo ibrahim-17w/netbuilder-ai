@@ -102,9 +102,7 @@ class ToolRuntime {
     }
     try {
       final uri = Uri.parse('$base/tools/list');
-      final response = await client
-          .get(uri)
-          .timeout(StreamDeadlines.discovery);
+      final response = await client.get(uri).timeout(StreamDeadlines.discovery);
       if (response.statusCode != 200) {
         _tools = const [];
         return false;
@@ -221,12 +219,14 @@ class ToolRuntime {
           );
 
     if (response.statusCode != 200) {
-      throw Exception(AiErrors.describe(
-        status: response.statusCode,
-        body: response.body,
-        model: config.model,
-        baseUrl: config.effectiveBaseUrl(),
-      ));
+      throw Exception(
+        AiErrors.describe(
+          status: response.statusCode,
+          body: response.body,
+          model: config.model,
+          baseUrl: config.effectiveBaseUrl(),
+        ),
+      );
     }
     return jsonDecode(response.body);
   }
@@ -259,7 +259,8 @@ class ToolRuntime {
     if (decoded is Map && decoded['ok'] == false) {
       throw Exception(decoded['error']?.toString() ?? 'tool failed');
     }
-    if (decoded is Map && decoded.containsKey('result')) return decoded['result'];
+    if (decoded is Map && decoded.containsKey('result'))
+      return decoded['result'];
     return decoded;
   }
 
@@ -374,11 +375,15 @@ class ToolRuntime {
   /// told it had been shown a picture and could see nothing.
   static List<Map<String, dynamic>> _geminiParts(Object? content) {
     if (content is String) {
-      return [if (content.isNotEmpty) {'text': content}];
+      return [
+        if (content.isNotEmpty) {'text': content},
+      ];
     }
     if (content is! List) {
       final text = content?.toString() ?? '';
-      return [if (text.isNotEmpty) {'text': text}];
+      return [
+        if (text.isNotEmpty) {'text': text},
+      ];
     }
     final parts = <Map<String, dynamic>>[];
     for (final part in content) {
@@ -420,7 +425,9 @@ class ToolRuntime {
 
   static Map<String, dynamic> _decodeObject(Object? raw) {
     final value = _decodeAny(raw);
-    return value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
+    return value is Map
+        ? Map<String, dynamic>.from(value)
+        : <String, dynamic>{};
   }
 
   static Object? _decodeAny(Object? raw) {

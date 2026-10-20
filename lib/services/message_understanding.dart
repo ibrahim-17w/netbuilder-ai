@@ -50,9 +50,13 @@ class MessageUnderstanding {
     r'laptops?|printers?|phones?|firewalls?|tablets?|access\s+points?|aps?)\b',
     caseSensitive: false,
   );
-  static final RegExp _cidr =
-      RegExp(r'\b\d{1,3}(?:\.\d{1,3}){3}\s*/\s*\d{1,2}\b');
-  static final RegExp _vlan = RegExp(r'\bvlan\s*\d{1,4}\b', caseSensitive: false);
+  static final RegExp _cidr = RegExp(
+    r'\b\d{1,3}(?:\.\d{1,3}){3}\s*/\s*\d{1,2}\b',
+  );
+  static final RegExp _vlan = RegExp(
+    r'\bvlan\s*\d{1,4}\b',
+    caseSensitive: false,
+  );
   static final RegExp _correction = RegExp(
     r"\b(?:not\s+[a-z]+|don'?t\s+use\s+[a-z]+|instead\s+of\s+[a-z]+|"
     r"rather\s+than\s+[a-z]+|actually\s+\d{1,3}|no\s+wait|"
@@ -84,8 +88,10 @@ class MessageUnderstanding {
     collect(_vlan, 'vlan');
     final routing = NetworkIntent.resolveRouting(trimmed.toLowerCase());
     if (routing != null) {
-      final m = RegExp('\\b$routing\\b', caseSensitive: false)
-          .firstMatch(trimmed);
+      final m = RegExp(
+        '\\b$routing\\b',
+        caseSensitive: false,
+      ).firstMatch(trimmed);
       if (m != null) {
         details.add(RecognizedDetail('routing', m.group(0)!, m.start));
       }
@@ -94,7 +100,9 @@ class MessageUnderstanding {
 
     final corrections = <RecognizedDetail>[];
     for (final m in _correction.allMatches(trimmed)) {
-      corrections.add(RecognizedDetail('correction', m.group(0)!.trim(), m.start));
+      corrections.add(
+        RecognizedDetail('correction', m.group(0)!.trim(), m.start),
+      );
     }
 
     final ref = FileEditIntentReader.referenceIn(trimmed);

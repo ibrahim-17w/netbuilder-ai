@@ -32,7 +32,9 @@ void main() {
 
   testWidgets('empty history shows zeros', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: HistoryDashboard(items: const []))),
+      MaterialApp(
+        home: Scaffold(body: HistoryDashboard(items: const [])),
+      ),
     );
     expect(find.text('0%'), findsOneWidget);
     expect(find.text('Builds'), findsOneWidget);

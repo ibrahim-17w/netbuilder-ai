@@ -50,8 +50,10 @@ void main() {
     test('a greeting carrying a real request is NOT small talk', () {
       // "hi, build me a lab" is a build request wearing a greeting.
       expect(ScopeGate.isSmallTalk('hi, build me a lab'), isFalse);
-      expect(ScopeGate.isSmallTalk('thanks - now add a second router'),
-          isFalse);
+      expect(
+        ScopeGate.isSmallTalk('thanks - now add a second router'),
+        isFalse,
+      );
       expect(ScopeGate.isSmallTalk('ok, 20 PCs and 3 switches'), isFalse);
     });
 
@@ -84,8 +86,11 @@ void main() {
       // Asserting that the parser WOULD invent a lab documents exactly why
       // it must not be called.
       final invented = NetworkIntent.parseSimple('chat', 'hello');
-      expect(invented.nodes, isNotEmpty,
-          reason: 'if this ever empties, the gate may be unnecessary');
+      expect(
+        invented.nodes,
+        isNotEmpty,
+        reason: 'if this ever empties, the gate may be unnecessary',
+      );
       expect(
         ScopeGate.isSmallTalk('hello'),
         isTrue,
@@ -102,8 +107,9 @@ void main() {
     });
   });
 
-  testWidgets('a greeting leaves the app with NO plan to describe',
-      (tester) async {
+  testWidgets('a greeting leaves the app with NO plan to describe', (
+    tester,
+  ) async {
     await tester.pumpWidget(const NetBuilderApp());
     await tester.pumpAndSettle();
 
@@ -127,16 +133,25 @@ void main() {
     // shipped to the model, and a model handed a default lab will describe
     // it back ("here is the network I understand") to someone who only said
     // hello.
-    expect(find.text('Understood'), findsNothing,
-        reason: '"hello" must not create a plan');
-    expect(find.textContaining('lab I understand'), findsNothing,
-        reason: '"hello" must not be answered with a network');
+    expect(
+      find.text('Understood'),
+      findsNothing,
+      reason: '"hello" must not create a plan',
+    );
+    expect(
+      find.textContaining('lab I understand'),
+      findsNothing,
+      reason: '"hello" must not be answered with a network',
+    );
 
     // A REAL brief on the same screen does produce one, so this is the gate
     // working and not the card being broken.
     await say('2 routers, 3 switches and 10 PCs');
     await tester.pumpAndSettle();
-    expect(find.text('Understood'), findsOneWidget,
-        reason: 'a real brief still gets a plan');
+    expect(
+      find.text('Understood'),
+      findsOneWidget,
+      reason: 'a real brief still gets a plan',
+    );
   });
 }

@@ -42,22 +42,22 @@ void main() {
   /// A plan with two interfaces claiming one address - the finding the
   /// deterministic pass actually fixes.
   NetworkIntent clashing() => NetworkIntent(
-        projectName: 'office',
-        routing: 'ospf',
-        nodes: [
-          NetNode(name: 'R1', type: 'router', model: '4331'),
-          NetNode(name: 'SW1', type: 'switch', model: '2960'),
-          NetNode(name: 'PC1', type: 'pc', model: 'pc'),
-        ],
-        links: [
-          NetLink(a: 'R1', aIf: 'g0/0', b: 'SW1', bIf: 'f0/1'),
-          NetLink(a: 'SW1', aIf: 'f0/2', b: 'PC1', bIf: 'f0'),
-        ],
-        addressing: [
-          InterfaceAddr(node: 'R1', iface: 'g0/0', ipCidr: '192.168.1.1/24'),
-          InterfaceAddr(node: 'PC1', iface: 'f0', ipCidr: '192.168.1.1/24'),
-        ],
-      );
+    projectName: 'office',
+    routing: 'ospf',
+    nodes: [
+      NetNode(name: 'R1', type: 'router', model: '4331'),
+      NetNode(name: 'SW1', type: 'switch', model: '2960'),
+      NetNode(name: 'PC1', type: 'pc', model: 'pc'),
+    ],
+    links: [
+      NetLink(a: 'R1', aIf: 'g0/0', b: 'SW1', bIf: 'f0/1'),
+      NetLink(a: 'SW1', aIf: 'f0/2', b: 'PC1', bIf: 'f0'),
+    ],
+    addressing: [
+      InterfaceAddr(node: 'R1', iface: 'g0/0', ipCidr: '192.168.1.1/24'),
+      InterfaceAddr(node: 'PC1', iface: 'f0', ipCidr: '192.168.1.1/24'),
+    ],
+  );
 
   /// Park the rules a repair of [plan] would teach, the way the chat does,
   /// and return the plan that would actually be built afterwards.
@@ -105,7 +105,10 @@ void main() {
   }
 
   test('the repair pass states what it fixed, in rules a plan can use', () {
-    final repair = PlanRepairService.repair(clashing(), target: 'packet-tracer');
+    final repair = PlanRepairService.repair(
+      clashing(),
+      target: 'packet-tracer',
+    );
     expect(repair.changed, isTrue);
     // Every change can say its own rule: a change the app cannot generalise
     // is a change it must not learn from.
@@ -124,28 +127,32 @@ void main() {
   test('a parked repair teaches nothing until a build verifies', () async {
     final mem = await fresh();
     await park(mem, clashing());
-    expect(await mem.allRules(), isEmpty,
-        reason: 'parking is not promotion');
-    expect(await mem.plannerRuleTexts(), isEmpty,
-        reason: 'and nothing a planner reads may exist yet');
+    expect(await mem.allRules(), isEmpty, reason: 'parking is not promotion');
+    expect(
+      await mem.plannerRuleTexts(),
+      isEmpty,
+      reason: 'and nothing a planner reads may exist yet',
+    );
   });
 
-  test('a verified build promotes the repair into rules a planner reads',
-      () async {
-    final mem = await fresh();
-    final repaired = await park(mem, clashing());
-    await logAndSettle(mem, repaired, verified: true);
-    final rules = await mem.plannerRuleTexts();
-    expect(rules, isNotEmpty);
-    for (final rule in rules) {
-      expect(rule, isNot(contains('192.168.1.1')));
-      expect(rule.toLowerCase(), isNot(contains('failed')));
-    }
-    // Scoped to the target it was learned for, like every other rule.
-    for (final row in await mem.allRules()) {
-      expect(row.targets, 'packet-tracer');
-    }
-  });
+  test(
+    'a verified build promotes the repair into rules a planner reads',
+    () async {
+      final mem = await fresh();
+      final repaired = await park(mem, clashing());
+      await logAndSettle(mem, repaired, verified: true);
+      final rules = await mem.plannerRuleTexts();
+      expect(rules, isNotEmpty);
+      for (final rule in rules) {
+        expect(rule, isNot(contains('192.168.1.1')));
+        expect(rule.toLowerCase(), isNot(contains('failed')));
+      }
+      // Scoped to the target it was learned for, like every other rule.
+      for (final row in await mem.allRules()) {
+        expect(row.targets, 'packet-tracer');
+      }
+    },
+  );
 
   test('a failed build promotes nothing and leaves no trace', () async {
     final mem = await fresh();
@@ -184,8 +191,11 @@ void main() {
     expect(first, greaterThan(0));
     await park(mem, clashing());
     await logAndSettle(mem, repaired, verified: true);
-    expect((await mem.allRules()).length, first,
-        reason: 'the same lesson repeated is not a second lesson');
+    expect(
+      (await mem.allRules()).length,
+      first,
+      reason: 'the same lesson repeated is not a second lesson',
+    );
   });
 
   test('a plan is identified by its shape, not by its bookkeeping', () {
@@ -199,8 +209,10 @@ void main() {
         ..['confidence'] = 0.1
         ..['notes'] = ['later'],
     );
-    expect(RepairLearning.fingerprint(rebuilt),
-        RepairLearning.fingerprint(plan));
+    expect(
+      RepairLearning.fingerprint(rebuilt),
+      RepairLearning.fingerprint(plan),
+    );
     // A real change of shape is a different plan.
     final moved = NetworkIntent(
       projectName: plan.projectName,
@@ -212,8 +224,10 @@ void main() {
       ],
       addressing: plan.addressing,
     );
-    expect(RepairLearning.fingerprint(moved),
-        isNot(RepairLearning.fingerprint(plan)));
+    expect(
+      RepairLearning.fingerprint(moved),
+      isNot(RepairLearning.fingerprint(plan)),
+    );
   });
 
   test('candidate rules are bounded and de-duplicated', () {

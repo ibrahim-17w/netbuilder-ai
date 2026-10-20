@@ -93,7 +93,7 @@ class ReachabilityQuestion {
         question: null,
         failure: asked
             ? 'This plan has fewer than two devices, so there is nothing to '
-                'reason between yet.'
+                  'reason between yet.'
             : null,
       );
     }
@@ -232,7 +232,8 @@ class ReachabilityQuestion {
     if (exact.length > 1) {
       return (
         name: null,
-        failure: "'${raw.trim()}' matches more than one device in this plan "
+        failure:
+            "'${raw.trim()}' matches more than one device in this plan "
             '- ${exact.join(', ')}. Name one of them.',
       );
     }
@@ -249,7 +250,8 @@ class ReachabilityQuestion {
     if (prefixed.length > 1) {
       return (
         name: null,
-        failure: "'${raw.trim()}' matches more than one device in this plan "
+        failure:
+            "'${raw.trim()}' matches more than one device in this plan "
             '- ${prefixed.join(', ')}. Name one of them.',
       );
     }
@@ -274,14 +276,16 @@ class ReachabilityQuestion {
       if (best.length == 1) return (name: best.first.$1, failure: null);
       return (
         name: null,
-        failure: "'${raw.trim()}' is one letter from several devices in this "
+        failure:
+            "'${raw.trim()}' is one letter from several devices in this "
             'plan - ${best.map((e) => e.$1).join(', ')}. Which one did you '
             'mean?',
       );
     }
     return (
       name: null,
-      failure: "I don't see a device named '${raw.trim()}' in this plan - "
+      failure:
+          "I don't see a device named '${raw.trim()}' in this plan - "
           'the plan has $names.',
     );
   }
@@ -340,8 +344,10 @@ class ReachabilityVerdict {
     final ask = target.trim();
     if (ask.isNotEmpty) sb.writeln('Q: $ask');
     if (reachable == true) {
-      sb.write('$from -> $to looks reachable in this plan, checked step by '
-          'step:');
+      sb.write(
+        '$from -> $to looks reachable in this plan, checked step by '
+        'step:',
+      );
     } else if (reachable == false) {
       sb.write('Why $from cannot reach $to - walked against the plan:');
     } else {
@@ -361,13 +367,17 @@ class ReachabilityVerdict {
       }
     }
     if (reachable == true && verifyCommand != null) {
-      sb.write('\nConfirm on the device: `$verifyCommand` - the first reply '
-          'may wait on ARP, run it twice.');
+      sb.write(
+        '\nConfirm on the device: `$verifyCommand` - the first reply '
+        'may wait on ARP, run it twice.',
+      );
     } else if (reachable != true) {
       final replies = quickReplies;
       if (replies.isNotEmpty) {
-        sb.write('\nSay one of these and I will walk the plan again: '
-            '${replies.join(' | ')}.');
+        sb.write(
+          '\nSay one of these and I will walk the plan again: '
+          '${replies.join(' | ')}.',
+        );
       }
     }
     return sb.toString();
@@ -388,7 +398,12 @@ class TopologyReasoner {
   /// switch-shaped, which is private there): they forward at layer 2 and
   /// route at none.
   static const Set<String> _layer2 = {
-    'switch', 'hub', 'bridge', 'cloud', 'modem', 'wlc',
+    'switch',
+    'hub',
+    'bridge',
+    'cloud',
+    'modem',
+    'wlc',
   };
 
   /// Kinds with serial interfaces a serial cable can terminate on. A PC or a
@@ -401,7 +416,11 @@ class TopologyReasoner {
   /// NOT count is 'none'/empty - the plan then declares no routing at all,
   /// the same reading DesignReview gives it.
   static const Set<String> _routingKinds = {
-    'static', 'ospf', 'eigrp', 'bgp', 'rip',
+    'static',
+    'ospf',
+    'eigrp',
+    'bgp',
+    'rip',
   };
 
   /// Walk the plan's own graph for one reachability question and return the
@@ -430,7 +449,8 @@ class TopologyReasoner {
           ReasonStep(
             check: 'Same device',
             blocked: true,
-            detail: '${resolvedFrom.name} and ${resolvedTo.name} are the '
+            detail:
+                '${resolvedFrom.name} and ${resolvedTo.name} are the '
                 'same device - a ping to itself never crosses the network, '
                 'so there is no path to reason about.',
             fixes: ['Name two different devices from the plan'],
@@ -455,7 +475,8 @@ class TopologyReasoner {
           ReasonStep(
             check: 'Devices',
             cannotTell: true,
-            detail: 'Cannot tell from the plan: '
+            detail:
+                'Cannot tell from the plan: '
                 "${failure ?? "no device named '$missing' in this plan"}.",
             fixes: ['Check the device names against the plan'],
           ),
@@ -476,22 +497,27 @@ class TopologyReasoner {
     //    later steps answer that.
     final path = _walk(plan, nodeA.name, nodeB.name);
     if (path == null) {
-      steps.add(ReasonStep(
-        check: 'Link',
-        blocked: true,
-        detail: '${nodeA.name} and ${nodeB.name} are not cabled together in '
-            'this plan - nothing connects them, so there is no path to walk.',
-        fixes: [
-          'Cable ${nodeA.name} and ${nodeB.name} together directly or '
-              'through a switch',
-        ],
-      ));
+      steps.add(
+        ReasonStep(
+          check: 'Link',
+          blocked: true,
+          detail:
+              '${nodeA.name} and ${nodeB.name} are not cabled together in '
+              'this plan - nothing connects them, so there is no path to walk.',
+          fixes: [
+            'Cable ${nodeA.name} and ${nodeB.name} together directly or '
+                'through a switch',
+          ],
+        ),
+      );
       return _verdict(false, steps, nodeA, nodeB, target, null);
     }
-    steps.add(ReasonStep(
-      check: 'Link',
-      detail: '${_renderPath(path)} - a cabled path exists.',
-    ));
+    steps.add(
+      ReasonStep(
+        check: 'Link',
+        detail: '${_renderPath(path)} - a cabled path exists.',
+      ),
+    );
 
     // 4. End-device addressing: IP + mask on both ends, read from the plan's
     //    own addressing rows (the same rows Desktop > IP Configuration is
@@ -500,30 +526,38 @@ class TopologyReasoner {
     if (addrA.cidr == null) {
       return _addressingStop(steps, nodeA, addrA, nodeA, nodeB, target);
     }
-    steps.add(ReasonStep(
-      check: 'Addressing',
-      detail: '${nodeA.name} is ${addrA.cidr}'
-          '${addrA.iface == null ? '' : ' on ${addrA.iface}'}.',
-    ));
+    steps.add(
+      ReasonStep(
+        check: 'Addressing',
+        detail:
+            '${nodeA.name} is ${addrA.cidr}'
+            '${addrA.iface == null ? '' : ' on ${addrA.iface}'}.',
+      ),
+    );
     final addrB = _endpointAddress(plan, nodeB);
     if (addrB.cidr == null) {
       return _addressingStop(steps, nodeB, addrB, nodeA, nodeB, target);
     }
-    steps.add(ReasonStep(
-      check: 'Addressing',
-      detail: '${nodeB.name} is ${addrB.cidr}'
-          '${addrB.iface == null ? '' : ' on ${addrB.iface}'}.',
-    ));
+    steps.add(
+      ReasonStep(
+        check: 'Addressing',
+        detail:
+            '${nodeB.name} is ${addrB.cidr}'
+            '${addrB.iface == null ? '' : ' on ${addrB.iface}'}.',
+      ),
+    );
 
     // 5. Same subnet, via each end's OWN mask (masks can disagree; a
     //    mismatched mask is itself the fault this comparison exposes).
     final sameSubnet = NetworkTools.sameSubnet(addrA.cidr!, addrB.cidr!);
     final infoA = NetworkTools.subnet(addrA.cidr!);
     final infoB = NetworkTools.subnet(addrB.cidr!);
-    final netA =
-        infoA == null ? addrA.cidr! : '${infoA.network}/${infoA.prefix}';
-    final netB =
-        infoB == null ? addrB.cidr! : '${infoB.network}/${infoB.prefix}';
+    final netA = infoA == null
+        ? addrA.cidr!
+        : '${infoA.network}/${infoA.prefix}';
+    final netB = infoB == null
+        ? addrB.cidr!
+        : '${infoB.network}/${infoB.prefix}';
     final routersOnPath = path.nodes
         .map((n) => _nodeOf(plan, n))
         .whereType<NetNode>()
@@ -531,34 +565,43 @@ class TopologyReasoner {
         .map((n) => n.name)
         .toList();
     if (sameSubnet) {
-      steps.add(ReasonStep(
-        check: 'Subnet',
-        detail: '${nodeA.name} ($netA) and ${nodeB.name} ($netB) are in the '
-            'same subnet - no routing is needed.',
-      ));
+      steps.add(
+        ReasonStep(
+          check: 'Subnet',
+          detail:
+              '${nodeA.name} ($netA) and ${nodeB.name} ($netB) are in the '
+              'same subnet - no routing is needed.',
+        ),
+      );
     } else if (routersOnPath.isEmpty) {
       // Different subnets with only switches between them: a layer-2 device
       // cannot route, and no amount of addressing fixes a missing router.
-      steps.add(ReasonStep(
-        check: 'Subnet',
-        blocked: true,
-        detail: '${nodeA.name} is in $netA and ${nodeB.name} is in $netB - '
-            'different subnets, but the path between them never crosses a '
-            'router: a layer-2 switch cannot route between $netA and $netB.',
-        fixes: [
-          'Add a router between the two subnets',
-          'Put ${nodeA.name} and ${nodeB.name} in the same subnet',
-        ],
-      ));
+      steps.add(
+        ReasonStep(
+          check: 'Subnet',
+          blocked: true,
+          detail:
+              '${nodeA.name} is in $netA and ${nodeB.name} is in $netB - '
+              'different subnets, but the path between them never crosses a '
+              'router: a layer-2 switch cannot route between $netA and $netB.',
+          fixes: [
+            'Add a router between the two subnets',
+            'Put ${nodeA.name} and ${nodeB.name} in the same subnet',
+          ],
+        ),
+      );
       return _verdict(false, steps, nodeA, nodeB, target, null);
     } else {
-      steps.add(ReasonStep(
-        check: 'Subnet',
-        detail: '${nodeA.name} is in $netA and ${nodeB.name} is in $netB - '
-            'different subnets, and ${routersOnPath.join(' and ')} '
-            '${routersOnPath.length == 1 ? 'is' : 'are'} on the path to '
-            'route between them.',
-      ));
+      steps.add(
+        ReasonStep(
+          check: 'Subnet',
+          detail:
+              '${nodeA.name} is in $netA and ${nodeB.name} is in $netB - '
+              'different subnets, and ${routersOnPath.join(' and ')} '
+              '${routersOnPath.length == 1 ? 'is' : 'are'} on the path to '
+              'route between them.',
+        ),
+      );
     }
 
     // The one test that confirms the whole ladder on the device, whichever
@@ -623,20 +666,25 @@ class TopologyReasoner {
     if (dups.isNotEmpty) {
       final first = dups.first;
       final users = (first['usedBy'] as List).join(' and ');
-      steps.add(ReasonStep(
-        check: 'Duplicates',
-        blocked: true,
-        detail: 'Address ${first['address']} is used more than once on the '
-            'path - $users - so the second one answers ARP that belongs to '
-            'the first.',
-        fixes: ['Give one of the duplicated devices a different address'],
-      ));
+      steps.add(
+        ReasonStep(
+          check: 'Duplicates',
+          blocked: true,
+          detail:
+              'Address ${first['address']} is used more than once on the '
+              'path - $users - so the second one answers ARP that belongs to '
+              'the first.',
+          fixes: ['Give one of the duplicated devices a different address'],
+        ),
+      );
       return _verdict(false, steps, nodeA, nodeB, target, null);
     }
-    steps.add(const ReasonStep(
-      check: 'Duplicates',
-      detail: 'No address on the path is used twice.',
-    ));
+    steps.add(
+      const ReasonStep(
+        check: 'Duplicates',
+        detail: 'No address on the path is used twice.',
+      ),
+    );
 
     // 8. Routing - only when the pings must cross subnets, which is exactly
     //    when a router on the path needs to know where the far side lives.
@@ -645,37 +693,46 @@ class TopologyReasoner {
       if (_routingKinds.contains(routing)) {
         final note = routing == 'static'
             ? 'the plan uses static routing - one `ip route` per remote LAN '
-                'is part of the build'
+                  'is part of the build'
             : 'the plan runs ${routing.toUpperCase()} between the routers';
-        steps.add(ReasonStep(
-          check: 'Routing',
-          detail: '$note (`show ip route` on ${routersOnPath.first} should '
-              'list the far subnet).',
-          command: 'show ip route',
-        ));
+        steps.add(
+          ReasonStep(
+            check: 'Routing',
+            detail:
+                '$note (`show ip route` on ${routersOnPath.first} should '
+                'list the far subnet).',
+            command: 'show ip route',
+          ),
+        );
       } else if (plan.security.interVlanRouting) {
         // Router-on-a-stick: the plan routes between the VLANs through one
         // dot1Q sub-interface set - that IS the routing intent, spelled in
         // the security block, even when the routing field says none.
-        steps.add(ReasonStep(
-          check: 'Routing',
-          detail: 'the plan routes between the VLANs on '
-              '${routersOnPath.first} (router-on-a-stick), so no separate '
-              'routing protocol is needed.',
-        ));
+        steps.add(
+          ReasonStep(
+            check: 'Routing',
+            detail:
+                'the plan routes between the VLANs on '
+                '${routersOnPath.first} (router-on-a-stick), so no separate '
+                'routing protocol is needed.',
+          ),
+        );
       } else {
         final label = routing.isEmpty
             ? 'no routing at all'
             : 'no routing the plan declares (routing: ${plan.routing})';
-        steps.add(ReasonStep(
-          check: 'Routing',
-          blocked: true,
-          detail: 'The path crosses ${routersOnPath.join(' and ')} but the '
-              'plan carries $label - the last router would answer '
-              '"destination host unreachable".',
-          command: 'show ip route',
-          fixes: _routingFixes(routersOnPath),
-        ));
+        steps.add(
+          ReasonStep(
+            check: 'Routing',
+            blocked: true,
+            detail:
+                'The path crosses ${routersOnPath.join(' and ')} but the '
+                'plan carries $label - the last router would answer '
+                '"destination host unreachable".',
+            command: 'show ip route',
+            fixes: _routingFixes(routersOnPath),
+          ),
+        );
         return _verdict(false, steps, nodeA, nodeB, target, null);
       }
     }
@@ -685,35 +742,45 @@ class TopologyReasoner {
     //    or a router interface named s0/x, must not land on a PC or a switch
     //    - those have no serial port to terminate the cable.
     final serialLinks = path.links
-        .where((l) =>
-            l.isSerial || (l.cable ?? '').toLowerCase().contains('serial'))
+        .where(
+          (l) => l.isSerial || (l.cable ?? '').toLowerCase().contains('serial'),
+        )
         .toList();
     if (serialLinks.isEmpty) {
-      steps.add(const ReasonStep(
-        check: 'Cables',
-        detail: 'No serial or special cable kinds on the path - copper '
-            'Ethernet throughout.',
-      ));
+      steps.add(
+        const ReasonStep(
+          check: 'Cables',
+          detail:
+              'No serial or special cable kinds on the path - copper '
+              'Ethernet throughout.',
+        ),
+      );
     } else {
       for (final l in serialLinks) {
         final offender = _serialOffender(plan, l);
         if (offender != null) {
-          steps.add(ReasonStep(
-            check: 'Cables',
-            blocked: true,
-            detail: 'The link ${l.a} ${l.aIf} -<-> ${l.b} ${l.bIf} is wired '
-                'as serial, but $offender has no serial port - serial needs '
-                'serial-capable ends (routers, firewalls).',
-            fixes: ['Use an Ethernet cable between ${l.a} and ${l.b}'],
-          ));
+          steps.add(
+            ReasonStep(
+              check: 'Cables',
+              blocked: true,
+              detail:
+                  'The link ${l.a} ${l.aIf} -<-> ${l.b} ${l.bIf} is wired '
+                  'as serial, but $offender has no serial port - serial needs '
+                  'serial-capable ends (routers, firewalls).',
+              fixes: ['Use an Ethernet cable between ${l.a} and ${l.b}'],
+            ),
+          );
           return _verdict(false, steps, nodeA, nodeB, target, null);
         }
       }
-      steps.add(ReasonStep(
-        check: 'Cables',
-        detail: 'Serial link(s) on the path terminate on serial-capable '
-            'ends: ${serialLinks.map((l) => '${l.a}-${l.b}').join(', ')}.',
-      ));
+      steps.add(
+        ReasonStep(
+          check: 'Cables',
+          detail:
+              'Serial link(s) on the path terminate on serial-capable '
+              'ends: ${serialLinks.map((l) => '${l.a}-${l.b}').join(', ')}.',
+        ),
+      );
     }
 
     // Every check the plan supports has passed - the ladder IS the proof.
@@ -730,15 +797,14 @@ class TopologyReasoner {
     NetNode to,
     String target,
     String? verifyCommand,
-  ) =>
-      ReachabilityVerdict(
-        reachable: reachable,
-        ladder: steps,
-        from: from.name,
-        to: to.name,
-        target: target,
-        verifyCommand: verifyCommand,
-      );
+  ) => ReachabilityVerdict(
+    reachable: reachable,
+    ladder: steps,
+    from: from.name,
+    to: to.name,
+    target: target,
+    verifyCommand: verifyCommand,
+  );
 
   /// The step-4 stop: a missing address on an end device is a deterministic
   /// fault (the file would ship unconfigured); a switch with no IP config is
@@ -751,17 +817,19 @@ class TopologyReasoner {
     NetNode to,
     String target,
   ) {
-    steps.add(ReasonStep(
-      check: 'Addressing',
-      blocked: !addr.cannotTell,
-      cannotTell: addr.cannotTell,
-      detail: addr.problem!,
-      // A missing IP has a concrete fix; a layer-2 device with no IP config
-      // is not fixable in the plan, so no fix is offered.
-      fixes: addr.cannotTell
-          ? const []
-          : ['Add an IP address for ${failing.name} in the plan'],
-    ));
+    steps.add(
+      ReasonStep(
+        check: 'Addressing',
+        blocked: !addr.cannotTell,
+        cannotTell: addr.cannotTell,
+        detail: addr.problem!,
+        // A missing IP has a concrete fix; a layer-2 device with no IP config
+        // is not fixable in the plan, so no fix is offered.
+        fixes: addr.cannotTell
+            ? const []
+            : ['Add an IP address for ${failing.name} in the plan'],
+      ),
+    );
     return _verdict(
       addr.cannotTell ? null : false,
       steps,
@@ -779,7 +847,7 @@ class TopologyReasoner {
   /// address without a mask is a fail-closed gap - the subnet cannot be
   /// computed from it.
   static ({String? cidr, String? iface, String? problem, bool cannotTell})
-      _endpointAddress(NetworkIntent plan, NetNode node) {
+  _endpointAddress(NetworkIntent plan, NetNode node) {
     final rows = plan.addressing
         .where((r) => r.node.toLowerCase() == node.name.toLowerCase())
         .toList();
@@ -790,7 +858,8 @@ class TopologyReasoner {
         return (
           cidr: null,
           iface: null,
-          problem: '${node.name} has ${row.ipCidr} in the plan, which is not '
+          problem:
+              '${node.name} has ${row.ipCidr} in the plan, which is not '
               'a valid address/mask pair - cannot tell its subnet.',
           cannotTell: true,
         );
@@ -806,7 +875,8 @@ class TopologyReasoner {
       return (
         cidr: null,
         iface: null,
-        problem: '${node.name} is a ${node.type} and the plan carries no IP '
+        problem:
+            '${node.name} is a ${node.type} and the plan carries no IP '
             'config for it - a ping from it cannot be judged from the plan.',
         cannotTell: true,
       );
@@ -815,7 +885,8 @@ class TopologyReasoner {
       return (
         cidr: null,
         iface: null,
-        problem: '${node.name} has no IP address in the plan - the file '
+        problem:
+            '${node.name} has no IP address in the plan - the file '
             'would ship unconfigured.',
         cannotTell: false,
       );
@@ -823,7 +894,8 @@ class TopologyReasoner {
     return (
       cidr: null,
       iface: null,
-      problem: '${node.name} has no interface address in the plan - it could '
+      problem:
+          '${node.name} has no interface address in the plan - it could '
           'not send or forward anything as it stands.',
       cannotTell: false,
     );
@@ -844,7 +916,8 @@ class TopologyReasoner {
     if (_routingCapable.contains(end.type)) {
       return ReasonStep(
         check: 'Gateway',
-        detail: '${end.name} is a ${end.type} - it routes from its own '
+        detail:
+            '${end.name} is a ${end.type} - it routes from its own '
             'interfaces, so it needs no gateway.',
       );
     }
@@ -864,7 +937,8 @@ class TopologyReasoner {
       return ReasonStep(
         check: 'Gateway',
         blocked: true,
-        detail: "${end.name}'s gateway would be ${gw.ip} (${gw.owner} "
+        detail:
+            "${end.name}'s gateway would be ${gw.ip} (${gw.owner} "
             '${gw.iface}), but ${verdict['reason']} - a gateway must live '
             "in the host's own subnet.",
         command: 'ping ${gw.ip}',
@@ -877,7 +951,8 @@ class TopologyReasoner {
     }
     return ReasonStep(
       check: 'Gateway',
-      detail: "${end.name}'s gateway is ${gw.ip} (${gw.owner} "
+      detail:
+          "${end.name}'s gateway is ${gw.ip} (${gw.owner} "
           '${gw.iface}) - inside its own subnet $net.',
     );
   }
@@ -893,7 +968,8 @@ class TopologyReasoner {
     String? gwCidr,
     String? problem,
     List<String> fixes,
-  }) _deriveGateway(
+  })
+  _deriveGateway(
     NetworkIntent plan,
     _Path path,
     String device,
@@ -951,9 +1027,11 @@ class TopologyReasoner {
     // trunk - the dot1Q sub-interface whose subnet holds the device's
     // address is the gateway instead.
     final exact = plan.addressing
-        .where((r) =>
-            r.node.toLowerCase() == router.name.toLowerCase() &&
-            r.iface.toLowerCase() == router.iface.toLowerCase())
+        .where(
+          (r) =>
+              r.node.toLowerCase() == router.name.toLowerCase() &&
+              r.iface.toLowerCase() == router.iface.toLowerCase(),
+        )
         .toList();
     if (exact.isNotEmpty) {
       final ip = exact.first.ipCidr.split('/').first.trim();
@@ -970,12 +1048,14 @@ class TopologyReasoner {
       }
     }
     final subs = plan.addressing
-        .where((r) =>
-            r.node.toLowerCase() == router.name.toLowerCase() &&
-            r.iface
-                .toLowerCase()
-                .startsWith('${router.iface.toLowerCase()}.') &&
-            NetworkTools.contains(r.ipCidr, deviceIp))
+        .where(
+          (r) =>
+              r.node.toLowerCase() == router.name.toLowerCase() &&
+              r.iface.toLowerCase().startsWith(
+                '${router.iface.toLowerCase()}.',
+              ) &&
+              NetworkTools.contains(r.ipCidr, deviceIp),
+        )
         .toList();
     if (subs.isNotEmpty) {
       return (
@@ -1001,14 +1081,15 @@ class TopologyReasoner {
     String? gwCidr,
     String? problem,
     List<String> fixes,
-  }) _noGateway(String problem, List<String> fixes) => (
-        ip: null,
-        owner: null,
-        iface: null,
-        gwCidr: null,
-        problem: problem,
-        fixes: fixes,
-      );
+  })
+  _noGateway(String problem, List<String> fixes) => (
+    ip: null,
+    owner: null,
+    iface: null,
+    gwCidr: null,
+    problem: problem,
+    fixes: fixes,
+  );
 
   /// The router one hop behind a layer-2 first hop. The path's own next node
   /// is tried first (that is the walk the packets take); anything else falls
@@ -1048,9 +1129,7 @@ class TopologyReasoner {
       if (node == null || !_routingCapable.contains(node.type)) continue;
       return (
         name: node.name,
-        iface: l.a.toLowerCase() == node.name.toLowerCase()
-            ? l.aIf
-            : l.bIf,
+        iface: l.a.toLowerCase() == node.name.toLowerCase() ? l.aIf : l.bIf,
       );
     }
     return null;
@@ -1066,10 +1145,7 @@ class TopologyReasoner {
         'Add a static route',
       ];
     }
-    return [
-      'Add OSPF for ${routersOnPath.first}',
-      'Add a static route',
-    ];
+    return ['Add OSPF for ${routersOnPath.first}', 'Add a static route'];
   }
 
   /// The end of a serial link that cannot terminate one, or null when both

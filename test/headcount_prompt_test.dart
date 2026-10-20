@@ -60,10 +60,7 @@ void main() {
       );
       // The plan says the same thing in its own words, so the answer the user
       // reads and the popup cannot disagree.
-      expect(
-        plan.assumptions.any((a) => a.contains('40 users')),
-        isTrue,
-      );
+      expect(plan.assumptions.any((a) => a.contains('40 users')), isTrue);
     });
 
     test('the popup button really produces 40 PCs', () {

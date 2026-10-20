@@ -20,7 +20,11 @@ void main() {
     test('every design has a name, a blurb and something to change', () {
       expect(DesignLibrary.all, isNotEmpty);
       for (final d in DesignLibrary.all) {
-        expect(d.id, isNotEmpty, reason: 'a design with no id cannot be stored');
+        expect(
+          d.id,
+          isNotEmpty,
+          reason: 'a design with no id cannot be stored',
+        );
         expect(d.name, isNotEmpty);
         expect(d.blurb, isNotEmpty);
         expect(d.changes, isNotEmpty, reason: '${d.id} changes nothing');
@@ -44,7 +48,11 @@ void main() {
       expect(suggestions, isNotEmpty);
       for (final s in suggestions) {
         expect(s.fit, greaterThan(0));
-        expect(s.reasons, isNotEmpty, reason: '${s.design.id} cannot explain itself');
+        expect(
+          s.reasons,
+          isNotEmpty,
+          reason: '${s.design.id} cannot explain itself',
+        );
       }
     });
 
@@ -72,34 +80,42 @@ void main() {
       final ids = DesignLibrary.suggest(
         _plan('a small office with 1 router and 3 PCs'),
       ).map((s) => s.design.id);
-      expect(ids, isNot(contains('dmz')),
-          reason: 'a wrong design offered confidently is worse than none');
+      expect(
+        ids,
+        isNot(contains('dmz')),
+        reason: 'a wrong design offered confidently is worse than none',
+      );
     });
 
-    test('a design size range really is a range, not a pair of exact counts', () {
-      final design = DesignLibrary.byId('soho')!;
-      expect(design.minHosts, 1);
-      expect(design.maxHosts, 15);
-      // Twelve is inside one-to-fifteen. Reading the bounds as literal counts
-      // made every design fit exactly two lab sizes and quietly offered
-      // nothing to everything else.
-      final suggestions = DesignLibrary.suggest(
-        _plan('a small office with 1 wireless router and 12 laptops'),
-      );
-      expect(
-        suggestions.where((s) => s.design.id == 'soho'),
-        isNotEmpty,
-        reason: 'a genuinely small office SHOULD be offered the small design',
-      );
-    });
+    test(
+      'a design size range really is a range, not a pair of exact counts',
+      () {
+        final design = DesignLibrary.byId('soho')!;
+        expect(design.minHosts, 1);
+        expect(design.maxHosts, 15);
+        // Twelve is inside one-to-fifteen. Reading the bounds as literal counts
+        // made every design fit exactly two lab sizes and quietly offered
+        // nothing to everything else.
+        final suggestions = DesignLibrary.suggest(
+          _plan('a small office with 1 wireless router and 12 laptops'),
+        );
+        expect(
+          suggestions.where((s) => s.design.id == 'soho'),
+          isNotEmpty,
+          reason: 'a genuinely small office SHOULD be offered the small design',
+        );
+      },
+    );
   });
 
   group('what the review points at', () {
     test('a segmentation complaint suggests a segmented design', () {
       final plan = _plan('3 switches and 30 PCs');
       final review = DesignReviewer.review(plan);
-      final ids = DesignLibrary.suggestionsForReview(plan, review)
-          .map((s) => s.design.id);
+      final ids = DesignLibrary.suggestionsForReview(
+        plan,
+        review,
+      ).map((s) => s.design.id);
       expect(review.findings.any((f) => f.area == 'segmentation'), isTrue);
       expect(ids, isNotEmpty);
     });
@@ -153,8 +169,11 @@ void main() {
       final review = DesignReviewer.review(orphan);
       expect(review.score, lessThan(DesignMemory.kLearnThreshold));
       expect(DesignMemory.recordBuild(plan: orphan, review: review), isNull);
-      expect(DesignMemory.knownGood, isEmpty,
-          reason: 'a design that scored badly is not a lesson worth keeping');
+      expect(
+        DesignMemory.knownGood,
+        isEmpty,
+        reason: 'a design that scored badly is not a lesson worth keeping',
+      );
     });
 
     test('a good design is learned once it is seen twice', () {
@@ -163,8 +182,11 @@ void main() {
       expect(review.score, greaterThanOrEqualTo(DesignMemory.kLearnThreshold));
 
       DesignMemory.recordBuild(plan: plan, review: review);
-      expect(DesignMemory.recallFor(plan), isNull,
-          reason: 'one build is not evidence');
+      expect(
+        DesignMemory.recallFor(plan),
+        isNull,
+        reason: 'one build is not evidence',
+      );
 
       DesignMemory.recordBuild(plan: plan, review: review);
       final recalled = DesignMemory.recallFor(plan);
@@ -230,7 +252,10 @@ void main() {
       for (var i = 0; i < DesignMemory.kMaxEntries + 25; i++) {
         DesignMemory.recordBuild(plan: plan, review: review);
       }
-      expect(DesignMemory.entries.length, lessThanOrEqualTo(DesignMemory.kMaxEntries));
+      expect(
+        DesignMemory.entries.length,
+        lessThanOrEqualTo(DesignMemory.kMaxEntries),
+      );
     });
   });
 }

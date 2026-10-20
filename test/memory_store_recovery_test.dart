@@ -97,15 +97,16 @@ CREATE TABLE learned_answer(
     tmp.deleteSync(recursive: true);
   });
 
-  test('a column the counter says exists is still added when it does not',
-      () async {
-    // The counter is not the truth; the schema is. A store whose counter
-    // advanced past version 7 without the `source` column landing (exactly
-    // the shape the real store was found in) must still be repaired.
-    final tmp = Directory.systemTemp.createTempSync('mem-col-');
-    final path = '${tmp.path}${Platform.pathSeparator}memory.db';
-    final db = await databaseFactoryFfi.openDatabase(path);
-    await db.execute('''
+  test(
+    'a column the counter says exists is still added when it does not',
+    () async {
+      // The counter is not the truth; the schema is. A store whose counter
+      // advanced past version 7 without the `source` column landing (exactly
+      // the shape the real store was found in) must still be repaired.
+      final tmp = Directory.systemTemp.createTempSync('mem-col-');
+      final path = '${tmp.path}${Platform.pathSeparator}memory.db';
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute('''
 CREATE TABLE chat(
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  conversation TEXT NOT NULL DEFAULT 'default',
@@ -116,19 +117,20 @@ CREATE TABLE chat(
  executedJson TEXT NOT NULL DEFAULT '[]',
  createdAt TEXT NOT NULL
 )''');
-    await db.rawUpdate('PRAGMA user_version = 6');
-    await db.close();
+      await db.rawUpdate('PRAGMA user_version = 6');
+      await db.close();
 
-    final upgraded = await databaseFactoryFfi.openDatabase(path);
-    await MemoryService.upgradeSchema(upgraded, 6, 10);
-    final cols = await upgraded.rawQuery('PRAGMA table_info(chat)');
-    final names = cols.map((c) => '${c['name']}').toSet();
-    expect(
-      names,
-      contains('source'),
-      reason: 'the source column is added even when the counter is ahead',
-    );
-    await upgraded.close();
-    tmp.deleteSync(recursive: true);
-  });
+      final upgraded = await databaseFactoryFfi.openDatabase(path);
+      await MemoryService.upgradeSchema(upgraded, 6, 10);
+      final cols = await upgraded.rawQuery('PRAGMA table_info(chat)');
+      final names = cols.map((c) => '${c['name']}').toSet();
+      expect(
+        names,
+        contains('source'),
+        reason: 'the source column is added even when the counter is ahead',
+      );
+      await upgraded.close();
+      tmp.deleteSync(recursive: true);
+    },
+  );
 }

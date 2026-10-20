@@ -21,14 +21,39 @@ class CasualEnglish {
   const CasualEnglish._();
 
   static const Map<String, String> _shorthand = {
-    'u': 'you', 'ur': 'your', 'urs': 'yours', 'pls': 'please', 'plz': 'please',
-    'wanna': 'want to', 'gonna': 'going to', 'gotta': 'got to',
-    'lemme': 'let me', 'idk': 'i do not know', 'im': 'i am', 'ive': 'i have',
-    'dont': 'do not', 'doesnt': 'does not', 'cant': 'cannot', 'wont': 'will not',
-    'isnt': 'is not', 'arent': 'are not', 'teh': 'the', 'tpo': 'to',
-    'waht': 'what', 'wat': 'what', 'wut': 'what', 'b4': 'before', 'wid': 'with',
-    'cuz': 'because', 'coz': 'because', 'thx': 'thanks', 'ty': 'thanks',
-    'r': 'are', 'n': 'and', 'nd': 'and', 'abt': 'about',
+    'u': 'you',
+    'ur': 'your',
+    'urs': 'yours',
+    'pls': 'please',
+    'plz': 'please',
+    'wanna': 'want to',
+    'gonna': 'going to',
+    'gotta': 'got to',
+    'lemme': 'let me',
+    'idk': 'i do not know',
+    'im': 'i am',
+    'ive': 'i have',
+    'dont': 'do not',
+    'doesnt': 'does not',
+    'cant': 'cannot',
+    'wont': 'will not',
+    'isnt': 'is not',
+    'arent': 'are not',
+    'teh': 'the',
+    'tpo': 'to',
+    'waht': 'what',
+    'wat': 'what',
+    'wut': 'what',
+    'b4': 'before',
+    'wid': 'with',
+    'cuz': 'because',
+    'coz': 'because',
+    'thx': 'thanks',
+    'ty': 'thanks',
+    'r': 'are',
+    'n': 'and',
+    'nd': 'and',
+    'abt': 'about',
   };
 
   static const Map<String, String> _typos = {
@@ -47,9 +72,20 @@ class CasualEnglish {
   };
 
   static const List<String> _filler = [
-    'and other stuff', 'or something', 'make it normal', 'kinda', 'sorta',
-    'basically', 'you know', 'i mean', 'just', 'please', 'thanks',
-    'thank you', 'so yeah', 'ok so',
+    'and other stuff',
+    'or something',
+    'make it normal',
+    'kinda',
+    'sorta',
+    'basically',
+    'you know',
+    'i mean',
+    'just',
+    'please',
+    'thanks',
+    'thank you',
+    'so yeah',
+    'ok so',
   ];
 
   static final RegExp _dataToken = RegExp(r'[\d/@]');
@@ -117,7 +153,9 @@ class CasualEnglish {
         out.add(token);
         continue;
       }
-      final core = _shortHost.hasMatch(token) ? token : token.replaceAll(_edges, '');
+      final core = _shortHost.hasMatch(token)
+          ? token
+          : token.replaceAll(_edges, '');
       if (core.isEmpty) continue;
       // Data (addresses, CIDRs, emails, quantities, password with digits) is
       // kept verbatim so nothing numeric is ever damaged.
@@ -130,13 +168,13 @@ class CasualEnglish {
       final mapped = _mixed.hasMatch(core)
           ? null
           : (_typos[core.toLowerCase()] ??
-              _shorthand[core.toLowerCase()] ??
-              _pluralTypo(core.toLowerCase()) ??
-              // Nothing in the tables knows this word. Before giving up on it,
-              // ask the fuzzy matcher: an unseen typo (`switsh`, `rotuer`,
-              // `sevr`) would otherwise stay an unknown word and the device it
-              // names would drop out of the plan entirely.
-              FuzzyMatch.correct(core));
+                _shorthand[core.toLowerCase()] ??
+                _pluralTypo(core.toLowerCase()) ??
+                // Nothing in the tables knows this word. Before giving up on it,
+                // ask the fuzzy matcher: an unseen typo (`switsh`, `rotuer`,
+                // `sevr`) would otherwise stay an unknown word and the device it
+                // names would drop out of the plan entirely.
+                FuzzyMatch.correct(core));
       out.add(mapped ?? core);
     }
     var joined = out.join(' ');
@@ -236,9 +274,7 @@ class CasualEnglish {
     return [
       for (final e in entries)
         (
-          RegExp(
-            '\\b${e.key.split(' ').map(RegExp.escape).join(r'\s+')}s?\\b',
-          ),
+          RegExp('\\b${e.key.split(' ').map(RegExp.escape).join(r'\s+')}s?\\b'),
           e.value,
         ),
     ];

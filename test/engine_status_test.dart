@@ -79,27 +79,29 @@ void main() {
       expect(report, contains('capabilities: health'));
     });
 
-    test('a major app mismatch warns but keeps a compatible engine up',
-        () async {
-      AppVersion.overrideForTests(version: '1.0.0', buildNumber: '1');
-      addTearDown(AppVersion.resetForTests);
-      final status = EngineStatus(
-        healthProbe: (base, timeout) async => {
-          'ok': true,
-          'version': '9.9',
-          'apiSchemaVersion': 1,
-          'appVersion': '2.0.0',
-          'capabilities': ['health', 'pkt_build'],
-        },
-      );
+    test(
+      'a major app mismatch warns but keeps a compatible engine up',
+      () async {
+        AppVersion.overrideForTests(version: '1.0.0', buildNumber: '1');
+        addTearDown(AppVersion.resetForTests);
+        final status = EngineStatus(
+          healthProbe: (base, timeout) async => {
+            'ok': true,
+            'version': '9.9',
+            'apiSchemaVersion': 1,
+            'appVersion': '2.0.0',
+            'capabilities': ['health', 'pkt_build'],
+          },
+        );
 
-      expect(await status.probe(), isTrue);
-      expect(status.phase, EngineState.up);
-      expect(status.appVersion, '2.0.0');
-      expect(status.compatibilityWarning, contains('major'));
-      expect(status.summary, contains('major'));
-      expect(status.capabilities, contains('pkt_build'));
-    });
+        expect(await status.probe(), isTrue);
+        expect(status.phase, EngineState.up);
+        expect(status.appVersion, '2.0.0');
+        expect(status.compatibilityWarning, contains('major'));
+        expect(status.summary, contains('major'));
+        expect(status.capabilities, contains('pkt_build'));
+      },
+    );
 
     test('an incompatible engine is not restarted or duplicated', () async {
       var launched = 0;
@@ -151,33 +153,36 @@ void main() {
       expect(status.isUp, isTrue);
     });
 
-    test('a failed start reports the reason and does not retry in a loop',
-        () async {
-      var launched = 0;
-      final status = EngineStatus(
-        healthProbe: (base, timeout) async => throw Exception('refused'),
-        launcher: () async {
-          launched++;
-          return const SidecarLaunchResult(
-            ok: false,
-            message: '"C:\\WindowsApps\\python.exe" is not a working Python 3.',
-          );
-        },
-      );
+    test(
+      'a failed start reports the reason and does not retry in a loop',
+      () async {
+        var launched = 0;
+        final status = EngineStatus(
+          healthProbe: (base, timeout) async => throw Exception('refused'),
+          launcher: () async {
+            launched++;
+            return const SidecarLaunchResult(
+              ok: false,
+              message:
+                  '"C:\\WindowsApps\\python.exe" is not a working Python 3.',
+            );
+          },
+        );
 
-      expect(await status.ensure(), isFalse);
-      expect(status.phase, EngineState.down);
-      expect(status.summary, contains('not a working Python 3'));
+        expect(await status.ensure(), isFalse);
+        expect(status.phase, EngineState.down);
+        expect(status.summary, contains('not a working Python 3'));
 
-      // Asking again immediately must not spawn another attempt: a broken
-      // install would otherwise be hammered by every screen that checks.
-      expect(await status.ensure(), isFalse);
-      expect(launched, 1);
+        // Asking again immediately must not spawn another attempt: a broken
+        // install would otherwise be hammered by every screen that checks.
+        expect(await status.ensure(), isFalse);
+        expect(launched, 1);
 
-      // But a deliberate retry does.
-      expect(await status.ensure(force: true), isFalse);
-      expect(launched, 2);
-    });
+        // But a deliberate retry does.
+        expect(await status.ensure(force: true), isFalse);
+        expect(launched, 2);
+      },
+    );
 
     test('a started engine that never answers is reported as such', () async {
       final status = EngineStatus(
@@ -267,14 +272,22 @@ void main() {
 
       expect(status.isLocalEngine, isFalse);
       expect(await status.ensure(force: true), isFalse);
-      expect(launched, 0,
-          reason: 'the engine on another machine is that machine\'s process, '
-              'not one this app may create here');
+      expect(
+        launched,
+        0,
+        reason:
+            'the engine on another machine is that machine\'s process, '
+            'not one this app may create here',
+      );
       expect(status.phase, EngineState.down);
-      expect(status.summary, contains('192.168.1.20:5005'),
-          reason: 'the message has to name the address the user configured');
-      expect(probed, ['http://192.168.1.20:5005'],
-          reason: 'the probe must go to the configured address');
+      expect(
+        status.summary,
+        contains('192.168.1.20:5005'),
+        reason: 'the message has to name the address the user configured',
+      );
+      expect(probed, [
+        'http://192.168.1.20:5005',
+      ], reason: 'the probe must go to the configured address');
     });
 
     test('a remote engine is not restarted either', () async {
@@ -296,28 +309,37 @@ void main() {
       )..setBase('http://192.168.1.20:5005');
 
       await status.stop();
-      expect(status.summary, contains('192.168.1.20:5005'),
-          reason: 'stopping here would kill a local process the app never '
-              'started and the user never pointed at');
+      expect(
+        status.summary,
+        contains('192.168.1.20:5005'),
+        reason:
+            'stopping here would kill a local process the app never '
+            'started and the user never pointed at',
+      );
     });
 
-    test('pointing the app back at loopback restores the ability to start',
-        () async {
-      var launched = 0;
-      final status = statusWithLauncher(
-        probe: (base, timeout) async => throw Exception('refused'),
-        onLaunch: () => launched++,
-      )..setBase('http://192.168.1.20:5005');
-      expect(await status.ensure(force: true), isFalse);
-      expect(launched, 0);
+    test(
+      'pointing the app back at loopback restores the ability to start',
+      () async {
+        var launched = 0;
+        final status = statusWithLauncher(
+          probe: (base, timeout) async => throw Exception('refused'),
+          onLaunch: () => launched++,
+        )..setBase('http://192.168.1.20:5005');
+        expect(await status.ensure(force: true), isFalse);
+        expect(launched, 0);
 
-      status.setBase('127.0.0.1:5005');
-      expect(status.isLocalEngine, isTrue);
-      expect(status.base, 'http://127.0.0.1:5005',
-          reason: 'a bare host must resolve to the same address the app calls');
-      await status.ensure(force: true);
-      expect(launched, 1);
-    });
+        status.setBase('127.0.0.1:5005');
+        expect(status.isLocalEngine, isTrue);
+        expect(
+          status.base,
+          'http://127.0.0.1:5005',
+          reason: 'a bare host must resolve to the same address the app calls',
+        );
+        await status.ensure(force: true);
+        expect(launched, 1);
+      },
+    );
 
     test('the emulator host alias is remote, not local', () {
       // 10.0.2.2 is this machine from inside the Android emulator's network,
@@ -347,12 +369,12 @@ void main() {
     test('the Windows Store placeholder is not a Python', () {
       expect(
         SidecarSupervisor.looksLikeStoreAlias(
-            r'C:\Users\L\AppData\Local\Microsoft\WindowsApps\python.exe'),
+          r'C:\Users\L\AppData\Local\Microsoft\WindowsApps\python.exe',
+        ),
         isTrue,
       );
       expect(
-        SidecarSupervisor.looksLikeStoreAlias(
-            r'C:\Python314\python.exe'),
+        SidecarSupervisor.looksLikeStoreAlias(r'C:\Python314\python.exe'),
         isFalse,
       );
     });
@@ -396,8 +418,9 @@ void main() {
     });
   });
 
-  testWidgets('the engine screen states what works without an engine',
-      (tester) async {
+  testWidgets('the engine screen states what works without an engine', (
+    tester,
+  ) async {
     // Tall enough that the lazily-built cards below the status area exist.
     tester.view.physicalSize = const Size(1000, 2200);
     tester.view.devicePixelRatio = 1.0;

@@ -60,7 +60,10 @@ class _Backend {
       return http.Response(
         jsonEncode({
           'ok': true,
-          'result': {'devices': ['R1', 'SW1'], 'requested': body['name']},
+          'result': {
+            'devices': ['R1', 'SW1'],
+            'requested': body['name'],
+          },
         }),
         200,
       );
@@ -80,22 +83,28 @@ class _Backend {
           : [
               {'text': 'The devices are R1 and SW1.'},
             ];
-      return http.Response(jsonEncode({
-        'candidates': [
-          {'content': {'parts': parts}},
-        ],
-      }), 200);
+      return http.Response(
+        jsonEncode({
+          'candidates': [
+            {
+              'content': {'parts': parts},
+            },
+          ],
+        }),
+        200,
+      );
     }
     if (url.endsWith('/chat/completions')) {
-      return http.Response(jsonEncode({
-        'choices': [
-          {
-            'message': {
-              'content': 'The devices are R1 and SW1.',
+      return http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {'content': 'The devices are R1 and SW1.'},
             },
-          },
-        ],
-      }), 200);
+          ],
+        }),
+        200,
+      );
     }
     return http.Response('{"ok":false,"error":"unexpected"}', 404);
   });
@@ -106,20 +115,19 @@ ToolRuntime _runtime(
   bool gemini = false,
   String? base,
   String Function()? baseProvider,
-}) =>
-    ToolRuntime(
-      config: AiProviderConfig(
-        kind: gemini ? AiProviderKind.gemini : AiProviderKind.openai,
-        model: gemini ? 'gemini-2.0-flash' : 'gpt-4o-mini',
-        baseUrl: 'https://api.example.com/v1',
-      ),
-      geminiKey: 'gm-key',
-      openaiKey: 'oa-key',
-      sidecarBase: base ?? 'http://127.0.0.1:8765/',
-      baseProvider: baseProvider,
-      capturePath: r'C:\ai\labs\lab1.pkt',
-      client: backend.client,
-    );
+}) => ToolRuntime(
+  config: AiProviderConfig(
+    kind: gemini ? AiProviderKind.gemini : AiProviderKind.openai,
+    model: gemini ? 'gemini-2.0-flash' : 'gpt-4o-mini',
+    baseUrl: 'https://api.example.com/v1',
+  ),
+  geminiKey: 'gm-key',
+  openaiKey: 'oa-key',
+  sidecarBase: base ?? 'http://127.0.0.1:8765/',
+  baseProvider: baseProvider,
+  capturePath: r'C:\ai\labs\lab1.pkt',
+  client: backend.client,
+);
 
 /// A transport that behaves like the real one when the user presses stop: the
 /// in-flight request fails instead of pretending the cancel never happened.
@@ -133,12 +141,14 @@ class _AbortableClient extends http.BaseClient {
   Future<http.StreamedResponse> send(http.BaseRequest request) {
     sends++;
     final completer = Completer<http.StreamedResponse>();
-    unawaited(trigger.then((_) {
-      if (completer.isCompleted) return;
-      completer.completeError(
-        http.RequestAbortedException(Uri.parse('http://127.0.0.1:8765')),
-      );
-    }));
+    unawaited(
+      trigger.then((_) {
+        if (completer.isCompleted) return;
+        completer.completeError(
+          http.RequestAbortedException(Uri.parse('http://127.0.0.1:8765')),
+        );
+      }),
+    );
     return completer.future;
   }
 }
@@ -149,19 +159,25 @@ const List<Map<String, dynamic>> _oneTool = [
 ];
 
 void main() {
-  test('load() reads the engine catalogue and exposes it to the model',
-      () async {
-    final backend = _Backend();
-    final runtime = _runtime(backend);
-    expect(runtime.available, isFalse, reason: 'nothing loaded yet');
+  test(
+    'load() reads the engine catalogue and exposes it to the model',
+    () async {
+      final backend = _Backend();
+      final runtime = _runtime(backend);
+      expect(runtime.available, isFalse, reason: 'nothing loaded yet');
 
-    expect(await runtime.load(), isTrue);
-    expect(runtime.available, isTrue);
-    expect(runtime.tools.map((t) => t['name']).toList(),
-        ['get_devices', 'set_gateway']);
-    expect(backend.requests.single.url.toString(),
-        'http://127.0.0.1:8765/tools/list');
-  });
+      expect(await runtime.load(), isTrue);
+      expect(runtime.available, isTrue);
+      expect(runtime.tools.map((t) => t['name']).toList(), [
+        'get_devices',
+        'set_gateway',
+      ]);
+      expect(
+        backend.requests.single.url.toString(),
+        'http://127.0.0.1:8765/tools/list',
+      );
+    },
+  );
 
   test('load() degrades cleanly when the sidecar is down', () async {
     final runtime = ToolRuntime(
@@ -174,12 +190,14 @@ void main() {
       client: MockClient((_) async => throw Exception('refused')),
     );
     expect(await runtime.load(), isFalse);
-    expect(runtime.available, isFalse,
-        reason: 'the chat must be able to fall back');
+    expect(
+      runtime.available,
+      isFalse,
+      reason: 'the chat must be able to fall back',
+    );
   });
 
-  test('execute() posts the call to the tool layer with the capture',
-      () async {
+  test('execute() posts the call to the tool layer with the capture', () async {
     final backend = _Backend();
     final runtime = _runtime(backend);
     await runtime.load();
@@ -200,13 +218,15 @@ void main() {
     final runtime = _runtime(backend);
     await runtime.load();
 
-    final result = await runtime.execute(
-      const ToolCall(
-        id: '1',
-        name: 'set_gateway',
-        args: {'device': 'R1', 'gateway': '10.0.0.1'},
-      ),
-    ) as Map;
+    final result =
+        await runtime.execute(
+              const ToolCall(
+                id: '1',
+                name: 'set_gateway',
+                args: {'device': 'R1', 'gateway': '10.0.0.1'},
+              ),
+            )
+            as Map;
     expect(result['kind'], 'modify');
     expect(result['requiresApproval'], isTrue);
     expect(result['proposal']['gateway'], '10.0.0.1');
@@ -217,26 +237,29 @@ void main() {
     expect(body.contains('write'), isFalse);
   });
 
-  test('an engine error becomes a tool failure, not a silent success',
-      () async {
-    final runtime = ToolRuntime(
-      config: AiProviderConfig(
-        kind: AiProviderKind.openai,
-        model: 'm',
-        baseUrl: 'https://api.example.com/v1',
-      ),
-      sidecarBase: 'http://127.0.0.1:8765',
-      client: MockClient((_) async => http.Response(
+  test(
+    'an engine error becomes a tool failure, not a silent success',
+    () async {
+      final runtime = ToolRuntime(
+        config: AiProviderConfig(
+          kind: AiProviderKind.openai,
+          model: 'm',
+          baseUrl: 'https://api.example.com/v1',
+        ),
+        sidecarBase: 'http://127.0.0.1:8765',
+        client: MockClient(
+          (_) async => http.Response(
             jsonEncode({'ok': false, 'error': 'there is no device GHOST'}),
             400,
-          )),
-    );
-    await expectLater(
-      runtime.execute(const ToolCall(id: '1', name: 'get_device', args: {})),
-      throwsA(predicate(
-          (e) => e.toString().contains('no device GHOST'))),
-    );
-  });
+          ),
+        ),
+      );
+      await expectLater(
+        runtime.execute(const ToolCall(id: '1', name: 'get_device', args: {})),
+        throwsA(predicate((e) => e.toString().contains('no device GHOST'))),
+      );
+    },
+  );
 
   test('the OpenAI request carries the tools and the key', () async {
     final backend = _Backend();
@@ -256,10 +279,7 @@ void main() {
         .map((t) => (t as Map)['function']['name'])
         .toList();
     expect(names, ['get_devices', 'set_gateway']);
-    expect(
-      (body['messages'] as List).first['role'],
-      'system',
-    );
+    expect((body['messages'] as List).first['role'], 'system');
   });
 
   test('the Gemini request carries functionDeclarations and the key', () async {
@@ -275,13 +295,14 @@ void main() {
     expect(sent.headers['x-goog-api-key'], 'gm-key');
     final body = jsonDecode(sent.body) as Map<String, dynamic>;
     final decls = (body['tools'] as List).first['functionDeclarations'] as List;
-    expect(decls.map((d) => d['name']).toList(),
-        ['get_devices', 'set_gateway']);
+    expect(decls.map((d) => d['name']).toList(), [
+      'get_devices',
+      'set_gateway',
+    ]);
     expect((body['contents'] as List).first['role'], 'user');
   });
 
-  test('the loop, the protocol and the tool layer work together',
-      () async {
+  test('the loop, the protocol and the tool layer work together', () async {
     final backend = _Backend();
     final runtime = _runtime(backend, gemini: true);
     await runtime.load();
@@ -337,93 +358,111 @@ void main() {
     expect(runtime.extractText(null), '');
   });
 
-  group('the catalogue is loaded once per endpoint, and re-read when it moves',
-      () {
-    test('the engine is asked once, not on every turn', () async {
-      final backend = _Backend();
-      final runtime = _runtime(backend);
+  group(
+    'the catalogue is loaded once per endpoint, and re-read when it moves',
+    () {
+      test('the engine is asked once, not on every turn', () async {
+        final backend = _Backend();
+        final runtime = _runtime(backend);
 
-      expect(await runtime.ensureLoaded(), isTrue);
-      expect(await runtime.ensureLoaded(), isTrue);
-      expect(await runtime.ensureLoaded(), isTrue);
+        expect(await runtime.ensureLoaded(), isTrue);
+        expect(await runtime.ensureLoaded(), isTrue);
+        expect(await runtime.ensureLoaded(), isTrue);
 
-      expect(
-        backend.requests.where((r) => r.url.toString().endsWith('/tools/list')),
-        hasLength(1),
-        reason: 'the chat may ask on every turn; the answer is remembered',
-      );
-    });
+        expect(
+          backend.requests.where(
+            (r) => r.url.toString().endsWith('/tools/list'),
+          ),
+          hasLength(1),
+          reason: 'the chat may ask on every turn; the answer is remembered',
+        );
+      });
 
-    test('a failed attempt is NOT remembered', () async {
-      var sidecarUp = false;
-      var asks = 0;
-      final runtime = ToolRuntime(
-        config: const AiProviderConfig(
-          kind: AiProviderKind.openai,
-          model: 'gpt-4o-mini',
-          baseUrl: 'https://api.example.com/v1',
-        ),
-        sidecarBase: 'http://127.0.0.1:8765',
-        client: MockClient((request) async {
-          if (request.url.toString().endsWith('/tools/list')) {
-            asks++;
-            if (!sidecarUp) return http.Response('still starting', 500);
-            return http.Response(jsonEncode(_catalogue), 200);
-          }
-          return http.Response('{}', 200);
-        }),
-      );
+      test('a failed attempt is NOT remembered', () async {
+        var sidecarUp = false;
+        var asks = 0;
+        final runtime = ToolRuntime(
+          config: const AiProviderConfig(
+            kind: AiProviderKind.openai,
+            model: 'gpt-4o-mini',
+            baseUrl: 'https://api.example.com/v1',
+          ),
+          sidecarBase: 'http://127.0.0.1:8765',
+          client: MockClient((request) async {
+            if (request.url.toString().endsWith('/tools/list')) {
+              asks++;
+              if (!sidecarUp) return http.Response('still starting', 500);
+              return http.Response(jsonEncode(_catalogue), 200);
+            }
+            return http.Response('{}', 200);
+          }),
+        );
 
-      expect(await runtime.ensureLoaded(), isFalse);
-      expect(runtime.available, isFalse);
-      sidecarUp = true;
-      expect(await runtime.ensureLoaded(), isTrue,
-          reason: 'a sidecar that was still booting must not be written off '
-              'for the whole session');
-      expect(asks, 2);
-    });
+        expect(await runtime.ensureLoaded(), isFalse);
+        expect(runtime.available, isFalse);
+        sidecarUp = true;
+        expect(
+          await runtime.ensureLoaded(),
+          isTrue,
+          reason:
+              'a sidecar that was still booting must not be written off '
+              'for the whole session',
+        );
+        expect(asks, 2);
+      });
 
-    test('a different endpoint is a different engine, so tools are re-read',
+      test(
+        'a different endpoint is a different engine, so tools are re-read',
         () async {
-      final backend = _Backend();
-      var base = 'http://127.0.0.1:8765';
-      final runtime = _runtime(backend, baseProvider: () => base);
+          final backend = _Backend();
+          var base = 'http://127.0.0.1:8765';
+          final runtime = _runtime(backend, baseProvider: () => base);
 
-      expect(await runtime.ensureLoaded(), isTrue);
-      expect(await runtime.ensureLoaded(), isTrue);
+          expect(await runtime.ensureLoaded(), isTrue);
+          expect(await runtime.ensureLoaded(), isTrue);
 
-      // The sidecar came back on another port.
-      base = 'http://127.0.0.1:9999';
-      expect(runtime.toolCacheKey, contains('gpt-4o-mini'));
-      expect(runtime.toolCacheKey, contains('9999'));
-      expect(await runtime.ensureLoaded(), isTrue);
+          // The sidecar came back on another port.
+          base = 'http://127.0.0.1:9999';
+          expect(runtime.toolCacheKey, contains('gpt-4o-mini'));
+          expect(runtime.toolCacheKey, contains('9999'));
+          expect(await runtime.ensureLoaded(), isTrue);
 
-      final ports = backend.requests
-          .where((r) => r.url.toString().endsWith('/tools/list'))
-          .map((r) => r.url.port)
-          .toList();
-      expect(ports, [8765, 9999],
-          reason: 'a cached list from the old port must not answer for the new '
-              'one');
-    });
-
-    test('the base is resolved at call time, not captured at construction',
-        () async {
-      final backend = _Backend();
-      // sidecarBase is the address Settings had when the chat was built (and is
-      // dead here); the resolver is where the engine actually is now.
-      final runtime = _runtime(
-        backend,
-        base: 'http://127.0.0.1:1',
-        baseProvider: () => 'http://127.0.0.1:8765///',
+          final ports = backend.requests
+              .where((r) => r.url.toString().endsWith('/tools/list'))
+              .map((r) => r.url.port)
+              .toList();
+          expect(
+            ports,
+            [8765, 9999],
+            reason:
+                'a cached list from the old port must not answer for the new '
+                'one',
+          );
+        },
       );
 
-      expect(await runtime.ensureLoaded(), isTrue);
-      expect(backend.requests.single.url.toString(),
-          'http://127.0.0.1:8765/tools/list',
-          reason: 'the resolver wins, and trailing slashes are normalised');
-    });
-  });
+      test(
+        'the base is resolved at call time, not captured at construction',
+        () async {
+          final backend = _Backend();
+          // sidecarBase is the address Settings had when the chat was built (and is
+          // dead here); the resolver is where the engine actually is now.
+          final runtime = _runtime(
+            backend,
+            base: 'http://127.0.0.1:1',
+            baseProvider: () => 'http://127.0.0.1:8765///',
+          );
+
+          expect(await runtime.ensureLoaded(), isTrue);
+          expect(
+            backend.requests.single.url.toString(),
+            'http://127.0.0.1:8765/tools/list',
+            reason: 'the resolver wins, and trailing slashes are normalised',
+          );
+        },
+      );
+    },
+  );
 
   test('a tool turn is authenticated exactly like a plain one', () async {
     final backend = _Backend();
@@ -449,9 +488,13 @@ void main() {
     expect(sent.headers['Authorization'], 'Bearer oa-key');
     expect(sent.headers['OpenAI-Organization'], 'org-1');
     expect(sent.headers['OpenAI-Project'], 'proj-1');
-    expect(sent.headers['X-Title'], 'netbuilder',
-        reason: 'a gateway header that the plain path sends and the tool loop '
-            'dropped answered 401 on tool turns only');
+    expect(
+      sent.headers['X-Title'],
+      'netbuilder',
+      reason:
+          'a gateway header that the plain path sends and the tool loop '
+          'dropped answered 401 on tool turns only',
+    );
   });
 
   group('no leg of the loop can hang the turn', () {
@@ -525,99 +568,116 @@ void main() {
   });
 
   group('stop reaches every leg of the loop', () {
-    test('a turn stopped mid-flight is cancelled, not reported as a failure',
-        () async {
-      final control = GenerationControl()..begin();
-      final client = _AbortableClient(control.abortTrigger!);
-      final runtime = ToolRuntime(
-        config: const AiProviderConfig(
-          kind: AiProviderKind.gemini,
-          model: 'gemini-2.0-flash',
-        ),
-        geminiKey: 'k',
-        sidecarBase: 'http://127.0.0.1:8765',
-        client: client,
-      );
+    test(
+      'a turn stopped mid-flight is cancelled, not reported as a failure',
+      () async {
+        final control = GenerationControl()..begin();
+        final client = _AbortableClient(control.abortTrigger!);
+        final runtime = ToolRuntime(
+          config: const AiProviderConfig(
+            kind: AiProviderKind.gemini,
+            model: 'gemini-2.0-flash',
+          ),
+          geminiKey: 'k',
+          sidecarBase: 'http://127.0.0.1:8765',
+          client: client,
+        );
 
-      final kinds = <String>[];
-      Object? error;
-      final run = () async {
-        await for (final event
-            in runtime.loop(abortTrigger: control.abortTrigger).run(const [
-          {'role': 'user', 'content': 'list the devices'},
-        ])) {
-          kinds.add(event.kind);
-        }
-      }();
-      await pumpEventQueue();
-      control.cancel();
+        final kinds = <String>[];
+        Object? error;
+        final run = () async {
+          await for (final event
+              in runtime.loop(abortTrigger: control.abortTrigger).run(const [
+                {'role': 'user', 'content': 'list the devices'},
+              ])) {
+            kinds.add(event.kind);
+          }
+        }();
+        await pumpEventQueue();
+        control.cancel();
 
-      await expectLater(run, throwsA(isA<AbortedException>()));
-      expect(error, isNull);
-      expect(kinds, isNot(contains('error')),
-          reason: 'the user pressing stop is not the provider failing');
-      expect(kinds, isNot(contains('final')));
-    });
+        await expectLater(run, throwsA(isA<AbortedException>()));
+        expect(error, isNull);
+        expect(
+          kinds,
+          isNot(contains('error')),
+          reason: 'the user pressing stop is not the provider failing',
+        );
+        expect(kinds, isNot(contains('final')));
+      },
+    );
 
-    test('a turn stopped before it starts never reaches the provider',
-        () async {
+    test(
+      'a turn stopped before it starts never reaches the provider',
+      () async {
+        final backend = _Backend();
+        final runtime = _runtime(backend, gemini: true);
+        final control = GenerationControl()..begin();
+        control.cancel();
+        await pumpEventQueue();
+
+        await expectLater(
+          runtime
+              .loop(
+                abortTrigger: control.abortTrigger,
+                abortProbe: () => control.cancelled,
+              )
+              .run(const [
+                {'role': 'user', 'content': 'list them'},
+              ])
+              .toList(),
+          throwsA(isA<AbortedException>()),
+        );
+        expect(
+          backend.requests.where(
+            (r) => r.url.toString().contains('generateContent'),
+          ),
+          isEmpty,
+        );
+      },
+    );
+  });
+
+  test(
+    'a screenshot survives the tool loop as an image, not as text',
+    () async {
       final backend = _Backend();
       final runtime = _runtime(backend, gemini: true);
-      final control = GenerationControl()..begin();
-      control.cancel();
-      await pumpEventQueue();
+      expect(await runtime.ensureLoaded(), isTrue);
 
-      await expectLater(
-        runtime
-            .loop(
-              abortTrigger: control.abortTrigger,
-              abortProbe: () => control.cancelled,
-            )
-            .run(const [
-          {'role': 'user', 'content': 'list them'},
-        ]).toList(),
-        throwsA(isA<AbortedException>()),
-      );
+      await runtime.send([
+        const {'role': 'user', 'content': 'what is wrong on this screen?'},
+        {
+          'role': 'user',
+          'content': [
+            {'type': 'text', 'text': 'what is wrong here?'},
+            {
+              'type': 'image_url',
+              'image_url': {'url': 'data:image/png;base64,AAABBB'},
+            },
+          ],
+        },
+      ]);
+
+      final sent = backend.requests.last;
+      final body = jsonDecode(sent.body) as Map<String, dynamic>;
+      final contents = body['contents'] as List;
+      final parts = (contents.last as Map)['parts'] as List;
+      final inline = parts.where((p) => (p as Map).containsKey('inlineData'));
       expect(
-        backend.requests.where((r) => r.url.toString().contains('generateContent')),
-        isEmpty,
+        inline,
+        hasLength(1),
+        reason: 'the data URL is split back into mime type and bytes',
       );
-    });
-  });
-
-  test('a screenshot survives the tool loop as an image, not as text', () async {
-    final backend = _Backend();
-    final runtime = _runtime(backend, gemini: true);
-    expect(await runtime.ensureLoaded(), isTrue);
-
-    await runtime.send([
-      const {'role': 'user', 'content': 'what is wrong on this screen?'},
-      {
-        'role': 'user',
-        'content': [
-          {'type': 'text', 'text': 'what is wrong here?'},
-          {
-            'type': 'image_url',
-            'image_url': {'url': 'data:image/png;base64,AAABBB'},
-          },
-        ],
-      },
-    ]);
-
-    final sent = backend.requests.last;
-    final body = jsonDecode(sent.body) as Map<String, dynamic>;
-    final contents = body['contents'] as List;
-    final parts = (contents.last as Map)['parts'] as List;
-    final inline = parts.where((p) => (p as Map).containsKey('inlineData'));
-    expect(inline, hasLength(1),
-        reason: 'the data URL is split back into mime type and bytes');
-    expect(
-      ((inline.single as Map)['inlineData'] as Map)['data'],
-      'AAABBB',
-    );
-    expect(sent.body, isNot(contains('image_url')),
-        reason: 'a flattened content array arrives as a literal '
+      expect(((inline.single as Map)['inlineData'] as Map)['data'], 'AAABBB');
+      expect(
+        sent.body,
+        isNot(contains('image_url')),
+        reason:
+            'a flattened content array arrives as a literal '
             '"[{type: image_url...}]" string, so the model is told it can see '
-            'a picture it never receives');
-  });
+            'a picture it never receives',
+      );
+    },
+  );
 }

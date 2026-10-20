@@ -41,7 +41,8 @@ class OfflineKnowledge {
     // Same for an imperative setup ask ("build a network with a dhcp
     // server"). A how-to question that merely uses the words ("how do I
     // set up dhcp for ipv6") is a knowledge ask and must reach the table.
-    final questionShaped = t.contains('?') ||
+    final questionShaped =
+        t.contains('?') ||
         RegExp(r'^(how|what|why|when|which|where)\b').hasMatch(t) ||
         RegExp(r'\bhow\s+(do|to|can|should|i)\b').hasMatch(t);
     if (!questionShaped && _buildAsk.hasMatch(t)) return null;
@@ -66,8 +67,7 @@ class OfflineKnowledge {
   static bool _any(String t, List<String> phrases) =>
       phrases.any((p) => t.contains(p));
 
-  static bool _anyw(String t, List<String> words) =>
-      words.any((w) => _w(t, w));
+  static bool _anyw(String t, List<String> words) => words.any((w) => _w(t, w));
 
   static final RegExp _deviceCount = RegExp(
     r'\b\d{1,3}\s*(?:routers?|switches|switch|pcs?|servers?|laptops?|'
@@ -96,9 +96,7 @@ class OfflineKnowledge {
 
   /// An IPv6 address with a prefix (contains colons - the v4 matchers above
   /// cannot produce a false positive here).
-  static final RegExp _ipv6Cidr = RegExp(
-    r'[0-9a-fA-F:]{3,45}\s*/\s*\d{1,3}\b',
-  );
+  static final RegExp _ipv6Cidr = RegExp(r'[0-9a-fA-F:]{3,45}\s*/\s*\d{1,3}\b');
 
   /// The first "address/prefix" in the text, tightened to plain form.
   static String? _firstCidr(String t) {
@@ -121,8 +119,10 @@ class OfflineKnowledge {
 
   /// Narrow topics first: a message that mentions both a switchport mode and
   /// a VLAN should get the switchport answer, and so on.
-  static final List<({bool Function(String) match, String? Function(String) answer})>
-      _topics = [
+  static final List<
+    ({bool Function(String) match, String? Function(String) answer})
+  >
+  _topics = [
     // IPv6 address facts - computed on the same deterministic pattern as the
     // IPv4 side: "what is the network of 2001:db8::1/64".
     (
@@ -180,8 +180,10 @@ class OfflineKnowledge {
             '\n- First usable: ${info.firstHost}  -  last usable: '
             '${info.lastHost}',
           );
-          b.write('\n- Usable hosts: ${info.usableHosts} '
-              '(of ${info.totalAddresses} addresses)');
+          b.write(
+            '\n- Usable hosts: ${info.usableHosts} '
+            '(of ${info.totalAddresses} addresses)',
+          );
         }
         return b.toString();
       },
@@ -263,26 +265,26 @@ class OfflineKnowledge {
     ),
     // Connectivity faults: "cannot ping", "request timed out".
     (
-      match: (t) =>
-          _any(t, const [
-            'cannot ping',
-            "can't ping",
-            'cant ping',
-            'cannot reach',
-            "can't reach",
-            'ping fails',
-            'ping failed',
-            'not pinging',
-            'request timed out',
-            'destination host unreachable',
-            'no connectivity',
-            'unreachable',
-            'connection timed out',
-            'not connecting',
-            'does not connect',
-            'cannot connect',
-          ]),
-      answer: (t) => 'Work up the stack, one check per layer:\n'
+      match: (t) => _any(t, const [
+        'cannot ping',
+        "can't ping",
+        'cant ping',
+        'cannot reach',
+        "can't reach",
+        'ping fails',
+        'ping failed',
+        'not pinging',
+        'request timed out',
+        'destination host unreachable',
+        'no connectivity',
+        'unreachable',
+        'connection timed out',
+        'not connecting',
+        'does not connect',
+        'cannot connect',
+      ]),
+      answer: (t) =>
+          'Work up the stack, one check per layer:\n'
           '1. Link: interface up and up (`show ip interface brief`), correct '
           'cable (straight to switch, crossover between like devices), both '
           'ends in the same VLAN.\n'
@@ -308,7 +310,8 @@ class OfflineKnowledge {
         'check connectivity',
         'use ping',
       ]),
-      answer: (t) => 'On a PC in Packet Tracer: Desktop > Command Prompt, then '
+      answer: (t) =>
+          'On a PC in Packet Tracer: Desktop > Command Prompt, then '
           '`ping <address>`. Ping your own address (proves the stack), then '
           'the default gateway (proves the LAN), then the far side (proves '
           'routing). On a router: `ping 192.168.10.10` and use the extended '
@@ -318,7 +321,8 @@ class OfflineKnowledge {
     // traceroute.
     (
       match: (t) => _any(t, const ['traceroute', 'tracert', 'trace route']),
-      answer: (t) => '`traceroute` (tracert on Windows) lists every router a '
+      answer: (t) =>
+          '`traceroute` (tracert on Windows) lists every router a '
           'packet crosses: each line is one hop with three round-trip times. '
           'Read it as a map: where replies start failing is where the path '
           'breaks - the last responding router is usually the one that has no '
@@ -328,7 +332,8 @@ class OfflineKnowledge {
     // ARP.
     (
       match: (t) => _w(t, 'arp') || _has(t, 'show arp'),
-      answer: (t) => 'ARP maps an IP to the MAC on the local segment: the '
+      answer: (t) =>
+          'ARP maps an IP to the MAC on the local segment: the '
           'sender broadcasts "who has 192.168.1.1?" and the owner answers. If '
           'ARP fails, nothing on the LAN can talk - check `show arp` for the '
           'entry, that both devices share a VLAN, and clear a stale entry with '
@@ -341,7 +346,8 @@ class OfflineKnowledge {
           _anyw(t, const ['cdp', 'lldp']) ||
           _has(t, 'discover neighbors') ||
           _has(t, 'discover neighbours'),
-      answer: (t) => 'CDP and LLDP tell a device what is plugged into each '
+      answer: (t) =>
+          'CDP and LLDP tell a device what is plugged into each '
           'port - layer-2 neighbor discovery:\n'
           '- CDP (Cisco-only) is on by default: `cdp run` globally, and `no '
           'cdp enable` on any port facing an untrusted network so it stops '
@@ -353,7 +359,8 @@ class OfflineKnowledge {
     // SNMP.
     (
       match: (t) => _w(t, 'snmp'),
-      answer: (t) => 'SNMP lets a management station (NMS) poll the device:\n'
+      answer: (t) =>
+          'SNMP lets a management station (NMS) poll the device:\n'
           '1. `snmp-server community <community> ro` - read-only access\n'
           '2. Optional traps to the NMS: `snmp-server host <nms-ip> '
           '<community>`\n'
@@ -366,7 +373,8 @@ class OfflineKnowledge {
       match: (t) =>
           _anyw(t, const ['rstp']) ||
           _any(t, const ['rapid pvst', 'rapid-pvst', 'rapid spanning tree']),
-      answer: (t) => 'RSTP (rapid PVST+) is classic STP with much faster '
+      answer: (t) =>
+          'RSTP (rapid PVST+) is classic STP with much faster '
           'convergence: instead of waiting on timers, ports get roles - '
           'root, designated and alternate (the backup path that unblocks in '
           'seconds) - and an edge port to a host behaves like PortFast. '
@@ -380,7 +388,8 @@ class OfflineKnowledge {
       match: (t) =>
           _any(t, const ['dhcpv6', 'dhcp for ipv6', 'ipv6 dhcp']) &&
           !_has(t, 'relay'),
-      answer: (t) => 'Three ways IPv6 hosts get addressing: SLAAC (the '
+      answer: (t) =>
+          'Three ways IPv6 hosts get addressing: SLAAC (the '
           'router advertisement alone gives prefix + gateway), stateless '
           'DHCPv6 (SLAAC for the address, DHCPv6 only for the extras: DNS, '
           'domain) and stateful DHCPv6 (the server hands out addresses like '
@@ -395,7 +404,8 @@ class OfflineKnowledge {
     // PPP + CHAP/PAP on serial links.
     (
       match: (t) => _anyw(t, const ['ppp', 'chap', 'pap']),
-      answer: (t) => 'PPP on a serial link, both ends:\n'
+      answer: (t) =>
+          'PPP on a serial link, both ends:\n'
           '1. `interface s0/0/0` > `encapsulation ppp` (must match on both '
           'routers or the link stays down)\n'
           '2. `ppp authentication chap`\n'
@@ -418,7 +428,8 @@ class OfflineKnowledge {
         'lease line',
         'leased line',
       ]),
-      answer: (t) => 'A serial link needs the cable\'s DCE end to supply '
+      answer: (t) =>
+          'A serial link needs the cable\'s DCE end to supply '
           'clocking: on that side the interface gets `clock rate 64000` '
           '(DTE side gets none). Check the end with `show controllers '
           'serial0/0/0` - it names DCE or DTE. If both ends are right but the '
@@ -439,7 +450,8 @@ class OfflineKnowledge {
         'console cable',
         'cable type',
       ]),
-      answer: (t) => 'Cable cheat sheet: **straight-through** between unlike '
+      answer: (t) =>
+          'Cable cheat sheet: **straight-through** between unlike '
           'devices (PC/switch, switch/router). **Crossover** between like '
           'devices (switch-switch, PC-PC, router-router). **Console '
           '(rollover)** from a PC to the console port for out-of-band CLI. '
@@ -450,7 +462,8 @@ class OfflineKnowledge {
     // SSH.
     (
       match: (t) => _w(t, 'ssh') || _has(t, 'secure shell'),
-      answer: (t) => 'SSH on a Cisco device, in order:\n'
+      answer: (t) =>
+          'SSH on a Cisco device, in order:\n'
           '1. `hostname R1` and `ip domain-name lab.local`\n'
           '2. `crypto key generate rsa` (1024 or 2048 bits)\n'
           '3. `username admin secret <password>`\n'
@@ -461,8 +474,11 @@ class OfflineKnowledge {
     // Port security.
     (
       match: (t) =>
-          _has(t, 'port security') || _has(t, 'port-security') || _has(t, 'sticky mac'),
-      answer: (t) => 'Port security on an access port:\n'
+          _has(t, 'port security') ||
+          _has(t, 'port-security') ||
+          _has(t, 'sticky mac'),
+      answer: (t) =>
+          'Port security on an access port:\n'
           '1. `interface f0/2` > `switchport mode access`\n'
           '2. `switchport port-security`\n'
           '3. `switchport port-security maximum 1`\n'
@@ -474,7 +490,8 @@ class OfflineKnowledge {
     // DHCP snooping.
     (
       match: (t) => _has(t, 'snooping'),
-      answer: (t) => 'DHCP snooping blocks rogue DHCP servers:\n'
+      answer: (t) =>
+          'DHCP snooping blocks rogue DHCP servers:\n'
           '1. `ip dhcp snooping` (global)\n'
           '2. `ip dhcp snooping vlan 10`\n'
           '3. On all UPLINK/trusted ports: `ip dhcp snooping trust`\n'
@@ -489,7 +506,8 @@ class OfflineKnowledge {
           _anyw(t, const ['hsrp', 'vrrp', 'glbp']) ||
           _has(t, 'gateway redundancy') ||
           _has(t, 'first hop redundancy'),
-      answer: (t) => 'HSRP gives hosts one virtual gateway held by two '
+      answer: (t) =>
+          'HSRP gives hosts one virtual gateway held by two '
           'routers: `interface g0/1` > `standby 10 ip 192.168.10.254` on both '
           'routers, `standby 10 priority 150` + `standby 10 preempt` on the '
           'preferred one. Hosts point at .254 and never see the failover. '
@@ -498,7 +516,8 @@ class OfflineKnowledge {
     // Static routes.
     (
       match: (t) => _has(t, 'static route') || _has(t, 'ip route'),
-      answer: (t) => 'Static route syntax: `ip route <network> <mask> '
+      answer: (t) =>
+          'Static route syntax: `ip route <network> <mask> '
           '<next-hop|exit-interface>`. Example: `ip route 192.168.20.0 '
           '255.255.255.0 10.0.0.2`. The default route is `ip route 0.0.0.0 '
           '0.0.0.0 <next-hop>`. Verify with `show ip route` (S = static, '
@@ -510,7 +529,8 @@ class OfflineKnowledge {
           (_w(t, 'gateway') || _has(t, 'default gateway')) &&
           !_has(t, 'last resort') &&
           !_has(t, 'gateway of last'),
-      answer: (t) => 'The default gateway is the router address a host sends '
+      answer: (t) =>
+          'The default gateway is the router address a host sends '
           'non-local traffic to. On a PC it is set with the IP (Desktop > IP '
           'Configuration in Packet Tracer, or DHCP hands it out); on the '
           'router it is the default route `ip route 0.0.0.0 0.0.0.0 '
@@ -530,7 +550,8 @@ class OfflineKnowledge {
             'save my config',
           ]) ||
           (_w(t, 'save') && _w(t, 'config')),
-      answer: (t) => 'Make the config survive a reload: `copy running-config '
+      answer: (t) =>
+          'Make the config survive a reload: `copy running-config '
           'startup-config` (older IOS: `write memory`). Short form on exams: '
           '`copy run start`. Check with `show startup-config`. In the app, '
           'the executor performs the analogous save of the .pkt file - and a '
@@ -540,8 +561,12 @@ class OfflineKnowledge {
     (
       match: (t) =>
           _w(t, 'save') &&
-          (_has(t, 'my work') || _has(t, 'my file') || _has(t, 'packet tracer') || _has(t, 'the file')),
-      answer: (t) => 'To keep your Packet Tracer work: Ctrl+S (or File > '
+          (_has(t, 'my work') ||
+              _has(t, 'my file') ||
+              _has(t, 'packet tracer') ||
+              _has(t, 'the file')),
+      answer: (t) =>
+          'To keep your Packet Tracer work: Ctrl+S (or File > '
           'Save As) writes the .pkt - save it with a name you will recognise. '
           'In this app you can also press "Build the .pkt": it compiles the '
           'plan you discussed into a real file offline, and you can reopen or '
@@ -561,7 +586,8 @@ class OfflineKnowledge {
         'verify the config',
         'commands list',
       ]),
-      answer: (t) => 'Verification cheat sheet:\n'
+      answer: (t) =>
+          'Verification cheat sheet:\n'
           '- Interfaces: `show ip interface brief` (`up/up` is the goal)\n'
           '- MAC/VLAN: `show mac address-table`, `show vlan brief`\n'
           '- Routing: `show ip route`, `show ip protocols`\n'
@@ -577,7 +603,8 @@ class OfflineKnowledge {
           _anyw(t, const ['duplex', 'half-duplex']) ||
           _has(t, 'speed mismatch') ||
           _has(t, 'auto-negotiat'),
-      answer: (t) => 'A duplex mismatch looks like bad ping numbers: some '
+      answer: (t) =>
+          'A duplex mismatch looks like bad ping numbers: some '
           'pings fine, throughput terrible, late collisions on one side '
           '(`show interfaces` - FCS/CRC and late collision counters climb). '
           'Fix: leave both ends on auto, or set both ends to the same fixed '
@@ -595,7 +622,8 @@ class OfflineKnowledge {
         'link is down',
         'circle is red',
       ]),
-      answer: (t) => 'A red link in Packet Tracer means the physical layer '
+      answer: (t) =>
+          'A red link in Packet Tracer means the physical layer '
           'never came up:\n'
           '1. Wrong cable - crossover for like devices (switch-switch, '
           'router-router), straight for unlike.\n'
@@ -616,7 +644,8 @@ class OfflineKnowledge {
         'dynamic desirable',
         'switchport access',
       ]),
-      answer: (t) => 'Port modes: `switchport mode access` pins a port to one '
+      answer: (t) =>
+          'Port modes: `switchport mode access` pins a port to one '
           'VLAN (use `switchport access vlan 10` to choose it); `switchport '
           'mode trunk` carries many. Leaving ports on dynamic (DTP) lets '
           'switch-to-switch links negotiate and is the root of many lab '
@@ -632,7 +661,8 @@ class OfflineKnowledge {
         'mac learning',
         'show mac',
       ]),
-      answer: (t) => 'Switches learn source MACs per port: `show mac '
+      answer: (t) =>
+          'Switches learn source MACs per port: `show mac '
           'address-table` lists MAC -> port -> VLAN. Use it to find where a '
           'device hangs, to spot a MAC appearing on two ports (loop or '
           'duplicate), and - with port security - to see a violated port. A '
@@ -645,7 +675,8 @@ class OfflineKnowledge {
           _has(t, 'wireless security') ||
           _has(t, 'secure the wifi') ||
           _has(t, 'secure wi-fi'),
-      answer: (t) => 'On the AP in Packet Tracer: Config tab > Port 1 > set '
+      answer: (t) =>
+          'On the AP in Packet Tracer: Config tab > Port 1 > set '
           'the SSID, then Wireless Security: WPA2-Personal with a passphrase '
           'is the normal choice (WEP is what old labs ask for but it is '
           'broken by design). Clients then pick the SSID and type the same '
@@ -658,7 +689,8 @@ class OfflineKnowledge {
           _has(t, 'wireless controller') ||
           _has(t, 'wireless lan controller') ||
           _w(t, 'wlc'),
-      answer: (t) => 'A WLC centralises the wireless: APs join it (lightweight '
+      answer: (t) =>
+          'A WLC centralises the wireless: APs join it (lightweight '
           'mode) and every SSID/WLAN lives on the controller. In Packet '
           'Tracer: give the WLC its management address, create the WLAN with '
           'the SSID and security, then let APs register. If an AP shows '
@@ -680,7 +712,8 @@ class OfflineKnowledge {
             'iot',
           ]) &&
           _w(t, 'server'),
-      answer: (t) => 'Server services live on the Server-PT Services tab - '
+      answer: (t) =>
+          'Server services live on the Server-PT Services tab - '
           'enable the service, then fill its panel:\n'
           '- HTTP/HTTPS: enable, edit the index page to your text.\n'
           '- FTP: add users (user/password) and permissions.\n'
@@ -688,8 +721,8 @@ class OfflineKnowledge {
           'server as both SMTP and POP3.\n'
           '- NTP/TFTP/Syslog: enable, then point clients/devices at this '
           'server\'s address.\n'
-        'Remember to give the server a static address on the right VLAN '
-        'first - services with a 0.0.0.0 address never answer.',
+          'Remember to give the server a static address on the right VLAN '
+          'first - services with a 0.0.0.0 address never answer.',
     ),
     // NTP client on a router. Placed AFTER the server-panels entry on
     // purpose: "enable ntp on the server" must keep hitting the panels
@@ -697,7 +730,8 @@ class OfflineKnowledge {
     // ("configure ntp on my router" names no server).
     (
       match: (t) => _w(t, 'ntp') || _has(t, 'network time'),
-      answer: (t) => 'Make the router sync its clock - correct timestamps '
+      answer: (t) =>
+          'Make the router sync its clock - correct timestamps '
           'are what make logs and certificates trustworthy:\n'
           '1. `ntp server <server-ip>` - the time source (a server-PT box '
           'with its NTP service on, or an upstream router).\n'
@@ -710,10 +744,9 @@ class OfflineKnowledge {
     // Syslog on a router/switch.
     (
       match: (t) =>
-          _w(t, 'syslog') ||
-          _has(t, 'logging host') ||
-          _w(t, 'logging'),
-      answer: (t) => 'Ship the device\'s logs to one place so you can see '
+          _w(t, 'syslog') || _has(t, 'logging host') || _w(t, 'logging'),
+      answer: (t) =>
+          'Ship the device\'s logs to one place so you can see '
           'events across devices:\n'
           '1. `logging host <server-ip>` - the syslog server (a Server-PT '
           'with the Syslog service on).\n'
@@ -733,7 +766,8 @@ class OfflineKnowledge {
           _has(t, 'line password') ||
           _has(t, 'vty password') ||
           _has(t, 'password encryption'),
-      answer: (t) => 'Local access hardening, in the order a config '
+      answer: (t) =>
+          'Local access hardening, in the order a config '
           'usually gets it:\n'
           '1. `banner motd #Authorized access only#` - the legal/notices '
           'banner shown before login.\n'
@@ -750,10 +784,9 @@ class OfflineKnowledge {
     // PortFast / BPDUGuard.
     (
       match: (t) =>
-          _w(t, 'portfast') ||
-          _w(t, 'bpduguard') ||
-          _has(t, 'edge port'),
-      answer: (t) => 'Access ports waiting through STP\'s listening/'
+          _w(t, 'portfast') || _w(t, 'bpduguard') || _has(t, 'edge port'),
+      answer: (t) =>
+          'Access ports waiting through STP\'s listening/'
           'learning states is why a PC "takes 30 seconds" to get network - '
           'and why DHCP sometimes times out on boot:\n'
           '1. On each ACCESS port: `spanning-tree portfast` - the port '
@@ -775,7 +808,8 @@ class OfflineKnowledge {
           _has(t, 'lockout') ||
           _has(t, 'failed logins') ||
           _has(t, 'brute force'),
-      answer: (t) => 'Lock out repeated failed logins (brute-force '
+      answer: (t) =>
+          'Lock out repeated failed logins (brute-force '
           'protection on vty/line access):\n'
           '1. `login block-for 120 attempts 3 within 60` - 3 failures in '
           '60s silences login for 120s.\n'
@@ -795,7 +829,8 @@ class OfflineKnowledge {
           _has(t, 'seeing each other') ||
           _has(t, 'from each other') ||
           _has(t, 'isolate hosts'),
-      answer: (t) => 'Keep hosts on the SAME switch from talking to each '
+      answer: (t) =>
+          'Keep hosts on the SAME switch from talking to each '
           'other while they all still reach the router:\n'
           '1. On each isolated port: `switchport protected`.\n'
           '2. Protected-to-protected traffic is dropped at layer 2; '
@@ -819,7 +854,8 @@ class OfflineKnowledge {
         'new to packet tracer',
         'how do i add',
       ]),
-      answer: (t) => 'Packet Tracer in five moves: pick the device group at '
+      answer: (t) =>
+          'Packet Tracer in five moves: pick the device group at '
           'the bottom-left (Routers/Switches/End Devices), drag the model to '
           'the canvas, choose Connections for the cable (straight for '
           'unlike, crossover for like, console for CLI-from-PC), click the '
@@ -839,7 +875,8 @@ class OfflineKnowledge {
         'pc to wifi',
         'tablet to wifi',
       ]),
-      answer: (t) => 'To join a wireless client in Packet Tracer: click the '
+      answer: (t) =>
+          'To join a wireless client in Packet Tracer: click the '
           'device > Desktop > PC Wireless > Connect tab, pick the SSID, enter '
           'the passphrase for WPA2 (or the WEP key). The AP must be powered '
           'and its wireless port configured first; a client that never '
@@ -858,7 +895,8 @@ class OfflineKnowledge {
         'find the mac',
         '169.254',
       ]),
-      answer: (t) => 'On a PC in Packet Tracer: Desktop > Command Prompt > '
+      answer: (t) =>
+          'On a PC in Packet Tracer: Desktop > Command Prompt > '
           '`ipconfig` (or `ipconfig /all` for the MAC and DNS). The same '
           'values are editable under Desktop > IP Configuration - static '
           'address + mask + gateway, or switch it to DHCP and let the pool '
@@ -868,7 +906,8 @@ class OfflineKnowledge {
     (
       match: (t) =>
           _w(t, 'loopback') || _has(t, 'loopback0') || _has(t, 'loopback 0'),
-      answer: (t) => 'A loopback is a virtual interface that never goes '
+      answer: (t) =>
+          'A loopback is a virtual interface that never goes '
           'down: `interface loopback0` > `ip address 10.255.255.1 '
           '255.255.255.255`. Routers use one as the OSPF/BGP router-id, for '
           'management reachability, and to keep a stable anchor when physical '
@@ -876,9 +915,9 @@ class OfflineKnowledge {
     ),
     // VPN / IPsec.
     (
-      match: (t) =>
-          _w(t, 'vpn') || _has(t, 'ipsec') || _has(t, 'site-to-site'),
-      answer: (t) => 'A site-to-site IPsec VPN joins two LANs across an '
+      match: (t) => _w(t, 'vpn') || _has(t, 'ipsec') || _has(t, 'site-to-site'),
+      answer: (t) =>
+          'A site-to-site IPsec VPN joins two LANs across an '
           'untrusted link: interesting traffic triggers IKE (isakmp policy + '
           'pre-shared key), then IPsec (transform-set aes/sha) protects it, '
           'and a crypto map applies it to the WAN interface. Both routers '
@@ -890,7 +929,8 @@ class OfflineKnowledge {
     // VLSM.
     (
       match: (t) => _has(t, 'vlsm'),
-      answer: (t) => 'VLSM sizes each subnet to its need instead of forcing '
+      answer: (t) =>
+          'VLSM sizes each subnet to its need instead of forcing '
           'all /24s: sort requirements largest-first, allocate from the top '
           'of the block, and each next subnet starts where the last one '
           'ends. Example in 192.168.10.0/24: 100 hosts -> /25 (.0-.127), 50 '
@@ -905,7 +945,8 @@ class OfflineKnowledge {
           _has(t, 'how to subnet') ||
           _has(t, 'split a /24') ||
           _has(t, 'split a /16'),
-      answer: (t) => 'Subnetting is borrowing host bits: each borrowed bit '
+      answer: (t) =>
+          'Subnetting is borrowing host bits: each borrowed bit '
           'doubles the subnets and halves the hosts. From /24: /25 = 2 '
           'subnets of 126 hosts, /26 = 4 of 62, /27 = 8 of 30, /28 = 16 of '
           '14, /30 = 64 point-to-point links of 2. The block size of the '
@@ -921,7 +962,8 @@ class OfflineKnowledge {
         'subinterface',
         'sub-interface',
       ]),
-      answer: (t) => 'Router-on-a-stick: one router uplink carries all VLANs '
+      answer: (t) =>
+          'Router-on-a-stick: one router uplink carries all VLANs '
           'as a trunk; the router uses a sub-interface per VLAN: `interface '
           'g0/1.10` > `encapsulation dot1q 10` > `ip address 192.168.10.1 '
           '255.255.255.0`. The switch port toward the router is `switchport '
@@ -931,8 +973,11 @@ class OfflineKnowledge {
     // Inter-VLAN routing.
     (
       match: (t) =>
-          _has(t, 'inter-vlan') || _has(t, 'intervlan') || _has(t, 'vlan routing'),
-      answer: (t) => 'Two ways to route between VLANs: router-on-a-stick (a '
+          _has(t, 'inter-vlan') ||
+          _has(t, 'intervlan') ||
+          _has(t, 'vlan routing'),
+      answer: (t) =>
+          'Two ways to route between VLANs: router-on-a-stick (a '
           'trunk to a router with a dot1Q sub-interface per VLAN) or a '
           'layer-3 switch (SVIs: create `interface vlan 10`, give it an '
           '`ip address`, then enable `ip routing`). Router-on-a-stick is the '
@@ -948,7 +993,8 @@ class OfflineKnowledge {
         'message-digest',
         'md5 auth',
       ]),
-      answer: (t) => 'OSPF MD5 authentication: `interface g0/0` > `ip ospf '
+      answer: (t) =>
+          'OSPF MD5 authentication: `interface g0/0` > `ip ospf '
           'message-digest-key 1 md5 <key>`, then under `router ospf 1` > '
           '`area 0 authentication message-digest`. Both neighbors must use '
           'the same key id and key or the adjacency never leaves INIT. '
@@ -966,7 +1012,8 @@ class OfflineKnowledge {
         'ospf is not forming',
         'neighbor state',
       ]),
-      answer: (t) => 'OSPF adjacency states and what they mean: DOWN/INIT = '
+      answer: (t) =>
+          'OSPF adjacency states and what they mean: DOWN/INIT = '
           'hellos not heard or one-way (area/Hello/authentication mismatch, '
           'ACL, NBMA); 2-WAY = normal on broadcast between non-DRs, a fault '
           'on point-to-point; EXSTART/EXCHANGE stuck = MTU mismatch; '
@@ -987,7 +1034,8 @@ class OfflineKnowledge {
         'secure the router',
         'secure the switch',
       ]),
-      answer: (t) => 'Locking down device access:\n'
+      answer: (t) =>
+          'Locking down device access:\n'
           '1. `enable secret <password>` (hashed; prefer over `enable '
           'password`)\n'
           '2. `line console 0` > `password <password>` > `login`\n'
@@ -1004,7 +1052,8 @@ class OfflineKnowledge {
         'rename the router',
         'rename the switch',
       ]),
-      answer: (t) => 'From privileged mode: `configure terminal`, then '
+      answer: (t) =>
+          'From privileged mode: `configure terminal`, then '
           '`hostname R1` (applies immediately), then `end`. The prompt '
           'changes with it. For domain-dependent features (SSH), also set '
           '`ip domain-name lab.local`.',
@@ -1014,7 +1063,8 @@ class OfflineKnowledge {
       match: (t) =>
           _any(t, const ['root bridge', 'root primary', 'root secondary']) ||
           _has(t, 'stp root'),
-      answer: (t) => 'Spanning tree picks the root by lowest priority then '
+      answer: (t) =>
+          'Spanning tree picks the root by lowest priority then '
           'lowest MAC. To choose it yourself: `spanning-tree vlan 10 root '
           'primary` on the intended core switch (and `root secondary` on the '
           'backup). Verify with `show spanning-tree vlan 10` - "This bridge '
@@ -1026,7 +1076,8 @@ class OfflineKnowledge {
           _has(t, 'ip helper-address') ||
           _has(t, 'dhcp relay') ||
           _has(t, 'relay agent'),
-      answer: (t) => 'A router does not forward broadcasts, so a DHCP server '
+      answer: (t) =>
+          'A router does not forward broadcasts, so a DHCP server '
           'on another subnet is reached with a relay: on the LAN interface '
           'facing the clients, `ip helper-address <server-address>`. The '
           'request is unicast to the server, which replies to the giaddr. '
@@ -1040,11 +1091,13 @@ class OfflineKnowledge {
     // is right.
     (
       match: (t) =>
-          (_has(t, 'ospf') && _any(t, ['or ', 'versus', ' vs ', 'instead']) &&
+          (_has(t, 'ospf') &&
+              _any(t, ['or ', 'versus', ' vs ', 'instead']) &&
               _has(t, 'eigrp')) ||
           _has(t, 'ospf or eigrp') ||
           _has(t, 'eigrp or ospf'),
-      answer: (t) => 'OSPF or EIGRP - both are link-state-ish, both converge '
+      answer: (t) =>
+          'OSPF or EIGRP - both are link-state-ish, both converge '
           'fast, so neither is "better" in the abstract. Choose OSPF when you '
           'need standards-based, multi-vendor, hierarchical areas, or an '
           'open protocol some auditor will ask about. Choose EIGRP when the '
@@ -1056,9 +1109,11 @@ class OfflineKnowledge {
     (
       match: (t) =>
           _anyw(t, ['transit', 'wan']) &&
-          (_has(t, '/30') || _has(t, '/31') ||
+          (_has(t, '/30') ||
+              _has(t, '/31') ||
               _anyw(t, ['point-to-point', 'p2p'])),
-      answer: (t) => 'Point-to-point transit links: use a /31 rather than a /30 '
+      answer: (t) =>
+          'Point-to-point transit links: use a /31 rather than a /30 '
           'when both ends support it (RFC 3021, IOS 12.2+). A /31 wastes zero '
           'addresses - both addresses are usable - where a /30 burns two of '
           'its four on network and broadcast. The catch: a /31 only works on '
@@ -1071,7 +1126,8 @@ class OfflineKnowledge {
           _has(t, 'management') &&
           (_has(t, 'vlan') || _has(t, 'vlans')) &&
           _anyw(t, ['why', 'should', 'best', 'separate', 'dedicated', 'own']),
-      answer: (t) => 'Put management in its own VLAN, never VLAN 1 and never '
+      answer: (t) =>
+          'Put management in its own VLAN, never VLAN 1 and never '
           'a user VLAN. Three concrete reasons: (1) VLAN 1 carries CDP, '
           'VTP, DTP and STP for the whole switch - putting SVI management '
           'traffic there mixes control-plane and management-plane traffic; '
@@ -1086,7 +1142,8 @@ class OfflineKnowledge {
       match: (t) =>
           _has(t, 'vlan 1') &&
           _anyw(t, ['why', 'not', 'avoid', 'bad', 'shouldn']),
-      answer: (t) => 'Avoid carrying user traffic on VLAN 1 because it is the '
+      answer: (t) =>
+          'Avoid carrying user traffic on VLAN 1 because it is the '
           'default and cannot be deleted: a new, unconfigured port lands in '
           'it automatically, so an unnoticed patch can bridge a user into '
           'it; it is the default native VLAN, so untagged frames leak across '
@@ -1096,10 +1153,12 @@ class OfflineKnowledge {
     ),
     (
       match: (t) =>
-          _has(t, 'adjust-mss') || _has(t, 'tcp adjust mss') ||
+          _has(t, 'adjust-mss') ||
+          _has(t, 'tcp adjust mss') ||
           (_has(t, 'gre') && _has(t, 'mss')) ||
           _has(t, 'packet too big'),
-      answer: (t) => 'Tunnel overhead breaks TCP: a GRE tunnel adds 24 bytes '
+      answer: (t) =>
+          'Tunnel overhead breaks TCP: a GRE tunnel adds 24 bytes '
           '(IP+GRE) so a 1500-byte frame no longer fits the underlying MTU, '
           'and a host that cannot fragment a large TCP segment hangs on big '
           'transfers (small pings work, the web page does not). The fix is on '
@@ -1112,7 +1171,8 @@ class OfflineKnowledge {
       match: (t) =>
           _anyw(t, ['eigrp', 'ospf', 'bgp', 'static']) &&
           _anyw(t, ['when', 'which', 'choose', 'pick', 'recommend', 'best']),
-      answer: (t) => 'Routing protocol, in one line each: STATIC when the '
+      answer: (t) =>
+          'Routing protocol, in one line each: STATIC when the '
           'topology is small and stable and you want zero protocol overhead '
           '(but every change is manual and a typo black-holes a subnet); OSPF '
           'when you want open, standards-based, hierarchical scaling with '

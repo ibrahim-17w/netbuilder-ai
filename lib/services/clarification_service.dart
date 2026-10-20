@@ -142,8 +142,7 @@ class ClarificationService {
           // consistent however the answer arrived.
           display: switch (q.id) {
             'scale' => '$value users',
-            'segmentation' =>
-              value == 'none' ? 'one flat network' : 'VLANs',
+            'segmentation' => value == 'none' ? 'one flat network' : 'VLANs',
             _ => _display(q, value),
           },
         );
@@ -179,16 +178,16 @@ class ClarificationService {
     if (RegExp(r'\brip\b').hasMatch(t)) {
       return const BriefFact(value: 'rip', display: 'RIP');
     }
-    if (RegExp(r'\bstatic\b|\bstatic routes?\b|\bstatic routing\b')
-        .hasMatch(t)) {
+    if (RegExp(
+      r'\bstatic\b|\bstatic routes?\b|\bstatic routing\b',
+    ).hasMatch(t)) {
       return const BriefFact(value: 'static', display: 'Static routes');
     }
     return null;
   }
 
   static BriefFact? _resolveSegmentation(String t) {
-    if (RegExp(r'\bflat\b|\bno vlans?\b|\bone (?:lan|network)\b')
-        .hasMatch(t)) {
+    if (RegExp(r'\bflat\b|\bno vlans?\b|\bone (?:lan|network)\b').hasMatch(t)) {
       return const BriefFact(value: 'none', display: 'one flat network');
     }
     if (RegExp(r'\bvlans?\b|\bsplit\b|\bsegment').hasMatch(t)) {

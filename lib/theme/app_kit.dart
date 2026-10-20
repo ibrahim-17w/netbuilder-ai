@@ -80,10 +80,7 @@ class AppPage extends StatelessWidget {
                     ),
                   ),
                 )
-              : Padding(
-                  padding: padding ?? EdgeInsets.zero,
-                  child: body,
-                ),
+              : Padding(padding: padding ?? EdgeInsets.zero, child: body),
         ),
       ],
     );
@@ -136,12 +133,7 @@ class AppPageHeader extends StatelessWidget {
               AppIconBubble(icon: icon!, tone: AppTone.accent, size: 38),
               const SizedBox(width: AppTheme.s12),
             ],
-            Flexible(
-              child: Text(
-                title,
-                style: theme.textTheme.headlineSmall,
-              ),
-            ),
+            Flexible(child: Text(title, style: theme.textTheme.headlineSmall)),
             if (trailing != null) ...[
               const SizedBox(width: AppTheme.s10),
               trailing!,
@@ -254,7 +246,10 @@ class AppPanel extends StatelessWidget {
     final scheme = theme.colorScheme;
     final colors = AppPalette.tone(scheme, tone);
     final hasHeader =
-        title != null || leading != null || trailing != null || actions.isNotEmpty;
+        title != null ||
+        leading != null ||
+        trailing != null ||
+        actions.isNotEmpty;
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -319,9 +314,7 @@ class AppPanel extends StatelessWidget {
       ],
     );
     final content = Padding(
-      padding:
-          padding ??
-          EdgeInsets.all(dense ? AppTheme.s12 : AppTheme.s16),
+      padding: padding ?? EdgeInsets.all(dense ? AppTheme.s12 : AppTheme.s16),
       child: body,
     );
     // The panel is a Material, not a decorated Container: a ListTile inside a
@@ -340,9 +333,7 @@ class AppPanel extends StatelessWidget {
       color: filled ? colors.fill : AppPalette.panel(scheme),
       shape: shape,
       clipBehavior: Clip.antiAlias,
-      child: onTap == null
-          ? content
-          : InkWell(onTap: onTap, child: content),
+      child: onTap == null ? content : InkWell(onTap: onTap, child: content),
     );
     return Padding(
       padding: const EdgeInsets.only(bottom: AppTheme.s12),
@@ -400,7 +391,11 @@ class AppRowTile extends StatelessWidget {
           else if (icon != null)
             Padding(
               padding: const EdgeInsets.only(right: AppTheme.s10),
-              child: AppIconBubble(icon: icon!, tone: tone, size: dense ? 28 : 32),
+              child: AppIconBubble(
+                icon: icon!,
+                tone: tone,
+                size: dense ? 28 : 32,
+              ),
             ),
           Expanded(
             child: Column(
@@ -438,7 +433,9 @@ class AppRowTile extends StatelessWidget {
       ),
     );
     return Material(
-      color: selected ? scheme.primary.withValues(alpha: 0.10) : Colors.transparent,
+      color: selected
+          ? scheme.primary.withValues(alpha: 0.10)
+          : Colors.transparent,
       borderRadius: BorderRadius.circular(AppTheme.rMd),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppTheme.rMd),
@@ -730,7 +727,10 @@ class AppMetricGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = (constraints.maxWidth / minTileWidth).floor().clamp(1, 4);
+        final columns = (constraints.maxWidth / minTileWidth).floor().clamp(
+          1,
+          4,
+        );
         const gap = AppTheme.s8;
         final tileWidth =
             (constraints.maxWidth - gap * (columns - 1)) / columns;
@@ -778,7 +778,9 @@ class AppToolbar extends StatelessWidget {
         vertical: AppTheme.s10,
       ),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppPalette.hairline(theme.colorScheme))),
+        border: Border(
+          bottom: BorderSide(color: AppPalette.hairline(theme.colorScheme)),
+        ),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -890,7 +892,8 @@ class AppSearchField extends StatelessWidget {
         hintText: hint,
         isDense: true,
         prefixIcon: const Icon(Icons.search, size: 18),
-        suffixIcon: trailing ??
+        suffixIcon:
+            trailing ??
             (value.isEmpty
                 ? null
                 : IconButton(
@@ -1010,14 +1013,18 @@ class AppCodeBlock extends StatelessWidget {
                   Icon(
                     Icons.terminal_outlined,
                     size: 14,
-                    color: AppPalette.consoleText(scheme).withValues(alpha: 0.7),
+                    color: AppPalette.consoleText(
+                      scheme,
+                    ).withValues(alpha: 0.7),
                   ),
                   const SizedBox(width: AppTheme.s8),
                   Expanded(
                     child: Text(
                       title ?? 'Output',
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: AppPalette.consoleText(scheme).withValues(alpha: 0.75),
+                        color: AppPalette.consoleText(
+                          scheme,
+                        ).withValues(alpha: 0.75),
                         letterSpacing: 0.8,
                       ),
                     ),
@@ -1028,11 +1035,15 @@ class AppCodeBlock extends StatelessWidget {
                       tooltip: 'Copy',
                       visualDensity: VisualDensity.compact,
                       iconSize: 16,
-                      color: AppPalette.consoleText(scheme).withValues(alpha: 0.75),
+                      color: AppPalette.consoleText(
+                        scheme,
+                      ).withValues(alpha: 0.75),
                       icon: const Icon(Icons.copy_all_outlined),
                       onPressed: hasText
                           ? () async {
-                              await Clipboard.setData(ClipboardData(text: text));
+                              await Clipboard.setData(
+                                ClipboardData(text: text),
+                              );
                               if (!context.mounted) return;
                               ScaffoldMessenger.maybeOf(context)?.showSnackBar(
                                 const SnackBar(content: Text('Copied')),
@@ -1139,7 +1150,9 @@ class _StepChip extends StatelessWidget {
     final active = state != _StepState.todo;
     final color = state == _StepState.current
         ? primary
-        : (state == _StepState.done ? scheme.onSurface : scheme.onSurfaceVariant);
+        : (state == _StepState.done
+              ? scheme.onSurface
+              : scheme.onSurfaceVariant);
     return Material(
       color: state == _StepState.current
           ? primary.withValues(alpha: 0.12)
@@ -1171,9 +1184,13 @@ class _StepChip extends StatelessWidget {
                 height: 20,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: active ? color.withValues(alpha: 0.16) : Colors.transparent,
+                  color: active
+                      ? color.withValues(alpha: 0.16)
+                      : Colors.transparent,
                   border: Border.all(
-                    color: active ? color.withValues(alpha: 0.5) : scheme.outlineVariant,
+                    color: active
+                        ? color.withValues(alpha: 0.5)
+                        : scheme.outlineVariant,
                   ),
                 ),
                 child: Center(
@@ -1254,11 +1271,7 @@ class AppBrandMark extends StatelessWidget {
           ),
         ],
       ),
-      child: Icon(
-        Icons.lan_outlined,
-        size: size * 0.56,
-        color: Colors.white,
-      ),
+      child: Icon(Icons.lan_outlined, size: size * 0.56, color: Colors.white),
     );
     if (!showWordmark) return mark;
     return Row(
@@ -1313,7 +1326,10 @@ class AppDivider extends StatelessWidget {
     if (label == null) {
       return Padding(
         padding: EdgeInsets.symmetric(vertical: space),
-        child: Divider(color: AppPalette.hairline(theme.colorScheme), height: 1),
+        child: Divider(
+          color: AppPalette.hairline(theme.colorScheme),
+          height: 1,
+        ),
       );
     }
     return Padding(

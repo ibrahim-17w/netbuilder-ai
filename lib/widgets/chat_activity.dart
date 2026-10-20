@@ -275,7 +275,11 @@ class NetworkInspector extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.all(AppTheme.s12),
               children: [
-                _field(theme, 'Network', project.isEmpty ? '(not set)' : project),
+                _field(
+                  theme,
+                  'Network',
+                  project.isEmpty ? '(not set)' : project,
+                ),
                 if (state.problem.isNotEmpty)
                   _field(theme, 'Working on', state.problem),
                 if (state.focus.isNotEmpty)
@@ -320,7 +324,7 @@ class NetworkInspector extends StatelessWidget {
                   theme,
                   'Detected problems'
                   '${issues.isEmpty ? '' : ' (${errors.length} error(s), '
-                      '${warnings.length} warning(s))'}',
+                            '${warnings.length} warning(s))'}',
                 ),
                 if (issues.isEmpty)
                   _hint(theme, 'The validator found nothing to flag.')
@@ -340,8 +344,8 @@ class NetworkInspector extends StatelessWidget {
                       theme,
                       '${change['device']} ${change['interface']}'.trim(),
                       '${change['field']}: "${change['oldValue']}" -> '
-                          '"${change['newValue']}"'
-                          '${(change['undoneAt'] ?? '').toString().isEmpty ? '' : ' (undone)'}',
+                      '"${change['newValue']}"'
+                      '${(change['undoneAt'] ?? '').toString().isEmpty ? '' : ' (undone)'}',
                     ),
               ],
             ),
@@ -370,10 +374,7 @@ class NetworkInspector extends StatelessWidget {
   }
 
   Widget _section(ThemeData theme, String label) => Padding(
-    padding: const EdgeInsets.only(
-      top: AppTheme.s12,
-      bottom: AppTheme.s4,
-    ),
+    padding: const EdgeInsets.only(top: AppTheme.s12, bottom: AppTheme.s4),
     child: Text(
       label.toUpperCase(),
       style: theme.textTheme.labelSmall?.copyWith(

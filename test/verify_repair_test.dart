@@ -34,7 +34,12 @@ void main() {
     final result = await engine.verifyRepair(
       before: {
         'devices': [
-          {'name': 'PC1', 'findings': [{'id': 'PC1:x'}]},
+          {
+            'name': 'PC1',
+            'findings': [
+              {'id': 'PC1:x'},
+            ],
+          },
         ],
       },
       after: {

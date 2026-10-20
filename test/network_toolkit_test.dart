@@ -78,14 +78,14 @@ void main() {
       find.textContaining('access-list 100 permit tcp 192.168.10.0 0.0.0.255'),
       findsOneWidget,
     );
-    expect(
-      find.textContaining('10.168.192.in-addr.arpa'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('10.168.192.in-addr.arpa'), findsOneWidget);
   });
 
   testWidgets('every exporter renders the open plan', (tester) async {
-    final intent = NetworkIntent.parseSimple('office', '2 routers 1 switch ospf');
+    final intent = NetworkIntent.parseSimple(
+      'office',
+      '2 routers 1 switch ospf',
+    );
     await pumpToolkit(tester, ToolkitSection.exporters, intent: intent);
 
     expect(find.text('Cisco IOS configuration'), findsOneWidget);
@@ -127,8 +127,10 @@ void main() {
     await pumpToolkit(tester, ToolkitSection.addressing, intent: intent);
 
     expect(find.textContaining('Duplicate addresses: 1'), findsOneWidget);
-    expect(find.textContaining('192.168.1.1 used by R1 f0/0, R2 f0/0'),
-        findsOneWidget);
+    expect(
+      find.textContaining('192.168.1.1 used by R1 f0/0, R2 f0/0'),
+      findsOneWidget,
+    );
     expect(find.textContaining('Overlapping subnets: none'), findsOneWidget);
   });
 

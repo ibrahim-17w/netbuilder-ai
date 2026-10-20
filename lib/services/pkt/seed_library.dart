@@ -115,7 +115,8 @@ class SeedLibrary {
     final wantedModel = (model ?? '').trim();
     if (wantedModel.isNotEmpty) {
       for (final d in devices) {
-        if (d.type.trim().toLowerCase() == wantedType && d.model == wantedModel) {
+        if (d.type.trim().toLowerCase() == wantedType &&
+            d.model == wantedModel) {
           return d;
         }
       }
@@ -128,7 +129,8 @@ class SeedLibrary {
   }
 
   /// Every model the seed has, for the picker to show.
-  List<({String type, String model, int available})> get catalogue => [
+  List<({String type, String model, int available})> get catalogue =>
+      [
         for (final entry in inventory.entries)
           (
             type: entry.key.split('/').first,
@@ -138,9 +140,9 @@ class SeedLibrary {
             available: entry.value,
           ),
       ]..sort((a, b) {
-          final byType = a.type.compareTo(b.type);
-          return byType != 0 ? byType : a.model.compareTo(b.model);
-        });
+        final byType = a.type.compareTo(b.type);
+        return byType != 0 ? byType : a.model.compareTo(b.model);
+      });
 
   // --- scanning -----------------------------------------------------------
 
@@ -204,10 +206,16 @@ class SeedLibrary {
     return match == null ? '' : match.group(0)!;
   }
 
-  static String? _tagValue(String block, String tag, {bool engineOnly = false}) {
+  static String? _tagValue(
+    String block,
+    String tag, {
+    bool engineOnly = false,
+  }) {
     final scope = engineOnly ? _engineScope(block) : block;
-    final match =
-        RegExp('<$tag[^>]*>(.*?)</$tag>', dotAll: true).firstMatch(scope);
+    final match = RegExp(
+      '<$tag[^>]*>(.*?)</$tag>',
+      dotAll: true,
+    ).firstMatch(scope);
     if (match == null) return null;
     final value = match.group(1)!.trim();
     return value.isEmpty ? null : value;
@@ -221,8 +229,7 @@ class SeedLibrary {
   }
 
   static String? _attribute(String tag, String name) {
-    final match =
-        RegExp('$name="([^"]*)"').firstMatch(tag);
+    final match = RegExp('$name="([^"]*)"').firstMatch(tag);
     return match?.group(1);
   }
 

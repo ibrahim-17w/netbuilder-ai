@@ -11,31 +11,45 @@ import 'package:net_builder/services/troubleshoot_flows.dart';
 void main() {
   group('flow openers', () {
     test('the classic symptom opens the local ladder', () {
-      expect(TroubleshootFlows.matchStart('my pc cannot ping anything'),
-          'pc-unreachable');
-      expect(TroubleshootFlows.matchStart('my pc has no connectivity'),
-          'pc-unreachable');
-      expect(TroubleshootFlows.matchStart('troubleshoot my connection'),
-          'pc-unreachable');
+      expect(
+        TroubleshootFlows.matchStart('my pc cannot ping anything'),
+        'pc-unreachable',
+      );
+      expect(
+        TroubleshootFlows.matchStart('my pc has no connectivity'),
+        'pc-unreachable',
+      );
+      expect(
+        TroubleshootFlows.matchStart('troubleshoot my connection'),
+        'pc-unreachable',
+      );
     });
 
     test('a symptom that names its target stays with the corpus ladder', () {
       // The flows ask the questions an open symptom needs; a question that
       // already names where the ping dies is answered directly.
-      expect(TroubleshootFlows.matchStart('PC1 cannot ping the gateway'),
-          isNull);
-      expect(TroubleshootFlows.matchStart('the pc cannot reach 8.8.8.8'),
-          isNull);
+      expect(
+        TroubleshootFlows.matchStart('PC1 cannot ping the gateway'),
+        isNull,
+      );
+      expect(
+        TroubleshootFlows.matchStart('the pc cannot reach 8.8.8.8'),
+        isNull,
+      );
       expect(TroubleshootFlows.matchStart('PC1 cannot ping PC2'), isNull);
     });
 
     test('internet trouble opens the WAN ladder, not the local one', () {
       // 'no internet' canonicalizes to 'no connectivity' - the raw words
       // must still decide the flow.
-      expect(TroubleshootFlows.matchStart('no internet in the lab'),
-          'no-internet');
-      expect(TroubleshootFlows.matchStart('the pc cannot reach the internet'),
-          'no-internet');
+      expect(
+        TroubleshootFlows.matchStart('no internet in the lab'),
+        'no-internet',
+      );
+      expect(
+        TroubleshootFlows.matchStart('the pc cannot reach the internet'),
+        'no-internet',
+      );
     });
 
     test('a configuration ask is not a symptom', () {
@@ -48,10 +62,14 @@ void main() {
     });
 
     test('the dropping symptom opens the intermittent ladder', () {
-      expect(TroubleshootFlows.matchStart('the network keeps dropping'),
-          'intermittent');
-      expect(TroubleshootFlows.matchStart('it is intermittent'),
-          'intermittent');
+      expect(
+        TroubleshootFlows.matchStart('the network keeps dropping'),
+        'intermittent',
+      );
+      expect(
+        TroubleshootFlows.matchStart('it is intermittent'),
+        'intermittent',
+      );
     });
 
     test('start rejects unknown flow ids', () {
@@ -69,10 +87,9 @@ void main() {
     }
 
     test('the dead-cable branch ends in a physical fix', () {
-      final turn = walk(
-        TroubleshootFlows.start('pc-unreachable')!,
-        ['down/down'],
-      );
+      final turn = walk(TroubleshootFlows.start('pc-unreachable')!, [
+        'down/down',
+      ]);
       expect(turn.done, isTrue);
       expect(turn.fix, isNotNull);
       expect(turn.fix, contains('down/down'));
@@ -80,34 +97,33 @@ void main() {
     });
 
     test('the APIPA branch ends in the DHCP fix', () {
-      final turn = walk(
-        TroubleshootFlows.start('pc-unreachable')!,
-        ['up/up', 'a 169.254.x.x address'],
-      );
+      final turn = walk(TroubleshootFlows.start('pc-unreachable')!, [
+        'up/up',
+        'a 169.254.x.x address',
+      ]);
       expect(turn.done, isTrue);
       expect(turn.fix, contains('169.254'));
       expect(turn.fix!.toLowerCase(), contains('dhcp'));
     });
 
     test('the full healthy path ends in a routing-or-ACL verdict', () {
-      final turn = walk(
-        TroubleshootFlows.start('pc-unreachable')!,
-        [
-          'up/up',
-          'a real address',
-          'it replies',
-          'destination host unreachable',
-        ],
-      );
+      final turn = walk(TroubleshootFlows.start('pc-unreachable')!, [
+        'up/up',
+        'a real address',
+        'it replies',
+        'destination host unreachable',
+      ]);
       expect(turn.done, isTrue);
       expect(turn.fix, contains('show ip route'));
     });
 
     test('the same ladder diverges: a timeout lands on the ACL rung', () {
-      final turn = walk(
-        TroubleshootFlows.start('pc-unreachable')!,
-        ['up/up', 'a real address', 'it replies', 'request timed out'],
-      );
+      final turn = walk(TroubleshootFlows.start('pc-unreachable')!, [
+        'up/up',
+        'a real address',
+        'it replies',
+        'request timed out',
+      ]);
       expect(turn.fix, contains('show access-lists'));
     });
 
@@ -150,7 +166,10 @@ void main() {
         'yes',
       );
       turn = TroubleshootFlowEngine.advance(turn.state, 'yes');
-      turn = TroubleshootFlowEngine.advance(turn.state, 'it shows translations');
+      turn = TroubleshootFlowEngine.advance(
+        turn.state,
+        'it shows translations',
+      );
       turn = TroubleshootFlowEngine.advance(turn.state, 'it fails');
       expect(turn.done, isTrue);
       expect(turn.fix!.toLowerCase(), contains('dns'));
@@ -174,9 +193,15 @@ void main() {
         'wired',
       );
       turn = TroubleshootFlowEngine.advance(turn.state, 'counters clean');
-      turn = TroubleshootFlowEngine.advance(turn.state, 'at random idle moments');
+      turn = TroubleshootFlowEngine.advance(
+        turn.state,
+        'at random idle moments',
+      );
       expect(turn.done, isFalse, reason: 'idle goes through the TCN rung');
-      turn = TroubleshootFlowEngine.advance(turn.state, 'yes, topology changes');
+      turn = TroubleshootFlowEngine.advance(
+        turn.state,
+        'yes, topology changes',
+      );
       expect(turn.done, isTrue);
       expect(turn.fix, contains('portfast'));
     });
@@ -187,7 +212,10 @@ void main() {
         'wired',
       );
       turn = TroubleshootFlowEngine.advance(turn.state, 'counters clean');
-      turn = TroubleshootFlowEngine.advance(turn.state, 'when another device joins');
+      turn = TroubleshootFlowEngine.advance(
+        turn.state,
+        'when another device joins',
+      );
       expect(turn.done, isTrue);
       expect(turn.fix!.toLowerCase(), contains('duplicate'));
     });
@@ -215,10 +243,11 @@ void main() {
     });
 
     test('a corrupt state fails closed to an honest restart', () {
-      final turn = TroubleshootFlowEngine.advance(
-        {'flow': 'nonsense', 'step': 'x', 'data': <String, dynamic>{}},
-        'up/up',
-      );
+      final turn = TroubleshootFlowEngine.advance({
+        'flow': 'nonsense',
+        'step': 'x',
+        'data': <String, dynamic>{},
+      }, 'up/up');
       expect(turn.done, isTrue);
       expect(turn.prompt, contains('fresh'));
     });

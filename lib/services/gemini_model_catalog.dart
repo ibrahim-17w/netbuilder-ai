@@ -35,7 +35,8 @@ class GeminiModelInfo {
 
   bool get thinking => name.contains('-thinking');
   bool get experimental =>
-      name.contains('-exp') || description.toLowerCase().contains('experimental');
+      name.contains('-exp') ||
+      description.toLowerCase().contains('experimental');
   bool get preview => name.contains('-preview') || name.contains('-preview-');
 
   /// The version family as a sortable number: 3, 2.5, 2.0, 1.5...
@@ -115,20 +116,21 @@ class GeminiModelCatalog {
   Future<List<GeminiModelInfo>> fetchFor(String apiKey) async {
     final key = apiKey.trim();
     if (key.isEmpty) {
-      throw Exception('Paste a Gemini API key first - the model list comes '
-          'from that key.');
+      throw Exception(
+        'Paste a Gemini API key first - the model list comes '
+        'from that key.',
+      );
     }
     final http.Response r;
     try {
       r = await _client
-          .get(
-            Uri.parse(_endpoint),
-            headers: {'x-goog-api-key': key},
-          )
+          .get(Uri.parse(_endpoint), headers: {'x-goog-api-key': key})
           .timeout(const Duration(seconds: 20));
     } catch (e) {
-      throw Exception('Could not reach the Gemini model list: '
-          '${e.toString().replaceFirst('Exception: ', '')}');
+      throw Exception(
+        'Could not reach the Gemini model list: '
+        '${e.toString().replaceFirst('Exception: ', '')}',
+      );
     }
     if (r.statusCode != 200) {
       throw Exception(_friendly(r.statusCode, r.body));
@@ -153,21 +155,25 @@ class GeminiModelCatalog {
     final out = <GeminiModelInfo>[];
     for (final raw in list) {
       if (raw is! Map) continue;
-      final name =
-          '${raw['name'] ?? ''}'.replaceFirst(RegExp(r'^models/'), '').trim();
+      final name = '${raw['name'] ?? ''}'
+          .replaceFirst(RegExp(r'^models/'), '')
+          .trim();
       if (name.isEmpty) continue;
-      out.add(GeminiModelInfo(
-        name: name,
-        displayName: '${raw['displayName'] ?? ''}',
-        description: '${raw['description'] ?? ''}',
-        methods: [
-          for (final m in (raw['supportedGenerationMethods'] as List? ?? const []))
-            '$m',
-        ],
-        inputTokenLimit: (raw['inputTokenLimit'] as num?)?.toInt() ?? 0,
-        outputTokenLimit: (raw['outputTokenLimit'] as num?)?.toInt() ?? 0,
-        updated: DateTime.tryParse('${raw['updatedTime'] ?? ''}'),
-      ));
+      out.add(
+        GeminiModelInfo(
+          name: name,
+          displayName: '${raw['displayName'] ?? ''}',
+          description: '${raw['description'] ?? ''}',
+          methods: [
+            for (final m
+                in (raw['supportedGenerationMethods'] as List? ?? const []))
+              '$m',
+          ],
+          inputTokenLimit: (raw['inputTokenLimit'] as num?)?.toInt() ?? 0,
+          outputTokenLimit: (raw['outputTokenLimit'] as num?)?.toInt() ?? 0,
+          updated: DateTime.tryParse('${raw['updatedTime'] ?? ''}'),
+        ),
+      );
     }
     return out;
   }
@@ -183,8 +189,9 @@ class GeminiModelCatalog {
     if (!n.startsWith('gemini-')) return false;
     if (m.version == null) return false;
     if (!m.supportsChat) return false;
-    if (RegExp(r'embedding|aqa|imagen|veo|lyria|tts|native-audio')
-        .hasMatch(n)) {
+    if (RegExp(
+      r'embedding|aqa|imagen|veo|lyria|tts|native-audio',
+    ).hasMatch(n)) {
       return false;
     }
     if (m.description.toLowerCase().contains('deprecated')) return false;

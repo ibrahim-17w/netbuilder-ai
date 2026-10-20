@@ -175,17 +175,18 @@ const Color kWorkspaceGlyphFill = Color(0xFFFDFCF8);
 const Color kWorkspaceSerial = Color(0xFFC62828);
 const Color kWorkspaceLabel = Color(0xFF263238);
 
-Color ptCableColor(String? cable) => switch (PacketTracerCatalog.instance.cable(cable)?.id) {
-  'console' => const Color(0xFF168BAD),
-  'fiber' || 'fiber-single' => const Color(0xFFD68016),
-  'fiber-multi' => const Color(0xFFAE6E16),
-  'serial' || 'serial-dce' || 'serial-dte' => kWorkspaceSerial,
-  'phone' => const Color(0xFF4B7D3A),
-  'coaxial' => const Color(0xFF395CB2),
-  'octal' => const Color(0xFF9463A7),
-  'ioe' => const Color(0xFF90653F),
-  _ => kWorkspaceInk,
-};
+Color ptCableColor(String? cable) =>
+    switch (PacketTracerCatalog.instance.cable(cable)?.id) {
+      'console' => const Color(0xFF168BAD),
+      'fiber' || 'fiber-single' => const Color(0xFFD68016),
+      'fiber-multi' => const Color(0xFFAE6E16),
+      'serial' || 'serial-dce' || 'serial-dte' => kWorkspaceSerial,
+      'phone' => const Color(0xFF4B7D3A),
+      'coaxial' => const Color(0xFF395CB2),
+      'octal' => const Color(0xFF9463A7),
+      'ioe' => const Color(0xFF90653F),
+      _ => kWorkspaceInk,
+    };
 
 /// The Packet Tracer-style glyph a device type renders as. One kind per
 /// classic shape: the Cisco router circle, the switch rectangle, the CRT
@@ -646,7 +647,9 @@ void drawHaloText(
   double haloWidth = 2.0,
 }) {
   final base = TextStyle(
-    fontFamily: 'Roboto', fontSize: fontSize, fontWeight: fontWeight,
+    fontFamily: 'Roboto',
+    fontSize: fontSize,
+    fontWeight: fontWeight,
   );
   final fill = TextPainter(
     text: TextSpan(
@@ -862,7 +865,9 @@ class _TopologyCanvasState extends State<TopologyCanvas> {
                             builder: (context, _, _) {
                               final visible = Rect.fromPoints(
                                 _view.toScene(Offset.zero),
-                                _view.toScene(viewport.bottomRight(Offset.zero)),
+                                _view.toScene(
+                                  viewport.bottomRight(Offset.zero),
+                                ),
                               ).inflate(90);
                               return RepaintBoundary(
                                 child: CustomPaint(
@@ -887,7 +892,9 @@ class _TopologyCanvasState extends State<TopologyCanvas> {
                             builder: (context, _, _) {
                               final visible = Rect.fromPoints(
                                 _view.toScene(Offset.zero),
-                                _view.toScene(viewport.bottomRight(Offset.zero)),
+                                _view.toScene(
+                                  viewport.bottomRight(Offset.zero),
+                                ),
                               ).inflate(90);
                               return Stack(
                                 children: [
@@ -898,77 +905,98 @@ class _TopologyCanvasState extends State<TopologyCanvas> {
                                       height: kNodeHeight + 44,
                                     ).overlaps(visible))
                                       Positioned(
-                            left: entry.value.dx - kNodeWidth / 2,
-                            top: entry.value.dy - kNodeHeight / 2,
-                            width: kNodeWidth,
-                            height: kNodeHeight + 28,
-                            child: _NodeTarget(
-                              label: _nodeLabel(
-                                entry.key,
-                                byName[entry.key],
-                                vlans[entry.key] ?? 0,
-                                peers[entry.key] ?? const <String>{},
-                                issues[entry.key] ?? const [],
-                              ),
-                              onOpen: () {
-                                final callback = widget.onNodeTap;
-                                if (callback != null) {
-                                  callback(entry.key);
-                                } else {
-                                  _showInspector(
-                                    context,
-                                    entry.key,
-                                    byName[entry.key],
-                                  );
-                                }
-                              },
-                              onPanStart: !widget.allowNodeDrag
-                                  ? null
-                                  : (d) {
-                                      _dragPointer = d.globalPosition;
-                                      setState(() => _dragging = entry.key);
-                                    },
-                              onPanUpdate: !widget.allowNodeDrag
-                                  ? null
-                                  : (d) {
-                                      final delta =
-                                          (d.globalPosition - _dragPointer) /
-                                          _view.value.getMaxScaleOnAxis();
-                                      _dragPointer = d.globalPosition;
-                                      final moving = widget.selectedNodes
-                                              .contains(entry.key)
-                                          ? widget.selectedNodes
-                                          : <String>{entry.key};
-                                      setState(() {
-                                        for (final name in moving) {
-                                          final current = _positions[name];
-                                          if (current == null) continue;
-                                          final point = current + delta;
-                                          _positions[name] = Offset(
-                                            point.dx.clamp(
-                                              frame.origin.dx + 44,
-                                              frame.origin.dx + frame.size.width - 44,
-                                            ),
-                                            point.dy.clamp(
-                                              frame.origin.dy + 24,
-                                              frame.origin.dy + frame.size.height - 48,
-                                            ),
-                                          );
-                                        }
-                                      });
-                                    },
-                              onPanEnd: !widget.allowNodeDrag
-                                  ? null
-                                  : (_) {
-                                      setState(() => _dragging = null);
-                                      widget.onLayoutChanged?.call(
-                                        Map.of(_positions),
-                                      );
-                                    },
-                              onPanCancel: !widget.allowNodeDrag
-                                  ? null
-                                  : () => setState(() => _dragging = null),
-                            ),
+                                        left: entry.value.dx - kNodeWidth / 2,
+                                        top: entry.value.dy - kNodeHeight / 2,
+                                        width: kNodeWidth,
+                                        height: kNodeHeight + 28,
+                                        child: _NodeTarget(
+                                          label: _nodeLabel(
+                                            entry.key,
+                                            byName[entry.key],
+                                            vlans[entry.key] ?? 0,
+                                            peers[entry.key] ??
+                                                const <String>{},
+                                            issues[entry.key] ?? const [],
+                                          ),
+                                          onOpen: () {
+                                            final callback = widget.onNodeTap;
+                                            if (callback != null) {
+                                              callback(entry.key);
+                                            } else {
+                                              _showInspector(
+                                                context,
+                                                entry.key,
+                                                byName[entry.key],
+                                              );
+                                            }
+                                          },
+                                          onPanStart: !widget.allowNodeDrag
+                                              ? null
+                                              : (d) {
+                                                  _dragPointer =
+                                                      d.globalPosition;
+                                                  setState(
+                                                    () => _dragging = entry.key,
+                                                  );
+                                                },
+                                          onPanUpdate: !widget.allowNodeDrag
+                                              ? null
+                                              : (d) {
+                                                  final delta =
+                                                      (d.globalPosition -
+                                                          _dragPointer) /
+                                                      _view.value
+                                                          .getMaxScaleOnAxis();
+                                                  _dragPointer =
+                                                      d.globalPosition;
+                                                  final moving =
+                                                      widget.selectedNodes
+                                                          .contains(entry.key)
+                                                      ? widget.selectedNodes
+                                                      : <String>{entry.key};
+                                                  setState(() {
+                                                    for (final name in moving) {
+                                                      final current =
+                                                          _positions[name];
+                                                      if (current == null)
+                                                        continue;
+                                                      final point =
+                                                          current + delta;
+                                                      _positions[name] = Offset(
+                                                        point.dx.clamp(
+                                                          frame.origin.dx + 44,
+                                                          frame.origin.dx +
+                                                              frame.size.width -
+                                                              44,
+                                                        ),
+                                                        point.dy.clamp(
+                                                          frame.origin.dy + 24,
+                                                          frame.origin.dy +
+                                                              frame
+                                                                  .size
+                                                                  .height -
+                                                              48,
+                                                        ),
+                                                      );
+                                                    }
+                                                  });
+                                                },
+                                          onPanEnd: !widget.allowNodeDrag
+                                              ? null
+                                              : (_) {
+                                                  setState(
+                                                    () => _dragging = null,
+                                                  );
+                                                  widget.onLayoutChanged?.call(
+                                                    Map.of(_positions),
+                                                  );
+                                                },
+                                          onPanCancel: !widget.allowNodeDrag
+                                              ? null
+                                              : () => setState(
+                                                  () => _dragging = null,
+                                                ),
+                                        ),
                                       ),
                                 ],
                               );
@@ -1100,7 +1128,8 @@ class _TopologyCanvasState extends State<TopologyCanvas> {
     final addrs = intent.addressing.where((a) => a.node == name).toList();
     final issues = widget.nodeIssues?[name] ?? const [];
     final vlan = _vlansFor(intent)[name] ?? 0;
-    final generatedConfig = PacketTracerAdapter.deviceConfigs(intent)[name] ?? '';
+    final generatedConfig =
+        PacketTracerAdapter.deviceConfigs(intent)[name] ?? '';
     final device = PacketTracerCatalog.instance.device(node.model ?? node.type);
     final variants = device?.variants.where(
       (variant) =>
@@ -1191,7 +1220,9 @@ class _TopologyCanvasState extends State<TopologyCanvas> {
                             : '${link.a} ${link.aIf}';
                         final cable = link == null
                             ? null
-                            : PacketTracerCatalog.instance.cable(link.cable)?.label ??
+                            : PacketTracerCatalog.instance
+                                      .cable(link.cable)
+                                      ?.label ??
                                   link.cable ??
                                   'cable';
                         return ListTile(
@@ -1218,7 +1249,9 @@ class _TopologyCanvasState extends State<TopologyCanvas> {
                 ] else
                   const Padding(
                     padding: EdgeInsets.only(top: 8),
-                    child: Text('This model is recognized; its port template is not available yet.'),
+                    child: Text(
+                      'This model is recognized; its port template is not available yet.',
+                    ),
                   ),
                 const SizedBox(height: 6),
                 ExpansionTile(
@@ -1386,14 +1419,30 @@ class TopologyLegend extends StatelessWidget {
         children: [
           Text('Key', style: style),
           for (final id in {
-            for(final link in links) PacketTracerCatalog.instance.cable(link.cable)?.id ?? 'unknown',
-          }.where((id)=>id!='copper' && !id.startsWith('serial')))
-            Row(mainAxisSize:MainAxisSize.min,children:[
-              SizedBox(width:18,height:8,child:CustomPaint(painter:_KeyPainter(
-                dashed:id=='copper-cross',color:ptCableColor(id)))),
-              const SizedBox(width:4),
-              Text(PacketTracerCatalog.instance.cable(id)?.label ?? 'Unknown cable',style:style),
-            ]),
+            for (final link in links)
+              PacketTracerCatalog.instance.cable(link.cable)?.id ?? 'unknown',
+          }.where((id) => id != 'copper' && !id.startsWith('serial')))
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 8,
+                  child: CustomPaint(
+                    painter: _KeyPainter(
+                      dashed: id == 'copper-cross',
+                      color: ptCableColor(id),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  PacketTracerCatalog.instance.cable(id)?.label ??
+                      'Unknown cable',
+                  style: style,
+                ),
+              ],
+            ),
           for (final v in used)
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -1592,10 +1641,15 @@ class TopologyDiagramPainter extends CustomPainter {
         }
         path.lineTo(end.dx, end.dy);
         canvas.drawPath(path, ink);
-      } else if (PacketTracerCatalog.instance.cable(link.cable)?.id == 'copper-cross') {
-        final length=(end-start).distance;
-        for(var distance=0.0;distance<length;distance+=7) {
-          canvas.drawLine(start+unit*distance,start+unit*math.min(distance+4,length),ink);
+      } else if (PacketTracerCatalog.instance.cable(link.cable)?.id ==
+          'copper-cross') {
+        final length = (end - start).distance;
+        for (var distance = 0.0; distance < length; distance += 7) {
+          canvas.drawLine(
+            start + unit * distance,
+            start + unit * math.min(distance + 4, length),
+            ink,
+          );
         }
       } else {
         canvas.drawLine(start, end, ink);

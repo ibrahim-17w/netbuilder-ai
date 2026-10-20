@@ -51,10 +51,7 @@ void main() {
         'split',
         '6 access points: 3 upstairs and 3 downstairs',
       );
-      expect(
-        split.nodes.where((n) => n.type == 'wireless'),
-        hasLength(6),
-      );
+      expect(split.nodes.where((n) => n.type == 'wireless'), hasLength(6));
     });
 
     test('a single-site brief is unchanged', () {
@@ -74,7 +71,7 @@ void main() {
       final plan = NetworkIntent.parseSimple(
         'roles',
         '1 router 1 switch, 3 Server-PT devices (1 DHCP server, 1 AAA server, '
-        '1 DNS server) and 15 PCs',
+            '1 DNS server) and 15 PCs',
       );
       expect(plan.nodes.where((n) => n.type == 'server'), hasLength(3));
       expect(plan.nodes.where((n) => n.type == 'pc'), hasLength(15));
@@ -115,14 +112,14 @@ void main() {
       expect(plan.security.managerIp, isNull);
     });
 
-    test('no time-range finding is reported for a plan that asked for none', () {
-      final plan = NetworkIntent.parseSimple('pool', pool);
-      final issues = ValidatorService.validate(plan, target: 'packet-tracer');
-      expect(
-        issues.where((i) => i.message.contains('time-range')),
-        isEmpty,
-      );
-    });
+    test(
+      'no time-range finding is reported for a plan that asked for none',
+      () {
+        final plan = NetworkIntent.parseSimple('pool', pool);
+        final issues = ValidatorService.validate(plan, target: 'packet-tracer');
+        expect(issues.where((i) => i.message.contains('time-range')), isEmpty);
+      },
+    );
 
     test('hours the user DID state are still read', () {
       final plan = NetworkIntent.parseSimple(
@@ -147,7 +144,8 @@ void main() {
       expect(
         noVpn.questions.where((q) => q.toLowerCase().contains('ipsec')),
         isEmpty,
-        reason: 'the brief never mentioned a VPN, so it is never asked for '
+        reason:
+            'the brief never mentioned a VPN, so it is never asked for '
             'a pre-shared key',
       );
       final withVpn = NetworkIntent.parseSimple(
@@ -162,28 +160,28 @@ void main() {
       );
     });
 
-    test('a brief that counts its devices is not taken over by the profile',
-        () {
-      // The profile is a fixed ten-device lab. A brief that states its own
-      // counts has already chosen, and its numbers win - otherwise 25 PCs and
-      // 4 servers were replaced by the profile's ten devices, and a follow-up
-      // re-parsed to the profile and the merge refused to shrink the lab.
-      final counted = NetworkIntent.parseSimple(
-        'counted',
-        'The headquarters has 2 routers, 2 switches and 4 servers and the '
-            'branch has 1 router, 1 switch and 1 server, with AAA at the '
-            'branch.',
-      );
-      expect(
-        counted.nodes.length,
-        greaterThan(10),
-        reason: 'the profile\'s fixed ten devices must not replace a '
-            'specification that names 11',
-      );
-      expect(
-        counted.nodes.where((n) => n.type == 'server'),
-        hasLength(5),
-      );
-    });
+    test(
+      'a brief that counts its devices is not taken over by the profile',
+      () {
+        // The profile is a fixed ten-device lab. A brief that states its own
+        // counts has already chosen, and its numbers win - otherwise 25 PCs and
+        // 4 servers were replaced by the profile's ten devices, and a follow-up
+        // re-parsed to the profile and the merge refused to shrink the lab.
+        final counted = NetworkIntent.parseSimple(
+          'counted',
+          'The headquarters has 2 routers, 2 switches and 4 servers and the '
+              'branch has 1 router, 1 switch and 1 server, with AAA at the '
+              'branch.',
+        );
+        expect(
+          counted.nodes.length,
+          greaterThan(10),
+          reason:
+              'the profile\'s fixed ten devices must not replace a '
+              'specification that names 11',
+        );
+        expect(counted.nodes.where((n) => n.type == 'server'), hasLength(5));
+      },
+    );
   });
 }

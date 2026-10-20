@@ -193,7 +193,9 @@ class TopologyEditService {
     }
 
     return AutoWireResult(
-      intent: added.isEmpty ? intent : intent.copyWith(links: [...intent.links, ...added]),
+      intent: added.isEmpty
+          ? intent
+          : intent.copyWith(links: [...intent.links, ...added]),
       added: List.unmodifiable(added),
       notConnected: names.where((name) => !connected.contains(name)).toList(),
     );
@@ -201,8 +203,7 @@ class TopologyEditService {
 
   static bool _alreadyConnected(List<NetLink> links, String a, String b) =>
       links.any(
-        (link) =>
-            (link.a == a && link.b == b) || (link.a == b && link.b == a),
+        (link) => (link.a == a && link.b == b) || (link.a == b && link.b == a),
       );
 
   static List<PtCable> _cableOrder(NetNode a, NetNode b) {

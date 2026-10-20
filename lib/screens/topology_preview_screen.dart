@@ -156,7 +156,8 @@ class _TopologyPreviewScreenState extends State<TopologyPreviewScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
             child: const Text('Save block'),
           ),
         ],
@@ -221,7 +222,9 @@ class _TopologyPreviewScreenState extends State<TopologyPreviewScreen> {
     if (!mounted) return;
     if (blocks.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Save a selected group to create a reusable block.')),
+        const SnackBar(
+          content: Text('Save a selected group to create a reusable block.'),
+        ),
       );
       return;
     }
@@ -236,7 +239,9 @@ class _TopologyPreviewScreenState extends State<TopologyPreviewScreen> {
               children: [
                 const ListTile(
                   title: Text('Reusable network blocks'),
-                  subtitle: Text('Tap a block to add a fresh copy to this plan.'),
+                  subtitle: Text(
+                    'Tap a block to add a fresh copy to this plan.',
+                  ),
                 ),
                 for (final block in blocks)
                   ListTile(
@@ -300,7 +305,10 @@ class _TopologyPreviewScreenState extends State<TopologyPreviewScreen> {
                   decoration: const InputDecoration(labelText: 'From device'),
                   items: [
                     for (final node in _intent.nodes)
-                      DropdownMenuItem(value: node.name, child: Text(node.name)),
+                      DropdownMenuItem(
+                        value: node.name,
+                        child: Text(node.name),
+                      ),
                   ],
                   onChanged: (value) => refresh(() => start = value ?? start),
                 ),
@@ -309,7 +317,10 @@ class _TopologyPreviewScreenState extends State<TopologyPreviewScreen> {
                   decoration: const InputDecoration(labelText: 'To device'),
                   items: [
                     for (final node in _intent.nodes)
-                      DropdownMenuItem(value: node.name, child: Text(node.name)),
+                      DropdownMenuItem(
+                        value: node.name,
+                        child: Text(node.name),
+                      ),
                   ],
                   onChanged: (value) => refresh(() => end = value ?? end),
                 ),
@@ -317,7 +328,10 @@ class _TopologyPreviewScreenState extends State<TopologyPreviewScreen> {
                   const SizedBox(height: AppTheme.s12),
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: Text(result!, style: Theme.of(context).textTheme.bodyMedium),
+                    child: Text(
+                      result!,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                   ),
                 ],
               ],
@@ -776,12 +790,12 @@ class _TopologyPreviewScreenState extends State<TopologyPreviewScreen> {
       if (securityJson[field] == name) securityJson.remove(field);
     }
     final next = _intentWithCurrentLayout.copyWith(
-        nodes: _intent.nodes.where((n) => n.name != name).toList(),
-        links: _intent.links.where((l) => l.a != name && l.b != name).toList(),
-        addressing: _intent.addressing.where((a) => a.node != name).toList(),
-        layout: layout,
-        security: SecurityIntent.fromJson(securityJson),
-      );
+      nodes: _intent.nodes.where((n) => n.name != name).toList(),
+      links: _intent.links.where((l) => l.a != name && l.b != name).toList(),
+      addressing: _intent.addressing.where((a) => a.node != name).toList(),
+      layout: layout,
+      security: SecurityIntent.fromJson(securityJson),
+    );
     _change(next);
     _layout = layout;
   }
@@ -790,8 +804,10 @@ class _TopologyPreviewScreenState extends State<TopologyPreviewScreen> {
   Widget build(BuildContext context) {
     return CallbackShortcuts(
       bindings: <ShortcutActivator, VoidCallback>{
-        const SingleActivator(LogicalKeyboardKey.keyZ, control: true): _undoEdit,
-        const SingleActivator(LogicalKeyboardKey.keyY, control: true): _redoEdit,
+        const SingleActivator(LogicalKeyboardKey.keyZ, control: true):
+            _undoEdit,
+        const SingleActivator(LogicalKeyboardKey.keyY, control: true):
+            _redoEdit,
         const SingleActivator(
           LogicalKeyboardKey.keyZ,
           control: true,
@@ -801,251 +817,279 @@ class _TopologyPreviewScreenState extends State<TopologyPreviewScreen> {
       child: Focus(
         autofocus: true,
         child: Scaffold(
-      appBar: AppBar(
-        title: Text(
-          '${_intent.projectName} - topology',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        actions: [
-          if (_editing) ...[
-            IconButton(
-              tooltip: 'Undo',
-              onPressed: _undo.isEmpty ? null : _undoEdit,
-              icon: const Icon(Icons.undo),
+          appBar: AppBar(
+            title: Text(
+              '${_intent.projectName} - topology',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            IconButton(
-              tooltip: 'Redo',
-              onPressed: _redo.isEmpty ? null : _redoEdit,
-              icon: const Icon(Icons.redo),
-            ),
-          ],
-          if (_editing)
-            TextButton(
-              onPressed: () => setState(() {
-                _editing = false;
-                _connecting = false;
-                _removing = false;
-                _selectingGroup = false;
-                _selectedGroup.clear();
-                _connectFrom = null;
-              }),
-              child: const Text('Done'),
-            )
-          else
-            TextButton.icon(
-              onPressed: () => setState(() => _editing = true),
-              icon: const Icon(Icons.edit_outlined),
-              label: const Text('Edit'),
-            ),
-          if (_dirty)
-            FilledButton.icon(
-              onPressed: _saving ? null : _save,
-              icon: _saving
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.save_outlined),
-              label: Text(_saving ? 'Saving' : 'Save'),
-            ),
-          const SizedBox(width: AppTheme.s8),
-        ],
-      ),
-      body: Column(
-        children: [
-          AppToolbar(
-            leading: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppTag(
-                  label: '${_intent.nodes.length} devices',
-                  tone: AppTone.accent,
-                  icon: Icons.devices_other_outlined,
+            actions: [
+              if (_editing) ...[
+                IconButton(
+                  tooltip: 'Undo',
+                  onPressed: _undo.isEmpty ? null : _undoEdit,
+                  icon: const Icon(Icons.undo),
                 ),
-                AppTag(
-                  label: '${_intent.links.length} cables',
-                  tone: AppTone.info,
-                  icon: Icons.cable_outlined,
-                ),
-                const SizedBox(width: AppTheme.s8),
-                Flexible(
-                  child: Text(
-                    _editing
-                        ? (_selectingGroup
-                              ? 'Tap devices to select; drag one to move the group'
-                              : _removing
-                              ? 'Select a device to remove'
-                              : _connecting
-                              ? (_connectFrom == null
-                                    ? 'Select the first device'
-                                    : 'Select the second device')
-                              : 'Select a device to edit')
-                        : 'Pinch to zoom, drag canvas, tap for details',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+                IconButton(
+                  tooltip: 'Redo',
+                  onPressed: _redo.isEmpty ? null : _redoEdit,
+                  icon: const Icon(Icons.redo),
                 ),
               ],
-            ),
+              if (_editing)
+                TextButton(
+                  onPressed: () => setState(() {
+                    _editing = false;
+                    _connecting = false;
+                    _removing = false;
+                    _selectingGroup = false;
+                    _selectedGroup.clear();
+                    _connectFrom = null;
+                  }),
+                  child: const Text('Done'),
+                )
+              else
+                TextButton.icon(
+                  onPressed: () => setState(() => _editing = true),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Edit'),
+                ),
+              if (_dirty)
+                FilledButton.icon(
+                  onPressed: _saving ? null : _save,
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save_outlined),
+                  label: Text(_saving ? 'Saving' : 'Save'),
+                ),
+              const SizedBox(width: AppTheme.s8),
+            ],
           ),
-          if (_editing)
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppTheme.s12,
-                vertical: AppTheme.s6,
-              ),
-              child: Wrap(
-                spacing: AppTheme.s8,
-                runSpacing: AppTheme.s6,
-                children: _selectingGroup
-                    ? [
-                        OutlinedButton.icon(
-                          onPressed: _finishGroupSelection,
-                          icon: const Icon(Icons.done),
-                          label: Text('Done (${_selectedGroup.length})'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _selectedGroup.isEmpty
-                              ? null
-                              : _duplicateSelectedGroup,
-                          icon: const Icon(Icons.copy_outlined),
-                          label: const Text('Duplicate'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _selectedGroup.length < 2
-                              ? null
-                              : _autoWireSelectedGroup,
-                          icon: const Icon(Icons.cable_outlined),
-                          label: const Text('Auto-wire'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _selectedGroup.isEmpty
-                              ? null
-                              : _saveSelectedBlock,
-                          icon: const Icon(Icons.bookmark_add_outlined),
-                          label: const Text('Save as block'),
-                        ),
-                      ]
-                    : [
-                        OutlinedButton.icon(
-                          onPressed: _addDevice,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Add device'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => setState(() {
-                            _connecting = !_connecting;
-                            _removing = false;
-                            _connectFrom = null;
-                          }),
-                          icon: const Icon(Icons.cable_outlined),
-                          label: Text(_connecting ? 'Cancel' : 'Connect cable'),
-                        ),
-                        PopupMenuButton<String>(
-                          tooltip: 'More network tools',
-                          onSelected: (value) {
-                            switch (value) {
-                              case 'connections':
-                                _manageCables();
-                                break;
-                              case 'catalog':
-                                PacketTracerCatalogSheet.show(context);
-                                break;
-                              case 'select':
-                                setState(() {
-                                  _selectingGroup = true;
-                                  _selectedGroup.clear();
-                                  _connecting = false;
-                                  _removing = false;
-                                });
-                                break;
-                              case 'remove':
-                                setState(() {
-                                  _removing = !_removing;
-                                  _connecting = false;
-                                  _connectFrom = null;
-                                });
-                                break;
-                              case 'path':
-                                _openPathExplorer();
-                                break;
-                              case 'blocks':
-                                _openReusableBlocks();
-                                break;
-                            }
-                          },
-                          itemBuilder: (context) => const [
-                            PopupMenuItem(value: 'connections', child: Text('Manage connections')),
-                            PopupMenuItem(value: 'catalog', child: Text('Device and cable catalog')),
-                            PopupMenuItem(value: 'select', child: Text('Select a device group')),
-                            PopupMenuItem(value: 'remove', child: Text('Remove a device')),
-                            PopupMenuItem(value: 'path', child: Text('Explore a network path')),
-                            PopupMenuItem(value: 'blocks', child: Text('Reusable network blocks')),
-                          ],
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.tune, size: 18),
-                                SizedBox(width: 6),
-                                Text('More'),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-              ),
-            ),
-          if (PtHardwareCheck.inspect(_intent).any((i) => i.blocking))
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 18,
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      PtHardwareCheck.inspect(
-                        _intent,
-                      ).firstWhere((i) => i.blocking).message,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall,
+          body: Column(
+            children: [
+              AppToolbar(
+                leading: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AppTag(
+                      label: '${_intent.nodes.length} devices',
+                      tone: AppTone.accent,
+                      icon: Icons.devices_other_outlined,
                     ),
+                    AppTag(
+                      label: '${_intent.links.length} cables',
+                      tone: AppTone.info,
+                      icon: Icons.cable_outlined,
+                    ),
+                    const SizedBox(width: AppTheme.s8),
+                    Flexible(
+                      child: Text(
+                        _editing
+                            ? (_selectingGroup
+                                  ? 'Tap devices to select; drag one to move the group'
+                                  : _removing
+                                  ? 'Select a device to remove'
+                                  : _connecting
+                                  ? (_connectFrom == null
+                                        ? 'Select the first device'
+                                        : 'Select the second device')
+                                  : 'Select a device to edit')
+                            : 'Pinch to zoom, drag canvas, tap for details',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_editing)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTheme.s12,
+                    vertical: AppTheme.s6,
                   ),
-                ],
+                  child: Wrap(
+                    spacing: AppTheme.s8,
+                    runSpacing: AppTheme.s6,
+                    children: _selectingGroup
+                        ? [
+                            OutlinedButton.icon(
+                              onPressed: _finishGroupSelection,
+                              icon: const Icon(Icons.done),
+                              label: Text('Done (${_selectedGroup.length})'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _selectedGroup.isEmpty
+                                  ? null
+                                  : _duplicateSelectedGroup,
+                              icon: const Icon(Icons.copy_outlined),
+                              label: const Text('Duplicate'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _selectedGroup.length < 2
+                                  ? null
+                                  : _autoWireSelectedGroup,
+                              icon: const Icon(Icons.cable_outlined),
+                              label: const Text('Auto-wire'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _selectedGroup.isEmpty
+                                  ? null
+                                  : _saveSelectedBlock,
+                              icon: const Icon(Icons.bookmark_add_outlined),
+                              label: const Text('Save as block'),
+                            ),
+                          ]
+                        : [
+                            OutlinedButton.icon(
+                              onPressed: _addDevice,
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add device'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () => setState(() {
+                                _connecting = !_connecting;
+                                _removing = false;
+                                _connectFrom = null;
+                              }),
+                              icon: const Icon(Icons.cable_outlined),
+                              label: Text(
+                                _connecting ? 'Cancel' : 'Connect cable',
+                              ),
+                            ),
+                            PopupMenuButton<String>(
+                              tooltip: 'More network tools',
+                              onSelected: (value) {
+                                switch (value) {
+                                  case 'connections':
+                                    _manageCables();
+                                    break;
+                                  case 'catalog':
+                                    PacketTracerCatalogSheet.show(context);
+                                    break;
+                                  case 'select':
+                                    setState(() {
+                                      _selectingGroup = true;
+                                      _selectedGroup.clear();
+                                      _connecting = false;
+                                      _removing = false;
+                                    });
+                                    break;
+                                  case 'remove':
+                                    setState(() {
+                                      _removing = !_removing;
+                                      _connecting = false;
+                                      _connectFrom = null;
+                                    });
+                                    break;
+                                  case 'path':
+                                    _openPathExplorer();
+                                    break;
+                                  case 'blocks':
+                                    _openReusableBlocks();
+                                    break;
+                                }
+                              },
+                              itemBuilder: (context) => const [
+                                PopupMenuItem(
+                                  value: 'connections',
+                                  child: Text('Manage connections'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'catalog',
+                                  child: Text('Device and cable catalog'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'select',
+                                  child: Text('Select a device group'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'remove',
+                                  child: Text('Remove a device'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'path',
+                                  child: Text('Explore a network path'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'blocks',
+                                  child: Text('Reusable network blocks'),
+                                ),
+                              ],
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.tune, size: 18),
+                                    SizedBox(width: 6),
+                                    Text('More'),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                  ),
+                ),
+              if (PtHardwareCheck.inspect(_intent).any((i) => i.blocking))
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          PtHardwareCheck.inspect(
+                            _intent,
+                          ).firstWhere((i) => i.blocking).message,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: TopologyCanvas(
+                    intent: _intent,
+                    selectedNode: _connectFrom,
+                    allowNodeDrag: _editing && !_connecting && !_removing,
+                    layout: _layout?.cast<String, Offset?>(),
+                    onNodeTap: _editing ? _tapDevice : null,
+                    selectedNodes: Set<String>.unmodifiable(_selectedGroup),
+                    onLayoutChanged: (positions) {
+                      _recordUndo();
+                      setState(() {
+                        _layout = {
+                          for (final e in positions.entries) e.key: e.value,
+                        };
+                        _dirty = true;
+                      });
+                    },
+                  ),
+                ),
               ),
-            ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: TopologyCanvas(
-                intent: _intent,
-                selectedNode: _connectFrom,
-                allowNodeDrag: _editing && !_connecting && !_removing,
-                layout: _layout?.cast<String, Offset?>(),
-                onNodeTap: _editing ? _tapDevice : null,
-                selectedNodes: Set<String>.unmodifiable(_selectedGroup),
-                onLayoutChanged: (positions) {
-                  _recordUndo();
-                  setState(() {
-                    _layout = {for (final e in positions.entries) e.key: e.value};
-                    _dirty = true;
-                  });
-                },
-              ),
-            ),
+            ],
           ),
-        ],
-      ),
         ),
       ),
     );

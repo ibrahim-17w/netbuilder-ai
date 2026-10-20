@@ -40,15 +40,15 @@ class DesignMemoryEntry {
   });
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'signature': signature,
-        'shape': shape,
-        'designId': designId,
-        'score': score,
-        'strengths': strengths,
-        'weaknesses': weaknesses,
-        'builds': builds,
-        'bestScore': bestScore,
-      };
+    'signature': signature,
+    'shape': shape,
+    'designId': designId,
+    'score': score,
+    'strengths': strengths,
+    'weaknesses': weaknesses,
+    'builds': builds,
+    'bestScore': bestScore,
+  };
 
   static DesignMemoryEntry? fromJson(Object? raw) {
     if (raw is! Map) return null;
@@ -74,19 +74,18 @@ class DesignMemoryEntry {
   }
 
   DesignMemoryEntry mergedWith(DesignMemoryEntry next) => DesignMemoryEntry(
-        signature: signature,
-        shape: next.shape.isEmpty ? shape : next.shape,
-        designId: next.designId.isEmpty ? designId : next.designId,
-        score: next.score,
-        strengths: next.strengths,
-        weaknesses: next.weaknesses,
-        builds: builds + next.builds,
-        bestScore: next.score > bestScore ? next.score : bestScore,
-      );
+    signature: signature,
+    shape: next.shape.isEmpty ? shape : next.shape,
+    designId: next.designId.isEmpty ? designId : next.designId,
+    score: next.score,
+    strengths: next.strengths,
+    weaknesses: next.weaknesses,
+    builds: builds + next.builds,
+    bestScore: next.score > bestScore ? next.score : bestScore,
+  );
 
-  static List<String> _strings(Object? raw) => raw is List
-      ? [for (final e in raw) '$e']
-      : const <String>[];
+  static List<String> _strings(Object? raw) =>
+      raw is List ? [for (final e in raw) '$e'] : const <String>[];
 }
 
 /// What the app learned from every network it has built.
@@ -148,13 +147,11 @@ class DesignMemory {
       byType[type] = (byType[type] ?? 0) + 1;
     }
     final parts = byType.keys.toList()..sort();
-    final shape = [
-      for (final type in parts) '$type:${byType[type]}',
-    ].join(',');
+    final shape = [for (final type in parts) '$type:${byType[type]}'].join(',');
     final services = <String>{
-      for (final n in plan.nodes) ...n.services.map((s) => s.trim().toLowerCase()),
-    }.toList()
-      ..sort();
+      for (final n in plan.nodes)
+        ...n.services.map((s) => s.trim().toLowerCase()),
+    }.toList()..sort();
     return <String>[
       shape,
       'routing=${plan.routing.trim().toLowerCase()}',
@@ -174,8 +171,9 @@ class DesignMemory {
     }
     final parts = byType.keys.toList()..sort();
     return <String>[
-      for (final type in parts) '${byType[type]} $type'
-          '${byType[type] == 1 ? '' : 's'}',
+      for (final type in parts)
+        '${byType[type]} $type'
+            '${byType[type] == 1 ? '' : 's'}',
       plan.routing.trim().isEmpty ? '' : plan.routing.trim(),
       if (plan.vlans.isNotEmpty) '${plan.vlans.length} VLANs',
     ].where((s) => s.isNotEmpty).join(', ');
@@ -248,9 +246,9 @@ class DesignMemory {
   /// Every remembered shape that scored well, best first - the "other designs
   /// this has learned" list.
   static List<DesignMemoryEntry> get knownGood => <DesignMemoryEntry>[
-        for (final e in entries)
-          if (e.bestScore >= kLearnThreshold) e,
-      ];
+    for (final e in entries)
+      if (e.bestScore >= kLearnThreshold) e,
+  ];
 
   /// The repeated weaknesses across remembered designs, most common first.
   ///
@@ -264,14 +262,15 @@ class DesignMemory {
         counts[area] = (counts[area] ?? 0) + 1;
       }
     }
-    final out = counts.entries
-        .where((e) => e.value >= kTrustedAfter)
-        .map((e) => (area: e.key, count: e.value))
-        .toList()
-      ..sort((a, b) {
-        final byCount = b.count.compareTo(a.count);
-        return byCount != 0 ? byCount : a.area.compareTo(b.area);
-      });
+    final out =
+        counts.entries
+            .where((e) => e.value >= kTrustedAfter)
+            .map((e) => (area: e.key, count: e.value))
+            .toList()
+          ..sort((a, b) {
+            final byCount = b.count.compareTo(a.count);
+            return byCount != 0 ? byCount : a.area.compareTo(b.area);
+          });
     return out;
   }
 
@@ -316,11 +315,9 @@ class DesignMemory {
 
   /// Everything remembered, for storage.
   static Map<String, dynamic> snapshot() => <String, dynamic>{
-        'entries': [
-          for (final e in _entries.values) e.toJson(),
-        ],
-        'words': DomainVocabulary.snapshot(),
-      };
+    'entries': [for (final e in _entries.values) e.toJson()],
+    'words': DomainVocabulary.snapshot(),
+  };
 
   /// Put back what [snapshot] took out, skipping anything unusable.
   static void restore(Map<dynamic, dynamic>? raw) {

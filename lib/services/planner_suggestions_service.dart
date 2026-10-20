@@ -25,11 +25,15 @@ class PlannerSuggestionsService {
 
     // 1. A plan with nothing in it: the single most useful thing to say.
     if (intent.nodes.isEmpty) {
-      add('No devices were recognised. Name what you want built, for '
-          'example "2 routers, 1 switch, 1 server and 4 PCs with OSPF".');
-      add('Keep device counts as digits, and use plain device words '
-          '(router, switch, pc, server, access point). The local planner is '
-          'bilingual English/Arabic, so either is fine.');
+      add(
+        'No devices were recognised. Name what you want built, for '
+        'example "2 routers, 1 switch, 1 server and 4 PCs with OSPF".',
+      );
+      add(
+        'Keep device counts as digits, and use plain device words '
+        '(router, switch, pc, server, access point). The local planner is '
+        'bilingual English/Arabic, so either is fine.',
+      );
       return out;
     }
 
@@ -47,20 +51,26 @@ class PlannerSuggestionsService {
     //    always worth an explicit ask.
     final s = intent.security;
     if (s.aaa && (s.aaaUsername == null || s.aaaPassword == null)) {
-      add('AAA is on but no username/password was given. Add "username '
-          'labadmin password <your password>", or the VTY login is left to '
-          'the default, which is unsafe.');
+      add(
+        'AAA is on but no username/password was given. Add "username '
+        'labadmin password <your password>", or the VTY login is left to '
+        'the default, which is unsafe.',
+      );
     }
     if (s.ipsecVpn && (s.vpnPreSharedKey ?? '').isEmpty) {
-      add('The site-to-site VPN needs a pre-shared key. Add "pre-shared key '
-          '<your key>" and the crypto map will be generated for you.');
+      add(
+        'The site-to-site VPN needs a pre-shared key. Add "pre-shared key '
+        '<your key>" and the crypto map will be generated for you.',
+      );
     }
 
     // 4. A server that was placed but never given a role.
     for (final n in intent.nodes.where((n) => n.type == 'server')) {
       if (n.services.isEmpty) {
-        add('${n.name} has no service role. Say what it serves - one of '
-            'DHCP, DNS, HTTP, FTP, email, AAA, NTP, TFTP or syslog.');
+        add(
+          '${n.name} has no service role. Say what it serves - one of '
+          'DHCP, DNS, HTTP, FTP, email, AAA, NTP, TFTP or syslog.',
+        );
       }
     }
 

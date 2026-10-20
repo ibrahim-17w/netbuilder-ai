@@ -65,8 +65,9 @@ class PlannerMemoryService {
       if (protocol != null && !wanted.containsKey('routing')) {
         wanted['routing'] = protocol;
       }
-      final cidr =
-          RegExp(r'\b(\d{1,3}(?:\.\d{1,3}){3}/\d{1,2})\b').firstMatch(r);
+      final cidr = RegExp(
+        r'\b(\d{1,3}(?:\.\d{1,3}){3}/\d{1,2})\b',
+      ).firstMatch(r);
       if (cidr != null &&
           (r.contains('subnet') ||
               r.contains('network') ||
@@ -87,8 +88,10 @@ class PlannerMemoryService {
       if (RegExp(r'\bdns\b').hasMatch(r)) wanted['add_dns'] = 'true';
       // Transit-link style: "/31" or "31-bit" means point-to-point /31;
       // "\/30" the classic two-address transit.
-      if (r.contains('transit') || r.contains('wan link') ||
-          r.contains('point-to-point') || r.contains('p2p')) {
+      if (r.contains('transit') ||
+          r.contains('wan link') ||
+          r.contains('point-to-point') ||
+          r.contains('p2p')) {
         if (RegExp(r'\b/?31\b').hasMatch(r) || r.contains('31-bit')) {
           wanted.putIfAbsent('transit', () => 'p2p31');
         } else if (RegExp(r'\b/?30\b').hasMatch(r)) {
@@ -96,8 +99,9 @@ class PlannerMemoryService {
         }
       }
       // Management VLAN preference, e.g. "management on vlan 99".
-      final mgmt = RegExp(r'management\s+(?:on\s+)?vlan\s+(\d{1,4})')
-          .firstMatch(r);
+      final mgmt = RegExp(
+        r'management\s+(?:on\s+)?vlan\s+(\d{1,4})',
+      ).firstMatch(r);
       if (mgmt != null) {
         wanted.putIfAbsent('management_vlan', () => mgmt.group(1)!);
       }

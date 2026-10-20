@@ -23,8 +23,11 @@ void main() {
             'the password [redacted] stays one value',
       };
       cases.forEach((brief, expected) {
-        expect(NetworkIntent.redactSecrets(brief), expected,
-            reason: 'redacted: $brief');
+        expect(
+          NetworkIntent.redactSecrets(brief),
+          expected,
+          reason: 'redacted: $brief',
+        );
       });
     });
 
@@ -46,8 +49,11 @@ void main() {
         'a compass and a pass route through the top',
       ];
       for (final sentence in untouched) {
-        expect(NetworkIntent.redactSecrets(sentence), sentence,
-            reason: 'left as written: $sentence');
+        expect(
+          NetworkIntent.redactSecrets(sentence),
+          sentence,
+          reason: 'left as written: $sentence',
+        );
       }
     });
   });
@@ -60,8 +66,11 @@ void main() {
       );
       final note = intent.notes.first;
       expect(note, startsWith('parsed offline from:'));
-      expect(note, isNot(contains('H0unter2')),
-          reason: 'the stored note must not carry the password');
+      expect(
+        note,
+        isNot(contains('H0unter2')),
+        reason: 'the stored note must not carry the password',
+      );
       expect(note, contains(NetworkIntent.redacted));
       // The rest of the brief is still readable - redaction is not deletion.
       expect(note, contains('2 routers'));
@@ -76,8 +85,10 @@ void main() {
 
       final portable = intent.toJson(includeSecrets: false);
       expect((portable['notes'] as List).first, isNot(contains('Cl@ss1')));
-      expect((portable['notes'] as List).first,
-          contains(NetworkIntent.redacted));
+      expect(
+        (portable['notes'] as List).first,
+        contains(NetworkIntent.redacted),
+      );
       expect(
         (portable['security'] as Map).containsKey('enableSecret'),
         isFalse,

@@ -123,9 +123,10 @@ void main() {
         ],
       );
       expect(
-        ValidatorService.validate(firewall, target: 'packet-tracer').any(
-          (x) => x.message.contains('cannot build'),
-        ),
+        ValidatorService.validate(
+          firewall,
+          target: 'packet-tracer',
+        ).any((x) => x.message.contains('cannot build')),
         isFalse,
       );
     },

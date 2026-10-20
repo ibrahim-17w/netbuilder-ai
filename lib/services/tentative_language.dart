@@ -258,7 +258,10 @@ class TentativeLanguageService {
     // the repair block above for why this is safe).
     t = t
         .replaceAllMapped(_mangledCould, (m) => 'could ${m.group(1)}')
-        .replaceAllMapped(_mangledCouldAfterSubject, (m) => '${m.group(1)} could');
+        .replaceAllMapped(
+          _mangledCouldAfterSubject,
+          (m) => '${m.group(1)} could',
+        );
 
     final definite = [
       ..._matches(_politeImperative, t),

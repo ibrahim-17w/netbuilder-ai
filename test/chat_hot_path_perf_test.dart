@@ -56,15 +56,14 @@ double medianMs(void Function() body, {int runs = 5}) {
 }
 
 NetworkIntent _lab() => NetworkIntent.parseSimple(
-      'perf',
-      '2 routers, 2 switches and 50 PCs with OSPF',
-    );
+  'perf',
+  '2 routers, 2 switches and 50 PCs with OSPF',
+);
 
 /// A long answer the way the model actually writes one: headings, bullets,
 /// numbered steps, two fenced configs, three pipe tables, inline code, bold,
 /// a link and wrapped prose.
-String _longAnswer() =>
-    r'''# Configuring OSPF on the two-router lab
+String _longAnswer() => r'''# Configuring OSPF on the two-router lab
 
 OSPF is what the planner picks when a brief asks for routing without naming a
 protocol: it converges fast, needs no neighbour entries typed by hand, and it
@@ -275,13 +274,21 @@ void main() {
       final short = _shortAnswer();
 
       final blocks = ChatMarkdown.parse(answer);
-      expect(blocks, isNotEmpty,
-          reason: 'the fixture must still parse into blocks at all');
-      expect(blocks.length, 79, reason: '''
+      expect(
+        blocks,
+        isNotEmpty,
+        reason: 'the fixture must still parse into blocks at all',
+      );
+      expect(
+        blocks.length,
+        79,
+        reason:
+            '''
         The long fixture parsed into ${blocks.length} top-level blocks, not
         the 79 it was measured on - the fixture drifted, so the timings below
         are no longer comparable to the numbers in the header.
-      ''');
+      ''',
+      );
       expect(
         blocks.map((b) => b.kind).toSet(),
         containsAll([
@@ -293,8 +300,11 @@ void main() {
         ]),
       );
       final codeBlocks = blocks.where((b) => b.kind == MdKind.code).toList();
-      expect(codeBlocks, hasLength(2),
-          reason: 'both fenced configs must survive the parse');
+      expect(
+        codeBlocks,
+        hasLength(2),
+        reason: 'both fenced configs must survive the parse',
+      );
       expect(codeBlocks.first.language, 'cisco');
       expect(codeBlocks.first.text, contains('router ospf 1'));
       final tables = blocks.where((b) => b.kind == MdKind.table).toList();
@@ -313,80 +323,120 @@ void main() {
         }
       });
 
-      expect(longMs, lessThan(10.0), reason: '''
+      expect(
+        longMs,
+        lessThan(10.0),
+        reason:
+            '''
         Parsing took ${longMs.toStringAsFixed(2)} ms (measured 2.0 ms).
         ChatMarkdown.parse runs on the UI isolate on EVERY rebuild of the
         chat screen - about every 12 ms while a reply streams in - so a
         quadratic scan of the answer shows up as the bubble stuttering
         mid-stream rather than as a failed build.
-      ''');
-      expect(shortBatchMs, lessThan(10.0), reason: '''
+      ''',
+      );
+      expect(
+        shortBatchMs,
+        lessThan(10.0),
+        reason:
+            '''
         Parsing 200 one-sentence bubbles took
         ${shortBatchMs.toStringAsFixed(2)} ms (measured 2.0 ms, about
         0.010 ms each). Short bubbles are the common case - every user
         message and every terse answer - so they must stay far cheaper than
         the long answer above, and a per-bubble cost that crept towards the
         12 ms rebuild budget would be visible as lag while typing.
-      ''');
+      ''',
+      );
     });
 
-    test('streaming 200 chunks of a growing 23k payload stays under 650 ms',
-        () {
-      final reply = List.filled(3, _longAnswer()).join('\n\n');
-      final full = jsonEncode({'reply': reply, 'status': 'streaming'});
-      final chunks = <String>[
-        for (var i = 1; i <= _streamSteps; i++)
-          full.substring(0, (full.length * i / _streamSteps).floor()),
-      ];
-      expect(chunks, hasLength(_streamSteps));
+    test(
+      'streaming 200 chunks of a growing 23k payload stays under 650 ms',
+      () {
+        final reply = List.filled(3, _longAnswer()).join('\n\n');
+        final full = jsonEncode({'reply': reply, 'status': 'streaming'});
+        final chunks = <String>[
+          for (var i = 1; i <= _streamSteps; i++)
+            full.substring(0, (full.length * i / _streamSteps).floor()),
+        ];
+        expect(chunks, hasLength(_streamSteps));
 
-      final preview = ChatService.streamPreview(full);
-      expect(preview, isNotNull,
-          reason: 'a complete payload must produce a readable preview');
-      expect(preview, reply, reason: '''
+        final preview = ChatService.streamPreview(full);
+        expect(
+          preview,
+          isNotNull,
+          reason: 'a complete payload must produce a readable preview',
+        );
+        expect(
+          preview,
+          reply,
+          reason: '''
         The final preview did not decode back to the reply that was encoded.
         A "fast" streamPreview that returned a prefix, a truncated string or
         nothing at all would sail through the timing gate below while the
         chat screen showed the wrong text.
-      ''');
-      final mid = ChatService.streamPreview(chunks[_streamSteps ~/ 2]);
-      expect(mid, isNotNull);
-      expect(reply.startsWith(mid!), isTrue,
-          reason: 'a half-arrived payload must preview as a prefix of it');
+      ''',
+        );
+        final mid = ChatService.streamPreview(chunks[_streamSteps ~/ 2]);
+        expect(mid, isNotNull);
+        expect(
+          reply.startsWith(mid!),
+          isTrue,
+          reason: 'a half-arrived payload must preview as a prefix of it',
+        );
 
-      final took = medianMs(() {
-        for (final chunk in chunks) {
-          ChatService.streamPreview(chunk);
-        }
-      }, runs: 3);
+        final took = medianMs(() {
+          for (final chunk in chunks) {
+            ChatService.streamPreview(chunk);
+          }
+        }, runs: 3);
 
-      expect(took, lessThan(650.0), reason: '''
+        expect(
+          took,
+          lessThan(650.0),
+          reason:
+              '''
         The ${chunks.length}-call streamPreview loop took
         ${took.toStringAsFixed(1)} ms (measured 130.0 ms for a
         ${full.length}-char payload). The chat screen calls this once per
         arriving chunk on the UI isolate, and every call rescans everything
         that arrived before it - a quadratic rescan here is exactly what
         turns a long answer into a stuttering frame rate.
-      ''');
-    });
+      ''',
+        );
+      },
+    );
 
     test('validating a 54-device lab three times stays under 50 ms', () {
       final intent = _lab();
-      expect(intent.nodes.length, greaterThanOrEqualTo(54),
-          reason: 'the fixture must stay the 54-device lab it was measured on');
+      expect(
+        intent.nodes.length,
+        greaterThanOrEqualTo(54),
+        reason: 'the fixture must stay the 54-device lab it was measured on',
+      );
 
       final first = ValidatorService.validate(intent);
       final second = ValidatorService.validate(intent);
       final third = ValidatorService.validate(intent);
-      expect(first, isNotEmpty, reason: '''
+      expect(
+        first,
+        isNotEmpty,
+        reason: '''
         The validator returned nothing for the 54-device lab, so it is not
         doing the work these gates protect - a validator that early-outed to
         an empty list would be both wrong and very fast.
-      ''');
-      expect(second.length, first.length,
-          reason: 'validate must be stable across consecutive builds');
-      expect(third.length, first.length,
-          reason: 'validate must be stable across consecutive builds');
+      ''',
+      );
+      expect(
+        second.length,
+        first.length,
+        reason: 'validate must be stable across consecutive builds',
+      );
+      expect(
+        third.length,
+        first.length,
+        reason: 'validate must be stable across consecutive builds',
+      );
 
       var counted = 0;
       final took = medianMs(() {
@@ -395,16 +445,25 @@ void main() {
         }
       });
 
-      expect(counted, greaterThan(0), reason: '''
+      expect(
+        counted,
+        greaterThan(0),
+        reason: '''
         Nothing was counted across the timed calls, so the body did not
         actually run - the gate would pass on an empty loop.
-      ''');
-      expect(took, lessThan(50.0), reason: '''
+      ''',
+      );
+      expect(
+        took,
+        lessThan(50.0),
+        reason:
+            '''
         Validating three times took ${took.toStringAsFixed(1)} ms (measured
         10.0 ms). NetworkInspector.build calls validate with no target on
         every build of the chat screen, so its cost is paid on the UI
         isolate alongside the parse and the stream preview.
-      ''');
+      ''',
+      );
     });
   });
 }

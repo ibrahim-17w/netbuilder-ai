@@ -315,8 +315,9 @@ class NetworkMath {
         );
         continue;
       }
-      final info =
-          NetworkTools.subnet('${NetworkTools.intToIp(aligned)}/$prefix');
+      final info = NetworkTools.subnet(
+        '${NetworkTools.intToIp(aligned)}/$prefix',
+      );
       if (info == null) continue;
       out.add(
         VlsmAllocation(
@@ -638,13 +639,8 @@ class NetworkMath {
   /// Everything worth stating about one IPv6 CIDR: network, first and last
   /// address (compressed) and the address count as an exact number when it
   /// fits and 2^N otherwise.
-  static (
-    String network,
-    String first,
-    String last,
-    String countText,
-  )?
-      ipv6Facts(String cidr) {
+  static (String network, String first, String last, String countText)?
+  ipv6Facts(String cidr) {
     final parts = cidr.trim().split('/');
     if (parts.length != 2) return null;
     final addr = ipv6ToBig(parts[0]);

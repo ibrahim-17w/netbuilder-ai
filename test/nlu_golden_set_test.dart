@@ -92,8 +92,11 @@ void main() {
         } catch (e, st) {
           fail('a real brief must not throw the parser away: $brief\n$st');
         }
-        expect(intent.nodes, isNotEmpty,
-            reason: 'a brief that names devices must produce a plan: $brief');
+        expect(
+          intent.nodes,
+          isNotEmpty,
+          reason: 'a brief that names devices must produce a plan: $brief',
+        );
         final kinds = intent.nodes.map((n) => n.type).toSet();
         for (final kind in mustSurvive) {
           expect(
@@ -163,8 +166,7 @@ void main() {
       expect(count(intent, 'pc'), 4);
     });
 
-    test('a brief that states counts is parsed as written, never replayed',
-        () {
+    test('a brief that states counts is parsed as written, never replayed', () {
       teach();
       final intent = NetworkIntent.parseSimple(
         'golden',
@@ -193,29 +195,34 @@ void main() {
       expect(count(intent, 'pc'), 6);
     });
 
-    test('teaching memory makes the very next parse replay the lesson',
-        () async {
-      final db = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath);
-      await MemoryService.createSchema(db);
-      addTearDown(() async {
-        PhrasingMemoryService.clearIndex();
-        await db.close();
-      });
-      final mem = MemoryService(injected: db);
-      await mem.teachPhrasing(
-        PhrasingMemoryService.normalizeKey('make me a lab for the class'),
-        '2 routers 2 switches 6 pcs',
-      );
-      expect(PhrasingMemoryService.indexView, isNotEmpty,
-          reason: 'teachPhrasing refreshes the live index');
-      final intent = NetworkIntent.parseSimple(
-        'golden',
-        'make me a lab for the class',
-      );
-      expect(count(intent, 'router'), 2);
-      expect(count(intent, 'switch'), 2);
-      expect(count(intent, 'pc'), 6);
-    });
+    test(
+      'teaching memory makes the very next parse replay the lesson',
+      () async {
+        final db = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath);
+        await MemoryService.createSchema(db);
+        addTearDown(() async {
+          PhrasingMemoryService.clearIndex();
+          await db.close();
+        });
+        final mem = MemoryService(injected: db);
+        await mem.teachPhrasing(
+          PhrasingMemoryService.normalizeKey('make me a lab for the class'),
+          '2 routers 2 switches 6 pcs',
+        );
+        expect(
+          PhrasingMemoryService.indexView,
+          isNotEmpty,
+          reason: 'teachPhrasing refreshes the live index',
+        );
+        final intent = NetworkIntent.parseSimple(
+          'golden',
+          'make me a lab for the class',
+        );
+        expect(count(intent, 'router'), 2);
+        expect(count(intent, 'switch'), 2);
+        expect(count(intent, 'pc'), 6);
+      },
+    );
   });
 
   group('golden set: a fuzzy memory match merges, never replaces', () {
@@ -232,7 +239,7 @@ void main() {
       final intent = NetworkIntent.parseSimple(
         'golden',
         'design a network for our marketing floor with printers and phones'
-        ' and a dhcp server',
+            ' and a dhcp server',
       );
       expect(count(intent, 'router'), 2);
       expect(count(intent, 'pc'), 6);
@@ -264,7 +271,7 @@ void main() {
       final intent = NetworkIntent.parseSimple(
         'golden',
         'design a network for our marketing floor with eigrp instead of '
-        'ospf',
+            'ospf',
       );
       expect(count(intent, 'router'), 2);
       expect(
@@ -293,7 +300,8 @@ void main() {
       expect(
         count(intent, 'switch'),
         0,
-        reason: 'the remembered 2 switches must not join a brief that states '
+        reason:
+            'the remembered 2 switches must not join a brief that states '
             'its own counts',
       );
     });
@@ -311,7 +319,7 @@ void main() {
       final intent = NetworkIntent.parseSimple(
         'golden',
         'set up the training lab network with tacacs logins using shared '
-        'key S3cret42, R1 g0/0 to R2 g0/0, LAN 192.168.9.0/24',
+            'key S3cret42, R1 g0/0 to R2 g0/0, LAN 192.168.9.0/24',
       );
       expect(count(intent, 'router'), 2);
       expect(count(intent, 'pc'), 6);
@@ -322,9 +330,7 @@ void main() {
         reason: 'the supplied key still reaches the security intent',
       );
       expect(
-        intent.links.any(
-          (l) => l.a == 'R1' && l.aIf == 'g0/0' && l.b == 'R2',
-        ),
+        intent.links.any((l) => l.a == 'R1' && l.aIf == 'g0/0' && l.b == 'R2'),
         isTrue,
         reason: 'the interfaces the request named are honoured',
       );
@@ -417,7 +423,8 @@ void main() {
       expect(
         changed!.routing,
         'eigrp',
-        reason: 'the instruction selects eigrp; ospf is only mentioned to '
+        reason:
+            'the instruction selects eigrp; ospf is only mentioned to '
             'reject it',
       );
       expect(changed.nodes.length, statics.nodes.length);

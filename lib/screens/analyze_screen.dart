@@ -547,8 +547,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
           ),
       ],
       children: [
-        if (error.isNotEmpty)
-          AppBanner(tone: AppTone.danger, message: error),
+        if (error.isNotEmpty) AppBanner(tone: AppTone.danger, message: error),
         if (summary.isNotEmpty) ...[
           AppKeyValue(
             label: 'Scope',
@@ -632,8 +631,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     final ipcfg = Map<String, dynamic>.from((dev['ipcfg'] as Map? ?? const {}));
     final ospf = (dev['ospf'] as List? ?? []).join(', ');
     final name = (dev['name'] ?? 'device').toString();
-    final high =
-        findings.where((f) => f['severity'] == 'high').length;
+    final high = findings.where((f) => f['severity'] == 'high').length;
     return Padding(
       padding: const EdgeInsets.only(bottom: AppTheme.s8),
       child: AppPanel(
@@ -669,9 +667,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
             ),
             title: Row(
               children: [
-                Flexible(
-                  child: Text('$name (${dev['type'] ?? 'device'})'),
-                ),
+                Flexible(child: Text('$name (${dev['type'] ?? 'device'})')),
                 const SizedBox(width: AppTheme.s8),
                 AppTag(
                   label: '${findings.length} finding(s)',
@@ -754,7 +750,9 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         AppTag(
-                          label: probe['readable'] == true ? 'read' : 'unreadable',
+                          label: probe['readable'] == true
+                              ? 'read'
+                              : 'unreadable',
                           tone: probe['readable'] == true
                               ? AppTone.success
                               : AppTone.warning,
@@ -787,7 +785,9 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                       Icon(
                         Icons.check_circle_outline,
                         size: 16,
-                        color: AppPalette.success(Theme.of(context).colorScheme),
+                        color: AppPalette.success(
+                          Theme.of(context).colorScheme,
+                        ),
                       ),
                       const SizedBox(width: AppTheme.s8),
                       Text(
@@ -862,11 +862,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppIconBubble(
-              icon: Icons.info_outline,
-              tone: tone,
-              size: 24,
-            ),
+            AppIconBubble(icon: Icons.info_outline, tone: tone, size: 24),
             const SizedBox(width: AppTheme.s10),
             Expanded(
               child: Column(
@@ -891,7 +887,10 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
       padding: const EdgeInsets.only(top: AppTheme.s6),
       child: Material(
         color: selected
-            ? AppPalette.tone(Theme.of(context).colorScheme, AppTone.accent).fill
+            ? AppPalette.tone(
+                Theme.of(context).colorScheme,
+                AppTone.accent,
+              ).fill
             : Colors.transparent,
         borderRadius: BorderRadius.circular(AppTheme.rMd),
         child: InkWell(
@@ -984,9 +983,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                   icon: result['ok'] == true
                       ? Icons.check_circle_outline
                       : Icons.error_outline,
-                  tone: result['ok'] == true
-                      ? AppTone.success
-                      : AppTone.danger,
+                  tone: result['ok'] == true ? AppTone.success : AppTone.danger,
                   size: 26,
                 ),
                 const SizedBox(width: AppTheme.s10),

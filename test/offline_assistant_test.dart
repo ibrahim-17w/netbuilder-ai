@@ -33,8 +33,9 @@ AssistantReply ask(String raw) {
   } catch (_) {
     plan = null;
   }
-  final suggestions =
-      plan == null ? <String>[] : PlannerSuggestionsService.forIntent(plan);
+  final suggestions = plan == null
+      ? <String>[]
+      : PlannerSuggestionsService.forIntent(plan);
   return OfflineAssistantService.reply(
     rawText: raw,
     normalized: normalized,
@@ -94,16 +95,18 @@ void main() {
       '10 pcs, 1 server, 1 switch and a router with ospf',
     );
 
-    test('building the file does not re-plan a default lab over the real one',
-        () {
-      final next = standing(real, 'ok build the packet tracer file');
-      expect(next.nodes.length, real.nodes.length);
-      expect(
-        next.nodes.where((n) => n.type == 'pc').length,
-        10,
-        reason: 'the 10 PCs from the original ask must survive',
-      );
-    });
+    test(
+      'building the file does not re-plan a default lab over the real one',
+      () {
+        final next = standing(real, 'ok build the packet tracer file');
+        expect(next.nodes.length, real.nodes.length);
+        expect(
+          next.nodes.where((n) => n.type == 'pc').length,
+          10,
+          reason: 'the 10 PCs from the original ask must survive',
+        );
+      },
+    );
 
     test('neither does a vague nudge or a short approval', () {
       expect(standing(real, 'ok').nodes.length, real.nodes.length);
@@ -197,7 +200,11 @@ void main() {
       expect(ask('goodbye').intent, 'bye');
       expect(ask('good night').intent, 'bye');
       expect(ask('see you').intent, 'bye');
-      expect(ask('later').intent, 'bye', reason: 'later is a goodbye, not a no');
+      expect(
+        ask('later').intent,
+        'bye',
+        reason: 'later is a goodbye, not a no',
+      );
     });
   });
 

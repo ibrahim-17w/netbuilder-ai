@@ -11,30 +11,33 @@ import 'package:net_builder/services/validator_service.dart';
 /// and check the plan is strictly better - repeated several times, so a
 /// flaky result cannot pass by luck.
 void main() {
-  const faultyBrief = 'lab network with 2 routers 2 switches 1 server and 4 pcs';
+  const faultyBrief =
+      'lab network with 2 routers 2 switches 1 server and 4 pcs';
 
-  List<String> errors(NetworkIntent i) =>
-      ValidatorService.validate(i, target: 'pt')
-          .where((x) => x.severity == 'error')
-          .map((x) => x.message)
-          .toList();
+  List<String> errors(NetworkIntent i) => ValidatorService.validate(
+    i,
+    target: 'pt',
+  ).where((x) => x.severity == 'error').map((x) => x.message).toList();
 
-  test('round 0: the faulty brief is planned with suggestions, not a crash', () {
-    final intent = NetworkIntent.parseSimple('evo', faultyBrief);
-    expect(intent.nodes, isNotEmpty);
-    // The brief names no routing protocol and gives the server no role.
-    expect(intent.routing, 'static');
-    expect(
-      intent.nodes.firstWhere((n) => n.type == 'server').services,
-      isEmpty,
-    );
-    final suggestions = PlannerSuggestionsService.forIntent(intent);
-    expect(
-      suggestions.any((s) => s.toLowerCase().contains('service role')),
-      isTrue,
-      reason: 'the empty server role must be suggested to the user',
-    );
-  });
+  test(
+    'round 0: the faulty brief is planned with suggestions, not a crash',
+    () {
+      final intent = NetworkIntent.parseSimple('evo', faultyBrief);
+      expect(intent.nodes, isNotEmpty);
+      // The brief names no routing protocol and gives the server no role.
+      expect(intent.routing, 'static');
+      expect(
+        intent.nodes.firstWhere((n) => n.type == 'server').services,
+        isEmpty,
+      );
+      final suggestions = PlannerSuggestionsService.forIntent(intent);
+      expect(
+        suggestions.any((s) => s.toLowerCase().contains('service role')),
+        isTrue,
+        reason: 'the empty server role must be suggested to the user',
+      );
+    },
+  );
 
   test('a saved correction improves the SAME brief, stable over 3 rounds', () {
     // What the user accepted after reading the suggestions.
@@ -77,7 +80,10 @@ void main() {
         reason: 'round $round',
       );
       expect(
-        lans.map((a) => a.ipCidr.split('.').sublist(0, 3).join('.')).toSet().length,
+        lans
+            .map((a) => a.ipCidr.split('.').sublist(0, 3).join('.'))
+            .toSet()
+            .length,
         greaterThan(1),
         reason: 'the two LANs must stay separate subnets',
       );
@@ -99,9 +105,6 @@ void main() {
     final plan = NetworkIntent.parseSimple('evo', faultyBrief);
     final same = PlannerMemoryService.apply(plan);
     expect(same.routing, plan.routing);
-    expect(
-      same.nodes.firstWhere((n) => n.type == 'server').services,
-      isEmpty,
-    );
+    expect(same.nodes.firstWhere((n) => n.type == 'server').services, isEmpty);
   });
 }

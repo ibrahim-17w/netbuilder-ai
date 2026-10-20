@@ -36,12 +36,16 @@ void main() {
 
   group('same-subnet and membership', () {
     test('same subnet', () {
-      expect(NetworkTools.sameSubnet('192.168.1.10/24', '192.168.1.20/24'),
-          isTrue);
+      expect(
+        NetworkTools.sameSubnet('192.168.1.10/24', '192.168.1.20/24'),
+        isTrue,
+      );
     });
     test('different subnet', () {
-      expect(NetworkTools.sameSubnet('192.168.1.10/24', '192.168.2.10/24'),
-          isFalse);
+      expect(
+        NetworkTools.sameSubnet('192.168.1.10/24', '192.168.2.10/24'),
+        isFalse,
+      );
     });
     test('same address, different mask - not the same subnet', () {
       expect(NetworkTools.sameSubnet('10.0.0.1/24', '10.0.0.1/16'), isFalse);
@@ -128,8 +132,17 @@ void main() {
     expect(context['devices'], isA<List>());
     expect(context['interfaces'], isA<List>());
     expect(context['findings'], isA<List>());
-    expect(context.keys, containsAll(
-        ['devices', 'interfaces', 'links', 'vlans', 'routes', 'services']));
+    expect(
+      context.keys,
+      containsAll([
+        'devices',
+        'interfaces',
+        'links',
+        'vlans',
+        'routes',
+        'services',
+      ]),
+    );
     expect(context.toString(), isNot(contains('PACKETTRACER')));
   });
 

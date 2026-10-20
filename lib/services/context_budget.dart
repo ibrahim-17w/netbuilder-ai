@@ -73,8 +73,7 @@ class ContextPlan {
 
   /// True when the runtime's window is what limited the request - the state
   /// that used to be invisible.
-  bool get limitedByWindow =>
-      windowTokens > 0 && windowTokens < budgetTokens;
+  bool get limitedByWindow => windowTokens > 0 && windowTokens < budgetTokens;
 }
 
 /// The context window, in one place.
@@ -203,15 +202,17 @@ class ContextBudget {
     final window = (runtimeWindowTokens != null && runtimeWindowTokens > 0)
         ? (runtimeWindowTokens < configured ? runtimeWindowTokens : configured)
         : configured;
-    final windowSource = (runtimeWindowTokens != null &&
+    final windowSource =
+        (runtimeWindowTokens != null &&
             runtimeWindowTokens > 0 &&
             runtimeWindowTokens < configured)
         ? runtimeWindowSource
         : 'configured budget';
 
-    final working = (window * workingFractionOverride)
-        .round()
-        .clamp(window < 2048 ? 1 : 2048, window);
+    final working = (window * workingFractionOverride).round().clamp(
+      window < 2048 ? 1 : 2048,
+      window,
+    );
     final reserve = outputReserveFor(window);
     final notes = <String>[];
 
@@ -242,7 +243,8 @@ class ContextBudget {
           'the $window-token runtime window',
         );
       }
-      fixedTokens = estimateTokens(systemBlock) +
+      fixedTokens =
+          estimateTokens(systemBlock) +
           systemOverheadTokens +
           currentTokens +
           reserve;
@@ -383,10 +385,8 @@ class ContextBudget {
     }
 
     // --- count it honestly -------------------------------------------------
-    var tokens = fixedTokens +
-        sectionUsed +
-        historyUsed +
-        estimateTokens(summary);
+    var tokens =
+        fixedTokens + sectionUsed + historyUsed + estimateTokens(summary);
     // The clamp is the invariant: a plan never exceeds the window, whatever
     // the estimate above said. Oldest turns go first; they are in the summary.
     while (tokens > working && kept.isNotEmpty) {
@@ -431,35 +431,45 @@ class ContextBudget {
         configuredBudget: configured,
         effectiveBudget: window,
         outputReserve: reserve,
-        sections: [
-          ReportSection(
-            'system prompt',
-            estimateTokens(systemBlock) + systemOverheadTokens,
-          ),
-          if (networkBlock.isNotEmpty)
-            ReportSection('network context', estimateTokens(networkBlock)),
-          if (stateBlock.isNotEmpty)
-            ReportSection('session state', estimateTokens(stateBlock)),
-          if (memoryBlock.isNotEmpty)
-            ReportSection('conversation summary', estimateTokens(memoryBlock),
-                '$summarizedCount earlier turn(s)'),
-          if (memoriesBlock.isNotEmpty)
-            ReportSection('retrieved memory', estimateTokens(memoriesBlock)),
-          ReportSection(
-            'recent conversation',
-            estimateMessages(kept),
-            '${kept.length} turn(s)',
-          ),
-          ReportSection(
-            'current message',
-            currentTokens,
-            attachmentCount > 0 ? '$attachmentCount attachment(s)' : '',
-          ),
-        ]
-          // A section with no cost was not sent at all; the report lists what
-          // the model actually received.
-          .where((s) => s.tokens > 0)
-          .toList(),
+        sections:
+            [
+                  ReportSection(
+                    'system prompt',
+                    estimateTokens(systemBlock) + systemOverheadTokens,
+                  ),
+                  if (networkBlock.isNotEmpty)
+                    ReportSection(
+                      'network context',
+                      estimateTokens(networkBlock),
+                    ),
+                  if (stateBlock.isNotEmpty)
+                    ReportSection('session state', estimateTokens(stateBlock)),
+                  if (memoryBlock.isNotEmpty)
+                    ReportSection(
+                      'conversation summary',
+                      estimateTokens(memoryBlock),
+                      '$summarizedCount earlier turn(s)',
+                    ),
+                  if (memoriesBlock.isNotEmpty)
+                    ReportSection(
+                      'retrieved memory',
+                      estimateTokens(memoriesBlock),
+                    ),
+                  ReportSection(
+                    'recent conversation',
+                    estimateMessages(kept),
+                    '${kept.length} turn(s)',
+                  ),
+                  ReportSection(
+                    'current message',
+                    currentTokens,
+                    attachmentCount > 0 ? '$attachmentCount attachment(s)' : '',
+                  ),
+                ]
+                // A section with no cost was not sent at all; the report lists what
+                // the model actually received.
+                .where((s) => s.tokens > 0)
+                .toList(),
         turnsSent: kept.length,
         turnsSummarized: summarizedCount,
         notes: notes,
@@ -486,10 +496,9 @@ class ContextBudget {
       }
       return out.join('\n');
     }
-    final asks = RegExp(r'"[^"]*"')
-        .allMatches(lines[asksIndex])
-        .map((m) => m.group(0)!)
-        .toList();
+    final asks = RegExp(
+      r'"[^"]*"',
+    ).allMatches(lines[asksIndex]).map((m) => m.group(0)!).toList();
     while (asks.length > 1 && estimateTokens(summary) > maxTokens) {
       asks.removeAt(0);
       lines[asksIndex] =

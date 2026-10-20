@@ -204,8 +204,11 @@ void main() {
         profile: const EnvironmentProfile(venue: 'home'),
         mem: mem,
       );
-      expect(home!.value, 'static',
-          reason: 'no home answer exists, so the global one applies');
+      expect(
+        home!.value,
+        'static',
+        reason: 'no home answer exists, so the global one applies',
+      );
     });
 
     test('a different venue with no global answer applies nothing', () async {
@@ -236,27 +239,25 @@ void main() {
       final rows = await mem.clarificationAnswers();
       expect(rows, isNotEmpty);
       await mem.forgetClarification((rows.first['id'] as num).toInt());
-      expect(
-        await mem.answerForClarification('routing', null),
-        isNull,
-      );
+      expect(await mem.answerForClarification('routing', null), isNull);
     });
   });
 
   group('export and clearAll', () {
-    test('export carries clarification answers with the current schema version',
-        () async {
-      final mem = await fresh();
-      await mem.rememberClarification('scale', '40', venue: 'office');
-      final doc =
-          jsonDecode(await mem.exportJson()) as Map<String, dynamic>;
-      expect(doc['schemaVersion'], MemoryService.exportSchemaVersion);
-      final rows = (doc['clarificationAnswers'] as List)
-          .cast<Map<String, dynamic>>();
-      expect(rows, hasLength(1));
-      expect(rows.first['question_id'], 'scale');
-      expect(rows.first['venue'], 'office');
-    });
+    test(
+      'export carries clarification answers with the current schema version',
+      () async {
+        final mem = await fresh();
+        await mem.rememberClarification('scale', '40', venue: 'office');
+        final doc = jsonDecode(await mem.exportJson()) as Map<String, dynamic>;
+        expect(doc['schemaVersion'], MemoryService.exportSchemaVersion);
+        final rows = (doc['clarificationAnswers'] as List)
+            .cast<Map<String, dynamic>>();
+        expect(rows, hasLength(1));
+        expect(rows.first['question_id'], 'scale');
+        expect(rows.first['venue'], 'office');
+      },
+    );
 
     test('clearAll forgets clarifications too', () async {
       final mem = await fresh();

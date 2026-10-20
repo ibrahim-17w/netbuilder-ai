@@ -75,8 +75,10 @@ class PktExportService {
     // often resolves to a path that exists and cannot be written, which is
     // exactly how a "save to the selected folder" setting silently stops
     // working. Probe with a real write rather than trusting the path.
-    final probe = File('${dir.path}${Platform.pathSeparator}'
-        '.netbuilder-write-test');
+    final probe = File(
+      '${dir.path}${Platform.pathSeparator}'
+      '.netbuilder-write-test',
+    );
     try {
       probe.writeAsStringSync('ok', flush: true);
       await probe.delete();
@@ -90,14 +92,18 @@ class PktExportService {
   /// different lab. Returns the file written.
   static Future<File> copyInto(File file, Directory target) async {
     if (!target.existsSync()) await target.create(recursive: true);
-    var out = File('${target.path}${Platform.pathSeparator}'
-        '${file.uri.pathSegments.last}');
+    var out = File(
+      '${target.path}${Platform.pathSeparator}'
+      '${file.uri.pathSegments.last}',
+    );
     if (out.existsSync() && await out.length() != await file.length()) {
       var n = 2;
       while (out.existsSync() && n < 50) {
-        out = File('${target.path}${Platform.pathSeparator}'
-            '${_stem(file.uri.pathSegments.last)}-$n'
-            '${_ext(file.uri.pathSegments.last)}');
+        out = File(
+          '${target.path}${Platform.pathSeparator}'
+          '${_stem(file.uri.pathSegments.last)}-$n'
+          '${_ext(file.uri.pathSegments.last)}',
+        );
         n++;
       }
     }
@@ -119,7 +125,8 @@ class PktExportService {
       required Uint8List bytes,
       String? type,
       String? dialogTitle,
-    })? saveBytes,
+    })?
+    saveBytes,
   }) async {
     final saver = saveBytes ?? _platformSave;
     final name = suggestedName ?? file.uri.pathSegments.last;
@@ -156,7 +163,8 @@ class PktExportService {
         path: saved,
         prompted: true,
         companionPath: manifestPath,
-        message: 'Saved to $saved'
+        message:
+            'Saved to $saved'
             '${manifestPath == null ? '' : ' (manifest alongside it)'}.',
       );
     } catch (e) {
@@ -173,16 +181,15 @@ class PktExportService {
     required Uint8List bytes,
     String? type,
     String? dialogTitle,
-  }) =>
-      FilePicker.platform.saveFile(
-        fileName: fileName,
-        bytes: bytes,
-        // The extension is carried by the file name; `FileType.any` keeps the
-        // system dialog from filtering out .pkt on devices that only know
-        // common types.
-        type: FileType.any,
-        dialogTitle: dialogTitle,
-      );
+  }) => FilePicker.platform.saveFile(
+    fileName: fileName,
+    bytes: bytes,
+    // The extension is carried by the file name; `FileType.any` keeps the
+    // system dialog from filtering out .pkt on devices that only know
+    // common types.
+    type: FileType.any,
+    dialogTitle: dialogTitle,
+  );
 
   static String _stem(String name) {
     final dot = name.lastIndexOf('.');

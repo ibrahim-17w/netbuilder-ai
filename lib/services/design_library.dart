@@ -102,22 +102,29 @@ class DesignLibrary {
     NetworkDesign(
       id: 'soho',
       name: 'Small office, one box',
-      blurb: 'A wireless router does routing, DHCP and wireless by itself. '
+      blurb:
+          'A wireless router does routing, DHCP and wireless by itself. '
           'Right until it stops being enough.',
       wantsSiteKinds: <String>['soho'],
-      minHosts: 1, maxHosts: 15,
+      minHosts: 1,
+      maxHosts: 15,
       changes: <DesignChange>[
-        DesignChange('device', 'wireless-router',
-            'Routes, hands out addresses and broadcasts a wireless network'),
+        DesignChange(
+          'device',
+          'wireless-router',
+          'Routes, hands out addresses and broadcasts a wireless network',
+        ),
       ],
       expectedScore: 70,
     ),
     NetworkDesign(
       id: 'flat-lab',
       name: 'Flat lab',
-      blurb: 'One router, one switch, one subnet. The simplest thing that '
+      blurb:
+          'One router, one switch, one subnet. The simplest thing that '
           'works, and the right starting point.',
-      minHosts: 1, maxHosts: 30,
+      minHosts: 1,
+      maxHosts: 30,
       changes: <DesignChange>[
         DesignChange('device', 'switch', 'Gives the hosts a place to plug in'),
         DesignChange('device', 'server', 'Carries DHCP and DNS for the lab'),
@@ -127,109 +134,160 @@ class DesignLibrary {
     NetworkDesign(
       id: 'router-on-a-stick',
       name: 'Router on a stick',
-      blurb: 'One router with a sub-interface per VLAN, so voice, servers and '
+      blurb:
+          'One router with a sub-interface per VLAN, so voice, servers and '
           'users share a cable but not a subnet.',
       wantsSiteKinds: <String>['classroom', 'lab', 'retail', 'healthcare'],
-      minHosts: 5, maxHosts: 60,
+      minHosts: 5,
+      maxHosts: 60,
       changes: <DesignChange>[
         DesignChange('vlan', '10', 'User data'),
         DesignChange('vlan', '20', 'Voice, so calls keep their own subnet'),
         DesignChange('vlan', '30', 'Servers, kept off the user network'),
-        DesignChange('note', 'sub-interface',
-            'The router needs one sub-interface per VLAN on the trunk link'),
+        DesignChange(
+          'note',
+          'sub-interface',
+          'The router needs one sub-interface per VLAN on the trunk link',
+        ),
       ],
       expectedScore: 86,
     ),
     NetworkDesign(
       id: 'services-segmentation',
       name: 'Servers on their own subnet',
-      blurb: 'User traffic and server traffic on separate subnets, so a busy '
+      blurb:
+          'User traffic and server traffic on separate subnets, so a busy '
           'file server never starves the office.',
       wantsSiteKinds: <String>['datacenter', 'headquarters', 'warehouse'],
-      minHosts: 5, maxHosts: 500,
+      minHosts: 5,
+      maxHosts: 500,
       changes: <DesignChange>[
         DesignChange('vlan', '10', 'Users'),
         DesignChange('vlan', '30', 'Servers'),
-        DesignChange('note', 'static-or-dynamic',
-            'Something has to route between the two subnets'),
+        DesignChange(
+          'note',
+          'static-or-dynamic',
+          'Something has to route between the two subnets',
+        ),
       ],
       expectedScore: 84,
     ),
     NetworkDesign(
       id: 'redundant-core',
       name: 'Redundant core',
-      blurb: 'Two routers and a core switch, so losing one box takes the site '
+      blurb:
+          'Two routers and a core switch, so losing one box takes the site '
           'down for a minute instead of a morning.',
       wantsSiteKinds: <String>['headquarters', 'campus', 'datacenter'],
-      minHosts: 40, maxHosts: 5000,
+      minHosts: 40,
+      maxHosts: 5000,
       changes: <DesignChange>[
         DesignChange('device', 'router', 'The second core router'),
-        DesignChange('device', 'multilayer switch', 'The core both routers '
-            'plug into'),
-        DesignChange('routing', 'ospf',
-            'Two routers with more than one path need to agree on it'),
-        DesignChange('note', 'dual-homing',
-            'Every access switch should reach both routers, not just one'),
+        DesignChange(
+          'device',
+          'multilayer switch',
+          'The core both routers '
+              'plug into',
+        ),
+        DesignChange(
+          'routing',
+          'ospf',
+          'Two routers with more than one path need to agree on it',
+        ),
+        DesignChange(
+          'note',
+          'dual-homing',
+          'Every access switch should reach both routers, not just one',
+        ),
       ],
       expectedScore: 92,
     ),
     NetworkDesign(
       id: 'dmz',
       name: 'DMZ',
-      blurb: 'Public services in their own segment, so the server the internet '
+      blurb:
+          'Public services in their own segment, so the server the internet '
           'can reach is not the server holding the office data.',
       wantsSiteKinds: <String>['headquarters', 'warehouse', 'industrial'],
-      minHosts: 10, maxHosts: 5000,
+      minHosts: 10,
+      maxHosts: 5000,
       changes: <DesignChange>[
         DesignChange('device', 'firewall', 'The edge, with three interfaces'),
         DesignChange('vlan', '50', 'The DMZ - public services only'),
-        DesignChange('note', 'nat', 'Only the DMZ is published to the '
-            'internet; inside stays private'),
+        DesignChange(
+          'note',
+          'nat',
+          'Only the DMZ is published to the '
+              'internet; inside stays private',
+        ),
       ],
       expectedScore: 90,
     ),
     NetworkDesign(
       id: 'branch-vpn',
       name: 'Branch over a tunnel',
-      blurb: 'A branch site reaching head office across a WAN, with a tunnel '
+      blurb:
+          'A branch site reaching head office across a WAN, with a tunnel '
           'so the two sites share one routing table.',
       wantsSiteKinds: <String>['branch', 'retail', 'warehouse'],
-      minHosts: 2, maxHosts: 100,
+      minHosts: 2,
+      maxHosts: 100,
       changes: <DesignChange>[
         DesignChange('device', 'router', 'The branch router'),
-        DesignChange('note', 'tunnel', 'The branch reaches head office over a '
-            'tunnel rather than exposing its own LAN'),
-        DesignChange('routing', 'ospf', 'So the tunnel learns routes by itself'),
+        DesignChange(
+          'note',
+          'tunnel',
+          'The branch reaches head office over a '
+              'tunnel rather than exposing its own LAN',
+        ),
+        DesignChange(
+          'routing',
+          'ospf',
+          'So the tunnel learns routes by itself',
+        ),
       ],
       expectedScore: 85,
     ),
     NetworkDesign(
       id: 'guest-wireless',
       name: 'Guest wireless, walled off',
-      blurb: 'Guests get wireless on their own VLAN with no route to anything '
+      blurb:
+          'Guests get wireless on their own VLAN with no route to anything '
           'inside the office.',
       wantsSiteKinds: <String>['classroom', 'retail', 'campus', 'soho'],
-      minHosts: 3, maxHosts: 200,
+      minHosts: 3,
+      maxHosts: 200,
       changes: <DesignChange>[
         DesignChange('device', 'wireless', 'The access point guests join'),
         DesignChange('vlan', '60', 'Guests, isolated from everything else'),
-        DesignChange('note', 'acl',
-            'Guest traffic is denied everywhere except the internet'),
+        DesignChange(
+          'note',
+          'acl',
+          'Guest traffic is denied everywhere except the internet',
+        ),
       ],
       expectedScore: 88,
     ),
     NetworkDesign(
       id: 'two-tier',
       name: 'Two-tier campus',
-      blurb: 'A distribution layer over access switches, which is what makes a '
+      blurb:
+          'A distribution layer over access switches, which is what makes a '
           'building-sized network readable and maintainable.',
       wantsSiteKinds: <String>['campus', 'headquarters', 'datacenter'],
-      minHosts: 60, maxHosts: 5000,
+      minHosts: 60,
+      maxHosts: 5000,
       changes: <DesignChange>[
-        DesignChange('device', 'multilayer switch',
-            'The distribution layer the access switches hang from'),
-        DesignChange('routing', 'ospf',
-            'The routers and the distribution layer agree on the paths'),
+        DesignChange(
+          'device',
+          'multilayer switch',
+          'The distribution layer the access switches hang from',
+        ),
+        DesignChange(
+          'routing',
+          'ospf',
+          'The routers and the distribution layer agree on the paths',
+        ),
       ],
       expectedScore: 93,
     ),
@@ -250,10 +308,11 @@ class DesignLibrary {
   /// suggestion, it is a wrong one.
   static List<DesignSuggestion> suggest(NetworkIntent plan) {
     final hosts = plan.nodes
-        .where((n) => const {'pc', 'laptop', 'tablet', 'phone'}.contains(n.type))
+        .where(
+          (n) => const {'pc', 'laptop', 'tablet', 'phone'}.contains(n.type),
+        )
         .length;
-    final routers =
-        plan.nodes.where((n) => n.type == 'router').length;
+    final routers = plan.nodes.where((n) => n.type == 'router').length;
     final hasCloud = plan.nodes.any((n) => n.type == 'cloud');
     final hasFirewall = plan.nodes.any((n) => n.type == 'firewall');
     final siteKinds = DomainVocabulary.siteKindsIn(
@@ -269,8 +328,10 @@ class DesignLibrary {
 
       if (design.wantsSiteKinds.any(siteKinds.contains)) {
         fit += 40;
-        reasons.add('the brief describes a '
-            '${siteKinds.firstWhere((k) => design.wantsSiteKinds.contains(k))}');
+        reasons.add(
+          'the brief describes a '
+          '${siteKinds.firstWhere((k) => design.wantsSiteKinds.contains(k))}',
+        );
       }
       if (hosts >= design.minHosts && hosts <= design.maxHosts) {
         fit += 20;
@@ -287,7 +348,9 @@ class DesignLibrary {
       }
       if (design.id == 'redundant-core' && routers >= 2) {
         fit += 25;
-        reasons.add('there are already ${routers > 2 ? routers : 'two'} routers');
+        reasons.add(
+          'there are already ${routers > 2 ? routers : 'two'} routers',
+        );
       }
       if (design.id == 'branch-vpn' && routers >= 2) {
         fit += 20;
@@ -346,8 +409,7 @@ class DesignLibrary {
           case 'routing':
             return areas.contains('routing');
           default:
-            return areas.contains('segmentation') ||
-                areas.contains('security');
+            return areas.contains('segmentation') || areas.contains('security');
         }
       });
     }).toList();
@@ -403,14 +465,13 @@ class DesignApplier {
   /// infrastructure - 20 PCs is 20 hosts whether they hang off one switch or
   /// four.
   static ({NetworkIntent plan, List<String> added, List<String> skipped})?
-  tryApply(
-    NetworkIntent plan,
-    String designId,
-  ) {
+  tryApply(NetworkIntent plan, String designId) {
     final design = DesignLibrary.byId(designId);
     if (design == null) return null;
     final hosts = plan.nodes
-        .where((n) => const {'pc', 'laptop', 'tablet', 'phone'}.contains(n.type))
+        .where(
+          (n) => const {'pc', 'laptop', 'tablet', 'phone'}.contains(n.type),
+        )
         .length;
     if (hosts < design.minHosts || hosts > design.maxHosts) return null;
     return apply(plan, designId);
@@ -507,7 +568,8 @@ class DesignApplier {
     NetworkDesign design,
     List<String> added,
     List<String> skipped,
-  })? applyNamed(NetworkIntent plan, String text) {
+  })?
+  applyNamed(NetworkIntent plan, String text) {
     final match = namedInDetailed(text);
     if (match == null) return null;
     // A shorthand match is size-checked; an explicit one is honoured.
@@ -552,9 +614,7 @@ class DesignApplier {
     // Longest name first, so "servers on their own subnet" is never read as
     // a shorter design that happens to be a prefix of it.
     final ranked = [...DesignLibrary.all]
-      ..sort(
-        (a, b) => b.name.length.compareTo(a.name.length),
-      );
+      ..sort((a, b) => b.name.length.compareTo(a.name.length));
     NetworkDesign? best;
     var bestSpan = 0;
     var bestShorthand = false;
@@ -583,11 +643,7 @@ class DesignApplier {
   static const Map<String, List<String>> _aliasWords = {
     'soho': <String>['soho', 'small office', 'one box'],
     'flat-lab': <String>['flat lab', 'flat network', 'one subnet'],
-    'router-on-a-stick': <String>[
-      'on a stick',
-      'router on a stick',
-      'one arm',
-    ],
+    'router-on-a-stick': <String>['on a stick', 'router on a stick', 'one arm'],
     'services-segmentation': <String>[
       'servers on their own subnet',
       'server subnet',
@@ -606,11 +662,7 @@ class DesignApplier {
       'site to site',
       'vpn',
     ],
-    'guest-wireless': <String>[
-      'guest wireless',
-      'guest wifi',
-      'guest network',
-    ],
+    'guest-wireless': <String>['guest wireless', 'guest wifi', 'guest network'],
     'two-tier': <String>['two tier', '2 tier', 'two-tier', 'campus'],
   };
 

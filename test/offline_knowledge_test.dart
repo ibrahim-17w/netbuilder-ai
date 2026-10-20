@@ -138,7 +138,9 @@ void main() {
     });
 
     test('simple network management protocol -> snmp entry', () {
-      final a = ask('how do I configure the simple network management protocol');
+      final a = ask(
+        'how do I configure the simple network management protocol',
+      );
       expect(a, isNotNull, reason: 'must answer offline');
       expect(a!.toLowerCase(), contains('snmp-server community'));
     });
@@ -150,14 +152,17 @@ void main() {
     });
 
     test('open shortest path first authentication -> ospf auth entry', () {
-      final a = ask('how do I configure open shortest path first authentication');
+      final a = ask(
+        'how do I configure open shortest path first authentication',
+      );
       expect(a, isNotNull, reason: 'must answer offline');
       expect(a!.toLowerCase(), contains('message-digest-key'));
     });
 
     test('dynamic host configuration protocol for ipv6 -> dhcpv6 entry', () {
-      final a =
-          ask('how do I set up dynamic host configuration protocol for ipv6');
+      final a = ask(
+        'how do I set up dynamic host configuration protocol for ipv6',
+      );
       expect(a, isNotNull, reason: 'must answer offline');
       expect(a!.toLowerCase(), contains('ipv6 dhcp pool'));
     });
@@ -204,12 +209,14 @@ void main() {
       expect(a!.toLowerCase(), contains('autonomous systems'));
     });
 
-    test('enhanced interior gateway routing protocol or ospf -> the trade-off',
-        () {
-      final a = ask('enhanced interior gateway routing protocol or ospf');
-      expect(a, isNotNull, reason: 'must answer offline');
-      expect(a!.toLowerCase(), contains('unequal-cost'));
-    });
+    test(
+      'enhanced interior gateway routing protocol or ospf -> the trade-off',
+      () {
+        final a = ask('enhanced interior gateway routing protocol or ospf');
+        expect(a, isNotNull, reason: 'must answer offline');
+        expect(a!.toLowerCase(), contains('unequal-cost'));
+      },
+    );
 
     test('a bare bgp / dhcp explainer stays out of this table', () {
       // "how does the border gateway protocol work" canonicalizes to
@@ -217,7 +224,10 @@ void main() {
       // those explainers belong to the concept layer above this table.
       // Asserting the truthful null pins that seam.
       expect(ask('how does the border gateway protocol work'), isNull);
-      expect(ask('how does the dynamic host configuration protocol work'), isNull);
+      expect(
+        ask('how does the dynamic host configuration protocol work'),
+        isNull,
+      );
     });
   });
 
@@ -290,7 +300,9 @@ void main() {
 
     test('a build ask in full-name clothing still goes to the planner', () {
       expect(
-        ask('build a network with a dynamic host configuration protocol server'),
+        ask(
+          'build a network with a dynamic host configuration protocol server',
+        ),
         isNull,
       );
     });
@@ -313,10 +325,7 @@ void main() {
         ask('how do I send logs to a syslog collector')!,
         contains('logging host'),
       );
-      expect(
-        ask('configure logging on the switch')!,
-        contains('show logging'),
-      );
+      expect(ask('configure logging on the switch')!, contains('show logging'));
     });
 
     test('banner and local line passwords', () {
@@ -337,8 +346,9 @@ void main() {
     });
 
     test('protected port isolation', () {
-      final a =
-          ask('how do I isolate hosts on the same switch from each other')!;
+      final a = ask(
+        'how do I isolate hosts on the same switch from each other',
+      )!;
       expect(a, contains('switchport protected'));
     });
   });

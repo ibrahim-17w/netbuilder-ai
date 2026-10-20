@@ -32,16 +32,14 @@ abstract final class AppPalette {
   static Color success(ColorScheme s) => s.brightness == Brightness.dark
       ? const Color(0xFF81C995)
       : const Color(0xFF2E7D32);
-  static Color successFill(ColorScheme s) =>
-      success(s).withValues(alpha: 0.12);
+  static Color successFill(ColorScheme s) => success(s).withValues(alpha: 0.12);
   static Color successBorder(ColorScheme s) =>
       success(s).withValues(alpha: 0.35);
 
   static Color warning(ColorScheme s) => s.brightness == Brightness.dark
       ? const Color(0xFFF5B759)
       : const Color(0xFFB26A00);
-  static Color warningFill(ColorScheme s) =>
-      warning(s).withValues(alpha: 0.12);
+  static Color warningFill(ColorScheme s) => warning(s).withValues(alpha: 0.12);
   static Color warningBorder(ColorScheme s) =>
       warning(s).withValues(alpha: 0.35);
 
@@ -49,13 +47,11 @@ abstract final class AppPalette {
       ? const Color(0xFFF28B82)
       : const Color(0xFFC62828);
   static Color dangerFill(ColorScheme s) => danger(s).withValues(alpha: 0.12);
-  static Color dangerBorder(ColorScheme s) =>
-      danger(s).withValues(alpha: 0.35);
+  static Color dangerBorder(ColorScheme s) => danger(s).withValues(alpha: 0.35);
 
   static Color accent(ColorScheme s) => s.primary;
   static Color accentFill(ColorScheme s) => s.primary.withValues(alpha: 0.10);
-  static Color accentBorder(ColorScheme s) =>
-      s.primary.withValues(alpha: 0.30);
+  static Color accentBorder(ColorScheme s) => s.primary.withValues(alpha: 0.30);
 
   /// A "plain text on this colour always reads" surface, for containers
   /// that just want to be a box: card-like, theme-aware, no opinions.
@@ -64,9 +60,8 @@ abstract final class AppPalette {
 
   /// The raised surface: one step above the scaffold. White on light (the
   /// cleanest reading surface there is), one container step up on dark.
-  static Color raised(ColorScheme s) => s.brightness == Brightness.dark
-      ? s.surfaceContainerLow
-      : Colors.white;
+  static Color raised(ColorScheme s) =>
+      s.brightness == Brightness.dark ? s.surfaceContainerLow : Colors.white;
 
   // --- tone system ---------------------------------------------------------
 
@@ -91,10 +86,12 @@ abstract final class AppPalette {
       s.brightness == Brightness.dark ? s.surfaceContainerLowest : s.surface;
   static Color panel(ColorScheme s) =>
       s.brightness == Brightness.dark ? s.surfaceContainerLow : s.surface;
-  static Color panelAlt(ColorScheme s) => s.surfaceContainerHighest
-      .withValues(alpha: s.brightness == Brightness.dark ? 0.45 : 0.5);
-  static Color hairline(ColorScheme s) =>
-      s.outlineVariant.withValues(alpha: s.brightness == Brightness.dark ? 0.75 : 0.65);
+  static Color panelAlt(ColorScheme s) => s.surfaceContainerHighest.withValues(
+    alpha: s.brightness == Brightness.dark ? 0.45 : 0.5,
+  );
+  static Color hairline(ColorScheme s) => s.outlineVariant.withValues(
+    alpha: s.brightness == Brightness.dark ? 0.75 : 0.65,
+  );
 
   /// The console surface for logs and configs: darker than a panel in both
   /// themes, so a wall of monospace reads as an instrument rather than as

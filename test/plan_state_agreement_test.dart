@@ -25,7 +25,8 @@ const String editAsk =
     'edit the file and make one server an AAA server and another server as '
     'dhcp server';
 
-NetworkIntent _plan(String project) => NetworkIntent.parseSimple(project, brief);
+NetworkIntent _plan(String project) =>
+    NetworkIntent.parseSimple(project, brief);
 void main() {
   group('the original request produces one buildable 17-device plan', () {
     final plan = NetworkIntent.parseSimple('offline-chat', brief);
@@ -79,8 +80,7 @@ void main() {
       final aaaServer = plan.nodes.firstWhere(
         (n) => n.name == plan.security.aaaServer,
       );
-      final users =
-          (aaaServer.serviceRules['aaa'] as Map)['users'] as List;
+      final users = (aaaServer.serviceRules['aaa'] as Map)['users'] as List;
       expect(users, isNotEmpty);
       expect(
         users.first,
@@ -97,26 +97,29 @@ void main() {
       expect(
         blocking,
         isEmpty,
-        reason: 'the reported "AAA credentials are missing" warning must not '
+        reason:
+            'the reported "AAA credentials are missing" warning must not '
             'fire for a brief that supplied an account: '
             '${blocking.map((b) => b.message).join(' | ')}',
       );
     });
 
-    test('the reply describes this plan, by revision, and offers the build',
-        () {
-      final reply = OfflineAssistantService.reply(
-        rawText: brief,
-        normalized: brief,
-        target: 'packet-tracer',
-        plan: plan,
-        modelError: 'HTTP 503',
-      );
-      expect(reply.text, contains('17'));
-      expect(reply.text, contains(plan.revision));
-      expect(reply.text, contains('Build the .pkt'));
-      expect(reply.quickReplies, contains('Build the .pkt'));
-    });
+    test(
+      'the reply describes this plan, by revision, and offers the build',
+      () {
+        final reply = OfflineAssistantService.reply(
+          rawText: brief,
+          normalized: brief,
+          target: 'packet-tracer',
+          plan: plan,
+          modelError: 'HTTP 503',
+        );
+        expect(reply.text, contains('17'));
+        expect(reply.text, contains(plan.revision));
+        expect(reply.text, contains('Build the .pkt'));
+        expect(reply.quickReplies, contains('Build the .pkt'));
+      },
+    );
 
     test('the .pkt the builder receives carries the same counts', () {
       final steps = PacketTracerAdapter.autopilotPlan(plan)['steps'] as List;
@@ -127,33 +130,41 @@ void main() {
       expect((step('create_links')['links'] as List), hasLength(16));
       // Every advertised service is actually configured, not merely named.
       final servers = step('config_servers')['servers'] as Map;
-      final aaa = ((servers[plan.security.aaaServer]! as Map)['services']
-          as Map)['aaa'] as Map;
+      final aaa =
+          ((servers[plan.security.aaaServer]! as Map)['services'] as Map)['aaa']
+              as Map;
       expect((aaa['users'] as List), isNotEmpty);
-      expect((aaa['clients'] as List), isNotEmpty,
-          reason: 'a client entry is what makes the AAA tab usable');
+      expect(
+        (aaa['clients'] as List),
+        isNotEmpty,
+        reason: 'a client entry is what makes the AAA tab usable',
+      );
       final dhcpNode = plan.nodes.firstWhere(
         (n) => n.services.contains('dhcp'),
       );
-      final dhcp = ((servers[dhcpNode.name]! as Map)['services'] as Map)['dhcp']
-          as Map;
+      final dhcp =
+          ((servers[dhcpNode.name]! as Map)['services'] as Map)['dhcp'] as Map;
       expect((dhcp['pools'] as List), isNotEmpty);
     });
 
-    test('the router configures AAA against the server that holds the account',
-        () {
-      final r1 = CiscoAdapter.render(plan)[plan.security.aaaRouter]!;
-      expect(r1, contains('aaa new-model'));
-      expect(r1, contains('tacacs-server host'));
-      expect(r1, contains('tacacs-server key'));
-      // The account is not the shared key: the router's own login uses the
-      // account password so it matches what the server holds.
-      expect(r1, contains('username admin secret 0 123'));
-    });
+    test(
+      'the router configures AAA against the server that holds the account',
+      () {
+        final r1 = CiscoAdapter.render(plan)[plan.security.aaaRouter]!;
+        expect(r1, contains('aaa new-model'));
+        expect(r1, contains('tacacs-server host'));
+        expect(r1, contains('tacacs-server key'));
+        // The account is not the shared key: the router's own login uses the
+        // account password so it matches what the server holds.
+        expect(r1, contains('username admin secret 0 123'));
+      },
+    );
 
     test('preflight reports these counts, not a different plan', () {
-      final lines = BuildPreflight.lines(intent: plan, target: 'packet-tracer')
-          .join('\n');
+      final lines = BuildPreflight.lines(
+        intent: plan,
+        target: 'packet-tracer',
+      ).join('\n');
       expect(lines, contains('17 device(s)'));
       expect(lines, contains('16 link(s)'));
     });
@@ -164,55 +175,60 @@ void main() {
       expect(
         FileEditIntentReader.read(editAsk, hasArtifact: true, candidates: 1),
         FileEditIntent.editExisting,
-        reason: 'the user said "edit the file" and named no second file, so '
+        reason:
+            'the user said "edit the file" and named no second file, so '
             'there is nothing ambiguous about it',
       );
     });
 
-    test('applying it keeps every device and link, changing only the roles',
-        () {
-      final before = _plan('offline-chat');
-      final outcome = NetworkIntent.followUp(
-        previous: before,
-        previousBrief: brief,
-        brief: editAsk,
-        parsed: NetworkIntent.parseSimple('chat', editAsk),
-        project: 'chat',
-      );
-      final after = outcome.plan;
-      // The whole lab survives: an edit is a focused update, not a rebuild
-      // from the words of one sentence.
-      expect(after.nodes.length, before.nodes.length);
-      expect(after.links.length, before.links.length);
-      for (final node in before.nodes) {
-        expect(after.nodes.any((n) => n.name == node.name), isTrue);
-      }
-      for (final link in before.links) {
-        expect(
-          after.links.any((l) =>
-              l.a == link.a &&
-              l.b == link.b &&
-              l.aIf == link.aIf &&
-              l.bIf == link.bIf),
-          isTrue,
+    test(
+      'applying it keeps every device and link, changing only the roles',
+      () {
+        final before = _plan('offline-chat');
+        final outcome = NetworkIntent.followUp(
+          previous: before,
+          previousBrief: brief,
+          brief: editAsk,
+          parsed: NetworkIntent.parseSimple('chat', editAsk),
+          project: 'chat',
         );
-      }
-      // Addressing and routing are preserved.
-      expect(after.routing, before.routing);
-      expect(after.addressing.length, before.addressing.length);
-      // The two named roles exist on two different servers.
-      final aaa = after.nodes
-          .where((n) => n.type == 'server' && n.services.contains('aaa'))
-          .toList();
-      final dhcp = after.nodes
-          .where((n) => n.type == 'server' && n.services.contains('dhcp'))
-          .toList();
-      expect(aaa, hasLength(1));
-      expect(dhcp, hasLength(1));
-      expect(aaa.single.name, isNot(dhcp.single.name));
-      // And the revision moved, so a card written for the old plan is stale.
-      expect(after.revision, isNot(before.revision));
-    });
+        final after = outcome.plan;
+        // The whole lab survives: an edit is a focused update, not a rebuild
+        // from the words of one sentence.
+        expect(after.nodes.length, before.nodes.length);
+        expect(after.links.length, before.links.length);
+        for (final node in before.nodes) {
+          expect(after.nodes.any((n) => n.name == node.name), isTrue);
+        }
+        for (final link in before.links) {
+          expect(
+            after.links.any(
+              (l) =>
+                  l.a == link.a &&
+                  l.b == link.b &&
+                  l.aIf == link.aIf &&
+                  l.bIf == link.bIf,
+            ),
+            isTrue,
+          );
+        }
+        // Addressing and routing are preserved.
+        expect(after.routing, before.routing);
+        expect(after.addressing.length, before.addressing.length);
+        // The two named roles exist on two different servers.
+        final aaa = after.nodes
+            .where((n) => n.type == 'server' && n.services.contains('aaa'))
+            .toList();
+        final dhcp = after.nodes
+            .where((n) => n.type == 'server' && n.services.contains('dhcp'))
+            .toList();
+        expect(aaa, hasLength(1));
+        expect(dhcp, hasLength(1));
+        expect(aaa.single.name, isNot(dhcp.single.name));
+        // And the revision moved, so a card written for the old plan is stale.
+        expect(after.revision, isNot(before.revision));
+      },
+    );
   });
 
   group('a plan with blocking findings is not offered as ready', () {
@@ -230,9 +246,10 @@ void main() {
         target: 'packet-tracer',
         plan: broken,
       );
-      final blocking = ValidatorService.validate(broken, target: 'packet-tracer')
-          .where((i) => i.severity == 'error' || i.severity == 'warning')
-          .toList();
+      final blocking = ValidatorService.validate(
+        broken,
+        target: 'packet-tracer',
+      ).where((i) => i.severity == 'error' || i.severity == 'warning').toList();
       if (blocking.isNotEmpty) {
         expect(reply.quickReplies, isNot(contains('Build the .pkt')));
         expect(reply.text, contains('cannot build this one yet'));

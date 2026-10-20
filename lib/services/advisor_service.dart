@@ -152,7 +152,12 @@ class AdvisorService {
     (
       match: (c) =>
           c.kind == AdviceKind.troubleshoot ||
-          (c.mentionsAny(const ['slow', 'dead spot', 'dropping', 'buffering']) &&
+          (c.mentionsAny(const [
+                'slow',
+                'dead spot',
+                'dropping',
+                'buffering',
+              ]) &&
               c.mentionsAny(const ['wifi', 'wi-fi', 'wireless', 'internet'])),
       answer: _slowWifi,
     ),
@@ -171,11 +176,7 @@ class AdvisorService {
       // router and modem is about power, not about the ISP handoff below.
       match: (c) =>
           c.words(const ['rack', 'ups']) ||
-          c.mentionsAny(const [
-            'patch panel',
-            'cabinet',
-            'structured cabling',
-          ]),
+          c.mentionsAny(const ['patch panel', 'cabinet', 'structured cabling']),
       answer: _rackAndPower,
     ),
     (
@@ -190,20 +191,23 @@ class AdvisorService {
             'isp ',
           ]) ||
           c.words(const ['isp', 'modem', 'ont']) ||
-          c.mentionsAny(const ['from the isp', 'internet provider', 'fibre box']),
+          c.mentionsAny(const [
+            'from the isp',
+            'internet provider',
+            'fibre box',
+          ]),
       answer: _ispEdge,
     ),
     (
-      match: (c) =>
-          c.mentionsAny(const [
-            'firewall',
-            'utm',
-            'fortigate',
-            'pfsense',
-            'opnsense',
-            'sonicwall',
-            'security appliance',
-          ]),
+      match: (c) => c.mentionsAny(const [
+        'firewall',
+        'utm',
+        'fortigate',
+        'pfsense',
+        'opnsense',
+        'sonicwall',
+        'security appliance',
+      ]),
       answer: _firewallSelection,
     ),
     (
@@ -221,24 +225,27 @@ class AdvisorService {
     (
       match: (c) =>
           c.mentions('poe') ||
-          c.mentionsAny(const ['power over ethernet', 'poe budget', 'poe switch']),
+          c.mentionsAny(const [
+            'power over ethernet',
+            'poe budget',
+            'poe switch',
+          ]),
       answer: _poeBudget,
     ),
     // Wireless-generation questions before the general AP topic, so "is
     // wifi 6 worth it?" is answered by the generation comparison.
     (
-      match: (c) =>
-          c.mentionsAny(const [
-            'wifi 5',
-            'wifi 6',
-            'wifi 7',
-            'wi-fi 5',
-            'wi-fi 6',
-            'wi-fi 7',
-            '802.11',
-            'ax ',
-            'ac ',
-          ]),
+      match: (c) => c.mentionsAny(const [
+        'wifi 5',
+        'wifi 6',
+        'wifi 7',
+        'wi-fi 5',
+        'wi-fi 6',
+        'wi-fi 7',
+        '802.11',
+        'ax ',
+        'ac ',
+      ]),
       answer: _wifiStandards,
     ),
     (
@@ -261,7 +268,14 @@ class AdvisorService {
       // switch selection.
       match: (c) =>
           c.words(const ['switch', 'switches']) &&
-          !c.words(const ['cable', 'cables', 'cabling', 'copper', 'fiber', 'fibre']),
+          !c.words(const [
+            'cable',
+            'cables',
+            'cabling',
+            'copper',
+            'fiber',
+            'fibre',
+          ]),
       answer: _switchSelection,
     ),
     (
@@ -304,76 +318,68 @@ class AdvisorService {
       answer: _segmentation,
     ),
     (
-      match: (c) =>
-          c.mentionsAny(const [
-            'port forward',
-            'port forwarding',
-            'dmz',
-            'remote access',
-            'expose',
-            'from outside',
-            'outside the office',
-          ]),
+      match: (c) => c.mentionsAny(const [
+        'port forward',
+        'port forwarding',
+        'dmz',
+        'remote access',
+        'expose',
+        'from outside',
+        'outside the office',
+      ]),
       answer: _remoteAccess,
     ),
+    (match: (c) => c.words(const ['vpn', 'vpns']), answer: _vpnTypes),
     (
-      match: (c) => c.words(const ['vpn', 'vpns']),
-      answer: _vpnTypes,
-    ),
-    (
-      match: (c) =>
-          c.mentionsAny(const [
-            'fiber',
-            'fibre',
-            'copper',
-            'cat5',
-            'cat 5',
-            'cat6',
-            'cat 6',
-            'cat6a',
-            'distance',
-            'long run',
-            'between buildings',
-            '100 m',
-            '100m',
-            'meters',
-            'metres',
-          ]),
+      match: (c) => c.mentionsAny(const [
+        'fiber',
+        'fibre',
+        'copper',
+        'cat5',
+        'cat 5',
+        'cat6',
+        'cat 6',
+        'cat6a',
+        'distance',
+        'long run',
+        'between buildings',
+        '100 m',
+        '100m',
+        'meters',
+        'metres',
+      ]),
       answer: _cabling,
     ),
     (
       match: (c) =>
           (c.words(const ['l3', 'layer 3']) && c.words(const ['switch'])) ||
-          c.mentionsAny(const ['inter-vlan', 'inter vlan', 'router-on-a-stick']),
+          c.mentionsAny(const [
+            'inter-vlan',
+            'inter vlan',
+            'router-on-a-stick',
+          ]),
       answer: _l3Switch,
     ),
     (
-      match: (c) =>
-          c.mentionsAny(const [
-            'failover',
-            'second isp',
-            'second internet',
-            'second line',
-            'second provider',
-            'backup internet',
-            'backup line',
-            'two lines',
-            'redundan',
-            'uptime',
-            'two isps',
-            'dual wan',
-          ]),
+      match: (c) => c.mentionsAny(const [
+        'failover',
+        'second isp',
+        'second internet',
+        'second line',
+        'second provider',
+        'backup internet',
+        'backup line',
+        'two lines',
+        'redundan',
+        'uptime',
+        'two isps',
+        'dual wan',
+      ]),
       answer: _backupWan,
     ),
     (
       match: (c) =>
-          c.mentionsAny(const [
-            'server',
-            'dhcp',
-            'dns',
-            'file share',
-            'nas',
-          ]) &&
+          c.mentionsAny(const ['server', 'dhcp', 'dns', 'file share', 'nas']) &&
           (c.kind == AdviceKind.recommendation || c.kind == AdviceKind.review),
       answer: _serverPlacement,
     ),
@@ -408,10 +414,7 @@ class AdvisorService {
     // Generic sizing last among the topics, so a named subject (access
     // points, ports, PoE) is measured by its own topic and everything else
     // - bandwidth, capacity, "enough for" - gets the sizing rules.
-    (
-      match: (c) => c.kind == AdviceKind.sizing,
-      answer: _sizing,
-    ),
+    (match: (c) => c.kind == AdviceKind.sizing, answer: _sizing),
   ];
 
   // --- topics ---------------------------------------------------------------
@@ -419,17 +422,17 @@ class AdvisorService {
   /// The lab-first lead. When a plan is on the table, "which should I
   /// use?" is at least partly about THAT lab, so the lab answer comes
   /// first and the real-world recommendation follows in the same breath.
-  static String _labFirst(_AdvisorContext c, String realWorld) =>
-      c.hasPlan
-          ? 'For the lab on the table (${c.labLine()}), the models are the '
-              'ones Packet Tracer ships - there the choice is the feature '
-              'the lab grades, not the brand. For the real hardware behind '
-              'your question: $realWorld'
-          : realWorld;
+  static String _labFirst(_AdvisorContext c, String realWorld) => c.hasPlan
+      ? 'For the lab on the table (${c.labLine()}), the models are the '
+            'ones Packet Tracer ships - there the choice is the feature '
+            'the lab grades, not the brand. For the real hardware behind '
+            'your question: $realWorld'
+      : realWorld;
 
   static AdviceAnswer _routerSelection(_AdvisorContext c) {
     final home = c.venue == _Venue.home;
-    final office = c.venue == _Venue.office ||
+    final office =
+        c.venue == _Venue.office ||
         c.venue == _Venue.school ||
         c.venue == _Venue.clinic ||
         c.venue == _Venue.hospitality ||
@@ -438,10 +441,10 @@ class AdvisorService {
       c,
       home
           ? 'For a home, one all-in-one Wi-Fi router is the right answer: it '
-              'does routing, Wi-Fi and a few LAN ports in one box, and it is '
-              'the least gear to buy, power and keep updated. Put it as '
-              'central as the building allows, not in a metal cabinet or on '
-              'the floor.'
+                'does routing, Wi-Fi and a few LAN ports in one box, and it is '
+                'the least gear to buy, power and keep updated. Put it as '
+                'central as the building allows, not in a metal cabinet or on '
+                'the floor.'
           : office
           ? 'For an office, split the jobs. Let a business router or '
                 'firewall at the edge own the WAN, DHCP/DNS and the firewall '
@@ -462,23 +465,29 @@ class AdvisorService {
       options: const [
         AdviceOption(
           label: 'All-in-one Wi-Fi router (home class)',
-          chooseWhen: 'a home or small flat, up to ~20-30 devices, one '
+          chooseWhen:
+              'a home or small flat, up to ~20-30 devices, one '
               'location',
-          tradeOff: 'Wi-Fi and NAT weaken under load, and features like VLANs '
+          tradeOff:
+              'Wi-Fi and NAT weaken under load, and features like VLANs '
               'or guest isolation are limited or absent',
         ),
         AdviceOption(
           label: 'Business router / firewall at the edge',
-          chooseWhen: 'an office, guests, VLANs, site-to-site VPN, or a '
+          chooseWhen:
+              'an office, guests, VLANs, site-to-site VPN, or a '
               'connection that must stay up',
-          tradeOff: 'more boxes and a little configuration; you need to keep '
+          tradeOff:
+              'more boxes and a little configuration; you need to keep '
               'the firmware updated',
         ),
         AdviceOption(
           label: 'ISP-supplied router left in place',
-          chooseWhen: 'the budget is fixed and the ISP device already does '
+          chooseWhen:
+              'the budget is fixed and the ISP device already does '
               'what you need',
-          tradeOff: 'often weak Wi-Fi and closed firmware; you may not be '
+          tradeOff:
+              'often weak Wi-Fi and closed firmware; you may not be '
               'able to bridge it or run the features you want later',
         ),
       ],
@@ -506,16 +515,17 @@ class AdvisorService {
       quickReplies: [
         if (c.planBrief != null) c.planBrief!,
         if (!home && !office) 'What router should I get for a home?',
-        if (!office) 'What router should I get for an office with 20 employees?',
+        if (!office)
+          'What router should I get for an office with 20 employees?',
         if (office) 'What firewall do we need for an office with guests?',
         if (office) 'How many access points do I need for 40 users?',
       ],
       nextStep: home
           ? 'Say how many rooms and floors it must cover and I will tell you '
-              'whether one router is enough or you need mesh/access points.'
+                'whether one router is enough or you need mesh/access points.'
           : 'Tell me the number of users and whether Wi-Fi must cover one '
-              'floor or several, and I will size the edge and the access '
-              'points.',
+                'floor or several, and I will size the edge and the access '
+                'points.',
       planBrief: c.planBrief,
     );
   }
@@ -525,34 +535,41 @@ class AdvisorService {
       topic: 'firewall_selection',
       kind: c.kind,
       recommendation: _labFirst(
-          c,
-          'Use a real firewall when you need to ENFORCE policy, not just '
-          'share the internet: rules between VLANs, logging, VPN '
-          'termination and updates. For a home or a tiny office the '
-          'router\'s own ACL/NAT is usually enough; from an office '
-          'upward, a dedicated firewall pays for itself the first time a '
-          'camera or a guest device is compromised.'),
+        c,
+        'Use a real firewall when you need to ENFORCE policy, not just '
+        'share the internet: rules between VLANs, logging, VPN '
+        'termination and updates. For a home or a tiny office the '
+        'router\'s own ACL/NAT is usually enough; from an office '
+        'upward, a dedicated firewall pays for itself the first time a '
+        'camera or a guest device is compromised.',
+      ),
       options: const [
         AdviceOption(
           label: 'SMB firewall appliance / UTM',
-          chooseWhen: 'an office with guests, VLANs, VPN or compliance needs '
+          chooseWhen:
+              'an office with guests, VLANs, VPN or compliance needs '
               '(examples: FortiGate 40F/60F, Sophos, SonicWall, or pfSense/'
               'OPNsense on a small PC)',
-          tradeOff: 'subscriptions for filtering/threat feeds and a learning '
+          tradeOff:
+              'subscriptions for filtering/threat feeds and a learning '
               'curve; inspected traffic lowers throughput',
         ),
         AdviceOption(
           label: 'Router with ACLs / zone-based firewall',
-          chooseWhen: 'budget is tight and the policy is simple (block '
+          chooseWhen:
+              'budget is tight and the policy is simple (block '
               'guest-to-staff, allow a few services)',
-          tradeOff: 'no threat inspection, no easy logging; you maintain '
+          tradeOff:
+              'no threat inspection, no easy logging; you maintain '
               'every rule yourself',
         ),
         AdviceOption(
           label: 'Cloud-managed gateway',
-          chooseWhen: 'several small sites and you want one dashboard '
+          chooseWhen:
+              'several small sites and you want one dashboard '
               '(examples: UniFi, Omada, Meraki Go)',
-          tradeOff: 'you depend on the vendor cloud, and advanced policy '
+          tradeOff:
+              'you depend on the vendor cloud, and advanced policy '
               'lives behind their UI',
         ),
       ],
@@ -580,7 +597,8 @@ class AdvisorService {
         if (c.planBrief != null) c.planBrief!,
         c.planSentence('a firewall, guest wifi and staff VLANs'),
       ],
-      nextStep: 'Tell me what must be kept apart and I will turn it into '
+      nextStep:
+          'Tell me what must be kept apart and I will turn it into '
           'VLANS/ACLs in the plan - or name the appliance and I will say what '
           'it can and cannot do.',
       planBrief: c.planBrief,
@@ -591,7 +609,8 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'router_vs_switch',
       kind: c.kind,
-      recommendation: 'A switch connects devices inside one network; a router '
+      recommendation:
+          'A switch connects devices inside one network; a router '
           'connects different networks and is what talks to the internet. '
           'A home needs both in one box; an office usually needs a router at '
           'the edge and switches for the desks - and if you have VLANs, '
@@ -599,23 +618,29 @@ class AdvisorService {
       options: const [
         AdviceOption(
           label: 'Router for the edge, switches inside',
-          chooseWhen: 'a normal office or lab: internet, NAT, VPN and '
+          chooseWhen:
+              'a normal office or lab: internet, NAT, VPN and '
               'inter-VLAN routing at the router',
-          tradeOff: 'all inter-VLAN traffic passes the router\'s uplink, so a '
+          tradeOff:
+              'all inter-VLAN traffic passes the router\'s uplink, so a '
               'fast-growing LAN can bottleneck there',
         ),
         AdviceOption(
           label: 'Layer-3 switch for the core',
-          chooseWhen: 'many VLANs or server-to-server traffic that should not '
+          chooseWhen:
+              'many VLANs or server-to-server traffic that should not '
               'make the trip to the edge',
-          tradeOff: 'can cost more than an L2 switch and needs routing '
+          tradeOff:
+              'can cost more than an L2 switch and needs routing '
               'configured on the switch too',
         ),
         AdviceOption(
           label: 'Router-on-a-stick (subinterfaces)',
-          chooseWhen: 'a small lab or office with a couple of VLANs and one '
+          chooseWhen:
+              'a small lab or office with a couple of VLANs and one '
               'router',
-          tradeOff: 'single physical link carries every VLAN - fine for '
+          tradeOff:
+              'single physical link carries every VLAN - fine for '
               'practice and small sites, not for heavy traffic',
         ),
       ],
@@ -637,7 +662,8 @@ class AdvisorService {
         if (c.planBrief != null) c.planBrief!,
         'Plan 2 routers, 1 switch and 2 VLANs',
       ],
-      nextStep: 'Say how many VLANs you need and I will plan the routing '
+      nextStep:
+          'Say how many VLANs you need and I will plan the routing '
           'shape (router-on-a-stick or L3 switch) into the lab.',
       planBrief: c.planBrief,
     );
@@ -645,44 +671,51 @@ class AdvisorService {
 
   static AdviceAnswer _switchSelection(_AdvisorContext c) {
     final devices = c.scale;
-    final needsPoe = c.mentions('poe') ||
+    final needsPoe =
+        c.mentions('poe') ||
         c.mentionsAny(const ['access point', 'camera', 'phone']);
     return AdviceAnswer(
       topic: 'switch_selection',
       kind: c.kind,
       recommendation: _labFirst(
-          c,
-          needsPoe
-              ? 'Buy a managed PoE switch: PoE powers access points, '
+        c,
+        needsPoe
+            ? 'Buy a managed PoE switch: PoE powers access points, '
                   'cameras and phones from the switch, and "managed" is '
                   'what gives you VLANs, port security and per-port '
                   'diagnosis later. An unmanaged switch is only for a '
                   'home or a single room where none of that is wanted.'
-              : 'Buy a managed switch, even if you only use it as '
+            : 'Buy a managed switch, even if you only use it as '
                   'unmanaged today: VLANs, port security and a second '
                   'SSID for guests all need it, and the price difference '
                   'is small. Choose the port count from the devices plus '
-                  'uplinks plus spare.'),
+                  'uplinks plus spare.',
+      ),
       options: const [
         AdviceOption(
           label: 'Unmanaged switch',
           chooseWhen: 'a home, or a small add-on for meeting-room ports',
-          tradeOff: 'no VLANs, no port security, no monitoring - a loop or a '
+          tradeOff:
+              'no VLANs, no port security, no monitoring - a loop or a '
               'bad cable takes down everything on it',
         ),
         AdviceOption(
           label: 'L2 managed PoE switch',
-          chooseWhen: 'an office: desk ports, PoE access points, VLANs, port '
+          chooseWhen:
+              'an office: desk ports, PoE access points, VLANs, port '
               'security (examples: Cisco CBS350, UniFi Switch, Omada, '
               'MikroTik CRS)',
-          tradeOff: 'needs configuration, and PoE budget must be counted '
+          tradeOff:
+              'needs configuration, and PoE budget must be counted '
               'against the devices it powers',
         ),
         AdviceOption(
           label: 'L3 managed switch (core)',
-          chooseWhen: 'several VLANs or servers that should route at wire '
+          chooseWhen:
+              'several VLANs or servers that should route at wire '
               'speed without going through the router',
-          tradeOff: 'more expensive and more advanced to configure; '
+          tradeOff:
+              'more expensive and more advanced to configure; '
               'inter-VLAN ACLs have to be planned too',
         ),
       ],
@@ -705,7 +738,8 @@ class AdvisorService {
         if (c.planBrief != null) c.planBrief!,
         'How many ports do I need for 30 devices?',
       ],
-      nextStep: 'Count the wired devices (PCs, printers, APs, cameras) and '
+      nextStep:
+          'Count the wired devices (PCs, printers, APs, cameras) and '
           'add uplinks plus spare - tell me the number and I will size the '
           'switch.',
       planBrief: c.planBrief,
@@ -718,7 +752,8 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'ap_selection',
       kind: c.kind,
-      recommendation: 'For anything larger than a flat, wired access points '
+      recommendation:
+          'For anything larger than a flat, wired access points '
           'beat mesh: a mesh node spends half its radio repeating the '
           'signal, while a wired AP uses both radios for clients. If a cable '
           'cannot be run, mesh is the honest fallback - but run the cable if '
@@ -726,22 +761,26 @@ class AdvisorService {
       options: const [
         AdviceOption(
           label: 'One all-in-one router',
-          chooseWhen: 'a small flat or one floor under ~80-100 m2 with no '
+          chooseWhen:
+              'a small flat or one floor under ~80-100 m2 with no '
               'thick walls',
           tradeOff: 'dead spots at the edges and no roaming to speak of',
         ),
         AdviceOption(
           label: 'Wired ceiling APs + PoE switch',
-          chooseWhen: 'an office, multi-floor home, or any space with more '
+          chooseWhen:
+              'an office, multi-floor home, or any space with more '
               'than ~30 devices (examples: UniFi U6/U7, Omada EAP, Aruba '
               'Instant On)',
-          tradeOff: 'needs cabling to each AP and a controller/app for '
+          tradeOff:
+              'needs cabling to each AP and a controller/app for '
               'management; roaming still depends on good coverage overlap',
         ),
         AdviceOption(
           label: 'Mesh kit (wireless backhaul)',
           chooseWhen: 'rented space, historic walls, or no way to run cable',
-          tradeOff: 'each hop loses roughly half the throughput, and latency '
+          tradeOff:
+              'each hop loses roughly half the throughput, and latency '
               'rises - fine for browsing, poor for many video calls',
         ),
       ],
@@ -769,7 +808,8 @@ class AdvisorService {
         if (c.planBrief != null) c.planBrief!,
         'How many access points do I need for 40 users?',
       ],
-      nextStep: 'Give me the floor count and the busiest moment\'s device '
+      nextStep:
+          'Give me the floor count and the busiest moment\'s device '
           'count and I will turn the AP plan into a topology you can build.',
       planBrief: c.planBrief,
     );
@@ -779,7 +819,8 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'wifi_standards',
       kind: c.kind,
-      recommendation: 'Wi-Fi 6 (802.11ax) is the sensible default today: it '
+      recommendation:
+          'Wi-Fi 6 (802.11ax) is the sensible default today: it '
           'handles many devices per AP far better than Wi-Fi 5, and the '
           'price gap has closed. Wi-Fi 5 (ac) is still fine for light use '
           'and small budgets. Wi-Fi 7 (be) is future-proofing you only need '
@@ -791,23 +832,29 @@ class AdvisorService {
       options: const [
         AdviceOption(
           label: 'Wi-Fi 5 (802.11ac)',
-          chooseWhen: 'a small site, phones/laptops only, and the budget is '
+          chooseWhen:
+              'a small site, phones/laptops only, and the budget is '
               'tight',
-          tradeOff: 'weaker under density; 2.4 GHz on old gear can drag the '
+          tradeOff:
+              'weaker under density; 2.4 GHz on old gear can drag the '
               'whole experience down',
         ),
         AdviceOption(
           label: 'Wi-Fi 6 / 6E (802.11ax)',
-          chooseWhen: 'an office, school or any space with many devices per '
+          chooseWhen:
+              'an office, school or any space with many devices per '
               'AP (the usual recommendation)',
-          tradeOff: '6 GHz in 6E has shorter range and needs its own survey; '
+          tradeOff:
+              '6 GHz in 6E has shorter range and needs its own survey; '
               'benefits need Wi-Fi 6 clients to be felt fully',
         ),
         AdviceOption(
           label: 'Wi-Fi 7 (802.11be)',
-          chooseWhen: 'new build with a fast plan, high-density spaces, and '
+          chooseWhen:
+              'new build with a fast plan, high-density spaces, and '
               'budget for matching clients',
-          tradeOff: 'premium price for benefits most networks cannot yet '
+          tradeOff:
+              'premium price for benefits most networks cannot yet '
               'measure',
         ),
       ],
@@ -824,7 +871,8 @@ class AdvisorService {
         'How many access points do I need for 40 users?',
         c.planSentence('2 access points and 1 PoE switch'),
       ],
-      nextStep: 'Tell me the device count and whether the space is dense '
+      nextStep:
+          'Tell me the device count and whether the space is dense '
           '(classroom, cafe) or sparse (offices), and I will pick the tier.',
     );
   }
@@ -833,7 +881,8 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'poe_budget',
       kind: c.kind,
-      recommendation: 'Add up the PoE budget before choosing the switch: '
+      recommendation:
+          'Add up the PoE budget before choosing the switch: '
           'budget ~15 W per Wi-Fi 5 AP, ~25-30 W per Wi-Fi 6 AP, ~8-15 W per '
           'fixed camera and 25-60 W per PTZ camera, then add 20-30% headroom. '
           'Pick a switch whose total PoE budget is above that sum, not just '
@@ -842,13 +891,15 @@ class AdvisorService {
         AdviceOption(
           label: 'PoE switch',
           chooseWhen: '3 or more powered devices, or any ceiling device',
-          tradeOff: 'costs more and its total budget - not the per-port '
+          tradeOff:
+              'costs more and its total budget - not the per-port '
               'standard - is the number that matters',
         ),
         AdviceOption(
           label: 'PoE injectors',
           chooseWhen: 'one or two devices on an existing non-PoE switch',
-          tradeOff: 'a wall wart per device, no remote power-cycling, and '
+          tradeOff:
+              'a wall wart per device, no remote power-cycling, and '
               'easy to mis-cable',
         ),
         AdviceOption(
@@ -865,10 +916,9 @@ class AdvisorService {
             'the switch does not have to be replaced when the second AP '
             'arrives.',
       ],
-      quickReplies: [
-        c.planSentence('2 access points and PoE cameras'),
-      ],
-      nextStep: 'List the powered devices (APs, cameras, phones) and I will '
+      quickReplies: [c.planSentence('2 access points and PoE cameras')],
+      nextStep:
+          'List the powered devices (APs, cameras, phones) and I will '
           'total the budget for you.',
     );
   }
@@ -877,7 +927,8 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'camera_network',
       kind: c.kind,
-      recommendation: 'Put cameras on their own VLAN, powered by a PoE '
+      recommendation:
+          'Put cameras on their own VLAN, powered by a PoE '
           'switch that has the budget for them, recorded by an NVR on that '
           'same VLAN, and reach them remotely through a VPN - never by '
           'port-forwarding the NVR. Cameras are the most commonly attacked '
@@ -887,19 +938,22 @@ class AdvisorService {
         AdviceOption(
           label: 'NVR + cameras on a dedicated camera VLAN',
           chooseWhen: 'any real deployment - the usual answer',
-          tradeOff: 'needs a VLAN and firewall rules (block camera-to-LAN, '
+          tradeOff:
+              'needs a VLAN and firewall rules (block camera-to-LAN, '
               'allow NVR), and a switch with the PoE budget',
         ),
         AdviceOption(
           label: 'Cameras on the general LAN',
           chooseWhen: 'a home with one or two cameras and no guests',
-          tradeOff: 'one compromised camera can reach your PCs; noise and '
+          tradeOff:
+              'one compromised camera can reach your PCs; noise and '
               'broadcast traffic share the network',
         ),
         AdviceOption(
           label: 'Cloud cameras',
           chooseWhen: 'no NVR wanted and recurring fees are acceptable',
-          tradeOff: 'the video leaves your premises, and the uplink becomes '
+          tradeOff:
+              'the video leaves your premises, and the uplink becomes '
               'the recording\'s bottleneck',
         ),
       ],
@@ -915,7 +969,8 @@ class AdvisorService {
         c.planSentence('a camera VLAN with an ACL to the NVR'),
         'How many cameras can a PoE switch handle?',
       ],
-      nextStep: 'Tell me how many cameras (and whether any are PTZ) and I '
+      nextStep:
+          'Tell me how many cameras (and whether any are PTZ) and I '
           'will size the PoE switch and plan the VLAN.',
     );
   }
@@ -926,7 +981,8 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'isp_edge',
       kind: c.kind,
-      recommendation: 'Terminate the ISP connection on your own router and '
+      recommendation:
+          'Terminate the ISP connection on your own router and '
           'put the ISP box into bridge/modem mode, so there is one NAT, one '
           'firewall and one place for rules. '
           '${pppoe ? 'With PPPoE, keep the credentials in your router\'s WAN settings (the ISP can read them out to you if you do not have them) and set MTU ~1492 if large transfers fail. ' : ''}'
@@ -936,22 +992,27 @@ class AdvisorService {
       options: const [
         AdviceOption(
           label: 'Bridge the ISP box, dial/connect on your router',
-          chooseWhen: 'the usual, best answer: PPPoE credentials or DHCP on '
+          chooseWhen:
+              'the usual, best answer: PPPoE credentials or DHCP on '
               'your WAN port',
-          tradeOff: 'needs the credentials or a modem-only mode from the ISP; '
+          tradeOff:
+              'needs the credentials or a modem-only mode from the ISP; '
               'support calls have to be repeated if they replace the box',
         ),
         AdviceOption(
           label: 'Keep the ISP router in router mode (double NAT)',
           chooseWhen: 'you cannot get bridge mode, and the network is simple',
-          tradeOff: 'port forwarding must be done twice, VPNs and some games '
+          tradeOff:
+              'port forwarding must be done twice, VPNs and some games '
               'break, and there are two DHCP servers to keep straight',
         ),
         AdviceOption(
           label: 'ISP router in DMZ to your router',
-          chooseWhen: 'bridge mode is unavailable but you still want your own '
+          chooseWhen:
+              'bridge mode is unavailable but you still want your own '
               'firewall in charge',
-          tradeOff: 'the ISP box still NATs, and its Wi-Fi (if used) sits '
+          tradeOff:
+              'the ISP box still NATs, and its Wi-Fi (if used) sits '
               'outside your policy',
         ),
       ],
@@ -977,7 +1038,8 @@ class AdvisorService {
         'What router should I get for PPPoE with a fast fibre line?',
         'What should I use for remote access if I am behind CGNAT?',
       ],
-      nextStep: 'Tell me the handoff and what must be reachable from '
+      nextStep:
+          'Tell me the handoff and what must be reachable from '
           'outside, and I will lay out the WAN plan step by step.',
     );
   }
@@ -986,29 +1048,35 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'guest_wifi',
       kind: c.kind,
-      recommendation: 'Give guests their own SSID on their own VLAN, with '
+      recommendation:
+          'Give guests their own SSID on their own VLAN, with '
           'client isolation ON, a bandwidth limit, and no route to the staff '
           'or camera networks. A guest network that only has a different '
           'password is still one flat network.',
       options: const [
         AdviceOption(
           label: 'Guest SSID + guest VLAN + isolation',
-          chooseWhen: 'any office, clinic, cafe or shop with visitors - the '
+          chooseWhen:
+              'any office, clinic, cafe or shop with visitors - the '
               'default answer',
-          tradeOff: 'needs managed APs/switches or a router that supports '
+          tradeOff:
+              'needs managed APs/switches or a router that supports '
               'guest isolation',
         ),
         AdviceOption(
           label: 'Guest SSID only',
           chooseWhen: 'a home with visitors for an evening',
-          tradeOff: 'guests are on your LAN: they can see printers, NAS and '
+          tradeOff:
+              'guests are on your LAN: they can see printers, NAS and '
               'sometimes the router',
         ),
         AdviceOption(
           label: 'Captive portal with vouchers/terms',
-          chooseWhen: 'public spaces where you must show terms or hand out '
+          chooseWhen:
+              'public spaces where you must show terms or hand out '
               'codes',
-          tradeOff: 'extra device/software and an onboarding step for '
+          tradeOff:
+              'extra device/software and an onboarding step for '
               'guests; support calls go up',
         ),
       ],
@@ -1023,10 +1091,9 @@ class AdvisorService {
         'Do guests need to reach anything on the staff network (a printer, '
             'a display)?',
       ],
-      quickReplies: [
-        c.planSentence('guest wifi and staff VLANs'),
-      ],
-      nextStep: 'Say what guests must reach (usually nothing) and I will '
+      quickReplies: [c.planSentence('guest wifi and staff VLANs')],
+      nextStep:
+          'Say what guests must reach (usually nothing) and I will '
           'plan the guest VLAN and the ACL that separates it.',
     );
   }
@@ -1035,7 +1102,8 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'remote_access',
       kind: c.kind,
-      recommendation: 'Open a port only for one specific service, and use a '
+      recommendation:
+          'Open a port only for one specific service, and use a '
           'VPN when you need to reach the network itself. Port forwarding '
           'publishes whatever is behind it to the whole internet; a VPN lets '
           'you in first, then everything else works as if you were on site. '
@@ -1044,22 +1112,27 @@ class AdvisorService {
       options: const [
         AdviceOption(
           label: 'VPN (WireGuard/OpenVPN/Tailscale-class)',
-          chooseWhen: 'you need files, cameras, remote desktop or the NVR - '
+          chooseWhen:
+              'you need files, cameras, remote desktop or the NVR - '
               'the usual answer',
-          tradeOff: 'a client to install and keys to manage; throughput '
+          tradeOff:
+              'a client to install and keys to manage; throughput '
               'depends on the router\'s CPU',
         ),
         AdviceOption(
           label: 'Port forward',
-          chooseWhen: 'exactly one service (a web server, a game server) and '
+          chooseWhen:
+              'exactly one service (a web server, a game server) and '
               'you can keep it patched',
-          tradeOff: 'exposed to scanning bots on day one; every service is '
+          tradeOff:
+              'exposed to scanning bots on day one; every service is '
               'its own risk, and double NAT breaks it',
         ),
         AdviceOption(
           label: 'A published cloud relay/tunnel',
           chooseWhen: 'CGNAT blocks inbound access, or you have no public IP',
-          tradeOff: 'traffic passes a third party, and availability depends '
+          tradeOff:
+              'traffic passes a third party, and availability depends '
               'on their service',
         ),
       ],
@@ -1081,7 +1154,8 @@ class AdvisorService {
       quickReplies: const [
         'What should I use for remote access if I am behind CGNAT?',
       ],
-      nextStep: 'Name the service or the need and I will pick the safest of '
+      nextStep:
+          'Name the service or the need and I will pick the safest of '
           'the three for it.',
     );
   }
@@ -1090,7 +1164,8 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'vpn_types',
       kind: c.kind,
-      recommendation: 'Two different jobs: site-to-site VPN joins two '
+      recommendation:
+          'Two different jobs: site-to-site VPN joins two '
           'offices permanently (always-on, router-to-router), and '
           'remote-access VPN lets people in from home (client dials in). '
           'Most small networks need both eventually; pick by who initiates '
@@ -1099,19 +1174,22 @@ class AdvisorService {
         AdviceOption(
           label: 'Site-to-site (IPsec or WireGuard)',
           chooseWhen: 'two or more fixed sites that must act like one network',
-          tradeOff: 'both ends need matching configuration; one side breaks '
+          tradeOff:
+              'both ends need matching configuration; one side breaks '
               'and both lose the link',
         ),
         AdviceOption(
           label: 'Remote-access (OpenVPN/WireGuard/SSL VPN)',
           chooseWhen: 'staff work from home or travel',
-          tradeOff: 'per-user accounts/keys; split-tunnel choices affect what '
+          tradeOff:
+              'per-user accounts/keys; split-tunnel choices affect what '
               'can be reached',
         ),
         AdviceOption(
           label: 'Zero-trust/overlay (Tailscale-class)',
           chooseWhen: 'no public IP, CGNAT, or you want it working in minutes',
-          tradeOff: 'control plane lives with the provider; not ideal for '
+          tradeOff:
+              'control plane lives with the provider; not ideal for '
               'strict compliance',
         ),
       ],
@@ -1125,7 +1203,8 @@ class AdvisorService {
       quickReplies: const [
         'What should I use for a site-to-site VPN between two offices?',
       ],
-      nextStep: 'Tell me whether you are joining offices or letting people '
+      nextStep:
+          'Tell me whether you are joining offices or letting people '
           'dial in, and I will lay out the endpoints for each side.',
     );
   }
@@ -1134,7 +1213,8 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'cabling',
       kind: c.kind,
-      recommendation: 'Copper (Cat5e/Cat6) is right for everything inside '
+      recommendation:
+          'Copper (Cat5e/Cat6) is right for everything inside '
           'one building, up to 100 m per run. Use fiber for runs over 100 m, '
           'between buildings, or for a 10G backbone - and never run copper '
           'between two buildings over a long distance: ground potential '
@@ -1143,20 +1223,24 @@ class AdvisorService {
         AdviceOption(
           label: 'Cat6/Cat6a copper',
           chooseWhen: 'desk runs, APs, cameras - runs up to 100 m',
-          tradeOff: 'thick conduit, and 10G needs Cat6a/short runs; cheap '
+          tradeOff:
+              'thick conduit, and 10G needs Cat6a/short runs; cheap '
               'cable or bad crimps fail at gigabit first',
         ),
         AdviceOption(
           label: 'Fiber (single-mode/multimode) between buildings',
           chooseWhen: 'long runs, buildings, or electrical isolation',
-          tradeOff: 'SFP ports/media converters on each end, and terminations '
+          tradeOff:
+              'SFP ports/media converters on each end, and terminations '
               'need the right tools or a contractor',
         ),
         AdviceOption(
           label: 'Point-to-point wireless bridge',
-          chooseWhen: 'a short-to-medium span with clear line of sight and no '
+          chooseWhen:
+              'a short-to-medium span with clear line of sight and no '
               'way to trench',
-          tradeOff: 'weather and line-of-sight dependent; adds latency and a '
+          tradeOff:
+              'weather and line-of-sight dependent; adds latency and a '
               'second device to power/aim',
         ),
       ],
@@ -1170,7 +1254,8 @@ class AdvisorService {
       quickReplies: const [
         'Review my network design for a two-building office',
       ],
-      nextStep: 'Tell me the longest run and how many buildings, and I will '
+      nextStep:
+          'Tell me the longest run and how many buildings, and I will '
           'say copper, fiber or wireless.',
     );
   }
@@ -1179,7 +1264,8 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'l3_vs_router',
       kind: c.kind,
-      recommendation: 'For a handful of VLANs, a router with subinterfaces '
+      recommendation:
+          'For a handful of VLANs, a router with subinterfaces '
           '(router-on-a-stick) is enough and costs nothing extra. When '
           'inter-VLAN traffic grows or servers must talk to each other at '
           'line rate, let a layer-3 switch do the routing in the core and '
@@ -1187,15 +1273,18 @@ class AdvisorService {
       options: const [
         AdviceOption(
           label: 'Router-on-a-stick',
-          chooseWhen: 'up to ~3-4 VLANs and modest traffic (the usual lab '
+          chooseWhen:
+              'up to ~3-4 VLANs and modest traffic (the usual lab '
               'answer)',
-          tradeOff: 'one interface carries every VLAN, so inter-VLAN traffic '
+          tradeOff:
+              'one interface carries every VLAN, so inter-VLAN traffic '
               'shares the router uplink',
         ),
         AdviceOption(
           label: 'L3 switch core + router at the edge',
           chooseWhen: 'many VLANs, server traffic, or a growing office',
-          tradeOff: 'more cost and configuration; ACLs between VLANs must be '
+          tradeOff:
+              'more cost and configuration; ACLs between VLANs must be '
               'planned on the switch',
         ),
       ],
@@ -1208,10 +1297,9 @@ class AdvisorService {
               'shape follows from whether the switches are 2960 '
               '(router-on-a-stick) or 3560 (SVI).',
       ],
-      quickReplies: [
-        if (c.planBrief != null) c.planBrief!,
-      ],
-      nextStep: 'Say how many VLANs you expect and whether the switches are '
+      quickReplies: [if (c.planBrief != null) c.planBrief!],
+      nextStep:
+          'Say how many VLANs you expect and whether the switches are '
           'learnable models, and I will plan the gateways.',
       planBrief: c.planBrief,
     );
@@ -1221,29 +1309,35 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'backup_wan',
       kind: c.kind,
-      recommendation: 'If internet downtime costs money, order a second line '
+      recommendation:
+          'If internet downtime costs money, order a second line '
           'from a DIFFERENT provider (or 5G/LTE as the standby) and use a '
           'router with WAN failover. A second line from the same provider '
           'shares the same cabinet, the same fiber and often the same outage.',
       options: const [
         AdviceOption(
           label: 'Second wireline ISP + failover router',
-          chooseWhen: 'two providers exist locally and you need bandwidth as '
+          chooseWhen:
+              'two providers exist locally and you need bandwidth as '
               'well as uptime',
-          tradeOff: 'monthly cost for a line that idles; both lines may use '
+          tradeOff:
+              'monthly cost for a line that idles; both lines may use '
               'the same duct into the building',
         ),
         AdviceOption(
           label: '4G/5G standby',
-          chooseWhen: 'the budget allows one primary line and a modem/'
+          chooseWhen:
+              'the budget allows one primary line and a modem/'
               'sim-router as backup (the pragmatic answer)',
-          tradeOff: 'data caps and latency; check indoor signal where the '
+          tradeOff:
+              'data caps and latency; check indoor signal where the '
               'router lives',
         ),
         AdviceOption(
           label: 'One line plus UPS and good support',
           chooseWhen: 'a small site where a few hours\' outage is tolerable',
-          tradeOff: 'not redundancy: the line, the ISP and often the power '
+          tradeOff:
+              'not redundancy: the line, the ISP and often the power '
               'share the same failure',
         ),
       ],
@@ -1256,7 +1350,8 @@ class AdvisorService {
       quickReplies: const [
         'Which router should I get for WAN failover with two internet lines?',
       ],
-      nextStep: 'Tell me the downtime budget and what providers reach the '
+      nextStep:
+          'Tell me the downtime budget and what providers reach the '
           'building, and I will choose between a second line and 5G standby.',
     );
   }
@@ -1265,22 +1360,26 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'server_placement',
       kind: c.kind,
-      recommendation: 'Keep DHCP and DNS where the network can always reach '
+      recommendation:
+          'Keep DHCP and DNS where the network can always reach '
           'them: the router for a small network, a server/NAS on a server '
           'VLAN once there are file shares or central authentication. Never '
           'put DHCP on a laptop or a VM that is not always on.',
       options: const [
         AdviceOption(
           label: 'Services on the router/gateway',
-          chooseWhen: 'a home or small office with a single subnet (the '
+          chooseWhen:
+              'a home or small office with a single subnet (the '
               'default)',
-          tradeOff: 'limited roles and storage; the router becomes the '
+          tradeOff:
+              'limited roles and storage; the router becomes the '
               'single point of failure',
         ),
         AdviceOption(
           label: 'Small server or NAS on a server VLAN',
           chooseWhen: 'file shares, media, backups, or central login',
-          tradeOff: 'needs its own VLAN/firewall rules, power protection '
+          tradeOff:
+              'needs its own VLAN/firewall rules, power protection '
               'and patching',
         ),
         AdviceOption(
@@ -1297,10 +1396,9 @@ class AdvisorService {
               'one a role (DHCP/DNS/AAA) so the build configures its '
               'services tab rather than leaving it idle.',
       ],
-      quickReplies: [
-        c.planSentence('a DHCP/DNS server and a file server'),
-      ],
-      nextStep: 'List the services you actually need and I will say what '
+      quickReplies: [c.planSentence('a DHCP/DNS server and a file server')],
+      nextStep:
+          'List the services you actually need and I will say what '
           'belongs on the router and what belongs on a server.',
     );
   }
@@ -1309,7 +1407,8 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'rack_and_power',
       kind: c.kind,
-      recommendation: 'Treat the cabinet as a small project: a patch panel '
+      recommendation:
+          'Treat the cabinet as a small project: a patch panel '
           'with every run labeled, a PoE switch, the router/firewall and a '
           'line-interactive UPS sized above the real load. Label both ends '
           'of every cable while you install it - nobody ever regrets labels.',
@@ -1322,13 +1421,15 @@ class AdvisorService {
         AdviceOption(
           label: 'Floor rack with patch panel + PDU/UPS',
           chooseWhen: 'an office with multiple rooms or cabling runs',
-          tradeOff: 'cost and space; get the depth right for the switch '
+          tradeOff:
+              'cost and space; get the depth right for the switch '
               'before buying',
         ),
         AdviceOption(
           label: 'No cabinet (gear on a shelf)',
           chooseWhen: 'one router and one switch, nothing else',
-          tradeOff: 'no protection, no labeling, and cables become the '
+          tradeOff:
+              'no protection, no labeling, and cables become the '
               'documentation',
         ),
       ],
@@ -1339,10 +1440,9 @@ class AdvisorService {
         'Document once - port, cable, room - and every future fault becomes '
             'a five-minute job instead of an afternoon.',
       ],
-      quickReplies: const [
-        'Review my network design for a small office',
-      ],
-      nextStep: 'Tell me the room count and what is powered in the cabinet '
+      quickReplies: const ['Review my network design for a small office'],
+      nextStep:
+          'Tell me the room count and what is powered in the cabinet '
           'and I will list what belongs in it.',
     );
   }
@@ -1351,7 +1451,8 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'segmentation',
       kind: c.kind,
-      recommendation: 'Yes - group devices by trust level and give each '
+      recommendation:
+          'Yes - group devices by trust level and give each '
           'group its own VLAN: staff, guests, cameras, point-of-sale/IoT, '
           'and voice if you run it. The VLAN is half the job; the other half '
           'is one rule per pair on the router/firewall (guests to staff = '
@@ -1359,22 +1460,27 @@ class AdvisorService {
       options: const [
         AdviceOption(
           label: 'VLAN per role + ACLs/firewall rules',
-          chooseWhen: 'any office, school, clinic or cafe with guests, '
+          chooseWhen:
+              'any office, school, clinic or cafe with guests, '
               'cameras or a POS - the usual answer',
-          tradeOff: 'the rules must be written and tested; one permissive '
+          tradeOff:
+              'the rules must be written and tested; one permissive '
               '"any" rule wastes the whole exercise',
         ),
         AdviceOption(
           label: 'One flat network with separate SSIDs',
           chooseWhen: 'a home, or a site with only trusted devices',
-          tradeOff: 'a separate Wi-Fi name on one flat subnet is a label, '
+          tradeOff:
+              'a separate Wi-Fi name on one flat subnet is a label, '
               'not isolation - guests can still reach every device',
         ),
         AdviceOption(
           label: 'Physical separation (own switch/uplink)',
-          chooseWhen: 'industrial or high-security segments that must not '
+          chooseWhen:
+              'industrial or high-security segments that must not '
               'share infrastructure at all',
-          tradeOff: 'doubles cabling and hardware; rarely worth it outside '
+          tradeOff:
+              'doubles cabling and hardware; rarely worth it outside '
               'those cases',
         ),
       ],
@@ -1393,10 +1499,9 @@ class AdvisorService {
         'Which of these must never reach each other: staff, guests, '
             'cameras, or local servers?',
       ],
-      quickReplies: [
-        c.planSentence('guest wifi and staff VLANs'),
-      ],
-      nextStep: 'Name the groups to separate and I will list the VLANs and '
+      quickReplies: [c.planSentence('guest wifi and staff VLANs')],
+      nextStep:
+          'Name the groups to separate and I will list the VLANs and '
           'the rules between them - or plan them into the lab.',
     );
   }
@@ -1405,7 +1510,8 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'lab_models',
       kind: c.kind,
-      recommendation: 'In Packet Tracer, build on the workhorse set: 2911 or '
+      recommendation:
+          'In Packet Tracer, build on the workhorse set: 2911 or '
           '4331 routers, 2960-24TT switches for access-layer work, 3560-24PS '
           'when the lab grades inter-VLAN routing or PoE, Access Point-PT '
           'for wireless, and an ASA 5505/5506 only for firewall labs (ASA is '
@@ -1416,21 +1522,26 @@ class AdvisorService {
         AdviceOption(
           label: 'Routers: 2911 / 4331',
           chooseWhen: 'routing, WAN, NAT, ACL and VPN-style labs',
-          tradeOff: 'no switching ports, so VLAN work still needs a switch '
+          tradeOff:
+              'no switching ports, so VLAN work still needs a switch '
               'model',
         ),
         AdviceOption(
           label: 'Switches: 2960-24TT (L2) / 3560-24PS (L3, PoE)',
-          chooseWhen: '2960 for access/VLAN/STP labs; 3560 when the lab needs '
+          chooseWhen:
+              '2960 for access/VLAN/STP labs; 3560 when the lab needs '
               'SVIs, routing or powered ports',
-          tradeOff: 'the 3560 is the heavier model, and not every Packet '
+          tradeOff:
+              'the 3560 is the heavier model, and not every Packet '
               'Tracer build ships the same device catalog',
         ),
         AdviceOption(
           label: 'Wireless: Access Point-PT / Wireless Router-PT',
-          chooseWhen: 'a wireless lab: AP-PT associates clients with no '
+          chooseWhen:
+              'a wireless lab: AP-PT associates clients with no '
               'cable; Wireless Router-PT is the all-in-one shape',
-          tradeOff: 'the PT wireless models cover 2.4 GHz and simple WPA, not '
+          tradeOff:
+              'the PT wireless models cover 2.4 GHz and simple WPA, not '
               'full enterprise WLAN features',
         ),
       ],
@@ -1454,7 +1565,8 @@ class AdvisorService {
         'Which switch should I get for a packet tracer lab?',
         'What is the difference between a router and a switch?',
       ],
-      nextStep: 'Name the feature the lab grades and the model follows from '
+      nextStep:
+          'Name the feature the lab grades and the model follows from '
           'it - or say "plan it" with the device counts and I will plan the '
           'matching models.',
     );
@@ -1477,11 +1589,14 @@ class AdvisorService {
       name: '1841',
       family: 'router',
       rank: 1,
-      tagline: 'the small classic ISR router, two FastEthernet ports plus '
+      tagline:
+          'the small classic ISR router, two FastEthernet ports plus '
           'WIC slots for serial links',
-      chooseWhen: 'the course or the template names it, or the lab is '
+      chooseWhen:
+          'the course or the template names it, or the lab is '
           'serial-WAN practice on WIC cards',
-      tradeOff: 'it is the oldest and smallest of the router set - routing, '
+      tradeOff:
+          'it is the oldest and smallest of the router set - routing, '
           'NAT and ACL practice runs fine, but a lab graded on throughput '
           'needs a bigger ISR',
     ),
@@ -1491,11 +1606,14 @@ class AdvisorService {
       name: '2811',
       family: 'router',
       rank: 2,
-      tagline: 'the older ISR router, two FastEthernet ports and NM/WIC '
+      tagline:
+          'the older ISR router, two FastEthernet ports and NM/WIC '
           'module slots',
-      chooseWhen: 'the exercise is about modules and slots, or the template '
+      chooseWhen:
+          'the exercise is about modules and slots, or the template '
           'names it',
-      tradeOff: 'it is FastEthernet-only and superseded - the 2901/2911 do '
+      tradeOff:
+          'it is FastEthernet-only and superseded - the 2901/2911 do '
           'the same jobs on newer hardware',
     ),
     _LabModel(
@@ -1505,9 +1623,11 @@ class AdvisorService {
       family: 'router',
       rank: 3,
       tagline: 'the small ISR G2 router, two GigabitEthernet ports',
-      chooseWhen: 'the lab is small routing/NAT/ACL work, or the course '
+      chooseWhen:
+          'the lab is small routing/NAT/ACL work, or the course '
           'ships 1941 images',
-      tradeOff: 'it cannot stand in for a 4331 when the lab grades '
+      tradeOff:
+          'it cannot stand in for a 4331 when the lab grades '
           'throughput or licensing',
     ),
     _LabModel(
@@ -1517,9 +1637,11 @@ class AdvisorService {
       family: 'router',
       rank: 4,
       tagline: 'the ISR G2 router with two GigabitEthernet ports',
-      chooseWhen: 'the lab wants gigabit routing inside the G2 family the '
+      chooseWhen:
+          'the lab wants gigabit routing inside the G2 family the '
           'course uses',
-      tradeOff: 'two ports is the whole box - the 2911 adds one more '
+      tradeOff:
+          'two ports is the whole box - the 2911 adds one more '
           'GigabitEthernet and nothing else changes',
     ),
     _LabModel(
@@ -1528,11 +1650,14 @@ class AdvisorService {
       name: '2911',
       family: 'router',
       rank: 5,
-      tagline: 'the Packet Tracer workhorse ISR G2 router, three '
+      tagline:
+          'the Packet Tracer workhorse ISR G2 router, three '
           'GigabitEthernet ports',
-      chooseWhen: 'it is the standard router lab: routing, WAN, NAT, ACL, '
+      chooseWhen:
+          'it is the standard router lab: routing, WAN, NAT, ACL, '
           'OSPF, VPN-style labs',
-      tradeOff: 'there are no switching ports, so VLAN work still needs a '
+      tradeOff:
+          'there are no switching ports, so VLAN work still needs a '
           'switch model',
     ),
     _LabModel(
@@ -1543,7 +1668,8 @@ class AdvisorService {
       rank: 6,
       tagline: 'the ISR 4000 router with two GigabitEthernet ports',
       chooseWhen: 'the lab or its image set names the ISR 4000 generation',
-      tradeOff: 'in the simulator its feature set sits close to the 2911 - '
+      tradeOff:
+          'in the simulator its feature set sits close to the 2911 - '
           'capacity is the real difference',
     ),
     _LabModel(
@@ -1553,9 +1679,11 @@ class AdvisorService {
       family: 'router',
       rank: 7,
       tagline: 'the big ISR 4000 router with three GigabitEthernet ports',
-      chooseWhen: 'the lab grades the big-platform things - throughput, '
+      chooseWhen:
+          'the lab grades the big-platform things - throughput, '
           'licensing, headroom',
-      tradeOff: 'few labs grade the capacity - if none does, the 2911 '
+      tradeOff:
+          'few labs grade the capacity - if none does, the 2911 '
           'builds the identical topology',
     ),
     _LabModel(
@@ -1565,9 +1693,11 @@ class AdvisorService {
       family: 'switch',
       rank: 1,
       tagline: 'the older layer-2 switch with 24 FastEthernet ports',
-      chooseWhen: 'the course names it - the access/VLAN/STP jobs are the '
+      chooseWhen:
+          'the course names it - the access/VLAN/STP jobs are the '
           "2960's otherwise",
-      tradeOff: 'it is superseded by the 2960-24TT in every Packet Tracer '
+      tradeOff:
+          'it is superseded by the 2960-24TT in every Packet Tracer '
           'catalog that ships both',
     ),
     _LabModel(
@@ -1578,7 +1708,8 @@ class AdvisorService {
       rank: 2,
       tagline: 'the layer-2 access switch with 24 FastEthernet ports',
       chooseWhen: 'the lab is access-layer work: VLANs, STP, port security',
-      tradeOff: 'it is layer 2 only - inter-VLAN routing on a 2960 alone '
+      tradeOff:
+          'it is layer 2 only - inter-VLAN routing on a 2960 alone '
           'cannot work',
     ),
     _LabModel(
@@ -1589,7 +1720,8 @@ class AdvisorService {
       rank: 3,
       tagline: 'the layer-3 PoE switch with 24 FastEthernet ports',
       chooseWhen: 'the lab needs SVIs, inter-VLAN routing, or powered ports',
-      tradeOff: 'it is the heavier model, and not every Packet Tracer build '
+      tradeOff:
+          'it is the heavier model, and not every Packet Tracer build '
           'ships the same device catalog',
     ),
     _LabModel(
@@ -1598,10 +1730,12 @@ class AdvisorService {
       name: 'Access Point-PT',
       family: 'wireless',
       rank: 1,
-      tagline: 'the Packet Tracer access point, one wired port and a '
+      tagline:
+          'the Packet Tracer access point, one wired port and a '
           '2.4 GHz radio',
       chooseWhen: 'wireless clients must associate with no cable drawn',
-      tradeOff: 'it covers 2.4 GHz and simple WPA, not full enterprise WLAN '
+      tradeOff:
+          'it covers 2.4 GHz and simple WPA, not full enterprise WLAN '
           'features',
     ),
     _LabModel(
@@ -1610,11 +1744,14 @@ class AdvisorService {
       name: '(Wireless) Router-PT',
       family: 'wireless',
       rank: 2,
-      tagline: 'the generic PT boxes - Wireless Router-PT is the all-in-one '
+      tagline:
+          'the generic PT boxes - Wireless Router-PT is the all-in-one '
           'shape',
-      chooseWhen: 'a quick all-in-one shape matters more than the '
+      chooseWhen:
+          'a quick all-in-one shape matters more than the '
           "box's name",
-      tradeOff: 'it is generic sim hardware - the named models carry the '
+      tradeOff:
+          'it is generic sim hardware - the named models carry the '
           'feature depth',
     ),
     _LabModel(
@@ -1623,10 +1760,12 @@ class AdvisorService {
       name: 'ISA-3000',
       family: 'firewall',
       rank: 1,
-      tagline: 'the industrial security appliance, cataloged ASA-kind by '
+      tagline:
+          'the industrial security appliance, cataloged ASA-kind by '
           'this app',
       chooseWhen: 'an industrial-security lab names it',
-      tradeOff: 'the same rule as the ASA applies: firewall configuration '
+      tradeOff:
+          'the same rule as the ASA applies: firewall configuration '
           'is by hand, never auto-configured',
     ),
     _LabModel(
@@ -1637,15 +1776,18 @@ class AdvisorService {
       rank: 2,
       tagline: 'the ASA firewall appliance',
       chooseWhen: 'the firewall lab is about the ASA CLI itself',
-      tradeOff: 'ASA is not IOS, so this app will not auto-configure it - '
+      tradeOff:
+          'ASA is not IOS, so this app will not auto-configure it - '
           'plan the policy on the router or configure the ASA by hand',
     ),
   ];
 
   /// The lab models [t] names, in table order, deduped by construction:
   /// one row per model, so "isr4331" and "4331" both land on one entry.
-  static List<_LabModel> _namedModels(String t) =>
-      [for (final m in _modelTable) if (m.token.hasMatch(t)) m];
+  static List<_LabModel> _namedModels(String t) => [
+    for (final m in _modelTable)
+      if (m.token.hasMatch(t)) m,
+  ];
 
   /// The answer when the ask names known lab models: a recommendation
   /// first, then one row per model - what it is, when to choose it, what it
@@ -1670,8 +1812,7 @@ class AdvisorService {
       'wireless': 'the radio the wireless clients associate to',
       'firewall': 'the policy box - the one this app leaves to hand config',
     };
-    final sameFamily =
-        shown.map((m) => m.family).toSet().length == 1;
+    final sameFamily = shown.map((m) => m.family).toSet().length == 1;
     final String recommendation;
     if (shown.length >= 2 && sameFamily) {
       final best = shown.reduce((a, b) => a.rank >= b.rank ? a : b);
@@ -1679,7 +1820,8 @@ class AdvisorService {
           .where((m) => m.key != best.key)
           .map((m) => m.name)
           .join(' or ');
-      recommendation = 'Take the ${best.name} unless your course or template '
+      recommendation =
+          'Take the ${best.name} unless your course or template '
           'names the $others: ${best.chooseWhen}. The trade-off: '
           '${best.tradeOff}. The honest caveat either way - these models '
           'build the same Packet Tracer topology, so matching the model the '
@@ -1689,21 +1831,24 @@ class AdvisorService {
       final jobs = shown
           .map((m) => 'the ${m.name} is ${familyJob[m.family]!}')
           .join(' and ');
-      recommendation = 'These are not rivals - $jobs. A working lab needs '
+      recommendation =
+          'These are not rivals - $jobs. A working lab needs '
           'one of each, so choose by the job the lab grades, not one model '
           'against the other.';
     } else {
       final m = shown.first;
-      recommendation = '${m.name} - ${m.tagline}. For a Packet Tracer lab: '
+      recommendation =
+          '${m.name} - ${m.tagline}. For a Packet Tracer lab: '
           'enough for its own jobs (${m.chooseWhen}); it is the wrong box '
           'only when the lab grades what it lacks - ${m.tradeOff}.';
-      final siblings = _modelTable
-          .where((s) => s.family == m.family && s.key != m.key)
-          .toList()
-        ..sort(
-          (a, b) =>
-              (a.rank - m.rank).abs().compareTo((b.rank - m.rank).abs()),
-        );
+      final siblings =
+          _modelTable
+              .where((s) => s.family == m.family && s.key != m.key)
+              .toList()
+            ..sort(
+              (a, b) =>
+                  (a.rank - m.rank).abs().compareTo((b.rank - m.rank).abs()),
+            );
       for (final s in siblings.take(2)) {
         options.add(
           AdviceOption(
@@ -1746,7 +1891,8 @@ class AdvisorService {
         'Which switch should I get for a packet tracer lab?',
         'What is the difference between a router and a switch?',
       ],
-      nextStep: 'Name the feature the lab grades and the model follows from '
+      nextStep:
+          'Name the feature the lab grades and the model follows from '
           'it - or say "plan it" with the device counts and I will plan the '
           'matching models.',
     );
@@ -1759,7 +1905,8 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'sizing',
       kind: c.kind,
-      recommendation: 'Size from the busy hour, not the average: budget '
+      recommendation:
+          'Size from the busy hour, not the average: budget '
           '5-10 Mbit/s per user for browsing, 25+ Mbit/s per user when '
           'several video-call at once, and 25-50% headroom on the WAN. For '
           'ports, count devices + uplinks + 20% spare. For Wi-Fi, one access '
@@ -1768,20 +1915,24 @@ class AdvisorService {
       options: const [
         AdviceOption(
           label: 'Capacity-led',
-          chooseWhen: 'the busiest hour decides (offices, schools at lesson '
+          chooseWhen:
+              'the busiest hour decides (offices, schools at lesson '
               'change)',
-          tradeOff: 'needs a density-aware design; cheap APs crack under the '
+          tradeOff:
+              'needs a density-aware design; cheap APs crack under the '
               'load',
         ),
         AdviceOption(
           label: 'Coverage-led',
-          chooseWhen: 'dead spots are the complaint (home, warehouse, thick '
+          chooseWhen:
+              'dead spots are the complaint (home, warehouse, thick '
               'walls)',
           tradeOff: 'APs placed only for coverage may still be slow at peak',
         ),
         AdviceOption(
           label: 'Hybrid (the usual)',
-          chooseWhen: 'almost always: coverage first, then capacity where '
+          chooseWhen:
+              'almost always: coverage first, then capacity where '
               'people gather',
           tradeOff: 'costs one more AP than a single-led design',
         ),
@@ -1799,10 +1950,9 @@ class AdvisorService {
         'What is the busiest thing they do - browsing, video calls, or file '
             'transfers?',
       ],
-      quickReplies: const [
-        'How many access points do I need for 40 users?',
-      ],
-      nextStep: 'Tell me the user count and the busiest activity and I will '
+      quickReplies: const ['How many access points do I need for 40 users?'],
+      nextStep:
+          'Tell me the user count and the busiest activity and I will '
           'turn the numbers into a plan.',
     );
   }
@@ -1811,7 +1961,8 @@ class AdvisorService {
     return AdviceAnswer(
       topic: 'slow_wifi',
       kind: c.kind,
-      recommendation: 'Work from the wire outward before buying anything: '
+      recommendation:
+          'Work from the wire outward before buying anything: '
           'test on a wired connection first, then fix Wi-Fi placement and '
           'channels, then add APs/capacity, and only then look at QoS or the '
           'ISP plan. Most "slow internet" is local Wi-Fi or DNS, not the '
@@ -1819,23 +1970,29 @@ class AdvisorService {
       options: const [
         AdviceOption(
           label: 'Prove where it is slow',
-          chooseWhen: 'always, first step: wired PC speed test at the same '
+          chooseWhen:
+              'always, first step: wired PC speed test at the same '
               'moment',
-          tradeOff: 'costs ten minutes; without it you may buy an AP for an '
+          tradeOff:
+              'costs ten minutes; without it you may buy an AP for an '
               'ISP problem',
         ),
         AdviceOption(
           label: 'Fix coverage and channels',
-          chooseWhen: 'dead spots, one end of the building, or many '
+          chooseWhen:
+              'dead spots, one end of the building, or many '
               'neighbouring networks on the same channel',
-          tradeOff: 'may need to move/re-cable an AP; moving an AP is often '
+          tradeOff:
+              'may need to move/re-cable an AP; moving an AP is often '
               'more effective than adding one',
         ),
         AdviceOption(
           label: 'Add capacity (APs, wired backhaul, QoS)',
-          chooseWhen: 'wired speed is fine but calls break when the office '
+          chooseWhen:
+              'wired speed is fine but calls break when the office '
               'is full',
-          tradeOff: 'spend; mis-placed APs add interference rather than '
+          tradeOff:
+              'spend; mis-placed APs add interference rather than '
               'capacity',
         ),
       ],
@@ -1857,7 +2014,8 @@ class AdvisorService {
         'How many access points do I need for 40 users?',
         'Is mesh or wired access points better?',
       ],
-      nextStep: 'Tell me wired-vs-wifi and where in the building it is bad, '
+      nextStep:
+          'Tell me wired-vs-wifi and where in the building it is bad, '
           'and I will narrow the cause to one of the four layers.',
     );
   }
@@ -1868,26 +2026,27 @@ class AdvisorService {
   static AdviceAnswer _designReview(_AdvisorContext c) {
     final counts = c.hasPlan
         ? '${c.count('router')} router(s), ${c.count('switch')} switch(es), '
-            '${c.count('pc')} PC(s)'
+              '${c.count('pc')} PC(s)'
         : '';
     return AdviceAnswer(
       topic: 'design_review',
       kind: c.kind,
       recommendation: c.hasPlan
           ? 'Judged as it stands ($counts), the plan covers the core. What I '
-              'would check next, in order: the edge (default route + NAT), '
-              'one address plan per VLAN, the services (DHCP/DNS) reachable '
-              'from each LAN, and a security control on the user ports.'
+                'would check next, in order: the edge (default route + NAT), '
+                'one address plan per VLAN, the services (DHCP/DNS) reachable '
+                'from each LAN, and a security control on the user ports.'
           : 'Start from the edge and work inward: one router/firewall at the '
-              'internet, a managed switch for the desks, wired access points, '
-              'one VLAN per role (staff / guest / voice / cameras), DHCP and '
-              'DNS somewhere always-on, and a backup path if downtime costs '
-              'money.',
+                'internet, a managed switch for the desks, wired access points, '
+                'one VLAN per role (staff / guest / voice / cameras), DHCP and '
+                'DNS somewhere always-on, and a backup path if downtime costs '
+                'money.',
       options: const [
         AdviceOption(
           label: 'Review the design as it stands',
           chooseWhen: 'a plan or a built network already exists',
-          tradeOff: 'finds the gaps you already own rather than the ones you '
+          tradeOff:
+              'finds the gaps you already own rather than the ones you '
               'might buy for',
         ),
         AdviceOption(
@@ -1925,14 +2084,15 @@ class AdvisorService {
       quickReplies: [
         if (c.planBrief != null) c.planBrief!,
         if (c.hasPlan) 'Should I segment this plan into VLANs?',
-        if (!c.hasPlan) 'What router should I get for an office with 20 employees?',
+        if (!c.hasPlan)
+          'What router should I get for an office with 20 employees?',
         if (!c.hasPlan) 'How many access points do I need for 40 users?',
       ],
       nextStep: c.hasPlan
           ? 'Say the layer to check - addressing, routing, services, security '
-              'or wireless - and I will review it against the lab.'
+                'or wireless - and I will review it against the lab.'
           : 'Answer the two questions above and I will produce a design you '
-              'can turn into a plan.',
+                'can turn into a plan.',
       planBrief: c.planBrief,
     );
   }
@@ -2232,12 +2392,10 @@ class _AdvisorContext {
     return 'Plan a small office with $n employees, $extra';
   }
 
-  bool mentionsAny(List<String> phrases) =>
-      phrases.any((p) => t.contains(p));
+  bool mentionsAny(List<String> phrases) => phrases.any((p) => t.contains(p));
 
-  bool words(List<String> words) => words.any(
-    (w) => RegExp('\\b${RegExp.escape(w)}\\b').hasMatch(t),
-  );
+  bool words(List<String> words) =>
+      words.any((w) => RegExp('\\b${RegExp.escape(w)}\\b').hasMatch(t));
 
   int count(String type) =>
       plan?.nodes.where((n) => n.type == type).length ?? 0;
@@ -2279,11 +2437,13 @@ class _AdvisorContext {
   /// silent about the one fact the advisor was just using.
   String? get planBrief {
     if (!lab) return null;
-    if (hasPlan) return null; // the lab already exists; advice must not re-plan it
+    if (hasPlan)
+      return null; // the lab already exists; advice must not re-plan it
     final v = venue;
     final n = scale;
     if (v == _Venue.home) {
-      if (n == null) return 'Build a home network with 1 wireless router and 4 PCs';
+      if (n == null)
+        return 'Build a home network with 1 wireless router and 4 PCs';
       return 'Build a home network with 1 wireless router and $n PCs';
     }
     if (n == null) {

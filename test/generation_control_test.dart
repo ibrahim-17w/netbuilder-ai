@@ -22,8 +22,11 @@ void main() {
     final second = control.begin();
     expect(control.isCurrent(second), isTrue);
     expect(control.cancelled, isFalse);
-    expect(control.isCurrent(first), isFalse,
-        reason: 'a stale token must never look current again');
+    expect(
+      control.isCurrent(first),
+      isFalse,
+      reason: 'a stale token must never look current again',
+    );
   });
 
   test('a second turn makes the first token stale without a cancel', () {
@@ -55,16 +58,23 @@ void main() {
       final withoutProbe = AbortSignal(control.abortTrigger);
       expect(withoutProbe.isAborted, isFalse);
       await Future<void>.delayed(Duration.zero);
-      expect(withoutProbe.isAborted, isTrue,
-          reason: 'which is why a request built after the stop used to go out '
-              'anyway');
+      expect(
+        withoutProbe.isAborted,
+        isTrue,
+        reason:
+            'which is why a request built after the stop used to go out '
+            'anyway',
+      );
 
       final withProbe = AbortSignal(
         control.abortTrigger,
         isAbortedNow: () => control.cancelled,
       );
-      expect(withProbe.isAborted, isTrue,
-          reason: 'read synchronously, the stop is honoured immediately');
+      expect(
+        withProbe.isAborted,
+        isTrue,
+        reason: 'read synchronously, the stop is honoured immediately',
+      );
       expect(
         () => withProbe.throwIfAborted(),
         throwsA(isA<AbortedException>()),
@@ -94,8 +104,11 @@ void main() {
       final failing = Future<void>.error(Exception('the trigger broke'));
       final signal = AbortSignal(failing);
       await pumpEventQueue();
-      expect(signal.isAborted, isFalse,
-          reason: 'a broken signal must not be reported as the user stopping');
+      expect(
+        signal.isAborted,
+        isFalse,
+        reason: 'a broken signal must not be reported as the user stopping',
+      );
       expect(signal.isAbortError(Exception('a real failure')), isFalse);
     });
   });

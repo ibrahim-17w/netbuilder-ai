@@ -126,8 +126,7 @@ class DesignBrief {
   String value(String slotId) => facts[slotId]?.value ?? '';
 
   /// Slots with no value yet, in card order.
-  List<String> get missing =>
-      slotIds.where((id) => !has(id)).toList();
+  List<String> get missing => slotIds.where((id) => !has(id)).toList();
 
   /// Critical slots with no value: the readiness gate.
   List<String> get missingCritical =>
@@ -183,7 +182,9 @@ class DesignBrief {
     facts: {
       for (final e in json.entries)
         if (e.value is Map)
-          e.key.toString(): BriefFact.fromJson(Map<String, dynamic>.from(e.value as Map)),
+          e.key.toString(): BriefFact.fromJson(
+            Map<String, dynamic>.from(e.value as Map),
+          ),
     },
   );
 }

@@ -105,8 +105,10 @@ class _LocalModelSectionState extends State<LocalModelSection> {
     });
     // A saved cloud key is left alone on purpose: localhost ignores it, and
     // deleting credentials the user may want back is not a preset's job.
-    widget.onNote('${preset.label} set as the base URL. A local server '
-        'needs no API key - leave the key field empty.');
+    widget.onNote(
+      '${preset.label} set as the base URL. A local server '
+      'needs no API key - leave the key field empty.',
+    );
   }
 
   Future<void> _test() async {
@@ -132,7 +134,8 @@ class _LocalModelSectionState extends State<LocalModelSection> {
     // The indicator only claims what was actually seen: this exact address,
     // probed by hand, with the field untouched since. No polling - a server
     // that stops after the test says so in the chat, not in a light here.
-    final reachable = _probe != null &&
+    final reachable =
+        _probe != null &&
         _probe!.reachable &&
         _probedBase == base &&
         LocalModelProber.isLocal(base);

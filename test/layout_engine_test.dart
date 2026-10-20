@@ -282,13 +282,7 @@ void main() {
       ],
       links: const [
         NetLink(a: 'FW1', aIf: 'g0/0', b: 'R1', bIf: 'g0/0'),
-        NetLink(
-          a: 'R1',
-          aIf: 'g0/1',
-          b: 'R2',
-          bIf: 'g0/0',
-          cable: 'serial',
-        ),
+        NetLink(a: 'R1', aIf: 'g0/1', b: 'R2', bIf: 'g0/0', cable: 'serial'),
         NetLink(a: 'R1', aIf: 'g0/2', b: 'SW1', bIf: 'g0/1'),
         NetLink(a: 'SW1', aIf: 'f0/1', b: 'PC1', bIf: 'f0'),
         NetLink(a: 'SW1', aIf: 'f0/2', b: 'PC2', bIf: 'f0'),
@@ -469,13 +463,7 @@ void main() {
       ],
       links: const [
         NetLink(a: 'FW1', aIf: 'g0/0', b: 'R1', bIf: 'g0/0'),
-        NetLink(
-          a: 'R1',
-          aIf: 'g0/1',
-          b: 'R2',
-          bIf: 'g0/0',
-          cable: 'serial',
-        ),
+        NetLink(a: 'R1', aIf: 'g0/1', b: 'R2', bIf: 'g0/0', cable: 'serial'),
         NetLink(a: 'R1', aIf: 'g0/2', b: 'SW1', bIf: 'g0/1'),
         NetLink(a: 'SW1', aIf: 'f0/1', b: 'PC1', bIf: 'f0'),
         NetLink(a: 'SW1', aIf: 'f0/2', b: 'PC2', bIf: 'f0'),
@@ -679,13 +667,7 @@ void main() {
       // switches may not.)
       final byAngle = [
         for (final name in ringNames)
-          (
-            name,
-            math.atan2(
-              yOf(snap, name) - centreY,
-              xOf(snap, name) - cx,
-            ),
-          ),
+          (name, math.atan2(yOf(snap, name) - centreY, xOf(snap, name) - cx)),
       ]..sort((a, b) => a.$2.compareTo(b.$2));
       const switches = {'SW1', 'SW2'};
       for (var i = 0; i < byAngle.length; i++) {
@@ -815,10 +797,11 @@ void main() {
       );
       final parked = resolveSideNames(intent, kinds: const ['server']);
       expect(parked, isNotEmpty);
-      final prints = computeAllLayouts(intent, side: parked)
-          .values
+      final prints = computeAllLayouts(intent, side: parked).values
           .map(
-            (s) => s.spots.map((spot) => '${spot.name}@${spot.x},${spot.y}').join('|'),
+            (s) => s.spots
+                .map((spot) => '${spot.name}@${spot.x},${spot.y}')
+                .join('|'),
           )
           .toSet();
       expect(prints.length, kLayoutStyles.length);
@@ -828,11 +811,7 @@ void main() {
       final intent = _plan('3 routers, 3 switches, 20 PCs and 3 servers');
       final parked = resolveSideNames(intent, kinds: const ['server']);
       for (final style in kLayoutStyles) {
-        final snap = computeLayoutSnapshot(
-          intent,
-          style: style,
-          side: parked,
-        );
+        final snap = computeLayoutSnapshot(intent, style: style, side: parked);
         expect(
           snap.spots.length,
           intent.nodes.length,
@@ -868,10 +847,7 @@ void main() {
       final shapes = <String, List<double>>{};
       for (final style in kLayoutStyles) {
         final snap = computeLayoutSnapshot(intent, style: style);
-        shapes[style] = [
-          snap.width / snap.height,
-          snap.maxY,
-        ];
+        shapes[style] = [snap.width / snap.height, snap.maxY];
       }
       final wideRatios = shapes.entries
           .map((e) => e.value[0] / (e.value[1] / 1000))
@@ -898,7 +874,8 @@ void main() {
       final x = <String, double>{for (final s in snap.spots) s.name: s.x};
       expect(<double?>{for (final s in servers) x[s]}.length, 1);
       expect(<double?>{for (final r in routers) x[r]}.length, 1);
-      final switchX = x[intent.nodes.firstWhere((n) => n.type == 'switch').name]!;
+      final switchX =
+          x[intent.nodes.firstWhere((n) => n.type == 'switch').name]!;
       expect(servers.every((s) => x[s]! < switchX), isTrue);
       expect(routers.every((r) => x[r]! > switchX), isTrue);
     });
@@ -927,7 +904,9 @@ void main() {
       final snap = computeLayoutSnapshot(
         intent,
         style: 'grouped',
-        zones: const [LayoutZone(['NOPE1', 'NOPE2'])],
+        zones: const [
+          LayoutZone(['NOPE1', 'NOPE2']),
+        ],
       );
       expect(snap.spots.length, intent.nodes.length);
     });

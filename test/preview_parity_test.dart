@@ -37,7 +37,8 @@ void main() {
       expect(
         positions.keys.toSet(),
         plan.nodes.map((n) => n.name).toSet(),
-        reason: 'a device with no spot in the payload is a device the sidecar '
+        reason:
+            'a device with no spot in the payload is a device the sidecar '
             'has to place for itself, which is how the preview stops being '
             'the truth',
       );
@@ -57,13 +58,17 @@ void main() {
           layout: {'style': style},
         );
         final positions = _positionsOf(payload);
-        expect(positions, hasLength(snapshot.spots.length),
-            reason: 'style $style');
+        expect(
+          positions,
+          hasLength(snapshot.spots.length),
+          reason: 'style $style',
+        );
         for (final spot in snapshot.spots) {
           expect(
             positions[spot.name],
             <int>[spot.x.toInt(), spot.y.toInt()],
-            reason: 'style $style placed ${spot.name} differently in the '
+            reason:
+                'style $style placed ${spot.name} differently in the '
                 'preview and in the build',
           );
         }
@@ -73,16 +78,26 @@ void main() {
     test('two styles really do reach the build as two different drawings', () {
       final plan = _plan('2 routers, 2 switches and 6 PCs');
       final tree = _positionsOf(
-        PacketTracerAdapter.autopilotPlan(plan, layout: const {'style': 'tree'}),
+        PacketTracerAdapter.autopilotPlan(
+          plan,
+          layout: const {'style': 'tree'},
+        ),
       );
       final circle = _positionsOf(
-        PacketTracerAdapter.autopilotPlan(plan, layout: const {'style': 'circle'}),
+        PacketTracerAdapter.autopilotPlan(
+          plan,
+          layout: const {'style': 'circle'},
+        ),
       );
       expect(tree, isNotEmpty);
       expect(circle, isNotEmpty);
-      expect(tree, isNot(equals(circle)),
-          reason: 'if the styles converge in the payload the user cannot tell '
-              'the drawings apart by what gets built');
+      expect(
+        tree,
+        isNot(equals(circle)),
+        reason:
+            'if the styles converge in the payload the user cannot tell '
+            'the drawings apart by what gets built',
+      );
     });
 
     test('a grouped request places its zones exactly as the gallery drew', () {
@@ -94,7 +109,8 @@ void main() {
       };
       final payload = PacketTracerAdapter.autopilotPlan(plan, layout: request);
       final layout = payload['layout'] as Map;
-      final side = (layout['side'] as List?)?.cast<String>() ?? const <String>[];
+      final side =
+          (layout['side'] as List?)?.cast<String>() ?? const <String>[];
       expect(side, isNotEmpty, reason: 'the servers should resolve to a side');
 
       final expected = computeLayoutSnapshot(
@@ -105,18 +121,27 @@ void main() {
       );
       final positions = _positionsOf(payload);
       for (final spot in expected.spots) {
-        expect(positions[spot.name], <int>[spot.x.toInt(), spot.y.toInt()],
-            reason: 'grouped placement drifted for ${spot.name}');
+        expect(
+          positions[spot.name],
+          <int>[spot.x.toInt(), spot.y.toInt()],
+          reason: 'grouped placement drifted for ${spot.name}',
+        );
       }
     });
 
     test('an explicit layout argument is what gets placed', () {
       final plan = _plan('1 router and 4 PCs');
       final compact = _positionsOf(
-        PacketTracerAdapter.autopilotPlan(plan, layout: const {'style': 'compact'}),
+        PacketTracerAdapter.autopilotPlan(
+          plan,
+          layout: const {'style': 'compact'},
+        ),
       );
       final wide = _positionsOf(
-        PacketTracerAdapter.autopilotPlan(plan, layout: const {'style': 'wide'}),
+        PacketTracerAdapter.autopilotPlan(
+          plan,
+          layout: const {'style': 'wide'},
+        ),
       );
       expect(compact, isNotEmpty);
       expect(compact, isNot(equals(wide)));
@@ -150,9 +175,9 @@ void main() {
         plan,
         layout: const {'style': 'layered'},
       );
-      final encoded = PacketTracerAdapter.exportPlanJson(plan.copyWith(
-        notes: ['layout: layered'],
-      ));
+      final encoded = PacketTracerAdapter.exportPlanJson(
+        plan.copyWith(notes: ['layout: layered']),
+      );
       expect(encoded, contains('"positions"'));
 
       final asMap = payload['layout'] as Map;

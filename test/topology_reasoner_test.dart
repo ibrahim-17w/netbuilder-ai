@@ -66,10 +66,7 @@ void main() {
     test('the classic fault question resolves both ends', () {
       final plan = ospfLab();
       final (a, b) = sameSubnetPair(plan);
-      final q = ReachabilityQuestion.parse(
-        "why can't $a ping $b",
-        plan,
-      );
+      final q = ReachabilityQuestion.parse("why can't $a ping $b", plan);
       expect(q, isNotNull);
       expect(q!.from.toLowerCase(), a.toLowerCase());
       expect(q.to.toLowerCase(), b.toLowerCase());
@@ -111,10 +108,7 @@ void main() {
 
     test('non-questions stay null with no failure claimed', () {
       final plan = ospfLab();
-      final result = ReachabilityQuestion.parseQuestion(
-        'what is a vlan',
-        plan,
-      );
+      final result = ReachabilityQuestion.parseQuestion('what is a vlan', plan);
       expect(result.question, isNull);
       expect(result.failure, isNull);
     });

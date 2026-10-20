@@ -65,8 +65,11 @@ void main() {
         expect(o.chooseWhen, isNotEmpty);
         expect(o.tradeOff, isNotEmpty);
       }
-      expect(a.questions.length, lessThanOrEqualTo(2),
-          reason: 'at most two questions may change the recommendation');
+      expect(
+        a.questions.length,
+        lessThanOrEqualTo(2),
+        reason: 'at most two questions may change the recommendation',
+      );
       expect(a.nextStep, isNotEmpty);
       expect(a.toText(), contains('| Option | Choose it when | Trade-off |'));
     });
@@ -152,8 +155,10 @@ void main() {
         NetworkIntent.classifyBrief('how do I configure a trunk port?'),
         'howto',
       );
-      expect(NetworkIntent.classifyBrief('what is better ospf or static'),
-          'howto');
+      expect(
+        NetworkIntent.classifyBrief('what is better ospf or static'),
+        'howto',
+      );
       expect(
         NetworkIntent.classifyBrief('recommend 2 routers and 4 pcs'),
         'build',

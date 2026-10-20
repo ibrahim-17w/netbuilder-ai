@@ -45,8 +45,7 @@ void main() {
       expect(r.message, isNot(contains('remote')));
     });
 
-    test('connection refused maps to the start-the-server guidance',
-        () async {
+    test('connection refused maps to the start-the-server guidance', () async {
       final client = MockClient(
         (request) async => throw SocketException('Connection refused'),
       );
@@ -64,9 +63,7 @@ void main() {
     test('a timeout maps to the same guidance as a refusal', () async {
       // A server that accepts nothing at all: the future never completes,
       // so the probe's own short timeout is what has to end the wait.
-      final client = MockClient(
-        (request) => Completer<http.Response>().future,
-      );
+      final client = MockClient((request) => Completer<http.Response>().future);
       final r = await LocalModelProber.probe(
         baseUrl: 'http://127.0.0.1:11434/v1',
         client: client,
@@ -99,28 +96,30 @@ void main() {
       expect(unknown.message, contains('is a server running there?'));
     });
 
-    test('a remote host is tested the same way but labeled as remote',
-        () async {
-      final client = MockClient((request) async {
-        expect(request.url.host, 'api.example.com');
-        return http.Response(
-          jsonEncode({
-            'data': [
-              {'id': 'llama-3.3-70b-versatile'},
-            ],
-          }),
-          200,
+    test(
+      'a remote host is tested the same way but labeled as remote',
+      () async {
+        final client = MockClient((request) async {
+          expect(request.url.host, 'api.example.com');
+          return http.Response(
+            jsonEncode({
+              'data': [
+                {'id': 'llama-3.3-70b-versatile'},
+              ],
+            }),
+            200,
+          );
+        });
+        final r = await LocalModelProber.probe(
+          baseUrl: 'https://api.example.com/v1',
+          client: client,
         );
-      });
-      final r = await LocalModelProber.probe(
-        baseUrl: 'https://api.example.com/v1',
-        client: client,
-      );
-      expect(r.reachable, isTrue);
-      expect(r.local, isFalse);
-      expect(r.models, ['llama-3.3-70b-versatile']);
-      expect(r.message, contains('remote address'));
-    });
+        expect(r.reachable, isTrue);
+        expect(r.local, isFalse);
+        expect(r.models, ['llama-3.3-70b-versatile']);
+        expect(r.message, contains('remote address'));
+      },
+    );
 
     test('404 points at the /v1 shape instead of just failing', () async {
       final client = MockClient(
@@ -161,8 +160,7 @@ void main() {
       expect(r.message, contains('no models yet'));
     });
 
-    test('Ollama native tags shape parses through the models[] fallback',
-        () {
+    test('Ollama native tags shape parses through the models[] fallback', () {
       // Pure parse, so the real shape Ollama serves at /api/tags is checked
       // against the exact code that will read it.
       final r = LocalModelProber.parse(
@@ -179,8 +177,7 @@ void main() {
       expect(r.models, ['llama3.2:latest', 'qwen2.5:0.5b']);
     });
 
-    test('a body that is not a model list says so, not "unreachable"',
-        () {
+    test('a body that is not a model list says so, not "unreachable"', () {
       final r = LocalModelProber.parse(
         '<html>hello</html>',
         baseUrl: 'http://127.0.0.1:8080/v1',
@@ -190,8 +187,7 @@ void main() {
       expect(r.message, contains('not with a model list'));
     });
 
-    test('an empty base URL asks for one instead of probing nothing',
-        () async {
+    test('an empty base URL asks for one instead of probing nothing', () async {
       final client = MockClient(
         (request) async => fail('no request should be made'),
       );

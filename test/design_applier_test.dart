@@ -16,12 +16,18 @@ bool _hasType(NetworkIntent plan, String type) =>
 void main() {
   group('naming a design', () {
     test('a design named by its catalog name resolves', () {
-      expect(DesignApplier.namedIn('rebuild it with Redundant core'),
-          DesignLibrary.byId('redundant-core'));
-      expect(DesignApplier.namedIn('use the DMZ design'),
-          DesignLibrary.byId('dmz'));
-      expect(DesignApplier.namedIn('router on a stick please'),
-          DesignLibrary.byId('router-on-a-stick'));
+      expect(
+        DesignApplier.namedIn('rebuild it with Redundant core'),
+        DesignLibrary.byId('redundant-core'),
+      );
+      expect(
+        DesignApplier.namedIn('use the DMZ design'),
+        DesignLibrary.byId('dmz'),
+      );
+      expect(
+        DesignApplier.namedIn('router on a stick please'),
+        DesignLibrary.byId('router-on-a-stick'),
+      );
     });
 
     test('a design named by its id or shorthand resolves', () {
@@ -111,10 +117,7 @@ void main() {
       expect(twice.plan.nodes, hasLength(once.plan.nodes.length));
       expect(twice.plan.vlans, once.plan.vlans);
       // One stamp, not two.
-      expect(
-        twice.plan.notes.where((n) => n == 'design: dmz'),
-        hasLength(1),
-      );
+      expect(twice.plan.notes.where((n) => n == 'design: dmz'), hasLength(1));
     });
 
     test('applying twice adds nothing the second time', () {
@@ -127,7 +130,10 @@ void main() {
 
     test('every design in the catalog can actually be applied', () {
       for (final d in DesignLibrary.all) {
-        final r = DesignApplier.apply(_plan('1 router, 2 switches, 20 PCs'), d.id);
+        final r = DesignApplier.apply(
+          _plan('1 router, 2 switches, 20 PCs'),
+          d.id,
+        );
         expect(r.added, isNotEmpty, reason: '${d.id} applied to nothing');
         expect(r.plan.notes, contains('design: ${d.id}'));
       }
@@ -137,11 +143,16 @@ void main() {
       // A design that makes the plan WORSE is worse than no design: applying
       // it would trade a working build for a broken one.
       for (final d in DesignLibrary.all) {
-        final r = DesignApplier.apply(_plan('1 router, 2 switches, 20 PCs'), d.id);
+        final r = DesignApplier.apply(
+          _plan('1 router, 2 switches, 20 PCs'),
+          d.id,
+        );
         final review = DesignReviewer.review(r.plan);
-        expect(review.findings.where((f) => f.severity == DesignSeverity.fault),
-            isEmpty,
-            reason: '${d.id} left a fault: ${review.headline}');
+        expect(
+          review.findings.where((f) => f.severity == DesignSeverity.fault),
+          isEmpty,
+          reason: '${d.id} left a fault: ${review.headline}',
+        );
       }
     });
   });
@@ -168,16 +179,23 @@ void main() {
           final applied = DesignApplier.applyNamed(plan, asked);
           expect(applied, isNotNull, reason: '"$asked" did not name a design');
           final second = DesignReviewer.review(applied!.plan);
-          expect(second.score, greaterThan(first.score),
-              reason: 'on "$brief", ${offer.design.id} took it from '
-                  '${first.score} to ${second.score}');
+          expect(
+            second.score,
+            greaterThan(first.score),
+            reason:
+                'on "$brief", ${offer.design.id} took it from '
+                '${first.score} to ${second.score}',
+          );
           closed++;
         }
       }
       // A loop that never closes is not a loop. Real briefs have to produce
       // real designs, or the feature is decoration.
-      expect(closed, greaterThan(0),
-          reason: 'no brief in the list produced a design worth applying');
+      expect(
+        closed,
+        greaterThan(0),
+        reason: 'no brief in the list produced a design worth applying',
+      );
     });
 
     test('a design is never offered for a plan it cannot improve', () {
@@ -191,9 +209,13 @@ void main() {
         final first = DesignReviewer.review(plan);
         for (final offer in DesignLibrary.suggestionsForReview(plan, first)) {
           final applied = DesignApplier.apply(plan, offer.design.id);
-          expect(DesignReviewer.review(applied.plan).score, greaterThan(first.score),
-              reason: '${offer.design.id} was offered for "$brief" but '
-                  'lowered the score');
+          expect(
+            DesignReviewer.review(applied.plan).score,
+            greaterThan(first.score),
+            reason:
+                '${offer.design.id} was offered for "$brief" but '
+                'lowered the score',
+          );
         }
       }
     });
@@ -202,14 +224,19 @@ void main() {
       // The review prints "ask me to rebuild with one of those". If any of
       // those names could not be typed back, the offer is a dead end.
       final plan = _plan(
-          '2 routers, 3 switches, 4 servers, 60 PCs and a firewall');
+        '2 routers, 3 switches, 4 servers, 60 PCs and a firewall',
+      );
       final offers = DesignLibrary.suggestionsForReview(
-          plan, DesignReviewer.review(plan));
+        plan,
+        DesignReviewer.review(plan),
+      );
       for (final offer in offers) {
-        final asked =
-            'rebuild it with ${offer.design.name} for this site';
-        expect(DesignApplier.namedIn(asked)?.id, offer.design.id,
-            reason: '"$asked" did not resolve back to its own design');
+        final asked = 'rebuild it with ${offer.design.name} for this site';
+        expect(
+          DesignApplier.namedIn(asked)?.id,
+          offer.design.id,
+          reason: '"$asked" did not resolve back to its own design',
+        );
       }
     });
   });

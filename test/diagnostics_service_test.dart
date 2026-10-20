@@ -186,8 +186,11 @@ Interface: 192.168.1.10 --- 0xb
       expect(trace.output, isEmpty);
       expect(trace.error, contains('not a host name'));
 
-      expect(marker.existsSync(), isFalse,
-          reason: 'the second command never ran, because there was no shell');
+      expect(
+        marker.existsSync(),
+        isFalse,
+        reason: 'the second command never ran, because there was no shell',
+      );
     });
 
     test('the socket and DNS probes refuse the same targets', () async {
@@ -260,10 +263,16 @@ Interface: 192.168.1.10 --- 0xb
     });
 
     test('a DNS answer says whether it resolved', () {
-      const lookup = DnsLookup(host: 'example.com', addresses: ['93.184.216.34']);
+      const lookup = DnsLookup(
+        host: 'example.com',
+        addresses: ['93.184.216.34'],
+      );
       expect(lookup.ok, isTrue);
       expect(lookup.summary, contains('1 address'));
-      const failed = DnsLookup(host: 'nope.invalid', error: 'name did not resolve');
+      const failed = DnsLookup(
+        host: 'nope.invalid',
+        error: 'name did not resolve',
+      );
       expect(failed.ok, isFalse);
       expect(failed.summary, contains('no answer'));
     });

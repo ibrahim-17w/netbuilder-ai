@@ -106,12 +106,7 @@ final List<GoldenCase> contract = [
     null,
     true,
   ),
-  (
-    '12 PCs, 1 switch',
-    {'pc': 12, 'switch': 1},
-    null,
-    true,
-  ),
+  ('12 PCs, 1 switch', {'pc': 12, 'switch': 1}, null, true),
   // --- the tiny-office default ------------------------------------------------
   (
     'build me something for the office',
@@ -151,12 +146,7 @@ final List<GoldenCase> contract = [
     null,
     true,
   ),
-  (
-    'no ospf for this lab, 2 routers',
-    {'router': 2},
-    'static',
-    false,
-  ),
+  ('no ospf for this lab, 2 routers', {'router': 2}, 'static', false),
   (
     'the second floor needs 6 access points, actually 8',
     {'wireless': 8},
@@ -217,16 +207,18 @@ final List<GoldenCase> contract = [
     true,
   ),
   ('CCNA lab 4.3.2 configure OSPF on R1 and R2', {'router': 2}, 'ospf', true),
-  ('the assignment says 3 routers 3 switches 9 pcs', {
-    'router': 3,
-    'switch': 3,
-    'pc': 9,
-  }, null, true),
-  ('build a network with 2 routers, 2 switches and 10 PCs, then configure OSPF', {
-    'router': 2,
-    'switch': 2,
-    'pc': 10,
-  }, 'ospf', true),
+  (
+    'the assignment says 3 routers 3 switches 9 pcs',
+    {'router': 3, 'switch': 3, 'pc': 9},
+    null,
+    true,
+  ),
+  (
+    'build a network with 2 routers, 2 switches and 10 PCs, then configure OSPF',
+    {'router': 2, 'switch': 2, 'pc': 10},
+    'ospf',
+    true,
+  ),
   ('lab 5.1.1: eigrp between R1 R2 R3', {'router': 3}, 'eigrp', true),
   // The lab number reads as a count only if the parser mistakes it; naming a
   // protocol near it must still land.
@@ -280,12 +272,7 @@ final List<GoldenCase> contract = [
 
   // --- services name the server they provision -------------------------------
   // A role is a request for a device, not a label on an existing one.
-  (
-    '1 router with dns dhcp and http',
-    {'router': 1, 'server': 1},
-    null,
-    true,
-  ),
+  ('1 router with dns dhcp and http', {'router': 1, 'server': 1}, null, true),
   (
     'router with a tftp server for image backup',
     {'router': 1, 'server': 1},
@@ -298,12 +285,7 @@ final List<GoldenCase> contract = [
     null,
     true,
   ),
-  (
-    '1 router with aaa tacacs+ server',
-    {'router': 1, 'server': 1},
-    null,
-    true,
-  ),
+  ('1 router with aaa tacacs+ server', {'router': 1, 'server': 1}, null, true),
   (
     'router 1 with ntp and snmp and 2 switches',
     {'router': 1, 'switch': 2, 'server': 1},
@@ -344,18 +326,8 @@ final List<GoldenCase> contract = [
   ),
 
   // --- counts that must not multiply when they are restated -------------------
-  (
-    '5 pcs, 5 pcs',
-    {'pc': 5},
-    null,
-    true,
-  ),
-  (
-    '3 routers 3 routers',
-    {'router': 3},
-    null,
-    true,
-  ),
+  ('5 pcs, 5 pcs', {'pc': 5}, null, true),
+  ('3 routers 3 routers', {'router': 3}, null, true),
 
   // --- phone / printer inventories --------------------------------------------
   (
@@ -402,12 +374,7 @@ final List<GoldenCase> contract = [
   // --- model numbers are never counts ------------------------------------------
   // A model in the sentence must not be mistaken for a quantity, and must
   // still leave the bare mention meaning one device.
-  (
-    'a 4331 router and 2 pcs',
-    {'router': 1, 'pc': 2},
-    null,
-    true,
-  ),
+  ('a 4331 router and 2 pcs', {'router': 1, 'pc': 2}, null, true),
   // --- multi-site phrasing variants --------------------------------------------
   // The drift guard is off on the next TWO cases BECAUSE IT FAILS, and that is a
   // bug worth keeping visible: for these briefs the parser invents an access
@@ -425,7 +392,7 @@ final List<GoldenCase> contract = [
     null,
     false,
   ),
-// =========================================================================
+  // =========================================================================
   // Batch 2. Every expectation here was checked against what the brief
   // MEANS first; where the parser disagreed, the case went to `knownGaps`
   // instead of being quietly rewritten to match the output. That is the whole
@@ -434,78 +401,104 @@ final List<GoldenCase> contract = [
   // =========================================================================
 
   // --- plain inventories, every ordering the parser supports ----------------
-  ('a network with 5 routers 5 switches 25 pcs', {
-    'router': 5,
-    'switch': 5,
-    'pc': 25,
-  }, null, true),
-  ('lab: 1 router 2 switches 8 pcs', {'router': 1, 'switch': 2, 'pc': 8}, null, true),
-  ('build 3 routers 3 switches 12 pcs 2 servers', {
-    'router': 3,
-    'switch': 3,
-    'pc': 12,
-    'server': 2,
-  }, null, true),
-  ('need a topology of 2 routers and 4 switches', {'router': 2, 'switch': 4}, null, true),
+  (
+    'a network with 5 routers 5 switches 25 pcs',
+    {'router': 5, 'switch': 5, 'pc': 25},
+    null,
+    true,
+  ),
+  (
+    'lab: 1 router 2 switches 8 pcs',
+    {'router': 1, 'switch': 2, 'pc': 8},
+    null,
+    true,
+  ),
+  (
+    'build 3 routers 3 switches 12 pcs 2 servers',
+    {'router': 3, 'switch': 3, 'pc': 12, 'server': 2},
+    null,
+    true,
+  ),
+  (
+    'need a topology of 2 routers and 4 switches',
+    {'router': 2, 'switch': 4},
+    null,
+    true,
+  ),
   ('set up 4 pcs on a switch', {'switch': 1, 'pc': 4}, null, true),
-  ('one server two pcs and a router', {'router': 1, 'pc': 2, 'server': 1}, null, true),
-  ('2 routers / 2 switches / 10 pcs', {'router': 2, 'switch': 2, 'pc': 10}, null, true),
+  (
+    'one server two pcs and a router',
+    {'router': 1, 'pc': 2, 'server': 1},
+    null,
+    true,
+  ),
+  (
+    '2 routers / 2 switches / 10 pcs',
+    {'router': 2, 'switch': 2, 'pc': 10},
+    null,
+    true,
+  ),
   ('give me 5 pcs', {'pc': 5}, null, true),
   ('just 1 router', {'router': 1}, null, true),
   ('six pcs please', {'pc': 6}, null, true),
   ('a router and two switches', {'router': 1, 'switch': 2}, null, true),
   ('a switch and 3 pcs', {'switch': 1, 'pc': 3}, null, true),
-  ('main campus 1 router 2 switches 30 pcs', {
-    'router': 1,
-    'switch': 2,
-    'pc': 30,
-  }, null, true),
-  ('branch 1 router 1 switch 10 pcs', {
-    'router': 1,
-    'switch': 1,
-    'pc': 10,
-  }, null, true),
-  ('1 router 2 switches 6 pcs and 1 firewall', {
-    'router': 1,
-    'switch': 2,
-    'pc': 6,
-    'firewall': 1,
-  }, null, true),
-  ('a network with 1 firewall 2 routers 4 pcs', {
-    'router': 2,
-    'pc': 4,
-    'firewall': 1,
-  }, null, true),
-  ('2 routers 2 switches 4 pcs on 10.1.1.0/24', {
-    'router': 2,
-    'switch': 2,
-    'pc': 4,
-  }, null, true),
+  (
+    'main campus 1 router 2 switches 30 pcs',
+    {'router': 1, 'switch': 2, 'pc': 30},
+    null,
+    true,
+  ),
+  (
+    'branch 1 router 1 switch 10 pcs',
+    {'router': 1, 'switch': 1, 'pc': 10},
+    null,
+    true,
+  ),
+  (
+    '1 router 2 switches 6 pcs and 1 firewall',
+    {'router': 1, 'switch': 2, 'pc': 6, 'firewall': 1},
+    null,
+    true,
+  ),
+  (
+    'a network with 1 firewall 2 routers 4 pcs',
+    {'router': 2, 'pc': 4, 'firewall': 1},
+    null,
+    true,
+  ),
+  (
+    '2 routers 2 switches 4 pcs on 10.1.1.0/24',
+    {'router': 2, 'switch': 2, 'pc': 4},
+    null,
+    true,
+  ),
   ('10.0.0.0/24 network with 2 routers', {'router': 2}, null, true),
-  ('build a lab with routers R1 R2 R3 and switches SW1 SW2', {
-    'router': 3,
-    'switch': 2,
-  }, null, true),
+  (
+    'build a lab with routers R1 R2 R3 and switches SW1 SW2',
+    {'router': 3, 'switch': 2},
+    null,
+    true,
+  ),
   ('R1 R2 SW1 SW2 and 4 PCs', {'router': 2, 'switch': 2, 'pc': 4}, null, true),
   ('switch SW1 connected to R1', {'router': 1, 'switch': 1}, null, true),
   ('add PC1 PC2 PC3', {'pc': 3}, null, true),
-  ('2 routers 2 switches 4 pcs, cisco 2911', {
-    'router': 2,
-    'switch': 2,
-    'pc': 4,
-  }, null, true),
+  (
+    '2 routers 2 switches 4 pcs, cisco 2911',
+    {'router': 2, 'switch': 2, 'pc': 4},
+    null,
+    true,
+  ),
 
   // --- EVERY device kind named once means one of each ------------------------
   // The inventory-list case. It is the single best breadth case in the set:
   // six kinds in one sentence, and every one of them must land.
-  ('router switch pc server printer phone', {
-    'router': 1,
-    'switch': 1,
-    'pc': 1,
-    'server': 1,
-    'printer': 1,
-    'phone': 1,
-  }, null, true),
+  (
+    'router switch pc server printer phone',
+    {'router': 1, 'switch': 1, 'pc': 1, 'server': 1, 'printer': 1, 'phone': 1},
+    null,
+    true,
+  ),
 
   // --- corrections replace the number they correct ---------------------------
   ('ten routers is too many, use 2 routers', {'router': 2}, null, true),
@@ -514,18 +507,20 @@ final List<GoldenCase> contract = [
   // A user who says "please" or "can you help me" is still asking for the same
   // lab. These are the cases where a chatty wrapper silently empties the plan.
   ('please make a network with 2 routers', {'router': 2}, null, true),
-  ('can you help me build 3 routers 3 switches 9 pcs', {
-    'router': 3,
-    'switch': 3,
-    'pc': 9,
-  }, null, true),
+  (
+    'can you help me build 3 routers 3 switches 9 pcs',
+    {'router': 3, 'switch': 3, 'pc': 9},
+    null,
+    true,
+  ),
   ('i want 2 routers connected with ospf', {'router': 2}, 'ospf', true),
   ('set up a server and 2 pcs', {'pc': 2, 'server': 1}, null, true),
-  ('1 router 1 switch 10 pcs for a cafe', {
-    'router': 1,
-    'switch': 1,
-    'pc': 10,
-  }, null, true),
+  (
+    '1 router 1 switch 10 pcs for a cafe',
+    {'router': 1, 'switch': 1, 'pc': 10},
+    null,
+    true,
+  ),
 
   // --- the tiny-office default, in the phrasings people actually use ---------
   // A vague brief gets the stated assumption rather than an empty plan. These
@@ -541,24 +536,34 @@ final List<GoldenCase> contract = [
   // --- the sizing pack: a headcount expands before the parser sees it ---------
   // No drift guard: BriefSlotPipeline reads the raw brief, so it cannot know
   // about an expansion that has not happened yet.
-  ('a lab for 30 users', {
-    'router': 1,
-    'switch': 2,
-    'pc': 30,
-    'server': 1,
-    'firewall': 1,
-    'wireless': 2,
-    'cloud': 1,
-  }, null, false),
-  ('network for 25 employees', {
-    'router': 1,
-    'switch': 2,
-    'pc': 25,
-    'server': 1,
-    'firewall': 1,
-    'wireless': 1,
-    'cloud': 1,
-  }, null, false),
+  (
+    'a lab for 30 users',
+    {
+      'router': 1,
+      'switch': 2,
+      'pc': 30,
+      'server': 1,
+      'firewall': 1,
+      'wireless': 2,
+      'cloud': 1,
+    },
+    null,
+    false,
+  ),
+  (
+    'network for 25 employees',
+    {
+      'router': 1,
+      'switch': 2,
+      'pc': 25,
+      'server': 1,
+      'firewall': 1,
+      'wireless': 1,
+      'cloud': 1,
+    },
+    null,
+    false,
+  ),
 
   // --- routing protocol phrasing ----------------------------------------------
   ('ospf on 3 routers', {'router': 3}, 'ospf', true),
@@ -574,73 +579,134 @@ final List<GoldenCase> contract = [
   ('trunk between two switches', {'switch': 2}, null, true),
   ('2 switches with etherchannel', {'switch': 2}, null, true),
   ('configure vtp on the switches', {'switch': 1}, null, true),
-  ('1 router 1 switch 5 pcs vlan 10', {'router': 1, 'switch': 1, 'pc': 5}, null, true),
+  (
+    '1 router 1 switch 5 pcs vlan 10',
+    {'router': 1, 'switch': 1, 'pc': 5},
+    null,
+    true,
+  ),
 
   // --- services provision exactly one server each ----------------------------
   ('a router with dhcp', {'router': 1, 'server': 1}, null, true),
   ('a router with dns and dhcp', {'router': 1, 'server': 1}, null, true),
   ('a server with dns', {'server': 1}, null, true),
   ('1 router with an email server', {'router': 1, 'server': 1}, null, true),
-  ('2 routers 2 switches 4 pcs and a web server', {
-    'router': 2,
-    'switch': 2,
-    'pc': 4,
-    'server': 1,
-  }, null, true),
-  ('2 routers 2 switches 4 pcs, tftp server', {
-    'router': 2,
-    'switch': 2,
-    'pc': 4,
-    'server': 1,
-  }, null, true),
-  ('2 routers 2 switches 4 pcs with a proxy server', {
-    'router': 2,
-    'switch': 2,
-    'pc': 4,
-    'server': 1,
-  }, null, true),
-  ('aaa with radius 2 routers 2 switches 4 pcs', {
-    'router': 2,
-    'switch': 2,
-    'pc': 4,
-    'server': 1,
-  }, null, true),
+  (
+    '2 routers 2 switches 4 pcs and a web server',
+    {'router': 2, 'switch': 2, 'pc': 4, 'server': 1},
+    null,
+    true,
+  ),
+  (
+    '2 routers 2 switches 4 pcs, tftp server',
+    {'router': 2, 'switch': 2, 'pc': 4, 'server': 1},
+    null,
+    true,
+  ),
+  (
+    '2 routers 2 switches 4 pcs with a proxy server',
+    {'router': 2, 'switch': 2, 'pc': 4, 'server': 1},
+    null,
+    true,
+  ),
+  (
+    'aaa with radius 2 routers 2 switches 4 pcs',
+    {'router': 2, 'switch': 2, 'pc': 4, 'server': 1},
+    null,
+    true,
+  ),
 
   // --- security features without a server of their own ------------------------
-  ('1 router 1 switch 3 pcs port forwarding', {
-    'router': 1,
-    'switch': 1,
-    'pc': 3,
-  }, null, true),
-  ('2 routers 2 switches 4 pcs hsrp', {'router': 2, 'switch': 2, 'pc': 4}, null, true),
+  (
+    '1 router 1 switch 3 pcs port forwarding',
+    {'router': 1, 'switch': 1, 'pc': 3},
+    null,
+    true,
+  ),
+  (
+    '2 routers 2 switches 4 pcs hsrp',
+    {'router': 2, 'switch': 2, 'pc': 4},
+    null,
+    true,
+  ),
   ('vpn between two routers', {'router': 2}, null, true),
   ('ipsec tunnel 2 routers', {'router': 2}, null, true),
   ('sdm on a router', {'router': 1}, null, true),
-  ('dmz with a firewall and a server', {'firewall': 1, 'server': 1}, null, true),
+  (
+    'dmz with a firewall and a server',
+    {'firewall': 1, 'server': 1},
+    null,
+    true,
+  ),
 
   // --- wireless vocabulary -----------------------------------------------------
-  ('wireless 3 access points and a router', {'router': 1, 'wireless': 3}, null, true),
+  (
+    'wireless 3 access points and a router',
+    {'router': 1, 'wireless': 3},
+    null,
+    true,
+  ),
   ('2 access points', {'wireless': 2}, null, true),
   ('wifi for the whole office', {'wireless': 1}, null, true),
   ('add wifi coverage', {'wireless': 1}, null, true),
-  ('firewall 2 pcs and a router', {'router': 1, 'pc': 2, 'firewall': 1}, null, true),
+  (
+    'firewall 2 pcs and a router',
+    {'router': 1, 'pc': 2, 'firewall': 1},
+    null,
+    true,
+  ),
 
   // --- systematic inventory coverage ------------------------------------------
   // Plain combinations of the shapes the contract set already proves. They
   // earn their place by pinning the ARITHMETIC across a grid: if a future
   // change makes 'and' stop joining two clauses, or a count stop carrying
   // across a comma, one of these goes red before a user does.
-  ('a lab with 6 routers 6 switches 30 pcs', {'router': 6, 'switch': 6, 'pc': 30}, null, true),
-  ('build 7 routers and 7 switches with 35 pcs', {'router': 7, 'switch': 7, 'pc': 35}, null, true),
+  (
+    'a lab with 6 routers 6 switches 30 pcs',
+    {'router': 6, 'switch': 6, 'pc': 30},
+    null,
+    true,
+  ),
+  (
+    'build 7 routers and 7 switches with 35 pcs',
+    {'router': 7, 'switch': 7, 'pc': 35},
+    null,
+    true,
+  ),
   ('1 router 1 switch 1 pc', {'router': 1, 'switch': 1, 'pc': 1}, null, true),
   ('2 routers 1 switch 1 pc', {'router': 2, 'switch': 1, 'pc': 1}, null, true),
   ('1 router 2 switches 1 pc', {'router': 1, 'switch': 2, 'pc': 1}, null, true),
-  ('2 routers 3 switches 6 pcs', {'router': 2, 'switch': 3, 'pc': 6}, null, true),
+  (
+    '2 routers 3 switches 6 pcs',
+    {'router': 2, 'switch': 3, 'pc': 6},
+    null,
+    true,
+  ),
   ('3 routers 1 switch 9 pcs', {'router': 3, 'switch': 1, 'pc': 9}, null, true),
-  ('4 routers 2 switches 12 pcs', {'router': 4, 'switch': 2, 'pc': 12}, null, true),
-  ('1 router 5 switches 20 pcs', {'router': 1, 'switch': 5, 'pc': 20}, null, true),
-  ('2 routers 2 switches 2 pcs', {'router': 2, 'switch': 2, 'pc': 2}, null, true),
-  ('8 pcs 4 switches 2 routers', {'router': 2, 'switch': 4, 'pc': 8}, null, true),
+  (
+    '4 routers 2 switches 12 pcs',
+    {'router': 4, 'switch': 2, 'pc': 12},
+    null,
+    true,
+  ),
+  (
+    '1 router 5 switches 20 pcs',
+    {'router': 1, 'switch': 5, 'pc': 20},
+    null,
+    true,
+  ),
+  (
+    '2 routers 2 switches 2 pcs',
+    {'router': 2, 'switch': 2, 'pc': 2},
+    null,
+    true,
+  ),
+  (
+    '8 pcs 4 switches 2 routers',
+    {'router': 2, 'switch': 4, 'pc': 8},
+    null,
+    true,
+  ),
   ('10 pcs with 3 switches', {'switch': 3, 'pc': 10}, null, true),
   ('7 pcs on 2 switches', {'switch': 2, 'pc': 7}, null, true),
   ('give me 3 routers and 3 switches', {'router': 3, 'switch': 3}, null, true),
@@ -657,72 +723,257 @@ final List<GoldenCase> contract = [
   ('2 clouds and a router', {'cloud': 2, 'router': 1}, null, true),
   ('an access point and a router', {'wireless': 1, 'router': 1}, null, true),
   ('4 access points', {'wireless': 4}, null, true),
-  ('2 routers 2 switches 4 pcs with dns', {'router': 2, 'switch': 2, 'pc': 4, 'server': 1}, null, true),
-  ('2 routers 2 switches 4 pcs with dhcp', {'router': 2, 'switch': 2, 'pc': 4, 'server': 1}, null, true),
-  ('2 routers 2 switches 4 pcs with a dhcp server', {'router': 2, 'switch': 2, 'pc': 4, 'server': 1}, null, true),
-  ('2 routers 2 switches 4 pcs with a web server', {'router': 2, 'switch': 2, 'pc': 4, 'server': 1}, null, true),
-  ('2 routers 2 switches 4 pcs with an ftp server', {'router': 2, 'switch': 2, 'pc': 4, 'server': 1}, null, true),
-  ('2 routers 2 switches 4 pcs with a mail server', {'router': 2, 'switch': 2, 'pc': 4, 'server': 1}, null, true),
+  (
+    '2 routers 2 switches 4 pcs with dns',
+    {'router': 2, 'switch': 2, 'pc': 4, 'server': 1},
+    null,
+    true,
+  ),
+  (
+    '2 routers 2 switches 4 pcs with dhcp',
+    {'router': 2, 'switch': 2, 'pc': 4, 'server': 1},
+    null,
+    true,
+  ),
+  (
+    '2 routers 2 switches 4 pcs with a dhcp server',
+    {'router': 2, 'switch': 2, 'pc': 4, 'server': 1},
+    null,
+    true,
+  ),
+  (
+    '2 routers 2 switches 4 pcs with a web server',
+    {'router': 2, 'switch': 2, 'pc': 4, 'server': 1},
+    null,
+    true,
+  ),
+  (
+    '2 routers 2 switches 4 pcs with an ftp server',
+    {'router': 2, 'switch': 2, 'pc': 4, 'server': 1},
+    null,
+    true,
+  ),
+  (
+    '2 routers 2 switches 4 pcs with a mail server',
+    {'router': 2, 'switch': 2, 'pc': 4, 'server': 1},
+    null,
+    true,
+  ),
   ('1 router with snmp', {'router': 1, 'server': 1}, null, true),
   ('1 router with ntp', {'router': 1, 'server': 1}, null, true),
-  ('router 1 with 2 switches and a dns server', {'router': 1, 'switch': 2, 'server': 1}, null, true),
+  (
+    'router 1 with 2 switches and a dns server',
+    {'router': 1, 'switch': 2, 'server': 1},
+    null,
+    true,
+  ),
   ('ospf with 2 routers 2 switches', {'router': 2, 'switch': 2}, null, true),
   ('eigrp with 3 routers 3 switches', {'router': 3, 'switch': 3}, null, true),
   ('bgp with 2 routers', {'router': 2}, null, true),
-  ('ospf 2 routers 2 switches 4 pcs', {'router': 2, 'switch': 2, 'pc': 4}, null, true),
-  ('eigrp 3 routers 2 switches 6 pcs', {'router': 3, 'switch': 2, 'pc': 6}, null, true),
+  (
+    'ospf 2 routers 2 switches 4 pcs',
+    {'router': 2, 'switch': 2, 'pc': 4},
+    null,
+    true,
+  ),
+  (
+    'eigrp 3 routers 2 switches 6 pcs',
+    {'router': 3, 'switch': 2, 'pc': 6},
+    null,
+    true,
+  ),
   ('static routing with 3 routers', {'router': 3}, null, true),
   ('ospf area 1 with 4 routers', {'router': 4}, null, true),
-  ('router R1 switch SW1 and 2 pcs', {'router': 1, 'switch': 1, 'pc': 2}, null, true),
-  ('routers R1 and R2 with switches SW1 SW2', {'router': 2, 'switch': 2}, null, true),
+  (
+    'router R1 switch SW1 and 2 pcs',
+    {'router': 1, 'switch': 1, 'pc': 2},
+    null,
+    true,
+  ),
+  (
+    'routers R1 and R2 with switches SW1 SW2',
+    {'router': 2, 'switch': 2},
+    null,
+    true,
+  ),
   ('R1 R2 R3 and 6 pcs', {'router': 3, 'pc': 6}, null, true),
   ('SW1 SW2 SW3 and 9 pcs', {'switch': 3, 'pc': 9}, null, true),
   ('R1 connects to SW1 and SW2', {'router': 1, 'switch': 2}, null, true),
-  ('10.10.10.0/24 with 2 routers 2 switches 4 pcs', {'router': 2, 'switch': 2, 'pc': 4}, null, true),
+  (
+    '10.10.10.0/24 with 2 routers 2 switches 4 pcs',
+    {'router': 2, 'switch': 2, 'pc': 4},
+    null,
+    true,
+  ),
   ('172.16.0.0/16 network 2 routers', {'router': 2}, null, true),
-  ('192.168.0.0/24 with 1 router 1 switch 5 pcs', {'router': 1, 'switch': 1, 'pc': 5}, null, true),
+  (
+    '192.168.0.0/24 with 1 router 1 switch 5 pcs',
+    {'router': 1, 'switch': 1, 'pc': 5},
+    null,
+    true,
+  ),
   ('build 2 routers on 10.0.0.0/8', {'router': 2}, null, true),
-  ('a cafe with 2 routers 2 switches 4 pcs', {'router': 2, 'switch': 2, 'pc': 4}, null, true),
-  ('an office with 1 router 1 switch 6 pcs', {'router': 1, 'switch': 1, 'pc': 6}, null, true),
-  ('a school with 2 routers 4 switches 20 pcs', {'router': 2, 'switch': 4, 'pc': 20}, null, true),
-  ('a hotel with 2 routers 2 switches 10 pcs', {'router': 2, 'switch': 2, 'pc': 10}, null, true),
-  ('what do i need for 2 routers and 2 switches', {'router': 2, 'switch': 2}, null, true),
+  (
+    'a cafe with 2 routers 2 switches 4 pcs',
+    {'router': 2, 'switch': 2, 'pc': 4},
+    null,
+    true,
+  ),
+  (
+    'an office with 1 router 1 switch 6 pcs',
+    {'router': 1, 'switch': 1, 'pc': 6},
+    null,
+    true,
+  ),
+  (
+    'a school with 2 routers 4 switches 20 pcs',
+    {'router': 2, 'switch': 4, 'pc': 20},
+    null,
+    true,
+  ),
+  (
+    'a hotel with 2 routers 2 switches 10 pcs',
+    {'router': 2, 'switch': 2, 'pc': 10},
+    null,
+    true,
+  ),
+  (
+    'what do i need for 2 routers and 2 switches',
+    {'router': 2, 'switch': 2},
+    null,
+    true,
+  ),
   // The drift guard is off HERE BECAUSE IT FAILS: the parser and
   // BriefSlotPipeline disagree about the pc count on a question-shaped
   // brief. The count itself is right; the two readers are not.
   ('how many pcs for 20 users in one room', {'pc': 20}, null, false),
-  ('can you make 3 routers 3 switches 9 pcs', {'router': 3, 'switch': 3, 'pc': 9}, null, true),
+  (
+    'can you make 3 routers 3 switches 9 pcs',
+    {'router': 3, 'switch': 3, 'pc': 9},
+    null,
+    true,
+  ),
 
   // --- final inventory grid --------------------------------------------------
-  ('i need a network with 2 routers and 2 switches', {'router': 2, 'switch': 2}, null, true),
+  (
+    'i need a network with 2 routers and 2 switches',
+    {'router': 2, 'switch': 2},
+    null,
+    true,
+  ),
   ('create a topology with 3 routers', {'router': 3}, null, true),
   ('make me a lab with 4 switches', {'switch': 4}, null, true),
   ('build a topology for 12 pcs', {'pc': 12}, null, true),
-  ('2 routers 2 switches 4 pcs and wifi', {'router': 2, 'switch': 2, 'pc': 4, 'wireless': 1}, null, true),
-  ('2 routers 2 switches 4 pcs and 1 firewall', {'router': 2, 'switch': 2, 'pc': 4, 'firewall': 1}, null, true),
-  ('2 routers 2 switches 4 pcs and a cloud', {'router': 2, 'switch': 2, 'pc': 4, 'cloud': 1}, null, true),
-  ('2 routers 2 switches 4 pcs and 2 servers', {'router': 2, 'switch': 2, 'pc': 4, 'server': 2}, null, true),
-  ('2 routers 2 switches 4 pcs and 2 printers', {'router': 2, 'switch': 2, 'pc': 4, 'printer': 2}, null, true),
-  ('2 routers 2 switches 4 pcs and 2 phones', {'router': 2, 'switch': 2, 'pc': 4, 'phone': 2}, null, true),
-  ('2 routers 2 switches 4 pcs and 2 access points', {'router': 2, 'switch': 2, 'pc': 4, 'wireless': 2}, null, true),
+  (
+    '2 routers 2 switches 4 pcs and wifi',
+    {'router': 2, 'switch': 2, 'pc': 4, 'wireless': 1},
+    null,
+    true,
+  ),
+  (
+    '2 routers 2 switches 4 pcs and 1 firewall',
+    {'router': 2, 'switch': 2, 'pc': 4, 'firewall': 1},
+    null,
+    true,
+  ),
+  (
+    '2 routers 2 switches 4 pcs and a cloud',
+    {'router': 2, 'switch': 2, 'pc': 4, 'cloud': 1},
+    null,
+    true,
+  ),
+  (
+    '2 routers 2 switches 4 pcs and 2 servers',
+    {'router': 2, 'switch': 2, 'pc': 4, 'server': 2},
+    null,
+    true,
+  ),
+  (
+    '2 routers 2 switches 4 pcs and 2 printers',
+    {'router': 2, 'switch': 2, 'pc': 4, 'printer': 2},
+    null,
+    true,
+  ),
+  (
+    '2 routers 2 switches 4 pcs and 2 phones',
+    {'router': 2, 'switch': 2, 'pc': 4, 'phone': 2},
+    null,
+    true,
+  ),
+  (
+    '2 routers 2 switches 4 pcs and 2 access points',
+    {'router': 2, 'switch': 2, 'pc': 4, 'wireless': 2},
+    null,
+    true,
+  ),
   ('4 pcs attached to a router', {'router': 1, 'pc': 4}, null, true),
   ('one server connected to a router', {'router': 1, 'server': 1}, null, true),
   ('2 printers on a switch', {'switch': 1, 'printer': 2}, null, true),
-  ('ospf between 2 routers 2 switches 4 pcs', {'router': 2, 'switch': 2, 'pc': 4}, null, true),
+  (
+    'ospf between 2 routers 2 switches 4 pcs',
+    {'router': 2, 'switch': 2, 'pc': 4},
+    null,
+    true,
+  ),
   ('eigrp between 4 routers', {'router': 4}, null, true),
   ('bgp for 2 routers 2 switches', {'router': 2, 'switch': 2}, null, true),
   ('configure ripv2 on 2 routers', {'router': 2}, null, true),
-  ('lab with R1 R2 SW1 SW2 PC1 PC2', {'router': 2, 'switch': 2, 'pc': 2}, null, true),
+  (
+    'lab with R1 R2 SW1 SW2 PC1 PC2',
+    {'router': 2, 'switch': 2, 'pc': 2},
+    null,
+    true,
+  ),
   ('R1 R2 R3 SW1 SW2 SW3', {'router': 3, 'switch': 3}, null, true),
-  ('a router a switch and 4 pcs', {'router': 1, 'switch': 1, 'pc': 4}, null, true),
+  (
+    'a router a switch and 4 pcs',
+    {'router': 1, 'switch': 1, 'pc': 4},
+    null,
+    true,
+  ),
   ('router, switch, 8 pcs', {'router': 1, 'switch': 1, 'pc': 8}, null, true),
-  ('2 routers, 2 switches, 4 pcs, 1 server, 1 firewall', {'router': 2, 'switch': 2, 'pc': 4, 'server': 1, 'firewall': 1}, null, true),
-  ('set up 1 router 1 switch 1 server 1 printer', {'router': 1, 'switch': 1, 'server': 1, 'printer': 1}, null, true),
-  ('a small network of 2 routers 1 switch 5 pcs', {'router': 2, 'switch': 1, 'pc': 5}, null, true),
-  ('a big network of 4 routers 4 switches 40 pcs', {'router': 4, 'switch': 4, 'pc': 40}, null, true),
-  ('please build 2 routers 2 switches 4 pcs with ospf', {'router': 2, 'switch': 2, 'pc': 4}, null, true),
-  ('can you do 3 routers 3 switches 9 pcs with eigrp', {'router': 3, 'switch': 3, 'pc': 9}, null, true),
-  ('i want a network for 4 pcs and a printer', {'pc': 4, 'printer': 1}, null, true),
+  (
+    '2 routers, 2 switches, 4 pcs, 1 server, 1 firewall',
+    {'router': 2, 'switch': 2, 'pc': 4, 'server': 1, 'firewall': 1},
+    null,
+    true,
+  ),
+  (
+    'set up 1 router 1 switch 1 server 1 printer',
+    {'router': 1, 'switch': 1, 'server': 1, 'printer': 1},
+    null,
+    true,
+  ),
+  (
+    'a small network of 2 routers 1 switch 5 pcs',
+    {'router': 2, 'switch': 1, 'pc': 5},
+    null,
+    true,
+  ),
+  (
+    'a big network of 4 routers 4 switches 40 pcs',
+    {'router': 4, 'switch': 4, 'pc': 40},
+    null,
+    true,
+  ),
+  (
+    'please build 2 routers 2 switches 4 pcs with ospf',
+    {'router': 2, 'switch': 2, 'pc': 4},
+    null,
+    true,
+  ),
+  (
+    'can you do 3 routers 3 switches 9 pcs with eigrp',
+    {'router': 3, 'switch': 3, 'pc': 9},
+    null,
+    true,
+  ),
+  (
+    'i want a network for 4 pcs and a printer',
+    {'pc': 4, 'printer': 1},
+    null,
+    true,
+  ),
 
   // --- REAL FAILURES, lifted from the regression tests that pin them ---------
   // These briefs are not invented. Each one is a sentence a user actually
@@ -755,12 +1006,12 @@ final List<GoldenCase> contract = [
   // phone count becomes a QUESTION instead; that is enforced by
   // chat_plan_continuity_test, not here. Asserting phone: 0 in a single-parse
   // contract would contradict the rule the rest of the corpus relies on.
-  ('2 routers 2 switches 50 pcs and some phones', {
-    'router': 2,
-    'switch': 2,
-    'pc': 50,
-    'phone': 1,
-  }, null, true),
+  (
+    '2 routers 2 switches 50 pcs and some phones',
+    {'router': 2, 'switch': 2, 'pc': 50, 'phone': 1},
+    null,
+    true,
+  ),
 
   // Bare model names are recognized by the hardware catalog.
   ('ISR4331 and ISR4331 in a branch office, 4 pcs', {'router': 2}, null, false),
@@ -798,18 +1049,8 @@ final List<GoldenCase> knownGaps = [
   // --- TYPOS SILENTLY DELETE DEVICES -------------------------------------------
   // A typo must never change a COUNT, let alone erase both kinds named. The
   // app keeps the one kind it could spell and loses the other.
-  (
-    '2 rouer 2 swich 4 pcs',
-    {'pc': 4},
-    null,
-    false,
-  ),
-  (
-    '2 routers 2 swtiches 4 pcs',
-    {'router': 2, 'pc': 4},
-    null,
-    false,
-  ),
+  ('2 rouer 2 swich 4 pcs', {'pc': 4}, null, false),
+  ('2 routers 2 swtiches 4 pcs', {'router': 2, 'pc': 4}, null, false),
 
   // --- A NAMED DEVICE KIND CAN VANISH ------------------------------------------
   // "1 scanner" is a device the user asked for. The plan has none, and
@@ -854,22 +1095,12 @@ final List<GoldenCase> knownGaps = [
   // --- A SECOND SITE NAMED IN PROSE DOES NOT PRODUCE A SECOND ROUTER ----------
   // "the branch router" is a distinct device at the far end of the VPN. The
   // plan carries one router and a VPN with nothing on the other side of it.
-  (
-    '1 router with ikev2 vpn to the branch router',
-    {'router': 1},
-    null,
-    false,
-  ),
+  ('1 router with ikev2 vpn to the branch router', {'router': 1}, null, false),
 
   // --- "N OF THEM" DOES NOT RESOLVE BACK TO THE KIND --------------------------
   // "3 of them" refers to the switches named one clause earlier. The parser
   // reads the bare mention and stops at one switch.
-  (
-    '2960 switches 3 of them and 6 pcs',
-    {'switch': 1},
-    null,
-    false,
-  ),
+  ('2960 switches 3 of them and 6 pcs', {'switch': 1}, null, false),
 
   // --- A BARE MODEL NAME PRODUCES NO DEVICE AT ALL ---------------------------
   // The worst of the six. "ISR4331 and ISR4331" is two routers, written the
@@ -877,7 +1108,6 @@ final List<GoldenCase> knownGaps = [
   // a set of PCs with nothing to connect to. Compare contract case #4,
   // "Cisco 2911 routers", which works - so the failure is the bare model name
   // with no type word, not the model recognition itself.
-
 
   // --- "ONE X EACH" DOES NOT MULTIPLY ACROSS THE SET -------------------------
   // "a campus of 4 buildings, one router each" is four routers. The app
@@ -896,7 +1126,12 @@ final List<GoldenCase> knownGaps = [
   // bare mention and stops at one of each. Note this is the OPPOSITE order
   // from the contract cases, which all put the number first - the parser is
   // not confused by the numbers, it only ever looks backwards from the noun.
-  ('routers 2, switches 4, pcs 20', {'router': 1, 'switch': 1, 'pc': 1}, null, false),
+  (
+    'routers 2, switches 4, pcs 20',
+    {'router': 1, 'switch': 1, 'pc': 1},
+    null,
+    false,
+  ),
 
   // --- SITE COMPLETION ONLY FIRES FOR THE SITE WORDS IT KNOWS ----------------
   // "two branch offices, each with a router..." completes correctly in the
@@ -910,11 +1145,21 @@ final List<GoldenCase> knownGaps = [
 
   // --- "EACH" DOES NOT MULTIPLY ACROSS TWO NAMED PLACES -----------------------
   ('hq and branch, each with a router', {'router': 1}, null, false),
-  ('3 stores each with a router and 2 pcs', {'router': 1, 'pc': 2}, null, false),
+  (
+    '3 stores each with a router and 2 pcs',
+    {'router': 1, 'pc': 2},
+    null,
+    false,
+  ),
   ('two sites connected by a wan', {'router': 1, 'switch': 1}, null, false),
 
   // --- "PER ROOM" DOES NOT MULTIPLY BY THE ROOM COUNT -------------------------
-  ('one access point per room, 4 rooms', {'router': 1, 'switch': 1, 'wireless': 1}, null, false),
+  (
+    'one access point per room, 4 rooms',
+    {'router': 1, 'switch': 1, 'wireless': 1},
+    null,
+    false,
+  ),
 
   // --- A VAGUE "SMALL OFFICE X" MISSES THE DEFAULT ---------------------------
   // "build me something for the office" gets the tiny-office default. "small
@@ -966,170 +1211,119 @@ final List<GoldenCase> knownGaps = [
 // so it scales to briefs nobody has read yet.
 final List<ObservedCase> observed = [
   // device kinds named in the brief -> kinds that must appear
-  ('a small retail shop with 1 router, 1 switch, 6 pcs and 2 printers', {
-    'router',
-    'switch',
-    'pc',
-    'printer',
-  }),
+  (
+    'a small retail shop with 1 router, 1 switch, 6 pcs and 2 printers',
+    {'router', 'switch', 'pc', 'printer'},
+  ),
   ('branch office: 1 router, 2 switches, 12 pcs', {'router', 'switch', 'pc'}),
-  ('lab with 3 routers 3 switches 9 pcs and 2 servers', {
-    'router',
-    'switch',
-    'pc',
-    'server',
-  }),
-  ('a cafe needs wifi, 2 access points and 1 router', {
-    'router',
-    'wireless',
-  }),
-  ('warehouse with 20 pcs, 2 switches and a printer', {
-    'switch',
-    'pc',
-    'printer',
-  }),
-  ('hospital lab: 2 routers, 4 switches, 30 pcs, 2 servers', {
-    'router',
-    'switch',
-    'pc',
-    'server',
-  }),
+  (
+    'lab with 3 routers 3 switches 9 pcs and 2 servers',
+    {'router', 'switch', 'pc', 'server'},
+  ),
+  ('a cafe needs wifi, 2 access points and 1 router', {'router', 'wireless'}),
+  (
+    'warehouse with 20 pcs, 2 switches and a printer',
+    {'switch', 'pc', 'printer'},
+  ),
+  (
+    'hospital lab: 2 routers, 4 switches, 30 pcs, 2 servers',
+    {'router', 'switch', 'pc', 'server'},
+  ),
   ('our school has 3 classrooms, each a switch and 10 pcs', {'switch', 'pc'}),
-  ('home network with 1 router, 1 switch and 4 pcs', {
-    'router',
-    'switch',
-    'pc',
-  }),
-  ('training lab: 2 routers, 2 switches, 8 pcs, 1 firewall', {
-    'router',
-    'switch',
-    'pc',
-    'firewall',
-  }),
-  ('a data centre lab with 2 routers and 4 servers', {
-    'router',
-    'server',
-  }),
-  ('two offices joined by a wan link, 1 router each and 8 pcs', {
-    'router',
-    'pc',
-  }),
-  ('i want 1 router 1 switch 2 pcs and a cloud for internet', {
-    'router',
-    'switch',
-    'pc',
-    'cloud',
-  }),
-  ('library: 6 pcs, 1 switch, 1 router and 2 printers', {
-    'router',
-    'switch',
-    'pc',
-    'printer',
-  }),
-  ('restaurant with 3 pcs, 1 switch, 1 router and a phone system', {
-    'router',
-    'switch',
-    'pc',
-  }),
-  ('office network: 1 router, 1 switch, 15 pcs, 1 server', {
-    'router',
-    'switch',
-    'pc',
-    'server',
-  }),
+  (
+    'home network with 1 router, 1 switch and 4 pcs',
+    {'router', 'switch', 'pc'},
+  ),
+  (
+    'training lab: 2 routers, 2 switches, 8 pcs, 1 firewall',
+    {'router', 'switch', 'pc', 'firewall'},
+  ),
+  ('a data centre lab with 2 routers and 4 servers', {'router', 'server'}),
+  (
+    'two offices joined by a wan link, 1 router each and 8 pcs',
+    {'router', 'pc'},
+  ),
+  (
+    'i want 1 router 1 switch 2 pcs and a cloud for internet',
+    {'router', 'switch', 'pc', 'cloud'},
+  ),
+  (
+    'library: 6 pcs, 1 switch, 1 router and 2 printers',
+    {'router', 'switch', 'pc', 'printer'},
+  ),
+  (
+    'restaurant with 3 pcs, 1 switch, 1 router and a phone system',
+    {'router', 'switch', 'pc'},
+  ),
+  (
+    'office network: 1 router, 1 switch, 15 pcs, 1 server',
+    {'router', 'switch', 'pc', 'server'},
+  ),
 
   // --- more real briefs, same three invariants -------------------------------
-  ('a dentist office with 2 pcs 1 switch and 1 router', {'router', 'switch', 'pc'}),
-  ('bakery: 1 router, 1 switch, 4 pcs, 1 printer', {
-    'router',
-    'switch',
-    'pc',
-    'printer',
-  }),
+  (
+    'a dentist office with 2 pcs 1 switch and 1 router',
+    {'router', 'switch', 'pc'},
+  ),
+  (
+    'bakery: 1 router, 1 switch, 4 pcs, 1 printer',
+    {'router', 'switch', 'pc', 'printer'},
+  ),
   ('a law firm with 30 pcs across 2 switches', {'switch', 'pc'}),
   ('gym with 10 pcs and wifi', {'pc', 'wireless'}),
   ('a factory line needs 2 routers and 4 pcs', {'router', 'pc'}),
-  ('small hotel: 1 router 2 switches 20 pcs 1 server', {
-    'router',
-    'switch',
-    'pc',
-    'server',
-  }),
+  (
+    'small hotel: 1 router 2 switches 20 pcs 1 server',
+    {'router', 'switch', 'pc', 'server'},
+  ),
   ('call center 50 pcs 2 switches', {'switch', 'pc'}),
-  ('a classroom lab with 10 pcs 1 switch 1 router', {
-    'router',
-    'switch',
-    'pc',
-  }),
+  ('a classroom lab with 10 pcs 1 switch 1 router', {'router', 'switch', 'pc'}),
   ('warehouse scanners and 4 pcs on 1 switch', {'switch', 'pc'}),
   ('an office with a firewall 2 routers 10 pcs', {'router', 'pc', 'firewall'}),
-  ('our branch office has 1 router 1 switch 8 pcs', {
-    'router',
-    'switch',
-    'pc',
-  }),
+  ('our branch office has 1 router 1 switch 8 pcs', {'router', 'switch', 'pc'}),
   ('a design studio with 12 pcs and 2 switches', {'switch', 'pc'}),
   ('ccna lab 2 routers 2 switches 6 pcs', {'router', 'switch', 'pc'}),
   ('packet tracer lab for ospf 3 routers', {'router'}),
-  ('a clinic with 6 pcs 1 switch 1 router 1 server', {
-    'router',
-    'switch',
-    'pc',
-    'server',
-  }),
+  (
+    'a clinic with 6 pcs 1 switch 1 router 1 server',
+    {'router', 'switch', 'pc', 'server'},
+  ),
   ('small business: 15 pcs 2 switches 1 router', {'router', 'switch', 'pc'}),
-  ('a hotel lobby needs 2 access points and a router', {
-    'router',
-    'wireless',
-  }),
+  ('a hotel lobby needs 2 access points and a router', {'router', 'wireless'}),
   ('network for a school with 40 pcs', {'pc'}),
   ('i need a lab with 2 routers and 4 switches', {'router', 'switch'}),
   ('set up 3 switches and 12 pcs', {'switch', 'pc'}),
   ('a training room with 8 pcs 1 switch', {'switch', 'pc'}),
-  ('retail store 2 pcs 1 switch 1 router 2 phones', {
-    'router',
-    'switch',
-    'pc',
-    'phone',
-  }),
+  (
+    'retail store 2 pcs 1 switch 1 router 2 phones',
+    {'router', 'switch', 'pc', 'phone'},
+  ),
   ('a pharmacy needs 3 pcs and a server', {'pc', 'server'}),
   ('office network with wireless 2 routers', {'router', 'wireless'}),
-  ('a cafe needs 3 pcs 1 switch 1 router wifi', {
-    'router',
-    'switch',
-    'pc',
-    'wireless',
-  }),
+  (
+    'a cafe needs 3 pcs 1 switch 1 router wifi',
+    {'router', 'switch', 'pc', 'wireless'},
+  ),
   ('museum lab 4 routers 4 switches 16 pcs', {'router', 'switch', 'pc'}),
-  ('a startup: 2 routers 1 switch 10 pcs 1 server', {
-    'router',
-    'switch',
-    'pc',
-    'server',
-  }),
+  (
+    'a startup: 2 routers 1 switch 10 pcs 1 server',
+    {'router', 'switch', 'pc', 'server'},
+  ),
   ('community centre 10 pcs 1 switch', {'switch', 'pc'}),
   ('a lab with a firewall 2 routers 6 pcs', {'router', 'pc', 'firewall'}),
   ('our new office needs 25 pcs and 2 switches', {'switch', 'pc'}),
   ('a barber shop with 2 pcs and a router', {'router', 'pc'}),
-  ('hotel with 2 routers 4 switches 40 pcs 2 servers', {
-    'router',
-    'switch',
-    'pc',
-    'server',
-  }),
+  (
+    'hotel with 2 routers 4 switches 40 pcs 2 servers',
+    {'router', 'switch', 'pc', 'server'},
+  ),
   ('a lab for 2 sites each with a router and 5 pcs', {'router', 'pc'}),
-  ('an office with 1 router 3 switches 18 pcs 2 printers', {
-    'router',
-    'switch',
-    'pc',
-    'printer',
-  }),
+  (
+    'an office with 1 router 3 switches 18 pcs 2 printers',
+    {'router', 'switch', 'pc', 'printer'},
+  ),
   ('study group lab 1 switch 4 pcs', {'switch', 'pc'}),
-  ('a new branch needs 1 router 1 switch 12 pcs', {
-    'router',
-    'switch',
-    'pc',
-  }),
+  ('a new branch needs 1 router 1 switch 12 pcs', {'router', 'switch', 'pc'}),
   ('conference wifi 6 access points', {'wireless'}),
   ('a lab with 2 routers and a server for dns', {'router', 'server'}),
   ('our office 2 switches 14 pcs 1 router', {'router', 'switch', 'pc'}),

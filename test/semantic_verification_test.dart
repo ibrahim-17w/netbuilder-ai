@@ -31,11 +31,7 @@ void main() {
     List<String> findings = const [],
   }) {
     // A sound file enables exactly the services the plan gave each device.
-    final svcs = services ??
-        {
-          for (final n in plan.nodes)
-            n.name: n.services,
-        };
+    final svcs = services ?? {for (final n in plan.nodes) n.name: n.services};
     return {
       'devices': [
         for (final n in plan.nodes)
@@ -45,7 +41,6 @@ void main() {
       'findings': findings,
     };
   }
-
 
   /// The generator's own report: every interface the plan names mapped to a
   /// real port. This is what the structural half compares against, so
@@ -67,7 +62,10 @@ void main() {
 
   test('a file that matches the plan and is sound verifies', () {
     final r = BuildPreflight.compare(
-          intent: plan, audit: cleanAudit(), builtDevices: builtPorts());
+      intent: plan,
+      audit: cleanAudit(),
+      builtDevices: builtPorts(),
+    );
     expect(r.verified, isTrue, reason: r.lines.join('\n'));
   });
 
@@ -101,30 +99,35 @@ void main() {
     expect(r.lines.join('\n'), contains('uncabled_device'));
   });
 
-  test('a service role the plan asked for and the file lacks fails the build',
-      () {
-    // The plan gave its server 'dns'; the file enabled nothing.
-    final server = plan.nodes.firstWhere((n) => n.type == 'server');
-    expect(server.services, isNotEmpty,
-        reason: 'the brief must give the server a role for this to test');
+  test(
+    'a service role the plan asked for and the file lacks fails the build',
+    () {
+      // The plan gave its server 'dns'; the file enabled nothing.
+      final server = plan.nodes.firstWhere((n) => n.type == 'server');
+      expect(
+        server.services,
+        isNotEmpty,
+        reason: 'the brief must give the server a role for this to test',
+      );
 
-    final r = BuildPreflight.compare(
-      intent: plan,
-      builtDevices: builtPorts(),
-      audit: cleanAudit(
-        services: {for (final n in plan.nodes) n.name: <String>[]},
-      ), // every device reports zero services
-    );
-    expect(r.verified, isFalse);
-    final text = r.lines.join('\n');
-    expect(text, contains('not a working lab'));
-    expect(text, contains(server.name));
-    expect(
-      text.toLowerCase(),
-      contains(server.services.first.toLowerCase()),
-      reason: 'the user must be told which role is missing',
-    );
-  });
+      final r = BuildPreflight.compare(
+        intent: plan,
+        builtDevices: builtPorts(),
+        audit: cleanAudit(
+          services: {for (final n in plan.nodes) n.name: <String>[]},
+        ), // every device reports zero services
+      );
+      expect(r.verified, isFalse);
+      final text = r.lines.join('\n');
+      expect(text, contains('not a working lab'));
+      expect(text, contains(server.name));
+      expect(
+        text.toLowerCase(),
+        contains(server.services.first.toLowerCase()),
+        reason: 'the user must be told which role is missing',
+      );
+    },
+  );
 
   test('a service the file DID enable is not reported missing', () {
     final server = plan.nodes.firstWhere((n) => n.type == 'server');
@@ -141,24 +144,31 @@ void main() {
     expect(r.verified, isTrue, reason: r.lines.join('\n'));
   });
 
-  test('an audit that carries no findings key still verifies structurally',
-      () {
+  test('an audit that carries no findings key still verifies structurally', () {
     // Older audit shapes have no 'findings'. They must not crash, and must
     // not be treated as "findings were checked and were clean" - they are
     // simply silent, so a sound file still verifies.
     final audit = cleanAudit()..remove('findings');
     final r = BuildPreflight.compare(
-        intent: plan, audit: audit, builtDevices: builtPorts());
+      intent: plan,
+      audit: audit,
+      builtDevices: builtPorts(),
+    );
     expect(r.verified, isTrue, reason: r.lines.join('\n'));
   });
 
-  test('a device missing from the file is still caught by the structural half',
-      () {
-    final audit = cleanAudit();
-    (audit['devices'] as List).removeLast();
-    final r = BuildPreflight.compare(
-        intent: plan, audit: audit, builtDevices: builtPorts());
-    expect(r.verified, isFalse);
-    expect(r.lines.join('\n'), contains('missing from the file'));
-  });
+  test(
+    'a device missing from the file is still caught by the structural half',
+    () {
+      final audit = cleanAudit();
+      (audit['devices'] as List).removeLast();
+      final r = BuildPreflight.compare(
+        intent: plan,
+        audit: audit,
+        builtDevices: builtPorts(),
+      );
+      expect(r.verified, isFalse);
+      expect(r.lines.join('\n'), contains('missing from the file'));
+    },
+  );
 }
