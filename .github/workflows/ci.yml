@@ -3,12 +3,21 @@ name: ci
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # One pin for every job. Keep this in step with .metadata's revision when
+  # upgrading Flutter; the version is logged in each job for support reports.
+  FLUTTER_VERSION: '3.44.0'
 
 jobs:
   analyze-and-test:
@@ -19,11 +28,21 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
+      - name: Log tool versions
+        run: |
+          flutter --version
+          dart --version
+          python3 --version
+
       - name: Resolve dependencies
         run: flutter pub get
+
+      - name: Formatting
+        run: dart format --output=none --set-exit-if-changed .
 
       # --fatal-infos, not --fatal-warnings: the suite's own style guide
       # (analysis_options.yaml) is written to be clean at info level too, and a
@@ -40,8 +59,35 @@ jobs:
       - name: Release build (Linux target, proof the bundle assembles)
         run: flutter build linux --release
 
+  windows:
+    name: test + build (windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Log tool versions
+        run: |
+          flutter --version
+          dart --version
+          python --version
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Test suite
+        run: flutter test
+
+      - name: Release build
+        run: flutter build windows --release
+
   sidecar:
-    name: sidecar pytest
+    name: sidecar pytest (ubuntu)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -65,19 +111,118 @@ jobs:
         working-directory: sidecar
         run: python -m pytest -q
 
-  windows:
-    name: windows release build
+  sidecar-windows:
+    name: sidecar pytest (windows)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Log tool versions
+        run: python --version
+
+      - name: Install engine dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pyautogui pywinauto pillow pynput
+
+      - name: Test suite
+        working-directory: sidecar
+        env:
+          PYTHONUTF8: '1'
+        run: python -m pytest -q
+
+  android-debug:
+    name: android debug APK (pull requests)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
 
       - name: Resolve dependencies
         run: flutter pub get
 
-      - name: Release build
-        run: flutter build windows --release
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: netbuilder-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  android-release:
+    name: android signed release APK (tags)
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Write signing material
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -eu
+          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not set; a tagged release must be signed."
+            exit 1
+          fi
+          if [ -z "${ANDROID_KEY_ALIAS:-}" ] || [ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ] || [ -z "${ANDROID_KEY_PASSWORD:-}" ]; then
+            echo "::error::Release keystore alias/passwords are not configured."
+            exit 1
+          fi
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          {
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyPassword=$ANDROID_KEY_PASSWORD"
+            echo "keyAlias=$ANDROID_KEY_ALIAS"
+            echo "storeFile=upload-keystore.jks"
+          } > android/key.properties
+
+      - name: Build signed release APK
+        run: |
+          flutter build apk --release \
+            --build-name="${GITHUB_REF_NAME#v}" \
+            --build-number="${GITHUB_RUN_NUMBER}"
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: netbuilder-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 30

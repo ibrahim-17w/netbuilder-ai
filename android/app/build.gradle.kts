@@ -1,7 +1,21 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// A tagged build supplies android/key.properties and the keystore through CI
+// secrets. Local builds keep the debug signing config so `flutter run
+// --release` still works without a private key on a developer machine.
+val keystorePropertiesFile = rootProject.file("key.properties")
+val hasReleaseKeystore = keystorePropertiesFile.exists()
+val keystoreProperties = Properties().apply {
+    if (hasReleaseKeystore) {
+        FileInputStream(keystorePropertiesFile).use { load(it) }
+    }
 }
 
 android {
@@ -28,11 +42,32 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                    ?: error("keyAlias is missing from android/key.properties")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                    ?: error("keyPassword is missing from android/key.properties")
+                storeFile = file(
+                    keystoreProperties.getProperty("storeFile")
+                        ?: error("storeFile is missing from android/key.properties"),
+                )
+                storePassword = keystoreProperties.getProperty("storePassword")
+                    ?: error("storePassword is missing from android/key.properties")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // A tag build must be signed with the release key; local builds
+            // without key.properties keep the debug key so they still run.
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
