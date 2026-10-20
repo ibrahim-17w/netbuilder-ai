@@ -140,8 +140,9 @@ class OfflineAssistantService {
     // keep their English technical content (device commands ARE English) but
     // are framed in Arabic, so a mixed "كيف أعمل ssh" conversation is
     // answered, not ignored.
-    final arabic =
-        _arabicScript.hasMatch(rawText.isEmpty ? normalized : rawText);
+    final arabic = _arabicScript.hasMatch(
+      rawText.isEmpty ? normalized : rawText,
+    );
 
     // The answer starts with its CONTENT. Which brain produced it - the
     // planner, a model, a learned answer - is the app's state, shown once
@@ -228,7 +229,9 @@ class OfflineAssistantService {
       );
     }
     if (_isYes(t)) {
-      final blocked = plan == null ? const <ValidationIssue>[] : _blocking(plan, target);
+      final blocked = plan == null
+          ? const <ValidationIssue>[]
+          : _blocking(plan, target);
       return AssistantReply(
         _join(opening, _confirmAnswer(plan, suggestions, blocked)),
         quickReplies: _nextStepsFor(plan, blocked: blocked),
@@ -236,10 +239,7 @@ class OfflineAssistantService {
       );
     }
     if (_isNo(t)) {
-      return AssistantReply(
-        _join(opening, _denyAnswer(plan)),
-        intent: 'deny',
-      );
+      return AssistantReply(_join(opening, _denyAnswer(plan)), intent: 'deny');
     }
     // FLOW CONTINUATION: an active troubleshooting flow owns this turn. The
     // user is answering a diagnostic question ("what does the port show?"),
@@ -462,14 +462,16 @@ class OfflineAssistantService {
       // A change that landed on a plan the build will refuse has still not
       // produced anything usable, so the closing line is chosen from the same
       // findings the card shows rather than always advertising the build.
-      final blocked = hasLab ? _blocking(plan, target) : const <ValidationIssue>[];
+      final blocked = hasLab
+          ? _blocking(plan, target)
+          : const <ValidationIssue>[];
       final buildLine = blocked.isEmpty
           ? 'Press "Build the .pkt" below and I compile the whole lab, not '
-              'just the change - offline, with no Packet Tracer.'
+                'just the change - offline, with no Packet Tracer.'
           : 'The Build card below is withheld: this plan still has '
-              '${blocked.length} finding(s) that would be baked into the .pkt '
-              '(first: ${blocked.first.message}). Fix that and the build '
-              'unlocks.';
+                '${blocked.length} finding(s) that would be baked into the .pkt '
+                '(first: ${blocked.first.message}). Fix that and the build '
+                'unlocks.';
       final body = StringBuffer()..writeln(_describeChange(t));
       if (hasLab && delta.isNotEmpty) {
         body
@@ -538,16 +540,14 @@ class OfflineAssistantService {
       // followed by the section composed from THIS plan - their routers,
       // their subnets - and the "tell me the lab" tail is dropped, because
       // the lab is known and the commands below are already specific.
-      final grounded =
-          _groundedSection(concept, plan, target);
+      final grounded = _groundedSection(concept, plan, target);
       return AssistantReply(
         _join(
           opening,
           '${arabic ? '$_arabicLead\n\n' : ''}${_continuity(plan, t, history)}'
           '${_conceptAnswer(concept)}'
           '${grounded == null ? '\n\nIf you tell me the lab you are building '
-              'I will turn this into a plan and give you the exact steps.'
-              : '\n\n$grounded'}'
+                    'I will turn this into a plan and give you the exact steps.' : '\n\n$grounded'}'
           '${briefNote.isEmpty ? '' : '\n\n$briefNote'}',
         ),
         quickReplies: _nextStepsFor(plan),
@@ -574,8 +574,7 @@ class OfflineAssistantService {
           opening,
           '${arabic ? '$_arabicLead\n\n' : ''}${_continuity(plan, t, history)}$knowledge'
           '${grounded == null ? '\n\nIf you tell me the lab you are building '
-              'I will turn this into a plan and give you the exact steps.'
-              : '\n\n$grounded'}'
+                    'I will turn this into a plan and give you the exact steps.' : '\n\n$grounded'}'
           '${briefNote.isEmpty ? '' : '\n\n$briefNote'}',
         ),
         quickReplies: _nextStepsFor(plan),
@@ -621,12 +620,7 @@ class OfflineAssistantService {
       words.length,
       hasPlan: plan != null && plan.nodes.isNotEmpty,
     )) {
-      return _missingReply(
-        t,
-        arabic: arabic,
-        opening: opening,
-        plan: plan,
-      );
+      return _missingReply(t, arabic: arabic, opening: opening, plan: plan);
     }
     if (plan != null && plan.nodes.isNotEmpty) {
       // ASK BEFORE PLAN: the brief has critical gaps and the chat supplied
@@ -655,7 +649,9 @@ class OfflineAssistantService {
         return AssistantReply(
           _join(gap.text, briefNote),
           questions: gap.questions,
-          quickReplies: [...{for (final c in chips) c}],
+          quickReplies: [
+            ...{for (final c in chips) c},
+          ],
           intent: gap.intent,
         );
       }
@@ -715,9 +711,9 @@ class OfflineAssistantService {
       ];
       return asks.isEmpty
           ? 'You are also describing a lab with $described. It is not '
-              'planned yet - tell me the rest and I will plan it.'
+                'planned yet - tell me the rest and I will plan it.'
           : 'You are also describing a lab with $described, which I have not '
-              'planned yet: ${asks.join(' ')}';
+                'planned yet: ${asks.join(' ')}';
     }
     return 'You are also describing a lab with $described - say "build the '
         '.pkt" and I will compile it offline.';
@@ -807,9 +803,10 @@ class OfflineAssistantService {
   /// and the card can never disagree about whether a plan is buildable.
   static List<ValidationIssue> _blocking(NetworkIntent plan, String target) {
     try {
-      return ValidatorService.validate(plan, target: target)
-          .where((i) => i.blocks)
-          .toList();
+      return ValidatorService.validate(
+        plan,
+        target: target,
+      ).where((i) => i.blocks).toList();
     } catch (_) {
       return const [];
     }
@@ -899,9 +896,11 @@ class OfflineAssistantService {
       }
       b
         ..writeln()
-        ..writeln('Tell me what to change (or edit the plan in the network '
-            'inspector) and I will re-plan and unlock the build. No API key '
-            'is needed for any of it.');
+        ..writeln(
+          'Tell me what to change (or edit the plan in the network '
+          'inspector) and I will re-plan and unlock the build. No API key '
+          'is needed for any of it.',
+        );
       return b.toString().trimRight();
     }
     b
@@ -909,7 +908,7 @@ class OfflineAssistantService {
       ..writeln(
         'Press "Build the .pkt" below and I will compile it offline - no Packet '
         'Tracer and no API key.${suggestions.isEmpty ? '' : ' One thing worth '
-            'fixing first: ${suggestions.first}'}',
+                  'fixing first: ${suggestions.first}'}',
       );
     return b.toString().trimRight();
   }
@@ -921,6 +920,88 @@ class OfflineAssistantService {
     return 'Understood - nothing changes.$lab Tell me what to adjust: for '
         'example "use OSPF instead of static" or "make it 2 routers and 20 '
         'PCs".';
+  }
+
+  /// Explain the blockers on the plan without changing it. This is used by
+  /// the build card's "What should I change?" button and by equivalent
+  /// questions typed into chat.
+  static AssistantReply explainPlanRepair({
+    required NetworkIntent? plan,
+    required String target,
+  }) {
+    if (plan == null || plan.nodes.isEmpty) {
+      return const AssistantReply(
+        'There is no network plan on the table to check yet.',
+        intent: 'fix',
+      );
+    }
+    final blocking = _blocking(plan, target);
+    if (blocking.isEmpty) {
+      return AssistantReply(
+        'Nothing in this plan blocks the build. If an older build card is '
+        'still disabled, it belongs to an earlier plan version; ask me to '
+        'build the current plan for a fresh card.',
+        intent: 'fix',
+      );
+    }
+
+    final repair = PlanRepairService.repair(plan, target: target);
+    final overLimit =
+        ValidatorService.isPacketTracerTarget(target) &&
+        plan.nodes.length > ValidatorService.packetTracerMaxDevices;
+    final b = StringBuffer();
+    if (overLimit) {
+      b
+        ..writeln(
+          'This plan has ${plan.nodes.length} devices, but this app’s '
+          'Packet Tracer builder is limited to '
+          '${ValidatorService.packetTracerMaxDevices}. It is '
+          '${plan.nodes.length - ValidatorService.packetTracerMaxDevices} '
+          'over the limit, so cable or IP repairs cannot make it buildable.',
+        )
+        ..writeln(
+          'I will not remove or replace devices without your choice. Tell me '
+          'the intended total and counts by device type, and which unsupported '
+          'models to replace or remove.',
+        );
+    } else if (repair.changes.isNotEmpty) {
+      b
+        ..writeln(
+          'I can safely repair ${repair.changes.length} issue(s) without '
+          'changing the requested device types. Say “fix the plan” to apply '
+          'those changes.',
+        )
+        ..writeln()
+        ..writeln('The remaining decisions are:');
+    } else {
+      b.writeln(
+        'No safe automatic repair remains. These blockers need a device, '
+        'model, or topology choice:',
+      );
+    }
+    b.writeln();
+    for (final issue in blocking.take(5)) {
+      b.writeln('- [${issue.severity}] ${issue.message}');
+    }
+    if (blocking.length > 5) {
+      b.writeln('- ... and ${blocking.length - 5} more blocker group(s).');
+    }
+    final remedy = _remedyFor(blocking, plan: plan);
+    if (remedy.isNotEmpty) {
+      b
+        ..writeln()
+        ..writeln(remedy);
+    }
+    return AssistantReply(
+      b.toString().trimRight(),
+      // Oversized plans may still have a safe local credential repair. Keep
+      // the action available when the repair pass found one; applying it does
+      // not pretend to clear the independent size/model blockers.
+      quickReplies: repair.changes.isNotEmpty
+          ? const ['Fix the plan']
+          : const [],
+      intent: 'fix',
+    );
   }
 
   /// The answer to a repair request: run the deterministic repair pass over
@@ -946,8 +1027,8 @@ class OfflineAssistantService {
         _join(
           opening,
           'There is no plan on the table to fix yet. Describe the lab - for '
-              'example "2 routers, 2 switches and 15 PCs with OSPF" - and I '
-              'will plan it and clear any finding that comes up.',
+          'example "2 routers, 2 switches and 15 PCs with OSPF" - and I '
+          'will plan it and clear any finding that comes up.',
         ),
         quickReplies: _exampleReplies,
         intent: 'fix',
@@ -993,16 +1074,42 @@ class OfflineAssistantService {
     final repair = PlanRepairService.repair(plan, target: target);
     final b = StringBuffer();
     final remedy = _remedyFor(repair.remaining, plan: plan);
+    final overLimit =
+        ValidatorService.isPacketTracerTarget(target) &&
+        plan.nodes.length > ValidatorService.packetTracerMaxDevices;
     if (repair.changes.isEmpty) {
-      b
-        ..writeln(
-          andBuild
-              ? 'I did not build it, and I cannot repair these from here - '
-                    'each one needs a choice only you can make:'
-              : 'I cannot repair these from here - each one needs a choice only '
-                    'you can make:',
-        )
-        ..writeln();
+      if (overLimit) {
+        b
+          ..writeln(
+            andBuild
+                ? 'I did not build or change this plan. It has '
+                      '${plan.nodes.length} devices, above the '
+                      '${ValidatorService.packetTracerMaxDevices}-device '
+                      'Packet Tracer build limit.'
+                : 'I left this plan unchanged: it has ${plan.nodes.length} '
+                      'devices, above the '
+                      '${ValidatorService.packetTracerMaxDevices}-device '
+                      'Packet Tracer build limit. Cable and IP repairs cannot '
+                      'clear that blocker.',
+          )
+          ..writeln(
+            'I will not guess which devices to remove or replace. Tell me the '
+            'intended total and counts by device type, plus what to do with '
+            'models the bundled templates cannot build.',
+          )
+          ..writeln()
+          ..writeln('What is still blocking it:');
+      } else {
+        b
+          ..writeln(
+            andBuild
+                ? 'I did not build it, and I cannot repair these from here - '
+                      'each one needs a choice only you can make:'
+                : 'I cannot repair these from here - each one needs a choice only '
+                      'you can make:',
+          )
+          ..writeln();
+      }
       for (final issue in repair.remaining.take(6)) {
         b.writeln('- [${issue.severity}] ${issue.message}');
       }
@@ -1023,8 +1130,11 @@ class OfflineAssistantService {
         );
     } else {
       b.writeln('Fixed ${repair.changes.length} thing(s):');
-      for (final change in repair.changes) {
+      for (final change in repair.changes.take(8)) {
         b.writeln('- $change');
+      }
+      if (repair.changes.length > 8) {
+        b.writeln('- ... and ${repair.changes.length - 8} more repair(s).');
       }
       b.writeln();
       if (repair.remaining.isEmpty) {
@@ -1046,6 +1156,17 @@ class OfflineAssistantService {
                 : 'These still block the build and need your call:',
           )
           ..writeln();
+        if (overLimit) {
+          b.writeln(
+            'The local repair is complete, but the plan still has '
+            '${repair.plan.nodes.length} devices, above the '
+            '${ValidatorService.packetTracerMaxDevices}-device Packet Tracer '
+            'build limit. The file remains blocked until you choose the '
+            'intended total and device counts, and what to do with unsupported '
+            'models.',
+          );
+          b.writeln();
+        }
         for (final issue in repair.remaining.take(6)) {
           b.writeln('- [${issue.severity}] ${issue.message}');
         }
@@ -1064,7 +1185,9 @@ class OfflineAssistantService {
     }
     return AssistantReply(
       _join(opening, b.toString().trimRight()),
-      quickReplies: _nextStepsFor(repair.plan, blocked: repair.remaining),
+      quickReplies: overLimit
+          ? const []
+          : _nextStepsFor(repair.plan, blocked: repair.remaining),
       intent: 'fix',
       repairedPlan: repair.plan,
       repairedFixes: repair.fixes,
@@ -1084,7 +1207,10 @@ class OfflineAssistantService {
   /// same is true of the other classes the app cannot decide on its own - how
   /// many ports a switch needs, which VLANs to create - so each one is named
   /// with the sentence that settles it.
-  static String _remedyFor(List<ValidationIssue> issues, {NetworkIntent? plan}) {
+  static String _remedyFor(
+    List<ValidationIssue> issues, {
+    NetworkIntent? plan,
+  }) {
     final logins = <String>[];
     final extra = <String>[];
     void addLogin(String label) {
@@ -1141,10 +1267,10 @@ class OfflineAssistantService {
       // username" turns into an account, so a user who followed it exactly
       // pressed Fix again forever.
       b.writeln(
-          'Press "Fix the plan" below and I write a placeholder account on '
-          '${logins.join(', ')} and report it in the same answer - then change '
-          'it to a real one before you rely on it.',
-        );
+        'Press "Fix the plan" below and I write a placeholder account on '
+        '${logins.join(', ')} and report it in the same answer - then change '
+        'it to a real one before you rely on it.',
+      );
     }
     for (final remedy in extra) {
       if (b.isNotEmpty) b.writeln();
@@ -1199,7 +1325,14 @@ class OfflineAssistantService {
     'good morning', 'good evening', 'good afternoon',
     // Arabic greetings, so an Arabic opener gets the greeting branch (and
     // the Arabic greeting text) rather than the vague fallback.
-    'مرحبا', 'مرحباً', 'مرحبتين', 'اهلا', 'أهلا', 'أهلاً', 'هلا', 'السلام عليكم',
+    'مرحبا',
+    'مرحباً',
+    'مرحبتين',
+    'اهلا',
+    'أهلا',
+    'أهلاً',
+    'هلا',
+    'السلام عليكم',
     'صباح الخير', 'مساء الخير',
   };
 
@@ -1298,22 +1431,52 @@ class OfflineAssistantService {
   /// shapes, so an Arabic build request that happens to mention them is
   /// never swallowed.
   static const List<String> _arabicIdentityWho = [
-    'من أنت', 'من انت', 'مين انت', 'ما اسمك', 'شو اسمك', 'من صنعك', 'من أنشأك',
-    'هل أنت ذكاء', 'هل انت ذكاء', 'هل أنت إنسان', 'هل انت انسان',
-    'هل أنت روبوت', 'هل أنت بوت', 'هل انت بوت',
+    'من أنت',
+    'من انت',
+    'مين انت',
+    'ما اسمك',
+    'شو اسمك',
+    'من صنعك',
+    'من أنشأك',
+    'هل أنت ذكاء',
+    'هل انت ذكاء',
+    'هل أنت إنسان',
+    'هل انت انسان',
+    'هل أنت روبوت',
+    'هل أنت بوت',
+    'هل انت بوت',
   ];
   static const List<String> _arabicIdentitySkills = [
-    'ماذا تفعل', 'ماذا تستطيع', 'ما الذي تستطيع', 'وش تقدر', 'ايش تقدر',
-    'إيش تقدر', 'وش تقدم', 'ماذا تقدم', 'ما الجديد', 'وش الجديد',
-    'ايش الجديد', 'إيش الجديد',
+    'ماذا تفعل',
+    'ماذا تستطيع',
+    'ما الذي تستطيع',
+    'وش تقدر',
+    'ايش تقدر',
+    'إيش تقدر',
+    'وش تقدم',
+    'ماذا تقدم',
+    'ما الجديد',
+    'وش الجديد',
+    'ايش الجديد',
+    'إيش الجديد',
   ];
   static const List<String> _arabicIdentityWellbeing = [
-    'كيف حالك', 'كيف الحال', 'كيفك', 'شخبارك', 'اخبارك', 'أخبارك',
+    'كيف حالك',
+    'كيف الحال',
+    'كيفك',
+    'شخبارك',
+    'اخبارك',
+    'أخبارك',
   ];
   static const List<String> _arabicIdentityOffline = [
-    'هل تعمل دون اتصال', 'هل تعمل بدون انترنت', 'هل تعمل بدون إنترنت',
-    'هل تحتاج انترنت', 'هل تحتاج إنترنت', 'هل تحتاج مفتاح',
-    'هل يعمل بدون مفتاح', 'هل يعمل بدون انترنت',
+    'هل تعمل دون اتصال',
+    'هل تعمل بدون انترنت',
+    'هل تعمل بدون إنترنت',
+    'هل تحتاج انترنت',
+    'هل تحتاج إنترنت',
+    'هل تحتاج مفتاح',
+    'هل يعمل بدون مفتاح',
+    'هل يعمل بدون انترنت',
   ];
 
   /// Which identity question [t] asks, or null when it is not one. The
@@ -1610,6 +1773,20 @@ class OfflineAssistantService {
     return _fixTarget.hasMatch(t) || _bareFixVerb.hasMatch(t);
   }
 
+  /// True for a question asking what is stopping the current plan from being
+  /// built. Keep this separate from [looksLikeRepairRequest]: asking for an
+  /// explanation must not mutate the plan or get parsed as a new lab.
+  static bool asksHowToFixPlan(String text) {
+    final t = text.trim().toLowerCase();
+    if (t.isEmpty) return false;
+    return RegExp(
+      r'\bwhat\s+(?:(?:do|should|must)\s+i\s+)?(?:need\s+to\s+)?'
+      r'(?:change|choose|select)\b.*\b(?:fix|build|unblock|clear)\b|'
+      r'\bwhat\s+is\s+(?:blocking|stopping)\s+(?:the\s+)?(?:build|plan)\b|'
+      r'\bwhy\s+(?:can\s*not|can.t|won.t)\s+i\s+build\b',
+    ).hasMatch(t);
+  }
+
   static bool _isFix(String t) => looksLikeRepairRequest(t);
 
   static final RegExp _thenBuild = RegExp(
@@ -1679,7 +1856,9 @@ class OfflineAssistantService {
         break;
       }
     }
-    if (bits.isEmpty) bits.add('apply the change you described to the current plan');
+    if (bits.isEmpty) {
+      bits.add('apply the change you described to the current plan');
+    }
     return 'Got it - I would ${bits.join(', and ')}.';
   }
 
@@ -1694,11 +1873,7 @@ class OfflineAssistantService {
   ) {
     if (topic == null || plan == null) return null;
     if (!PlanConfigComposer.topics.contains(topic)) return null;
-    return PlanConfigComposer.compose(
-      plan: plan,
-      topic: topic,
-      target: target,
-    );
+    return PlanConfigComposer.compose(plan: plan, topic: topic, target: target);
   }
 
   /// Explicit exits from an active troubleshooting flow. Anchored so a
@@ -1719,8 +1894,23 @@ class OfflineAssistantService {
 
   static final Map<String, RegExp> _conceptWords = {
     for (final w in const [
-      'ospf', 'eigrp', 'bgp', 'static', 'vs', 'difference', 'which', 'trunk',
-      'dhcp', 'dns', 'vlan', 'vlans', 'router', 'routers', 'nat', 'acl', 'nd',
+      'ospf',
+      'eigrp',
+      'bgp',
+      'static',
+      'vs',
+      'difference',
+      'which',
+      'trunk',
+      'dhcp',
+      'dns',
+      'vlan',
+      'vlans',
+      'router',
+      'routers',
+      'nat',
+      'acl',
+      'nd',
       'dr',
     ])
       w: RegExp('\\b$w\\b'),
@@ -1738,7 +1928,8 @@ class OfflineAssistantService {
     // question still gets its answer. (The battery test caught the old
     // behaviour: "how do I configure a trunk port on a 2960 switch" fell
     // through to the vague reply because of the 2960.)
-    final howtoShaped = t.startsWith('how ') ||
+    final howtoShaped =
+        t.startsWith('how ') ||
         t.startsWith('what ') ||
         t.startsWith('where ') ||
         t.startsWith('which ') ||
@@ -1786,7 +1977,9 @@ class OfflineAssistantService {
         !t.contains('snoop')) {
       return 'vlan';
     }
-    if ((t.contains('connect') || t.contains('link') || t.contains('between')) &&
+    if ((t.contains('connect') ||
+            t.contains('link') ||
+            t.contains('between')) &&
         (has('router') || has('routers'))) {
       return 'two_routers';
     }
@@ -1811,24 +2004,30 @@ class OfflineAssistantService {
         _loopWord.hasMatch(t)) {
       return 'stp';
     }
-    if (t.contains('etherchannel') || t.contains('port-channel') ||
+    if (t.contains('etherchannel') ||
+        t.contains('port-channel') ||
         t.contains('lag')) {
       return 'etherchannel';
     }
     if (t.contains('mtu') || t.contains('mss') || t.contains('fragment')) {
       return 'mtu';
     }
-    if (t.contains('retransmit') || t.contains('tcp') ||
-        t.contains('window') || t.contains('handshake')) {
+    if (t.contains('retransmit') ||
+        t.contains('tcp') ||
+        t.contains('window') ||
+        t.contains('handshake')) {
       return 'tcp';
     }
     if (t.contains('nat') || t.contains('pat')) return 'internet';
-    if (t.contains('qos') || t.contains('priority queue') ||
+    if (t.contains('qos') ||
+        t.contains('priority queue') ||
         t.contains('dscp')) {
       return 'qos';
     }
-    if (t.contains('roam') || t.contains('channel') ||
-        t.contains('802.11') || t.contains('rssi')) {
+    if (t.contains('roam') ||
+        t.contains('channel') ||
+        t.contains('802.11') ||
+        t.contains('rssi')) {
       return 'wireless';
     }
     // A concrete IPv6 address/prefix is computed by the knowledge table;
@@ -2010,6 +2209,7 @@ class OfflineAssistantService {
     final pcs = plan.nodes.where((n) => n.type == 'pc').length;
     final servers = plan.nodes.where((n) => n.type == 'server').length;
     final others = plan.nodes.length - routers - switches - pcs - servers;
+    final statedTotal = _statedDeviceTotal(originalAsk);
 
     final sb = StringBuffer();
     if (opening.trim().isNotEmpty) {
@@ -2039,12 +2239,17 @@ class OfflineAssistantService {
       'Here is the lab I understand: ${parts.join(', ')} '
       '(${plan.nodes.length} device(s) in total).',
     );
-    if (originalAsk.isNotEmpty) {
+    if (statedTotal != null && statedTotal != plan.nodes.length) {
       sb.writeln(
-        'This follows what you asked earlier: "$originalAsk".',
+        'Count mismatch: your brief says $statedTotal devices, but this plan '
+        'contains ${plan.nodes.length}. I have not guessed which devices to '
+        'drop; confirm the intended counts before building.',
       );
     }
-    sb.writeln('Devices: ${plan.nodes.map((n) => n.name).join(', ')}.');
+    if (originalAsk.isNotEmpty) {
+      sb.writeln('This follows what you asked earlier: "$originalAsk".');
+    }
+    sb.writeln(_inventoryLine(plan));
     // The revision travels with every count, so a number in this paragraph is
     // always traceable to one plan version and can be compared with what the
     // build card and the .pkt say.
@@ -2061,8 +2266,10 @@ class OfflineAssistantService {
     sb.writeln();
     sb.writeln('Advice:');
     if (plan.routing == 'static' && routers > 1) {
-      sb.writeln('- With more than one router, OSPF is usually easier than '
-          'hand-written static routes - say "use ospf" to switch.');
+      sb.writeln(
+        '- With more than one router, OSPF is usually easier than '
+        'hand-written static routes - say "use ospf" to switch.',
+      );
     }
     if (switches > 1) {
       // Advice has to describe the plan that will actually be built: telling
@@ -2078,23 +2285,32 @@ class OfflineAssistantService {
             switchNames.contains(l.b.toLowerCase()),
       );
       if (trunk) {
-        sb.writeln('- Make the switch-to-switch cable a trunk and leave the '
-            'device ports as access ports.');
+        sb.writeln(
+          '- Make the switch-to-switch cable a trunk and leave the '
+          'device ports as access ports.',
+        );
       } else {
-        sb.writeln('- The switches are not cabled to each other in this plan, '
-            'so there is no trunk yet - say "add a trunk between the '
-            'switches" and I will add the link as well as the config.');
+        sb.writeln(
+          '- The switches are not cabled to each other in this plan, '
+          'so there is no trunk yet - say "add a trunk between the '
+          'switches" and I will add the link as well as the config.',
+        );
       }
     }
-    final noRole =
-        plan.nodes.where((n) => n.type == 'server' && n.services.isEmpty).length;
+    final noRole = plan.nodes
+        .where((n) => n.type == 'server' && n.services.isEmpty)
+        .length;
     if (noRole > 0) {
-      sb.writeln('- Give each server a role (DHCP, DNS, HTTP, AAA, ...) so its '
-          'service tab is actually configured.');
+      sb.writeln(
+        '- Give each server a role (DHCP, DNS, HTTP, AAA, ...) so its '
+        'service tab is actually configured.',
+      );
     }
     if (!plan.security.requested) {
-      sb.writeln('- If this is a secure/graded lab, add port security on the '
-          'user ports plus an ACL or VPN - I can plan those too.');
+      sb.writeln(
+        '- If this is a secure/graded lab, add port security on the '
+        'user ports plus an ACL or VPN - I can plan those too.',
+      );
     }
     // The findings that hold the build card back, stated as the same list the
     // card shows, so the advice and the disabled button tell one story.
@@ -2120,34 +2336,112 @@ class OfflineAssistantService {
       // Saying "press Build" here while the card below refuses to build is
       // the dead end the user reported. Name the blocker and the way out.
       sb.writeln('Next steps:');
-      sb.writeln('1. The Build card on this reply is withheld: this plan still '
+      if (ValidatorService.isPacketTracerTarget(target) &&
+          plan.nodes.length > ValidatorService.packetTracerMaxDevices) {
+        sb.writeln(
+          '1. This app cannot build more than '
+          '${ValidatorService.packetTracerMaxDevices} devices in one Packet '
+          'Tracer plan. Say which device counts and unsupported models to keep; '
+          'repeating "fix the plan" cannot clear the size limit.',
+        );
+        sb.writeln(
+          '2. The Build card stays withheld until the plan is within the limit '
+          'and its device models have buildable templates.',
+        );
+      } else {
+        sb.writeln(
+          '1. The Build card on this reply is withheld: this plan still '
           'has ${blocking.length} finding(s) that would be baked into the '
           '.pkt. Fix them above (tell me what to change, or edit the plan in '
-          'the network inspector) and the build unlocks.');
-      sb.writeln('2. Tell me anything that is wrong or missing and I will keep '
-          'the plan moving - I hold on to it between messages.');
+          'the network inspector) and the build unlocks.',
+        );
+        sb.writeln(
+          '2. Tell me anything that is wrong or missing and I will keep '
+          'the plan moving - I hold on to it between messages.',
+        );
+      }
       sb.writeln();
-      sb.writeln('Nothing is built or typed into Packet Tracer until you '
-          'approve it.');
+      sb.writeln(
+        'Nothing is built or typed into Packet Tracer until you '
+        'approve it.',
+      );
       return sb.toString();
     }
     sb.writeln('Next steps:');
-    sb.writeln('1. Press "Build the .pkt" on this reply - it compiles the plan '
-        'into a real file offline, with no Packet Tracer and no API key.');
-    sb.writeln('2. Open the file in Packet Tracer and check it against your '
-        'brief.');
-    sb.writeln('3. Tell me anything that is wrong or missing and I will keep '
-        'the plan moving - I hold on to it between messages.');
+    sb.writeln(
+      '1. Press "Build the .pkt" on this reply - it compiles the plan '
+      'into a real file offline, with no Packet Tracer and no API key.',
+    );
+    sb.writeln(
+      '2. Open the file in Packet Tracer and check it against your '
+      'brief.',
+    );
+    sb.writeln(
+      '3. Tell me anything that is wrong or missing and I will keep '
+      'the plan moving - I hold on to it between messages.',
+    );
     sb.writeln();
     sb.writeln('Nothing is typed into Packet Tracer until you approve it.');
     return sb.toString();
   }
 
+  static int? _statedDeviceTotal(String text) {
+    if (text.trim().isEmpty) return null;
+    final patterns = [
+      RegExp(
+        r'\b(\d{1,4})[-\s]*devices?\s+'
+        r'(?:design|lab|network|topology)\b',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'\b(?:exactly|total\s+of)\s+(\d{1,4})\s+devices?\b',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'\b(\d{1,4})\s+devices?\s+(?:in\s+total|overall|in\s+all)\b',
+        caseSensitive: false,
+      ),
+    ];
+    for (final pattern in patterns) {
+      final match = pattern.firstMatch(text);
+      final value = int.tryParse(match?.group(1) ?? '');
+      if (value != null && value > 0) return value;
+    }
+    return null;
+  }
+
+  /// Keep an inventory readable when a malformed or stress-test plan is far
+  /// larger than the Packet Tracer builder can accept. Small labs still show
+  /// every exact name, so ordinary plans retain their useful detail.
+  static String _inventoryLine(NetworkIntent plan) {
+    if (plan.nodes.length <= ValidatorService.packetTracerMaxDevices) {
+      return 'Devices: ${plan.nodes.map((n) => n.name).join(', ')}.';
+    }
+    final byType = <String, List<String>>{};
+    for (final node in plan.nodes) {
+      byType.putIfAbsent(node.type, () => <String>[]).add(node.name);
+    }
+    final entries = byType.entries.toList()
+      ..sort((a, b) => b.value.length.compareTo(a.value.length));
+    final groups = <String>[];
+    for (final entry in entries.take(10)) {
+      final names = entry.value.take(4).join(', ');
+      final more = entry.value.length > 4
+          ? ', plus ${entry.value.length - 4} more'
+          : '';
+      groups.add('${entry.key}: ${entry.value.length} ($names$more)');
+    }
+    final extraTypes = entries.length > 10
+        ? '; ${entries.length - 10} other type(s) omitted'
+        : '';
+    return 'Device inventory by type: ${groups.join('; ')}$extraTypes.';
+  }
+
   static String _vagueAnswer(String originalAsk) =>
       'I am here - I just need a bit more to go on.\n\n'
       '${originalAsk.isEmpty ? '' : 'Earlier in this conversation you asked: '
-          '"$originalAsk". Do you want me to build on that, or is this '
-          'something new?\n\n'}'
+                '"$originalAsk". Do you want me to build on that, or is this '
+                'something new?\n\n'}'
       'Tell me what you want in plain words, for example:\n'
       '- "2 routers, 2 switches, 1 server and 4 PCs with OSPF"\n'
       '- "a small office with guest wifi and port security"\n'
@@ -2236,7 +2530,10 @@ class OfflineAssistantService {
   /// entries, the concept explainers, the config battery, the advisor and
   /// the planner itself (the .pkt build).
   static const List<({String topic, String sample})> _topicCatalog = [
-    (topic: 'Subnet math and VLSM', sample: 'how many hosts does a /28 subnet support'),
+    (
+      topic: 'Subnet math and VLSM',
+      sample: 'how many hosts does a /28 subnet support',
+    ),
     (topic: 'Wildcard masks', sample: 'what is the wildcard mask for /27'),
     (topic: 'Route summarization', sample: 'how does route summarization work'),
     (topic: 'VLANs', sample: 'how do VLANs work'),
@@ -2249,7 +2546,10 @@ class OfflineAssistantService {
     (topic: 'EtherChannel', sample: 'how does EtherChannel work'),
     (topic: 'DHCP', sample: 'how does DHCP work'),
     (topic: 'DNS', sample: 'how do I point the PCs at a DNS server'),
-    (topic: 'NAT and internet access', sample: 'how do I configure PAT overload'),
+    (
+      topic: 'NAT and internet access',
+      sample: 'how do I configure PAT overload',
+    ),
     (topic: 'ACLs', sample: 'what is an ACL'),
     (topic: 'OSPF', sample: 'how do I verify OSPF neighbors'),
     (topic: 'EIGRP', sample: 'how does EIGRP work'),
@@ -2257,7 +2557,10 @@ class OfflineAssistantService {
     (topic: 'Static and default routes', sample: 'static route syntax'),
     (topic: 'HSRP', sample: 'how do I configure HSRP'),
     (topic: 'SSH access', sample: 'how do I configure SSH on a switch'),
-    (topic: 'Port security', sample: 'how do I enable port security on a switch'),
+    (
+      topic: 'Port security',
+      sample: 'how do I enable port security on a switch',
+    ),
     (topic: 'VPN and IPsec', sample: 'how do I configure a site-to-site VPN'),
     (topic: 'Wireless and wifi', sample: 'how to secure wifi with WPA2'),
     (topic: 'IPv6', sample: 'how does IPv6 addressing work'),
@@ -2265,26 +2568,117 @@ class OfflineAssistantService {
       topic: 'Ping and traceroute faults',
       sample: 'request timed out when pinging across routers',
     ),
-    (topic: 'Packet Tracer basics', sample: 'how do I add a device in Packet Tracer'),
-    (topic: 'Design and sizing advice', sample: 'which router should I get for a home?'),
-    (topic: 'Building the .pkt', sample: '2 routers, 1 switch and 4 PCs with OSPF'),
+    (
+      topic: 'Packet Tracer basics',
+      sample: 'how do I add a device in Packet Tracer',
+    ),
+    (
+      topic: 'Design and sizing advice',
+      sample: 'which router should I get for a home?',
+    ),
+    (
+      topic: 'Building the .pkt',
+      sample: '2 routers, 1 switch and 4 PCs with OSPF',
+    ),
   ];
 
   /// Words that carry no topic meaning on either side of the comparison:
   /// question scaffolding and verbs so generic that matching on them would
   /// suggest topics at random.
   static const Set<String> _topicStopwords = {
-    'what', 'how', 'why', 'when', 'where', 'which', 'who', 'is', 'are',
-    'was', 'were', 'am', 'be', 'been', 'do', 'does', 'did', 'i', 'you',
-    'your', 'me', 'my', 'we', 'us', 'it', 'its', 'this', 'that', 'these',
-    'those', 'there', 'here', 'a', 'an', 'the', 'to', 'for', 'of', 'in',
-    'on', 'at', 'by', 'with', 'without', 'from', 'into', 'and', 'or', 'if',
-    'can', 'could', 'should', 'would', 'will', 'shall', 'may', 'might',
-    'must', 'need', 'needs', 'want', 'use', 'used', 'using', 'work',
-    'works', 'working', 'set', 'setup', 'get', 'gets', 'got', 'make',
-    'making', 'configure', 'configuring', 'config', 'tell', 'show', 'see',
-    'look', 'about', 'up', 'out', 'off', 'many', 'much', 'right', 'best',
-    'good', 'instead', 'also', 'just',
+    'what',
+    'how',
+    'why',
+    'when',
+    'where',
+    'which',
+    'who',
+    'is',
+    'are',
+    'was',
+    'were',
+    'am',
+    'be',
+    'been',
+    'do',
+    'does',
+    'did',
+    'i',
+    'you',
+    'your',
+    'me',
+    'my',
+    'we',
+    'us',
+    'it',
+    'its',
+    'this',
+    'that',
+    'these',
+    'those',
+    'there',
+    'here',
+    'a',
+    'an',
+    'the',
+    'to',
+    'for',
+    'of',
+    'in',
+    'on',
+    'at',
+    'by',
+    'with',
+    'without',
+    'from',
+    'into',
+    'and',
+    'or',
+    'if',
+    'can',
+    'could',
+    'should',
+    'would',
+    'will',
+    'shall',
+    'may',
+    'might',
+    'must',
+    'need',
+    'needs',
+    'want',
+    'use',
+    'used',
+    'using',
+    'work',
+    'works',
+    'working',
+    'set',
+    'setup',
+    'get',
+    'gets',
+    'got',
+    'make',
+    'making',
+    'configure',
+    'configuring',
+    'config',
+    'tell',
+    'show',
+    'see',
+    'look',
+    'about',
+    'up',
+    'out',
+    'off',
+    'many',
+    'much',
+    'right',
+    'best',
+    'good',
+    'instead',
+    'also',
+    'just',
   };
 
   static final RegExp _tokenSeparators = RegExp(r'[^a-z0-9+#]+');
@@ -2341,8 +2735,9 @@ class OfflineAssistantService {
       if (asked.any((a) => _tokensMeet(a, w))) shared++;
     }
     if (shared == 0) return 0;
-    final smaller =
-        asked.length < topicTokens.length ? asked.length : topicTokens.length;
+    final smaller = asked.length < topicTokens.length
+        ? asked.length
+        : topicTokens.length;
     return shared / smaller;
   }
 
@@ -2384,7 +2779,8 @@ class OfflineAssistantService {
   /// about the plan itself still gets the plan answer below.
   static bool _openQuestion(String t, int wordCount, {bool hasPlan = false}) {
     if (wordCount < 3) return false;
-    final shaped = t.endsWith('?') ||
+    final shaped =
+        t.endsWith('?') ||
         t.endsWith('؟') ||
         _openWhLead.hasMatch(t) ||
         _openArabicLead.hasMatch(t);
@@ -2402,5 +2798,4 @@ class OfflineAssistantService {
     'Should routing be static or OSPF?',
     'Do you need security (port security, an ACL, or a VPN)?',
   ];
-
 }

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../models/network_intent.dart';
+import 'cisco_adapter.dart';
 
 /// Compiles intent -> GNS3 REST payload (create project + nodes + links).
 /// GNS3 server API: http://127.0.0.1:3080/v2/*
@@ -25,7 +26,7 @@ class Gns3Adapter {
           'b': {'node': l.b, 'iface': l.bIf},
         },
     ],
-    'configs': CiscoRendererShim.render(intent),
+    'configs': CiscoAdapter.render(intent),
   };
 
   static String exportJson(NetworkIntent intent) =>
@@ -252,19 +253,6 @@ class Gns3ApiException implements Exception {
 /// We duplicate the 3-line call here by re-exporting logic through a function
 /// implemented in cisco_adapter (kept in sync manually, tested).
 class CiscoRendererShim {
-  static Map<String, String> render(NetworkIntent intent) {
-    // Intentionally duplicated minimal rendering to keep adapter dependency-free.
-    // Full fidelity lives in CiscoAdapter; this covers GNS3 export smoke tests.
-    final out = <String, String>{};
-    for (final n in intent.nodes) {
-      final sb = StringBuffer()..writeln('hostname ${n.name}');
-      for (final a in intent.addressing.where((e) => e.node == n.name)) {
-        sb.writeln('interface ${a.iface}');
-        sb.writeln(' ip address ${a.ipCidr}');
-        sb.writeln(' no shutdown');
-      }
-      out[n.name] = sb.toString();
-    }
-    return out;
-  }
+  static Map<String, String> render(NetworkIntent intent) =>
+      CiscoAdapter.render(intent);
 }

@@ -1,4 +1,7 @@
-﻿import 'dart:convert';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -14,6 +17,8 @@ import 'misparse_ledger.dart';
 import 'phrasing_memory_service.dart';
 import 'plan_repair_service.dart';
 import 'repair_learning_service.dart';
+import 'stored_privacy.dart';
+import 'secret_vault.dart';
 
 /// On-device learning memory: builds + rules + preferences + chat.
 /// SQLite file stays on device; nothing is uploaded.
@@ -33,6 +38,12 @@ class MemoryService extends ChangeNotifier {
   bool get ready => _db != null || injected != null;
   Database? get _active => injected ?? _db;
 
+  /// The file the store was recovered FROM, when a launch found the existing
+  /// database unopenable. Non-null means history was preserved on disk under
+  /// this name rather than lost - the app says so instead of opening an empty
+  /// store that looks like a fresh install.
+  String? recoveredFrom;
+
   Future<void> init() async {
     if (injected != null) return;
     if (_db != null) return;
@@ -48,19 +59,89 @@ class MemoryService extends ChangeNotifier {
     }
     final dir = await getApplicationDocumentsDirectory();
     final path = p.join(dir.path, 'netbuilder', 'memory.db');
-    // ensure parent exists via getApplicationDocumentsDirectory side-effect;
-    // sqflite creates dirs on most platforms, but be explicit with ffi.
-    _db = await openDatabase(
+    _db = await _openStore(path);
+    try {
+      await migrateStoredPrivacy();
+    } catch (_) {
+      // Keep history available; migration retries on next launch and never
+      // removes plaintext credentials before their secure copy is verified.
+      privacyError =
+          'Some older credentials could not be moved to secure storage. '
+          'Check secure storage and restart the app to finish protecting history.';
+    }
+    await _refreshPhrasingIndex();
+    notifyListeners();
+  }
+
+  /// Open [path], and if the store on disk cannot be opened, preserve it and
+  /// start a clean one beside it.
+  ///
+  /// WHY THIS EXISTS: a killed process left a migration half-applied - the
+  /// `learned_answer` table created, the version counter not advanced - so
+  /// every launch after that re-ran the same `CREATE TABLE`, threw, and
+  /// `main.dart` swallowed it. The app ran with no store at all: nothing was
+  /// written, the conversation list stayed empty, and nothing anywhere said
+  /// why. Losing every lab and every chat to a schema hiccup is not an
+  /// acceptable failure mode when the file is still sitting right there.
+  static Future<Database> _openStore(String path) async {
+    try {
+      return await _openAt(path);
+    } catch (_) {
+      // The store is unopenable, not empty. Move it aside - never over it -
+      // so its bytes survive for recovery, then open a fresh one.
+      final stamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+      final kept = '$path.unreadable-$stamp';
+      try {
+        await File(path).rename(kept);
+      } catch (_) {
+        // Could not move it: opening over it would destroy the evidence and
+        // the history, so fail loudly instead.
+        rethrow;
+      }
+      final db = await _openAt(path);
+      return db;
+    }
+  }
+
+  static Future<Database> _openAt(String path) async {
+    final db = await openDatabase(
       path,
       version: 10,
+      // PRAGMA assignments return a row in SQLite. Android's sqflite plugin
+      // requires rawQuery for statements with a result, while the FFI backend
+      // happens to accept execute and hid this startup failure in tests.
+      onConfigure: (db) async {
+        await db.rawQuery('PRAGMA secure_delete = ON');
+      },
       onCreate: (db, v) async => _create(db),
-      onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) {
-          await db.execute(
-            "ALTER TABLE builds ADD COLUMN status TEXT NOT NULL DEFAULT 'verified'",
-          );
-          await db.execute('''
-CREATE TABLE attempts(
+      onUpgrade: (db, oldVersion, newVersion) async =>
+          _upgrade(db, oldVersion, newVersion),
+    );
+    return db;
+  }
+
+  /// The whole migration chain from [oldVersion] to the current schema.
+  ///
+  /// Every step is re-runnable on purpose: the app is killed mid-migration
+  /// more often than not, SQLite does not roll a half-applied change back the
+  /// way the version counter suggests, and a schema that can only be applied
+  /// once leaves the store permanently unopenable afterwards.
+  static Future<void> _upgrade(
+    DatabaseExecutor db,
+    int oldVersion,
+    int newVersion,
+  ) async {
+    {
+      if (oldVersion < 2) {
+        await _addColumnIfMissing(
+          db,
+          'builds',
+          'status',
+          "ALTER TABLE builds ADD COLUMN status TEXT NOT NULL "
+              "DEFAULT 'verified'",
+        );
+        await db.execute('''
+CREATE TABLE IF NOT EXISTS attempts(
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  buildId INTEGER,
  projectName TEXT NOT NULL,
@@ -75,62 +156,85 @@ CREATE TABLE attempts(
  createdAt TEXT NOT NULL,
  updatedAt TEXT NOT NULL
 )''');
-        }
-        if (oldVersion < 3) {
-          await db.execute(_chatTableSql);
-        }
-        if (oldVersion < 4) {
-          // Existing rows become one conversation called "default", which is
-          // what they effectively already were: a single transcript.
-          await db.execute(
-            "ALTER TABLE chat ADD COLUMN conversation TEXT NOT NULL "
-            "DEFAULT 'default'",
-          );
-        }
-        if (oldVersion < 5) {
-          // Real conversation records (title, project, summary, structured
-          // state) and the exact change log "undo that" reads from.
-          await db.execute(_conversationsTableSql);
-          await db.execute(_changesTableSql);
-          await db.execute(_changesIndexSql);
-        }
-        if (oldVersion < 6) {
-          // Learned English phrasings (see [PhrasingMemoryService]).
-          await db.execute(_phrasingTableSql);
-        }
-        if (oldVersion < 7) {
-          // Which model answered each turn (see [ChatMessage.source]): the
-          // provider status belongs to the turn, not to the app's current
-          // settings, which may have changed since.
-          await db.execute(
-            "ALTER TABLE chat ADD COLUMN source TEXT NOT NULL DEFAULT ''",
-          );
-        }
-        if (oldVersion < 8) {
-          // Answers learned from keyed-model replies (see
-          // [LearnedAnswers]): question -> answer, replayed offline.
-          await db.execute(_learnedAnswerTableSql);
-          await db.execute(_learnedAnswerIndexSql);
-        }
-        if (oldVersion < 9) {
-          // The remembered environment (venue, scale, budget, skill) the
-          // advisor used to re-derive from every message and forget.
-          await db.execute(_envProfileTableSql);
-        }
-        if (oldVersion < 10) {
-          // Answers to clarifying questions, remembered so the same person
-          // is never asked the same thing twice (see [ClarificationService]).
-          await db.execute(_clarificationAnswerTableSql);
-        }
-      },
-    );
-    await _refreshPhrasingIndex();
-    notifyListeners();
+      }
+      if (oldVersion < 3) {
+        await db.execute(_chatTableSql);
+      }
+      if (oldVersion < 4) {
+        // Existing rows become one conversation called "default", which is
+        // what they effectively already were: a single transcript.
+        await _addColumnIfMissing(
+          db,
+          'chat',
+          'conversation',
+          "ALTER TABLE chat ADD COLUMN conversation TEXT NOT NULL "
+              "DEFAULT 'default'",
+        );
+      }
+      if (oldVersion < 5) {
+        // Real conversation records (title, project, summary, structured
+        // state) and the exact change log "undo that" reads from.
+        await db.execute(_conversationsTableSql);
+        await db.execute(_changesTableSql);
+        await db.execute(_changesIndexSql);
+      }
+      if (oldVersion < 6) {
+        // Learned English phrasings (see [PhrasingMemoryService]).
+        await db.execute(_phrasingTableSql);
+      }
+      if (oldVersion < 7) {
+        // Which model answered each turn (see [ChatMessage.source]): the
+        // provider status belongs to the turn, not to the app's current
+        // settings, which may have changed since.
+        await _addColumnIfMissing(
+          db,
+          'chat',
+          'source',
+          "ALTER TABLE chat ADD COLUMN source TEXT NOT NULL DEFAULT ''",
+        );
+      }
+      if (oldVersion < 8) {
+        // Answers learned from keyed-model replies (see
+        // [LearnedAnswers]): question -> answer, replayed offline.
+        await db.execute(_learnedAnswerTableSql);
+        await db.execute(_learnedAnswerIndexSql);
+      }
+      if (oldVersion < 9) {
+        // The remembered environment (venue, scale, budget, skill) the
+        // advisor used to re-derive from every message and forget.
+        await db.execute(_envProfileTableSql);
+      }
+      if (oldVersion < 10) {
+        // Answers to clarifying questions, remembered so the same person
+        // is never asked the same thing twice (see [ClarificationService]).
+        await db.execute(_clarificationAnswerTableSql);
+      }
+    }
+  }
+
+  /// Run [alter] only when [column] is not already on [table].
+  ///
+  /// Every migration here must be re-runnable. The app is killed mid-migration
+  /// far more often than not - a crash, a laptop lid, a forced update - and
+  /// SQLite does not roll a half-applied schema change back the way the
+  /// version counter suggests. A table created but a counter never advanced
+  /// left the store permanently unopenable: the next launch re-ran the same
+  /// `CREATE TABLE`, threw, and the app ran silently with no memory at all.
+  static Future<void> _addColumnIfMissing(
+    DatabaseExecutor db,
+    String table,
+    String column,
+    String alter,
+  ) async {
+    final rows = await db.rawQuery('PRAGMA table_info($table)');
+    final has = rows.any((r) => '${r['name']}'.toLowerCase() == column);
+    if (has) return;
+    await db.execute(alter);
   }
 
   static Future<void> _create(DatabaseExecutor db) async {
     await db.execute('''
-CREATE TABLE builds(
+CREATE TABLE IF NOT EXISTS builds(
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  projectName TEXT NOT NULL,
  instruction TEXT NOT NULL,
@@ -143,7 +247,7 @@ CREATE TABLE builds(
  createdAt TEXT NOT NULL
 )''');
     await db.execute('''
-CREATE TABLE rules(
+CREATE TABLE IF NOT EXISTS rules(
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  ruleText TEXT NOT NULL,
  targets TEXT NOT NULL DEFAULT 'all',
@@ -151,12 +255,12 @@ CREATE TABLE rules(
  misses INTEGER NOT NULL DEFAULT 0
 )''');
     await db.execute('''
-CREATE TABLE prefs(
+CREATE TABLE IF NOT EXISTS prefs(
  k TEXT PRIMARY KEY,
  v TEXT NOT NULL
 )''');
     await db.execute('''
-CREATE TABLE attempts(
+CREATE TABLE IF NOT EXISTS attempts(
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  buildId INTEGER,
  projectName TEXT NOT NULL,
@@ -185,7 +289,7 @@ CREATE TABLE attempts(
   /// Attachments are paths on disk, not blobs: screenshots are hundreds of
   /// KB each and keeping them out of SQLite keeps reads fast.
   static const _chatTableSql = '''
-CREATE TABLE chat(
+CREATE TABLE IF NOT EXISTS chat(
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  conversation TEXT NOT NULL DEFAULT 'default',
  role TEXT NOT NULL,
@@ -205,7 +309,7 @@ CREATE TABLE chat(
   /// a generated title and a manual rename both survive, and the summary is
   /// stored rather than recomputed so "summarize the summary" never happens.
   static const _conversationsTableSql = '''
-CREATE TABLE conversations(
+CREATE TABLE IF NOT EXISTS conversations(
  id TEXT PRIMARY KEY,
  title TEXT NOT NULL DEFAULT '',
  project TEXT NOT NULL DEFAULT '',
@@ -223,7 +327,7 @@ CREATE TABLE conversations(
   /// model to remember which value it typed. One row = one field on one
   /// interface, with both values recorded verbatim.
   static const _changesTableSql = '''
-CREATE TABLE changes(
+CREATE TABLE IF NOT EXISTS changes(
  actionId INTEGER PRIMARY KEY AUTOINCREMENT,
  conversation TEXT NOT NULL,
  device TEXT NOT NULL,
@@ -244,14 +348,14 @@ CREATE TABLE changes(
   /// brief it replayed to. Its own table, not prefs - a lesson is memory the
   /// app acts on, not a setting the user chose.
   static const _phrasingTableSql = '''
-CREATE TABLE phrasing(
+CREATE TABLE IF NOT EXISTS phrasing(
  phrasing TEXT PRIMARY KEY,
  rewrite TEXT NOT NULL,
  createdAt TEXT NOT NULL
 )''';
 
   static const _learnedAnswerTableSql = '''
-CREATE TABLE learned_answer(
+CREATE TABLE IF NOT EXISTS learned_answer(
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  qkey TEXT NOT NULL,
  question TEXT NOT NULL,
@@ -263,15 +367,15 @@ CREATE TABLE learned_answer(
  lastSeenAt TEXT NOT NULL
 )''';
 
-  static const _learnedAnswerIndexSql = '''
-CREATE INDEX idx_learned_answer_qkey ON learned_answer(qkey)
-''';
+  static const _learnedAnswerIndexSql =
+      'CREATE INDEX IF NOT EXISTS idx_learned_answer_qkey '
+      'ON learned_answer(qkey)';
 
   /// The remembered environment (see [EnvironmentProfile]): exactly one row,
   /// because "the user's environment" is one fact, not a history - the newest
   /// merge replaces the row, and the JSON carries its own timestamp.
   static const _envProfileTableSql = '''
-CREATE TABLE environment_profile(
+CREATE TABLE IF NOT EXISTS environment_profile(
  id INTEGER PRIMARY KEY CHECK(id = 1),
  json TEXT NOT NULL,
  updatedAt TEXT NOT NULL
@@ -283,7 +387,7 @@ CREATE TABLE environment_profile(
   /// A row with no venue applies anywhere - the user said it without a site
   /// in play.
   static const _clarificationAnswerTableSql = '''
-CREATE TABLE clarification_answer(
+CREATE TABLE IF NOT EXISTS clarification_answer(
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  question_id TEXT NOT NULL,
  answer TEXT NOT NULL,
@@ -295,10 +399,51 @@ CREATE TABLE clarification_answer(
   /// Used by unit tests to create schema on an in-memory db.
   static Future<void> createSchema(DatabaseExecutor db) => _create(db);
 
+  /// Used by unit tests to take a store from [oldVersion] to the current
+  /// schema, so the migration chain is testable against a real file.
+  static Future<void> upgradeSchema(
+    DatabaseExecutor db,
+    int oldVersion,
+    int newVersion,
+  ) => _upgrade(db, oldVersion, newVersion);
+
   Future<int> logBuild(BuildRecord r) async {
-    final id = await _active!.insert('builds', r.toMap());
+    final id = await _active!.insert(
+      'builds',
+      await _storedRow(r.projectName, r.toMap()),
+    );
     notifyListeners();
     return id;
+  }
+
+  /// Save a layout choice onto the plan that is still awaiting its first
+  /// build. The matching planned attempt is updated in the same transaction,
+  /// so reopening history does not fall back to the unreviewed drawing.
+  Future<bool> updatePlannedBuildIntent({
+    required int id,
+    required NetworkIntent intent,
+  }) async {
+    final db = _active;
+    if (db == null) return false;
+    final intentJson = jsonEncode(intent.toJson(includeSecrets: false));
+    final updated = await db.transaction<bool>((txn) async {
+      final count = await txn.update(
+        'builds',
+        StoredPrivacy.row({'intentJson': intentJson}),
+        where: 'id=? AND status=?',
+        whereArgs: [id, 'planned'],
+      );
+      if (count == 0) return false;
+      await txn.update(
+        'attempts',
+        StoredPrivacy.row({'intentJson': intentJson}),
+        where: 'buildId=? AND status=?',
+        whereArgs: [id, 'planned'],
+      );
+      return true;
+    });
+    if (updated) notifyListeners();
+    return updated;
   }
 
   Future<void> updateBuildOutcome({
@@ -314,7 +459,12 @@ CREATE TABLE clarification_answer(
       'error': error,
     };
     if (fix != null) values['fix'] = fix;
-    await _active!.update('builds', values, where: 'id=?', whereArgs: [id]);
+    await _active!.update(
+      'builds',
+      StoredPrivacy.row(values),
+      where: 'id=?',
+      whereArgs: [id],
+    );
     notifyListeners();
     // THE REPAIR LOOP CLOSES HERE. This is the one choke point every build
     // path reports through (PT autopilot evidence, GNS3 push, the offline
@@ -326,7 +476,10 @@ CREATE TABLE clarification_answer(
     try {
       final plan = await planForBuild(id);
       if (plan != null) {
-        await confirmRepairedPlan(plan, verified: success && status == 'verified');
+        await confirmRepairedPlan(
+          plan,
+          verified: success && status == 'verified',
+        );
       }
     } catch (_) {
       // A learning hiccup must never cost a build its outcome.
@@ -426,8 +579,7 @@ CREATE TABLE clarification_answer(
     var promoted = 0;
     for (final entry in match) {
       final known = {
-        for (final rule in await allRules())
-          rule.ruleText.trim().toLowerCase(),
+        for (final rule in await allRules()) rule.ruleText.trim().toLowerCase(),
       };
       for (final rule in (entry['rules'] as List?) ?? const []) {
         final text = rule.toString().trim();
@@ -467,7 +619,10 @@ CREATE TABLE clarification_answer(
   }
 
   Future<int> logAttempt(BuildAttempt attempt) async {
-    final id = await _active!.insert('attempts', attempt.toMap());
+    final id = await _active!.insert(
+      'attempts',
+      await _storedRow(attempt.projectName, attempt.toMap()),
+    );
     notifyListeners();
     return id;
   }
@@ -482,14 +637,14 @@ CREATE TABLE clarification_answer(
   }) async {
     await _active!.update(
       'attempts',
-      {
+      StoredPrivacy.row({
         'status': status,
         'failureKind': failureKind,
         'failureDetail': failureDetail,
         'evidenceJson': evidenceJson,
         'correction': correction,
         'updatedAt': DateTime.now().toIso8601String(),
-      },
+      }),
       where: 'id=?',
       whereArgs: [id],
     );
@@ -517,11 +672,7 @@ CREATE TABLE clarification_answer(
   Future<List<BuildRecord>> recentBuilds({int limit = 20}) async {
     final db = _active;
     if (db == null) return const [];
-    final rows = await db.query(
-      'builds',
-      orderBy: 'id DESC',
-      limit: limit,
-    );
+    final rows = await db.query('builds', orderBy: 'id DESC', limit: limit);
     return rows.map(BuildRecord.fromMap).toList();
   }
 
@@ -553,7 +704,10 @@ CREATE TABLE clarification_answer(
   Future<int> addRule(String text, {String targets = 'all'}) async {
     final id = await _active!.insert(
       'rules',
-      LearnedRule(ruleText: text, targets: targets).toMap(),
+      await _storedRow(
+        'default',
+        LearnedRule(ruleText: text, targets: targets).toMap(),
+      ),
     );
     notifyListeners();
     return id;
@@ -588,9 +742,9 @@ CREATE TABLE clarification_answer(
   /// only. Journal advice is excluded, including legacy rows written before
   /// the targets were recorded.
   Future<List<String>> plannerRuleTexts() async => [
-        for (final rule in await allRules())
-          if (_isPlannerRule(rule)) rule.ruleText,
-      ];
+    for (final rule in await allRules())
+      if (_isPlannerRule(rule)) rule.ruleText,
+  ];
 
   Future<void> markRule(int id, bool helpful) async {
     await _active!.rawUpdate(
@@ -603,9 +757,11 @@ CREATE TABLE clarification_answer(
   }
 
   Future<void> setPref(String k, String v) async {
+    await _protectText('default', v);
+    await _protectStructuredSecrets('default', v);
     await _active!.insert('prefs', {
       'k': k,
-      'v': v,
+      'v': StoredPrivacy.redact(v),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
     notifyListeners();
   }
@@ -651,15 +807,11 @@ CREATE TABLE clarification_answer(
             source: profile.source,
           )
         : profile;
-    await db.insert(
-      'environment_profile',
-      {
-        'id': 1,
-        'json': jsonEncode(stamped.toJson()),
-        'updatedAt': stamped.updatedAt,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('environment_profile', {
+      'id': 1,
+      'json': jsonEncode(StoredPrivacy.redact(stamped.toJson())),
+      'updatedAt': stamped.updatedAt,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
     notifyListeners();
   }
 
@@ -688,7 +840,7 @@ CREATE TABLE clarification_answer(
     if (db == null) return;
     await db.insert('clarification_answer', {
       'question_id': questionId,
-      'answer': answer,
+      'answer': NetworkIntent.redactSecrets(answer),
       'venue': venue,
       'scale': scale,
       'created_at': DateTime.now().toIso8601String(),
@@ -700,11 +852,7 @@ CREATE TABLE clarification_answer(
   Future<List<Map<String, dynamic>>> clarificationAnswers() async {
     final db = _active;
     if (db == null) return const [];
-    return db.query(
-      'clarification_answer',
-      orderBy: 'id DESC',
-      limit: 200,
-    );
+    return db.query('clarification_answer', orderBy: 'id DESC', limit: 200);
   }
 
   /// The remembered answer for [questionId], or null.
@@ -747,11 +895,7 @@ CREATE TABLE clarification_answer(
   Future<void> forgetClarification(int id) async {
     final db = _active;
     if (db == null) return;
-    await db.delete(
-      'clarification_answer',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    await db.delete('clarification_answer', where: 'id = ?', whereArgs: [id]);
     notifyListeners();
   }
 
@@ -768,15 +912,11 @@ CREATE TABLE clarification_answer(
   Future<void> teachPhrasing(String key, String rewrite) async {
     final db = _active;
     if (db == null) return;
-    await db.insert(
-      'phrasing',
-      {
-        'phrasing': key,
-        'rewrite': rewrite,
-        'createdAt': DateTime.now().toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('phrasing', {
+      'phrasing': NetworkIntent.redactSecrets(key),
+      'rewrite': NetworkIntent.redactSecrets(rewrite),
+      'createdAt': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
     await _refreshPhrasingIndex();
     notifyListeners();
   }
@@ -834,8 +974,7 @@ CREATE TABLE clarification_answer(
     );
     if (rows.isEmpty) return (entries: const <MisparseEntry>[], turns: 0);
     try {
-      final decoded =
-          jsonDecode(rows.first['v']?.toString() ?? '{}');
+      final decoded = jsonDecode(rows.first['v']?.toString() ?? '{}');
       if (decoded is! Map) return (entries: const <MisparseEntry>[], turns: 0);
       final raw = decoded['entries'];
       return (
@@ -859,17 +998,15 @@ CREATE TABLE clarification_answer(
   }) async {
     final db = _active;
     if (db == null) return;
-    await db.insert(
-      'prefs',
-      {
-        'k': misparseLedgerKey,
-        'v': jsonEncode({
+    await db.insert('prefs', {
+      'k': misparseLedgerKey,
+      'v': jsonEncode(
+        StoredPrivacy.redact({
           'turns': turns,
           'entries': [for (final e in entries) e.toMap()],
         }),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+      ),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
     if (notify) notifyListeners();
   }
 
@@ -921,13 +1058,9 @@ CREATE TABLE clarification_answer(
   /// parsed turn, so a falling number means the lessons are landing - it is
   /// counted, not felt.
   Future<
-      ({
-        int turns,
-        int corrections,
-        int proposed,
-        int taught,
-        int dismissed,
-      })> misparseStats() async {
+    ({int turns, int corrections, int proposed, int taught, int dismissed})
+  >
+  misparseStats() async {
     final state = await _misparseState();
     var corrections = 0;
     var proposed = 0;
@@ -961,8 +1094,9 @@ CREATE TABLE clarification_answer(
     final db = _active;
     if (db == null) return false;
     final state = await _misparseState();
-    final at = state.entries
-        .indexWhere((e) => e.key == key && e.corrected == corrected);
+    final at = state.entries.indexWhere(
+      (e) => e.key == key && e.corrected == corrected,
+    );
     if (at < 0) return false;
     await teachPhrasing(key, corrected);
     final next = [...state.entries];
@@ -988,8 +1122,9 @@ CREATE TABLE clarification_answer(
     final db = _active;
     if (db == null) return;
     final state = await _misparseState();
-    final at = state.entries
-        .indexWhere((e) => e.key == key && e.corrected == corrected);
+    final at = state.entries.indexWhere(
+      (e) => e.key == key && e.corrected == corrected,
+    );
     if (at < 0) return;
     final next = [...state.entries];
     next[at] = MisparseEntry(
@@ -1019,6 +1154,8 @@ CREATE TABLE clarification_answer(
   }) async {
     final db = _active;
     if (db == null) return -1;
+    question = NetworkIntent.redactSecrets(question);
+    answer = NetworkIntent.redactSecrets(answer);
     final key = LearnedAnswers.keyFor(question);
     final existing = await _learnedCandidates(key);
     final capture = LearnedAnswers.capture(
@@ -1070,7 +1207,9 @@ CREATE TABLE clarification_answer(
   Future<LearnedAnswer?> bestLearnedAnswer(String question) async {
     final db = _active;
     if (db == null) return null;
-    final candidates = await _learnedCandidates(LearnedAnswers.keyFor(question));
+    final candidates = await _learnedCandidates(
+      LearnedAnswers.keyFor(question),
+    );
     return LearnedAnswers.pickBest(candidates);
   }
 
@@ -1134,7 +1273,8 @@ CREATE TABLE clarification_answer(
   /// v2: adds the learned-phrasing table.
   /// v3: adds the environment profile (one row or null).
   /// v4: adds the clarification answers.
-  static const exportSchemaVersion = 4;
+  /// v5: includes the learned-answer replay store.
+  static const exportSchemaVersion = 5;
 
   /// Everything the app remembers, as one JSON document.
   ///
@@ -1160,6 +1300,7 @@ CREATE TABLE clarification_answer(
         'chat': <Map<String, dynamic>>[],
         'changes': <Map<String, dynamic>>[],
         'phrasing': <Map<String, dynamic>>[],
+        'learnedAnswers': <Map<String, dynamic>>[],
         'clarificationAnswers': <Map<String, dynamic>>[],
         'environmentProfile': null,
       });
@@ -1168,7 +1309,10 @@ CREATE TABLE clarification_answer(
     final attempts = await db.query('attempts', orderBy: 'id ASC');
     final rules = await db.query('rules', orderBy: 'id ASC');
     final prefs = await db.query('prefs', orderBy: 'k ASC');
-    final conversations = await db.query('conversations', orderBy: 'createdAt ASC');
+    final conversations = await db.query(
+      'conversations',
+      orderBy: 'createdAt ASC',
+    );
     final chat = await _exportChat();
     final changes = await _exportChanges();
     final phrasing = await db.query('phrasing', orderBy: 'createdAt ASC');
@@ -1176,28 +1320,615 @@ CREATE TABLE clarification_answer(
       'clarification_answer',
       orderBy: 'id ASC',
     );
+    final learnedAnswers = await db.query('learned_answer', orderBy: 'id ASC');
     final envRow = await db.query(
       'environment_profile',
       where: 'id = 1',
       limit: 1,
     );
-    return const JsonEncoder.withIndent('  ').convert({
+    return const JsonEncoder.withIndent('  ').convert(
+      StoredPrivacy.redact({
+        'schemaVersion': exportSchemaVersion,
+        'exportedAt': DateTime.now().toIso8601String(),
+        'builds': builds,
+        'attempts': attempts,
+        'rules': rules,
+        'prefs': {for (final row in prefs) row['k'].toString(): row['v']},
+        'conversations': conversations,
+        'chat': chat,
+        'changes': changes,
+        'phrasing': phrasing,
+        'learnedAnswers': learnedAnswers,
+        'clarificationAnswers': clarifications,
+        'environmentProfile': envRow.isEmpty
+            ? null
+            : EnvironmentProfile.tryDecode(
+                '${envRow.first['json'] ?? ''}',
+              )?.toJson(),
+      }),
+    );
+  }
+
+  /// Merge a backup into the current store, preserving local records.
+  /// Automatically generated numeric IDs are reassigned, build/attempt links
+  /// are remapped, and conflicting conversation IDs are renamed so imported
+  /// chat history never joins the wrong local conversation.
+  ///
+  /// Matching preferences and the single environment profile use the backup
+  /// value only when [preferBackupSettings] is true. History rows are merged
+  /// and exact duplicates are skipped. The final replacement remains atomic
+  /// and gets the same pre-merge recovery snapshot as a normal restore.
+  Future<Map<String, int>> mergeJson(
+    String source, {
+    bool preferBackupSettings = false,
+  }) async {
+    if (source.length > 50 * 1024 * 1024) {
+      throw const FormatException('This backup is larger than 50 MB.');
+    }
+    final decoded = jsonDecode(source);
+    if (decoded is! Map) {
+      throw const FormatException('This is not a NetBuilder backup.');
+    }
+    final input = Map<String, dynamic>.from(decoded);
+    final version = (input['schemaVersion'] as num?)?.toInt();
+    if (version == null || version < 1 || version > exportSchemaVersion) {
+      throw FormatException(
+        'Unsupported backup version: ${input['schemaVersion']}.',
+      );
+    }
+    List<Map<String, dynamic>> rows(String key, {bool optional = false}) {
+      final value = input[key];
+      if (value == null && optional) return [];
+      if (value is! List) {
+        throw FormatException('Backup section "$key" is missing or invalid.');
+      }
+      if (value.length > 100000) {
+        throw FormatException('Backup section "$key" is too large.');
+      }
+      return [
+        for (final row in value)
+          if (row is Map)
+            Map<String, dynamic>.fromEntries(
+              row.entries.map(
+                (entry) => MapEntry(entry.key.toString(), entry.value),
+              ),
+            )
+          else
+            throw FormatException(
+              'Backup section "$key" contains an invalid row.',
+            ),
+      ];
+    }
+
+    final sourceBuilds = rows('builds');
+    final sourceAttempts = rows('attempts');
+    final sourceRules = rows('rules');
+    final sourceConversations = rows('conversations', optional: version < 4);
+    final sourceChat = rows('chat', optional: version < 3);
+    final sourceChanges = rows('changes', optional: version < 4);
+    final sourcePhrasing = rows('phrasing', optional: version < 2);
+    final sourceAnswers = rows('learnedAnswers', optional: version < 5);
+    final sourceClarifications = rows(
+      'clarificationAnswers',
+      optional: version < 4,
+    );
+    final sourcePrefs = input['prefs'];
+    if (sourcePrefs is! Map) {
+      throw const FormatException('Backup preferences are invalid.');
+    }
+    final sourceEnvironment = input['environmentProfile'];
+    if (sourceEnvironment != null && sourceEnvironment is! Map) {
+      throw const FormatException('Backup environment profile is invalid.');
+    }
+
+    final current = Map<String, dynamic>.from(
+      jsonDecode(await exportJson()) as Map,
+    );
+    List<Map<String, dynamic>> currentRows(String key) =>
+        ((current[key] as List?) ?? const [])
+            .whereType<Map>()
+            .map(
+              (row) => Map<String, dynamic>.fromEntries(
+                row.entries.map(
+                  (entry) => MapEntry(entry.key.toString(), entry.value),
+                ),
+              ),
+            )
+            .toList();
+    String signature(Map<String, dynamic> row, List<String> fields) =>
+        jsonEncode({
+          for (final field in fields)
+            if (row.containsKey(field)) field: row[field],
+        });
+    int idOf(Map<String, dynamic> row) => (row['id'] as num?)?.toInt() ?? 0;
+    int nextId(List<Map<String, dynamic>> rows, {String key = 'id'}) =>
+        rows.fold<int>(0, (max, row) {
+          final id = (row[key] as num?)?.toInt() ?? 0;
+          return id > max ? id : max;
+        }) +
+        1;
+
+    final added = <String, int>{};
+    int putUnique(
+      List<Map<String, dynamic>> target,
+      Map<String, dynamic> row,
+      List<String> fields,
+    ) {
+      final key = signature(row, fields);
+      if (target.any((existing) => signature(existing, fields) == key)) {
+        return 0;
+      }
+      target.add(row);
+      return 1;
+    }
+
+    final builds = currentRows('builds');
+    final buildIds = <int, int>{};
+    var buildNext = nextId(builds);
+    const buildKey = [
+      'projectName',
+      'instruction',
+      'intentJson',
+      'target',
+      'createdAt',
+    ];
+    for (final sourceRow in sourceBuilds) {
+      final row = Map<String, dynamic>.from(sourceRow);
+      final duplicate = builds
+          .where(
+            (existing) =>
+                signature(existing, buildKey) == signature(row, buildKey),
+          )
+          .firstOrNull;
+      if (duplicate != null) {
+        final oldId = idOf(row);
+        if (oldId > 0) buildIds[oldId] = idOf(duplicate);
+        continue;
+      }
+      final oldId = idOf(row);
+      row['id'] = buildNext++;
+      builds.add(row);
+      if (oldId > 0) buildIds[oldId] = idOf(row);
+      added['builds'] = (added['builds'] ?? 0) + 1;
+    }
+
+    final attempts = currentRows('attempts');
+    var attemptNext = nextId(attempts);
+    const attemptKey = [
+      'buildId',
+      'projectName',
+      'instruction',
+      'intentJson',
+      'target',
+      'status',
+      'createdAt',
+      'updatedAt',
+    ];
+    for (final sourceRow in sourceAttempts) {
+      final row = Map<String, dynamic>.from(sourceRow);
+      final oldBuildId = (row['buildId'] as num?)?.toInt();
+      row['buildId'] = oldBuildId == null ? null : buildIds[oldBuildId];
+      if (putUnique(attempts, row, attemptKey) == 1) {
+        row['id'] = attemptNext++;
+        added['attempts'] = (added['attempts'] ?? 0) + 1;
+      }
+    }
+
+    final rules = currentRows('rules');
+    var ruleNext = nextId(rules);
+    for (final sourceRow in sourceRules) {
+      final row = Map<String, dynamic>.from(sourceRow);
+      const fields = ['ruleText', 'targets'];
+      final duplicate = rules
+          .where(
+            (existing) => signature(existing, fields) == signature(row, fields),
+          )
+          .firstOrNull;
+      if (duplicate != null) {
+        duplicate['hits'] = [
+          duplicate['hits'],
+          row['hits'],
+        ].whereType<num>().fold<int>(0, (a, b) => a > b ? a : b.toInt());
+        duplicate['misses'] = [
+          duplicate['misses'],
+          row['misses'],
+        ].whereType<num>().fold<int>(0, (a, b) => a > b ? a : b.toInt());
+      } else {
+        row['id'] = ruleNext++;
+        rules.add(row);
+        added['rules'] = (added['rules'] ?? 0) + 1;
+      }
+    }
+
+    final prefs = Map<String, dynamic>.from(
+      current['prefs'] as Map? ?? const {},
+    );
+    var preferenceAdds = 0;
+    for (final entry in sourcePrefs.entries) {
+      final key = entry.key.toString();
+      if (RegExp(
+        r'(api.?key|password|secret|token|credential)',
+        caseSensitive: false,
+      ).hasMatch(key)) {
+        continue;
+      }
+      if (!prefs.containsKey(key)) preferenceAdds++;
+      if (preferBackupSettings || !prefs.containsKey(key)) {
+        prefs[key] = entry.value;
+      }
+    }
+    added['prefs'] = preferenceAdds;
+
+    final conversations = currentRows('conversations');
+    final conversationMap = <String, String>{};
+    const conversationFields = [
+      'title',
+      'project',
+      'createdAt',
+      'updatedAt',
+      'summary',
+      'summaryUpToId',
+      'stateJson',
+    ];
+    for (final sourceRow in sourceConversations) {
+      final row = Map<String, dynamic>.from(sourceRow);
+      final original = '${row['id'] ?? ''}';
+      final sameId = conversations
+          .where((existing) => existing['id'] == original)
+          .firstOrNull;
+      if (sameId == null) {
+        conversations.add(row);
+        conversationMap[original] = original;
+        added['conversations'] = (added['conversations'] ?? 0) + 1;
+      } else if (signature(sameId, conversationFields) ==
+          signature(row, conversationFields)) {
+        conversationMap[original] = original;
+      } else {
+        final digest = sha256
+            .convert(utf8.encode(signature(row, conversationFields)))
+            .toString()
+            .substring(0, 12);
+        var renamed = '$original-import-$digest';
+        var collision = 1;
+        while (true) {
+          final existing = conversations
+              .where((candidate) => candidate['id'] == renamed)
+              .firstOrNull;
+          if (existing == null) {
+            row['id'] = renamed;
+            conversations.add(row);
+            conversationMap[original] = renamed;
+            added['conversations'] = (added['conversations'] ?? 0) + 1;
+            break;
+          }
+          if (signature(existing, conversationFields) ==
+              signature(row, conversationFields)) {
+            conversationMap[original] = renamed;
+            break;
+          }
+          renamed = '$original-import-$digest-${collision++}';
+        }
+      }
+    }
+
+    final chat = currentRows('chat');
+    var chatNext = nextId(chat);
+    const chatKey = [
+      'conversation',
+      'role',
+      'text',
+      'images',
+      'actions',
+      'executed',
+      'createdAt',
+      'source',
+    ];
+    for (final sourceRow in sourceChat) {
+      final row = Map<String, dynamic>.from(sourceRow);
+      final sourceConversation = '${row['conversation'] ?? 'default'}';
+      row['conversation'] =
+          conversationMap[sourceConversation] ?? sourceConversation;
+      if (putUnique(chat, row, chatKey) == 1) {
+        row['id'] = chatNext++;
+        added['chat'] = (added['chat'] ?? 0) + 1;
+      }
+    }
+
+    final changes = currentRows('changes');
+    var changeNext = nextId(changes, key: 'actionId');
+    const changeKey = [
+      'conversation',
+      'device',
+      'interface',
+      'field',
+      'oldValue',
+      'newValue',
+      'source',
+      'createdAt',
+      'undoneAt',
+    ];
+    for (final sourceRow in sourceChanges) {
+      final row = Map<String, dynamic>.from(sourceRow);
+      final sourceConversation = '${row['conversation'] ?? 'default'}';
+      row['conversation'] =
+          conversationMap[sourceConversation] ?? sourceConversation;
+      if (putUnique(changes, row, changeKey) == 1) {
+        row.remove('id');
+        row['actionId'] = changeNext++;
+        added['changes'] = (added['changes'] ?? 0) + 1;
+      }
+    }
+
+    final phrasing = currentRows('phrasing');
+    for (final sourceRow in sourcePhrasing) {
+      final row = Map<String, dynamic>.from(sourceRow);
+      final duplicate = phrasing
+          .where((existing) => existing['phrasing'] == row['phrasing'])
+          .firstOrNull;
+      if (duplicate == null) {
+        phrasing.add(row);
+        added['phrasing'] = (added['phrasing'] ?? 0) + 1;
+      } else if (preferBackupSettings) {
+        duplicate['rewrite'] = row['rewrite'];
+        duplicate['createdAt'] = row['createdAt'];
+      }
+    }
+
+    final answers = currentRows('learnedAnswers');
+    var answerNext = nextId(answers);
+    const answerKey = ['qkey', 'question', 'answer', 'source'];
+    for (final sourceRow in sourceAnswers) {
+      final row = Map<String, dynamic>.from(sourceRow);
+      final duplicate = answers
+          .where(
+            (existing) =>
+                signature(existing, answerKey) == signature(row, answerKey),
+          )
+          .firstOrNull;
+      if (duplicate == null) {
+        row['id'] = answerNext++;
+        answers.add(row);
+        added['learnedAnswers'] = (added['learnedAnswers'] ?? 0) + 1;
+      } else {
+        final oldCount = (duplicate['seenCount'] as num?)?.toInt() ?? 1;
+        final newCount = (row['seenCount'] as num?)?.toInt() ?? 1;
+        duplicate['seenCount'] = oldCount > newCount ? oldCount : newCount;
+        duplicate['confirmed'] =
+            duplicate['confirmed'] == 1 || row['confirmed'] == 1 ? 1 : 0;
+        if ('${row['lastSeenAt'] ?? ''}'.compareTo(
+              '${duplicate['lastSeenAt'] ?? ''}',
+            ) >
+            0) {
+          duplicate['lastSeenAt'] = row['lastSeenAt'];
+        }
+      }
+    }
+
+    final clarifications = currentRows('clarificationAnswers');
+    var clarificationNext = nextId(clarifications);
+    const clarificationKey = [
+      'question_id',
+      'answer',
+      'venue',
+      'scale',
+      'created_at',
+    ];
+    for (final sourceRow in sourceClarifications) {
+      final row = Map<String, dynamic>.from(sourceRow);
+      if (putUnique(clarifications, row, clarificationKey) == 1) {
+        row['id'] = clarificationNext++;
+        added['clarificationAnswers'] =
+            (added['clarificationAnswers'] ?? 0) + 1;
+      }
+    }
+
+    var environment = current['environmentProfile'];
+    if (sourceEnvironment != null &&
+        (environment == null ||
+            (preferBackupSettings &&
+                jsonEncode(environment) != jsonEncode(sourceEnvironment)))) {
+      environment = sourceEnvironment;
+      added['environmentProfile'] = 1;
+    } else {
+      added['environmentProfile'] = 0;
+    }
+
+    final merged = <String, dynamic>{
+      ...current,
       'schemaVersion': exportSchemaVersion,
       'exportedAt': DateTime.now().toIso8601String(),
       'builds': builds,
       'attempts': attempts,
       'rules': rules,
-      'prefs': {for (final row in prefs) row['k'].toString(): row['v']},
+      'prefs': prefs,
       'conversations': conversations,
       'chat': chat,
       'changes': changes,
       'phrasing': phrasing,
+      'learnedAnswers': answers,
       'clarificationAnswers': clarifications,
-      'environmentProfile': envRow.isEmpty
-          ? null
-          : EnvironmentProfile.tryDecode('${envRow.first['json'] ?? ''}')
-                ?.toJson(),
+      'environmentProfile': environment,
+    };
+    await restoreJson(jsonEncode(merged));
+    return added;
+  }
+
+  /// Restore a full memory export atomically. The input is checked before the
+  /// transaction starts; if any row is malformed or violates the local
+  /// schema, SQLite rolls the replacement back and leaves current memory
+  /// intact. This replaces the app database only; operating-system
+  /// credentials remain in the secure vault and are never imported.
+  Future<Map<String, int>> restoreJson(String source) async {
+    final db = _active;
+    if (db == null) throw StateError('Local memory is not available.');
+    if (source.length > 50 * 1024 * 1024) {
+      throw const FormatException('This backup is larger than 50 MB.');
+    }
+    final decoded = jsonDecode(source);
+    if (decoded is! Map) {
+      throw const FormatException('Backup must be a JSON object.');
+    }
+    final backup = Map<String, dynamic>.from(decoded);
+    final version = (backup['schemaVersion'] as num?)?.toInt();
+    if (version == null || version < 1 || version > exportSchemaVersion) {
+      throw FormatException(
+        'Unsupported backup version: ${backup['schemaVersion']}.',
+      );
+    }
+
+    List<Map<String, dynamic>> rows(String key, {bool optional = false}) {
+      final raw = backup[key];
+      if (raw == null && optional) return const [];
+      if (raw is! List) {
+        throw FormatException('Backup section "$key" is missing or invalid.');
+      }
+      if (raw.length > 100000) {
+        throw FormatException('Backup section "$key" is too large.');
+      }
+      return [
+        for (final row in raw)
+          if (row is Map)
+            Map<String, dynamic>.fromEntries(
+              row.entries.map((e) => MapEntry(e.key.toString(), e.value)),
+            )
+          else
+            throw FormatException(
+              'Backup section "$key" contains an invalid row.',
+            ),
+      ];
+    }
+
+    final builds = rows('builds');
+    final attempts = rows('attempts');
+    final rules = rows('rules');
+    final conversations = rows('conversations', optional: version < 4);
+    final chat = rows('chat', optional: version < 3);
+    final changes = rows('changes', optional: version < 4);
+    final phrasing = rows('phrasing', optional: version < 2);
+    final learnedAnswers = rows('learnedAnswers', optional: version < 5);
+    final clarifications = rows('clarificationAnswers', optional: version < 4);
+    final prefRaw = backup['prefs'];
+    if (prefRaw is! Map) {
+      throw const FormatException('Backup preferences are invalid.');
+    }
+    final prefs = <Map<String, dynamic>>[
+      for (final entry in prefRaw.entries)
+        if (!RegExp(
+          r'(api.?key|password|secret|token|credential)',
+          caseSensitive: false,
+        ).hasMatch(entry.key.toString()))
+          {'k': entry.key.toString(), 'v': entry.value?.toString() ?? ''},
+    ];
+    final env = backup['environmentProfile'];
+    if (env != null && env is! Map) {
+      throw const FormatException('Backup environment profile is invalid.');
+    }
+    final total =
+        builds.length +
+        attempts.length +
+        rules.length +
+        conversations.length +
+        chat.length +
+        changes.length +
+        phrasing.length +
+        learnedAnswers.length +
+        clarifications.length +
+        prefs.length;
+    if (total > 150000) {
+      throw const FormatException('This backup contains too many records.');
+    }
+
+    // Keep one automatic recovery point next to the app data before replacing
+    // the live store. A failed write aborts the restore before any rows change.
+    if (injected == null && db.path != ':memory:') {
+      final support = await getApplicationSupportDirectory();
+      final guard = Directory(p.join(support.path, 'restore-guard'));
+      await guard.create(recursive: true);
+      await File(
+        p.join(guard.path, 'memory-before-last-restore.json'),
+      ).writeAsString(await exportJson(), flush: true);
+    }
+
+    final replacements = <String, List<Map<String, dynamic>>>{
+      'builds': builds,
+      'attempts': attempts,
+      'rules': rules,
+      'prefs': prefs,
+      'conversations': conversations,
+      'changes': changes,
+      'chat': [
+        for (final raw in chat)
+          {
+            for (final entry in raw.entries)
+              if (entry.key != 'images' &&
+                  entry.key != 'actions' &&
+                  entry.key != 'executed')
+                entry.key: entry.value,
+            'imagesJson': jsonEncode(raw['images'] ?? const []),
+            'actionsJson': jsonEncode(raw['actions'] ?? const []),
+            'executedJson': jsonEncode(raw['executed'] ?? const []),
+          },
+      ],
+      'phrasing': phrasing,
+      'learned_answer': learnedAnswers,
+      'clarification_answer': clarifications,
+      'environment_profile': env == null
+          ? const []
+          : [
+              {
+                'id': 1,
+                'json': jsonEncode(env),
+                'updatedAt': DateTime.now().toIso8601String(),
+              },
+            ],
+    };
+
+    final restored = <String, int>{};
+    await db.transaction((txn) async {
+      for (final entry in replacements.entries) {
+        final columns = (await txn.rawQuery(
+          'PRAGMA table_info(${entry.key})',
+        )).map((column) => column['name'].toString()).toSet();
+        await txn.delete(entry.key);
+        for (final raw in entry.value) {
+          final row = StoredPrivacy.row({
+            for (final field in raw.entries)
+              if (columns.contains(field.key)) field.key: field.value,
+          });
+          if (row.isNotEmpty) await txn.insert(entry.key, row);
+        }
+        restored[entry.key] = entry.value.length;
+      }
     });
+    notifyListeners();
+    return restored;
+  }
+
+  /// Reapply the automatic pre-restore snapshot. [restoreJson] first saves
+  /// the current state over that snapshot, so this remains a reversible
+  /// one-step toggle rather than a destructive undo.
+  Future<Map<String, int>> restoreLastRestoreGuard() async {
+    if (injected != null) {
+      throw StateError(
+        'A file-based recovery copy is not available for this store.',
+      );
+    }
+    final support = await getApplicationSupportDirectory();
+    final file = File(
+      p.join(support.path, 'restore-guard', 'memory-before-last-restore.json'),
+    );
+    if (!await file.exists()) {
+      throw StateError('No automatic restore copy is available yet.');
+    }
+    return restoreJson(await file.readAsString());
+  }
+
+  Future<bool> hasRestoreGuard() async {
+    if (injected != null) return false;
+    final support = await getApplicationSupportDirectory();
+    return File(
+      p.join(support.path, 'restore-guard', 'memory-before-last-restore.json'),
+    ).exists();
   }
 
   /// Every chat row, oldest first and uncapped, with the conversation it
@@ -1256,7 +1987,8 @@ CREATE TABLE clarification_answer(
     ChatMessage message, {
     String conversation = 'default',
   }) async {
-    final row = message.toMap();
+    await _protectText(conversation, message.text);
+    final row = StoredPrivacy.row(message.toMap());
     row.remove('id');
     row['conversation'] = conversation.trim().isEmpty
         ? 'default'
@@ -1268,10 +2000,184 @@ CREATE TABLE clarification_answer(
   }
 
   Future<void> updateChat(int id, ChatMessage message) async {
-    final row = message.toMap();
+    final existing = await _active!.query(
+      'chat',
+      columns: ['conversation'],
+      where: 'id=?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    await _protectText(
+      existing.isEmpty ? 'default' : '${existing.first['conversation']}',
+      message.text,
+    );
+    final row = StoredPrivacy.row(message.toMap());
     row.remove('id');
     await _active!.update('chat', row, where: 'id=?', whereArgs: [id]);
     notifyListeners();
+  }
+
+  /// Replace a turn in place when the user edits it. Resolve turns created in
+  /// the current screen by their original timestamp and text when they do not
+  /// yet carry a database id.
+  Future<int?> replaceChatMessage({
+    required String conversation,
+    required ChatMessage previous,
+    required ChatMessage replacement,
+  }) async {
+    final db = _active;
+    final name = conversation.trim();
+    if (db == null || name.isEmpty) return null;
+    final List<Map<String, Object?>> rows;
+    if (previous.id != null) {
+      rows = await db.query(
+        'chat',
+        columns: ['id'],
+        where: 'id = ? AND conversation = ?',
+        whereArgs: [previous.id, name],
+        limit: 1,
+      );
+    } else {
+      rows = await db.query(
+        'chat',
+        columns: ['id'],
+        where: 'conversation = ? AND createdAt = ? AND role = ? AND text = ?',
+        whereArgs: [
+          name,
+          previous.createdAt,
+          previous.role,
+          StoredPrivacy.redact(previous.text),
+        ],
+        orderBy: 'id ASC',
+        limit: 1,
+      );
+    }
+    if (rows.isEmpty) return null;
+    final id = (rows.first['id'] as num).toInt();
+    await _protectText(name, replacement.text);
+    final row = StoredPrivacy.row(replacement.toMap())..remove('id');
+    await db.update(
+      'chat',
+      row,
+      where: 'id = ? AND conversation = ?',
+      whereArgs: [id, name],
+    );
+    notifyListeners();
+    return id;
+  }
+
+  static Future<void> _protectText(String project, String text) async {
+    if (NetworkIntent.redactSecrets(text) != text) {
+      await SecretVault.protectText(project, text);
+    }
+  }
+
+  static Future<Map<String, dynamic>> _storedRow(
+    String project,
+    Map<String, dynamic> row,
+  ) async {
+    for (final value in row.values.whereType<String>()) {
+      await _protectText(project, value);
+      await _protectStructuredSecrets(project, value);
+    }
+    return StoredPrivacy.row(row);
+  }
+
+  /// Idempotent upgrade: secure credentials first, then redact legacy rows.
+  String privacyError = '';
+  Future<void> migrateStoredPrivacy() async {
+    final db = _active;
+    if (db == null) return;
+    await db.rawQuery('PRAGMA secure_delete = ON');
+    final projects = await db.rawQuery(
+      'SELECT projectName FROM builds UNION SELECT projectName FROM attempts',
+    );
+    final groups = <String, Set<String>>{};
+    for (final row in projects) {
+      final name = '${row['projectName']}';
+      final legacy = name.trim().toLowerCase().replaceAll(
+        RegExp(r'[^a-z0-9_-]'),
+        '_',
+      );
+      (groups[legacy] ??= {}).add(name.trim().toLowerCase());
+    }
+    for (final group in groups.values.where((g) => g.length == 1)) {
+      await SecretVault.migrateLegacy(group.single);
+    }
+    for (final table in [
+      'builds',
+      'attempts',
+      'chat',
+      'conversations',
+      'changes',
+      'phrasing',
+      'prefs',
+      'clarification_answer',
+      'rules',
+      'learned_answer',
+      'environment_profile',
+    ]) {
+      final rows = await db.rawQuery(
+        'SELECT rowid AS _privacyRowId, * FROM $table',
+      );
+      for (final row in rows) {
+        final id = row['_privacyRowId'];
+        final original = Map<String, dynamic>.from(row)
+          ..remove('_privacyRowId');
+        final clean = StoredPrivacy.row(original);
+        if (jsonEncode(original) == jsonEncode(clean)) continue;
+        final project =
+            '${row['projectName'] ?? row['conversation'] ?? (table == 'conversations' ? row['id'] : 'default')}';
+        for (final value in original.values.whereType<String>()) {
+          await _protectText(project, value);
+          await _protectStructuredSecrets(project, value);
+        }
+        await db.update(table, clean, where: 'rowid=?', whereArgs: [id]);
+      }
+    }
+    await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
+    privacyError = '';
+    for (final group in groups.values.where((g) => g.length > 1)) {
+      if (!await SecretVault.hasLegacyCredentials(group.first)) continue;
+      for (final project in group) {
+        if ((await SecretVault.load(project)).isEmpty) {
+          privacyError =
+              'Some older project names shared a credential slot. '
+              'Re-enter credentials for those projects to keep them separate.';
+        }
+      }
+    }
+  }
+
+  static Future<void> _protectStructuredSecrets(
+    String project,
+    dynamic value,
+  ) async {
+    if (value is String) {
+      try {
+        await _protectStructuredSecrets(project, jsonDecode(value));
+      } on FormatException {
+        /* ordinary text */
+      }
+    } else if (value is Map) {
+      if (value.containsKey('security') || value.containsKey('nodes')) {
+        final found = SecretVault.extract(Map<String, dynamic>.from(value))
+          ..removeWhere((_, v) => v.isEmpty || v == NetworkIntent.redacted);
+        if (found.isNotEmpty) {
+          await SecretVault.store(project, {
+            ...await SecretVault.load(project),
+            ...found,
+          });
+        }
+      }
+      for (final child in value.values) {
+        await _protectStructuredSecrets(project, child);
+      }
+    } else if (value is List) {
+      for (final child in value) {
+        await _protectStructuredSecrets(project, child);
+      }
+    }
   }
 
   /// Remove one conversation's transcript FROM a turn onward, in place.
@@ -1329,7 +2235,12 @@ CREATE TABLE clarification_answer(
         'chat',
         columns: ['id'],
         where: 'conversation = ? AND createdAt = ? AND role = ? AND text = ?',
-        whereArgs: [name, fromCreatedAt, fromRole, fromText],
+        whereArgs: [
+          name,
+          fromCreatedAt,
+          fromRole,
+          StoredPrivacy.redact(fromText),
+        ],
         orderBy: 'id ASC',
         limit: 1,
       );
@@ -1388,8 +2299,8 @@ CREATE TABLE clarification_answer(
       '  AS summary '
       'FROM chat c '
       '${q.isEmpty ? '' : 'WHERE c.conversation IN ('
-          'SELECT conversation FROM chat WHERE text LIKE ? '
-          'UNION SELECT id FROM conversations WHERE title LIKE ?) '}'
+                'SELECT conversation FROM chat WHERE text LIKE ? '
+                'UNION SELECT id FROM conversations WHERE title LIKE ?) '}'
       'GROUP BY c.conversation ORDER BY lastId DESC LIMIT ?',
       q.isEmpty ? [limit] : ['%$q%', '%$q%', limit],
     );
@@ -1439,6 +2350,7 @@ CREATE TABLE clarification_answer(
   }) async {
     if (_active == null) return;
     final name = id.trim().isEmpty ? 'default' : id.trim();
+    title = NetworkIntent.redactSecrets(title);
     final now = DateTime.now().toIso8601String();
     final existing = await _active!.query(
       'conversations',
@@ -1463,7 +2375,8 @@ CREATE TABLE clarification_answer(
           if (project.isNotEmpty) 'project': project,
           // An explicit title only fills a blank one; a rename is never
           // overwritten by a later generated title.
-          if (title.isNotEmpty && (existing.first['title'] ?? '').toString().isEmpty)
+          if (title.isNotEmpty &&
+              (existing.first['title'] ?? '').toString().isEmpty)
             'title': title,
         },
         where: 'id = ?',
@@ -1493,7 +2406,10 @@ CREATE TABLE clarification_answer(
     await ensureConversation(name);
     await _active!.update(
       'conversations',
-      {'title': title.trim(), 'updatedAt': DateTime.now().toIso8601String()},
+      {
+        'title': NetworkIntent.redactSecrets(title.trim()),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
       where: 'id = ?',
       whereArgs: [name],
     );
@@ -1512,7 +2428,10 @@ CREATE TABLE clarification_answer(
     await ensureConversation(name);
     await _active!.update(
       'conversations',
-      {'summary': summary, 'summaryUpToId': upToId},
+      {
+        'summary': NetworkIntent.redactSecrets(summary),
+        'summaryUpToId': upToId,
+      },
       where: 'id = ?',
       whereArgs: [name],
     );
@@ -1527,10 +2446,12 @@ CREATE TABLE clarification_answer(
   Future<void> setSessionState(String id, String stateJson) async {
     if (_active == null) return;
     final name = id.trim().isEmpty ? 'default' : id.trim();
+    await _protectText(name, stateJson);
+    await _protectStructuredSecrets(name, stateJson);
     await ensureConversation(name);
     await _active!.update(
       'conversations',
-      {'stateJson': stateJson},
+      {'stateJson': StoredPrivacy.redact(stateJson, 'stateJson')},
       where: 'id = ?',
       whereArgs: [name],
     );

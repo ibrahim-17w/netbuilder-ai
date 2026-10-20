@@ -46,35 +46,48 @@ import 'package:net_builder/services/validator_service.dart';
 double medianMs(void Function() body, {int runs = 5}) {
   final samples = <double>[];
   for (var i = 0; i < runs; i++) {
-    final t = DateTime.now().microsecondsSinceEpoch;
+    final watch = Stopwatch()..start();
     body();
-    samples.add((DateTime.now().microsecondsSinceEpoch - t) / 1000.0);
+    watch.stop();
+    samples.add(watch.elapsedMicroseconds / 1000.0);
   }
   samples.sort();
   return samples[samples.length ~/ 2];
 }
 
 NetworkIntent _lab() => NetworkIntent.parseSimple(
-      'perf',
-      '2 routers, 2 switches and 50 PCs with OSPF',
-    );
+  'perf',
+  '2 routers, 2 switches and 50 PCs with OSPF',
+);
 
 void main() {
   group('hot-path cost ceilings', () {
     test('planning a 54-device lab stays under 150 ms', () {
       final plan = _lab();
-      expect(plan.nodes.length, greaterThanOrEqualTo(54),
-          reason: 'the fixture must stay the 54-device lab it was measured on');
+      expect(
+        plan.nodes.length,
+        greaterThanOrEqualTo(54),
+        reason: 'the fixture must stay the 54-device lab it was measured on',
+      );
 
-      final took = medianMs(() => NetworkIntent.parseSimple(
-          'perf', '2 routers, 2 switches and 50 PCs with OSPF'));
+      final took = medianMs(
+        () => NetworkIntent.parseSimple(
+          'perf',
+          '2 routers, 2 switches and 50 PCs with OSPF',
+        ),
+      );
 
-      expect(took, lessThan(150.0), reason: '''
+      expect(
+        took,
+        lessThan(150.0),
+        reason:
+            '''
         Planning took ${took.toStringAsFixed(1)} ms (measured 26.7 ms).
         parseSimple is called on the UI isolate for every build request and
         every follow-up. Something in the brief reader is very likely walking
         the whole message per device kind, or re-running the sizing pass.
-      ''');
+      ''',
+      );
     });
 
     test('validating a 54-device lab stays under 40 ms', () {
@@ -83,27 +96,40 @@ void main() {
         () => ValidatorService.validate(plan, target: 'packet-tracer'),
       );
 
-      expect(took, lessThan(40.0), reason: '''
+      expect(
+        took,
+        lessThan(40.0),
+        reason:
+            '''
         Validation took ${took.toStringAsFixed(1)} ms (measured 4.5 ms).
         It runs before every write and every device touch, so it is on the
         critical path of the whole app.
-      ''');
+      ''',
+      );
     });
 
     test('hashing the revision of a 54-device lab stays under 10 ms', () {
       final plan = _lab();
-      expect(plan.nodes.length, greaterThanOrEqualTo(54),
-          reason: 'the fixture must stay the 54-device lab it was measured on');
+      expect(
+        plan.nodes.length,
+        greaterThanOrEqualTo(54),
+        reason: 'the fixture must stay the 54-device lab it was measured on',
+      );
 
       final took = medianMs(() => plan.revision);
 
-      expect(took, lessThan(10.0), reason: '''
+      expect(
+        took,
+        lessThan(10.0),
+        reason:
+            '''
         Reading the revision took ${took.toStringAsFixed(2)} ms (measured
         1.0 ms). ValidatorService.validateCached recomputes it on every call
         to know whether the plan it is holding the findings for has really
         changed, so if this number ever grew towards the 40 ms validate
         ceiling the memo would cost nearly as much as the pass it saves.
-      ''');
+      ''',
+      );
     });
 
     test('planning the context for a 400-turn history stays under 1200 ms', () {
@@ -124,13 +150,18 @@ void main() {
         runs: 3,
       );
 
-      expect(took, lessThan(1200.0), reason: '''
+      expect(
+        took,
+        lessThan(1200.0),
+        reason:
+            '''
         Context budgeting took ${took.toStringAsFixed(1)} ms for a 400-turn
         history (measured 232.5 ms). This runs on the UI isolate before EVERY
         model turn, so it is felt directly as lag between sending and the
         request going out. Past a few hundred turns a compaction pass that
         re-measures the whole history each iteration would show up here first.
-      ''');
+      ''',
+      );
     });
   });
 
@@ -143,19 +174,28 @@ void main() {
 
       // The validator must still actually run and return a list - a "fast"
       // early-out that returns empty would pass every timing gate above.
-      expect(ValidatorService.validate(plan, target: 'packet-tracer'),
-          isA<List<Object?>>());
+      expect(
+        ValidatorService.validate(plan, target: 'packet-tracer'),
+        isA<List<Object?>>(),
+      );
     });
 
     test('the revision hash stays cheap relative to the pass it guards', () {
       final plan = _lab();
-      expect(plan.nodes.length, greaterThanOrEqualTo(54),
-          reason: 'the fixture must stay the 54-device lab it was measured on');
+      expect(
+        plan.nodes.length,
+        greaterThanOrEqualTo(54),
+        reason: 'the fixture must stay the 54-device lab it was measured on',
+      );
 
       final hashing = medianMs(() => plan.revision);
       final validating = medianMs(() => ValidatorService.validate(plan));
 
-      expect(hashing, lessThan(validating), reason: '''
+      expect(
+        hashing,
+        lessThan(validating),
+        reason:
+            '''
         The revision hash cost ${hashing.toStringAsFixed(2)} ms for a plan
         whose validate takes ${validating.toStringAsFixed(2)} ms. Both numbers
         are taken here on the same machine, so a ratio test says something
@@ -163,7 +203,8 @@ void main() {
         every call, so a hash that stopped being cheaper than the work it
         stands in for would make the memo slower than the thing it memoizes -
         and the fix is then to make the hash cheaper, not to drop it.
-      ''');
+      ''',
+      );
     });
   });
 }

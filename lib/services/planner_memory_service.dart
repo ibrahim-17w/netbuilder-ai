@@ -212,6 +212,8 @@ class PlannerMemoryService {
       name: node.name,
       type: node.type,
       model: node.model,
+      exactModel: node.exactModel,
+      modules: node.modules,
       mgmtIp: node.mgmtIp,
       services: [...node.services, service],
       serviceRules: node.serviceRules,

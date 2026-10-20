@@ -56,7 +56,16 @@ class BuildArtifactService {
       Map<String, dynamic>.from(decoded),
       secrets,
     );
-    return _restoreFromJson(record, merged);
+    final restored = _restoreFromJson(record, merged);
+    final intent = NetworkIntent.recoverRedactedSecrets(
+      restored.intent,
+      secrets['brief'] ?? '',
+    );
+    return RestoredBuild(
+      record: record,
+      intent: intent,
+      configText: renderLocal(intent, record.target),
+    );
   }
 
   static RestoredBuild _restoreFromJson(BuildRecord record, dynamic decoded) {
@@ -160,10 +169,42 @@ class BuildArtifactService {
   /// at four, so a brief becomes at most four dashes of name.
   static String _briefWords(String brief) {
     const stopwords = {
-      'the', 'a', 'an', 'and', 'or', 'with', 'for', 'of', 'in', 'on', 'at',
-      'to', 'from', 'plus', 'also', 'that', 'this', 'lab', 'network',
-      'build', 'make', 'create', 'plan', 'set', 'up', 'please', 'give',
-      'me', 'i', 'want', 'need', 'have', 'has', 'use', 'using', 'some',
+      'the',
+      'a',
+      'an',
+      'and',
+      'or',
+      'with',
+      'for',
+      'of',
+      'in',
+      'on',
+      'at',
+      'to',
+      'from',
+      'plus',
+      'also',
+      'that',
+      'this',
+      'lab',
+      'network',
+      'build',
+      'make',
+      'create',
+      'plan',
+      'set',
+      'up',
+      'please',
+      'give',
+      'me',
+      'i',
+      'want',
+      'need',
+      'have',
+      'has',
+      'use',
+      'using',
+      'some',
     };
     final words = brief
         .toLowerCase()

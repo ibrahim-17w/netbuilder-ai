@@ -92,6 +92,13 @@ class SessionState {
   /// message is still read as its answer.
   List<String> pendingQuestionIds;
 
+  /// Snapshot from the last offline Packet Tracer review in this chat. This
+  /// allows follow-up questions to be answered from the exact saved evidence
+  /// even after the conversation is reopened.
+  String capturePath;
+  String captureName;
+  String captureAnalysisJson;
+
   SessionState({
     this.project = '',
     List<String>? focus,
@@ -112,14 +119,17 @@ class SessionState {
     Map<String, dynamic>? flowState,
     this.briefJson = '',
     List<String>? pendingQuestionIds,
-  })  : focus = focus ?? <String>[],
-        confirmedFindings = confirmedFindings ?? <String>[],
-        openFindings = openFindings ?? <String>[],
-        changesMade = changesMade ?? <Map<String, dynamic>>[],
-        proposedChanges = proposedChanges ?? <Map<String, dynamic>>[],
-        artifacts = artifacts ?? <Map<String, String>>[],
-        flowState = flowState ?? <String, dynamic>{},
-        pendingQuestionIds = pendingQuestionIds ?? <String>[];
+    this.capturePath = '',
+    this.captureName = '',
+    this.captureAnalysisJson = '',
+  }) : focus = focus ?? <String>[],
+       confirmedFindings = confirmedFindings ?? <String>[],
+       openFindings = openFindings ?? <String>[],
+       changesMade = changesMade ?? <Map<String, dynamic>>[],
+       proposedChanges = proposedChanges ?? <Map<String, dynamic>>[],
+       artifacts = artifacts ?? <Map<String, String>>[],
+       flowState = flowState ?? <String, dynamic>{},
+       pendingQuestionIds = pendingQuestionIds ?? <String>[];
 
   static const int maxFocus = 6;
   static const int maxFindings = 8;
@@ -132,7 +142,8 @@ class SessionState {
       problem.isEmpty &&
       confirmedFindings.isEmpty &&
       changesMade.isEmpty &&
-      !hasArtifact;
+      !hasArtifact &&
+      captureAnalysisJson.trim().isEmpty;
 
   // --- observation ---------------------------------------------------------
 
@@ -251,10 +262,21 @@ class SessionState {
   /// old devices and findings are about a different .pkt, and letting them
   /// leak into the new one is how a chat answers about the wrong topology.
   SessionState forNewProject(String project) => SessionState(
-        project: project,
-        topic: topic,
-        lastMessageId: lastMessageId,
-      );
+    project: project,
+    topic: topic,
+    lastMessageId: lastMessageId,
+  );
+
+  SessionState withCaptureAnalysis({
+    required String path,
+    required String name,
+    required String analysisJson,
+  }) {
+    capturePath = path.trim();
+    captureName = name.trim();
+    captureAnalysisJson = analysisJson;
+    return this;
+  }
 
   /// Record the file a build landed in. Called by the app, never by a model.
   ///
@@ -284,10 +306,7 @@ class SessionState {
       'at': artifactUpdatedAt,
       'note': note?.trim() ?? (existing['note'] ?? ''),
     };
-    artifacts = [
-      entry,
-      ...artifacts.where((a) => a['path'] != trimmed),
-    ];
+    artifacts = [entry, ...artifacts.where((a) => a['path'] != trimmed)];
     if (artifacts.length > 12) {
       artifacts = artifacts.sublist(0, 12);
     }
@@ -297,7 +316,7 @@ class SessionState {
   /// The files this conversation produced, newest first, with the newest
   /// pointer folded in for conversations saved before the list existed.
   List<({String path, String name, String at, String note})>
-      get knownArtifacts {
+  get knownArtifacts {
     final list = <({String path, String name, String at, String note})>[
       for (final a in artifacts)
         if ((a['path'] ?? '').trim().isNotEmpty)
@@ -379,7 +398,9 @@ class SessionState {
         'exact. Use it to resolve "it", "that", "those" and "the same"; do '
         'not ask the user to restate it.',
       );
-    if (project.isNotEmpty) b.writeln('- Network in this conversation: $project');
+    if (project.isNotEmpty) {
+      b.writeln('- Network in this conversation: $project');
+    }
     if (problem.isNotEmpty) b.writeln('- Current problem: $problem');
     if (focus.isNotEmpty) {
       b.writeln(
@@ -402,6 +423,37 @@ class SessionState {
         'backup copy is kept). Only propose a brand-new file when they ask '
         'for a new one, a copy, or a differently named project.',
       );
+    }
+
+    if (captureAnalysisJson.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(captureAnalysisJson);
+        if (decoded is Map) {
+          final analysis = Map<String, dynamic>.from(decoded);
+          final findings = (analysis['findings'] as List?) ?? const [];
+          b
+            ..writeln(
+              '- Offline Packet Tracer review: ${captureName.isEmpty ? 'saved network' : captureName}',
+            )
+            ..writeln(
+              '  The scan is a read-only snapshot of the saved file, not live '
+              'Packet Tracer state. Answer questions from these findings and '
+              'state what the file cannot prove. Do not propose or apply '
+              'changes unless the user explicitly asks for a specific repair; '
+              'an approved repair writes a separate copy.',
+            );
+          for (final raw in findings.take(30)) {
+            if (raw is! Map) continue;
+            final finding = Map<String, dynamic>.from(raw);
+            b.writeln(
+              '  - [${finding['severity'] ?? 'info'}] '
+              '${finding['device'] ?? ''}: ${finding['text'] ?? ''}',
+            );
+          }
+        }
+      } catch (_) {
+        // An old or truncated analysis should not break regular chat.
+      }
     }
 
     final findings = confirmedFindings.where(mentions).toList();
@@ -476,6 +528,10 @@ class SessionState {
     if (briefJson.isNotEmpty) 'briefJson': briefJson,
     if (pendingQuestionIds.isNotEmpty) 'pendingQuestionIds': pendingQuestionIds,
     if (flowState.isNotEmpty) 'flowState': flowState,
+    if (capturePath.isNotEmpty) 'capturePath': capturePath,
+    if (captureName.isNotEmpty) 'captureName': captureName,
+    if (captureAnalysisJson.isNotEmpty)
+      'captureAnalysisJson': captureAnalysisJson,
   };
 
   String encode() => jsonEncode(toJson());
@@ -513,6 +569,9 @@ class SessionState {
     flowState: j['flowState'] is Map
         ? Map<String, dynamic>.from(j['flowState'] as Map)
         : <String, dynamic>{},
+    capturePath: (j['capturePath'] ?? '').toString(),
+    captureName: (j['captureName'] ?? '').toString(),
+    captureAnalysisJson: (j['captureAnalysisJson'] ?? '').toString(),
   );
 
   // --- deterministic extraction -------------------------------------------
@@ -581,9 +640,9 @@ class SessionState {
     final t = text.trim().toLowerCase();
     if (t.length > 120) return false;
     return RegExp(
-      r'^(what about|and |how about|check|also|now |then |what if|same for|'
-      r'try )',
-    ).hasMatch(t) ||
+          r'^(what about|and |how about|check|also|now |then |what if|same for|'
+          r'try )',
+        ).hasMatch(t) ||
         RegExp(r'\btoo\b\s*\?*$').hasMatch(t);
   }
 

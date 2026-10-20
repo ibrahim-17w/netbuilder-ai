@@ -21,54 +21,56 @@ void main() {
   final asked = <String>[];
 
   http.Client recorder() => MockClient((request) async {
-        asked.add(request.url.toString());
-        return http.Response(
-          jsonEncode({
-            'ok': true,
-            'version': '1.0',
-            'rpa': false,
-            'ocr': false,
-          }),
-          200,
-        );
-      });
+    asked.add(request.url.toString());
+    return http.Response(
+      jsonEncode({'ok': true, 'version': '1.0', 'rpa': false, 'ocr': false}),
+      200,
+    );
+  });
 
   setUp(asked.clear);
 
-  test('the address is resolved per request, not captured at construction',
-      () async {
-    // Stands in for SettingsService.engineBase: it changes between calls,
-    // which is exactly what the user does in Settings.
-    var configured = 'http://192.168.1.20:5005';
-    final svc = AutopilotService(baseProvider: () => configured, c: recorder());
+  test(
+    'the address is resolved per request, not captured at construction',
+    () async {
+      // Stands in for SettingsService.engineBase: it changes between calls,
+      // which is exactly what the user does in Settings.
+      var configured = 'http://192.168.1.20:5005';
+      final svc = AutopilotService(
+        baseProvider: () => configured,
+        c: recorder(),
+      );
 
-    expect(await svc.healthy, isTrue);
-    expect(asked.single, 'http://192.168.1.20:5005/health');
+      expect(await svc.healthy, isTrue);
+      expect(asked.single, 'http://192.168.1.20:5005/health');
 
-    // Change the setting. No new client, no rebuild: the next request must
-    // already go to the new machine.
-    configured = 'http://10.0.2.2:5005';
-    expect(await svc.healthy, isTrue);
-    expect(asked.last, 'http://10.0.2.2:5005/health');
+      // Change the setting. No new client, no rebuild: the next request must
+      // already go to the new machine.
+      configured = 'http://10.0.2.2:5005';
+      expect(await svc.healthy, isTrue);
+      expect(asked.last, 'http://10.0.2.2:5005/health');
 
-    // A POST resolves it the same way, so a start cannot slip back to a
-    // stale address while a GET looks fine.
-    await svc.dryRun({'project': 'x', 'steps': <dynamic>[]});
-    expect(asked.last, 'http://10.0.2.2:5005/dry_run');
-  });
+      // A POST resolves it the same way, so a start cannot slip back to a
+      // stale address while a GET looks fine.
+      await svc.dryRun({'project': 'x', 'steps': <dynamic>[]});
+      expect(asked.last, 'http://10.0.2.2:5005/dry_run');
+    },
+  );
 
-  test('an explicit base wins, for the drawer testing an unsaved address',
-      () async {
-    final svc = AutopilotService(
-      base: '  http://10.1.2.3:5005  ',
-      baseProvider: () => 'http://192.168.1.20:5005',
-      c: recorder(),
-    );
+  test(
+    'an explicit base wins when Settings tests an unsaved address',
+    () async {
+      final svc = AutopilotService(
+        base: '  http://10.1.2.3:5005  ',
+        baseProvider: () => 'http://192.168.1.20:5005',
+        c: recorder(),
+      );
 
-    expect(svc.base, 'http://10.1.2.3:5005');
-    expect(await svc.healthy, isTrue);
-    expect(asked.single, 'http://10.1.2.3:5005/health');
-  });
+      expect(svc.base, 'http://10.1.2.3:5005');
+      expect(await svc.healthy, isTrue);
+      expect(asked.single, 'http://10.1.2.3:5005/health');
+    },
+  );
 
   test('loopback is only the last resort, never a silent default', () {
     // A bare client with nothing to resolve from still has to answer with
@@ -106,7 +108,8 @@ void main() {
     expect(
       svc.hint,
       startsWith('The engine at http://192.168.1.20:5005 is not answering'),
-      reason: 'the address that did not answer is the one the user set, and '
+      reason:
+          'the address that did not answer is the one the user set, and '
           'it has to be the one named',
     );
     expect(
@@ -146,8 +149,9 @@ void main() {
     expect(svc.hint, contains('192.168.1.20:5005'));
   });
 
-  testWidgets('a tree without the provider still reads the settings',
-      (tester) async {
+  testWidgets('a tree without the provider still reads the settings', (
+    tester,
+  ) async {
     final settings = SettingsService();
     await settings.setEngineBase('192.168.9.9');
 
@@ -169,8 +173,9 @@ void main() {
     expect(resolved.base, 'http://192.168.9.9:5005');
   });
 
-  testWidgets('the app-scoped instance is the one the tree provides',
-      (tester) async {
+  testWidgets('the app-scoped instance is the one the tree provides', (
+    tester,
+  ) async {
     final settings = SettingsService();
     await settings.setEngineBase('192.168.1.20:5005');
     final shared = AutopilotService(baseProvider: () => settings.engineBase);

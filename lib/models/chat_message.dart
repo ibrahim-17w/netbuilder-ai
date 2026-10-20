@@ -166,8 +166,7 @@ class ChatAction {
       case 'pkt_export':
         return 'Save ${payload['name'] ?? 'the file'} to a folder you choose';
       case 'pkt_fix':
-        return 'Apply the proposed repair to '
-            '${payload['device'] ?? payload['path'] ?? 'the capture'}';
+        return 'Create a repaired .pkt copy';
       case 'pkt_undo':
         return 'Undo the last repair';
       case 'pkt_generate':
@@ -191,18 +190,10 @@ class ChatAction {
     return kind;
   }
 
-  /// True when approving this changes something outside the app's memory.
-  ///
-  /// The offline repair actions rewrite a saved capture, so they are as
-  /// consequential as typing CLI on a device and must carry the same warning.
-  /// Building a fresh .pkt does not: it writes a new file and touches no device.
+  /// True when approving this types commands or configuration into the live
+  /// Packet Tracer simulator. Offline .pkt file operations never do that.
   bool get touchesPacketTracer =>
-      kind == 'paste_cli' ||
-      kind == 'config_pcs' ||
-      kind == 'run_control' ||
-      kind == 'pkt_fix' ||
-      kind == 'pkt_undo' ||
-      kind == 'pkt_edit';
+      kind == 'paste_cli' || kind == 'config_pcs' || kind == 'run_control';
 }
 
 /// One turn of the conversation, including any attachments and proposals.
@@ -282,13 +273,14 @@ class ChatMessage {
   }
 
   ChatMessage copyWith({
+    int? id,
     String? text,
     List<ChatImage>? images,
     List<ChatAction>? actions,
     List<String>? executed,
     String? source,
   }) => ChatMessage(
-    id: id,
+    id: id ?? this.id,
     role: role,
     text: text ?? this.text,
     images: images ?? this.images,

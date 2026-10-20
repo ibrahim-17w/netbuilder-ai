@@ -95,6 +95,34 @@ class PlanRepairService {
     NetworkIntent intent, {
     String target = 'packet-tracer',
   }) {
+    // An oversized plan still has safe, local repairs. In particular, the
+    // assistant may tell the user that "Fix the plan" will add a documented
+    // placeholder AAA account. Do not make that promise a no-op just because
+    // the independent device-count blocker remains. At the same time, never
+    // auto-cable or re-address hundreds of nodes in a plan that cannot build:
+    // that can inflate the topology, consume memory, and still leave the size
+    // blocker. Restrict oversized plans to local credential completion.
+    final overLimit =
+        ValidatorService.isPacketTracerTarget(target) &&
+        intent.nodes.length > ValidatorService.packetTracerMaxDevices;
+    if (overLimit) {
+      final changes = <String>[];
+      final fixes = <RepairFix>[];
+      final repaired = intent.copyWith(
+        nodes: _repairAccountRows(intent, changes, fixes),
+        security: _repairSecurity(intent, changes, fixes),
+      );
+      return PlanRepair(
+        plan: repaired,
+        changes: changes,
+        fixes: fixes,
+        remaining: ValidatorService.validate(
+          repaired,
+          target: target,
+        ).where((issue) => issue.blocks).toList(),
+      );
+    }
+
     var nodes = [...intent.nodes];
     var links = [...intent.links];
     var addressing = [...intent.addressing];
@@ -174,7 +202,9 @@ class PlanRepairService {
         for (final n in nodes) {
           if (n.name == end.key) node = n;
         }
-        final free = node == null ? null : _freePortOn(node, ports, links: links);
+        final free = node == null
+            ? null
+            : _freePortOn(node, ports, links: links);
         if (free == null) break; // nowhere to move it; leave the finding
         ports.add(free.toLowerCase());
         final moved = _withPort(current, end.key, free) ?? current;
@@ -248,7 +278,8 @@ class PlanRepairService {
           (a) => a.node.toLowerCase() == peer.toLowerCase(),
         );
         final subnet = _lanSubnetFor(peer, nodes, links, addressing);
-        if (stale.isNotEmpty && subnet != null &&
+        if (stale.isNotEmpty &&
+            subnet != null &&
             !_inSubnet(stale.first.ipCidr, subnet)) {
           addressing = [
             for (final a in addressing)
@@ -323,9 +354,7 @@ class PlanRepairService {
       final ip = _ip(a.ipCidr);
       if (_toInt(ip) == null) continue;
       if (taken.add(ip)) continue;
-      final isRouter = nodes.any(
-        (n) => n.name == a.node && n.type == 'router',
-      );
+      final isRouter = nodes.any((n) => n.name == a.node && n.type == 'router');
       final moved = _freeAddress(a, taken, router: isRouter);
       if (moved == null) continue;
       addressing[i] = InterfaceAddr(
@@ -357,9 +386,10 @@ class PlanRepairService {
     // The same gate the build card uses (`ValidationIssue.blocks`), so this
     // pass can never call a plan clean when the card still refuses it - or
     // report a finding as blocking when the build handles it itself.
-    final remaining = ValidatorService.validate(repaired, target: target)
-        .where((i) => i.blocks)
-        .toList();
+    final remaining = ValidatorService.validate(
+      repaired,
+      target: target,
+    ).where((i) => i.blocks).toList();
     return PlanRepair(
       plan: repaired,
       changes: changes,
@@ -432,6 +462,8 @@ class PlanRepairService {
           name: node.name,
           type: node.type,
           model: node.model,
+          exactModel: node.exactModel,
+          modules: node.modules,
           mgmtIp: node.mgmtIp,
           services: node.services,
           serviceRules: rebuilt,
@@ -557,7 +589,9 @@ class PlanRepairService {
     for (final router in nodes.where((n) => n.type == 'router')) {
       if (router.name == node.name) continue;
       final used = _usedPorts(router.name, links);
-      final prefix = _gigRouters.contains(router.model?.trim() ?? '') ? 'g' : 'f';
+      final prefix = _gigRouters.contains(router.model?.trim() ?? '')
+          ? 'g'
+          : 'f';
       for (var port = 0; port <= 3; port++) {
         final name = '${prefix}0/$port';
         if (!used.contains(name)) return (router.name, name);
@@ -583,6 +617,7 @@ class PlanRepairService {
     String port, {
     String? toDevice,
   }) {
+    if (link.exactPorts) return null;
     final name = toDevice ?? device;
     if (link.a == device) {
       return NetLink(
@@ -591,6 +626,7 @@ class PlanRepairService {
         b: link.b,
         bIf: link.bIf,
         cable: link.cable,
+        exactPorts: link.exactPorts,
         dce: link.dce,
       );
     }
@@ -601,6 +637,7 @@ class PlanRepairService {
         b: name,
         bIf: port,
         cable: link.cable,
+        exactPorts: link.exactPorts,
         dce: link.dce,
       );
     }
@@ -619,8 +656,7 @@ class PlanRepairService {
     final claimed = {
       for (final p in taken) p.toLowerCase(),
       for (final l in links)
-        if (_portOn(l, node.name) != null)
-          _portOn(l, node.name)!.toLowerCase(),
+        if (_portOn(l, node.name) != null) _portOn(l, node.name)!.toLowerCase(),
     };
     bool free(String p) => p.isNotEmpty && !claimed.contains(p.toLowerCase());
     if (node.type == 'switch') {
@@ -720,7 +756,10 @@ class PlanRepairService {
         if (other.a != peer && other.b != peer) continue;
         final otherName = other.a == peer ? other.b : other.a;
         if (typeOf(otherName) != 'router') continue;
-        final cidr = addressOn(otherName, other.a == peer ? other.bIf : other.aIf);
+        final cidr = addressOn(
+          otherName,
+          other.a == peer ? other.bIf : other.aIf,
+        );
         if (cidr != null && _ip(cidr) != '0.0.0.0') return cidr;
       }
     }

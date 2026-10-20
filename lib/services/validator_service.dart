@@ -1,5 +1,6 @@
 import '../models/network_intent.dart';
 import 'nlu/lexicon.dart';
+import 'packet_tracer/hardware_check.dart';
 
 /// Pure-Dart pre-deploy validator. No plugins, fully unit-testable.
 class ValidationIssue {
@@ -24,12 +25,21 @@ class ValidationIssue {
 }
 
 class ValidatorService {
+  /// Largest plan the in-app Packet Tracer builder will accept. Keep the
+  /// planner, repair pass and validator on one limit so an oversized plan is
+  /// stopped before repair starts moving hundreds of devices around.
+  static const int packetTracerMaxDevices = 50;
+
+  static bool isPacketTracerTarget(String target) =>
+      const {'packet-tracer', 'packet_tracer', 'pt'}.contains(target);
+
   /// Cisco interface names: `g0/1`, `Serial0/0/0`, and now dot1Q
   /// sub-interfaces (`g0/1.10`) - the router-on-a-stick rows are real
   /// addressing, not typos.
   static final _interfacePattern = RegExp(
     r'^[A-Za-z][A-Za-z0-9-]*\d+(?:/\d+){0,2}(?:\.\d+)?$',
   );
+
   /// FastEthernet and above on a switch: `f0/1`, `fa0/1`, `gi0/1`. Used to
   /// count how many distinct switch ports a plan cables.
   static final _switchPortPattern = RegExp(r'^f[a-z]*0?/\d+$');
@@ -76,6 +86,17 @@ class ValidatorService {
     String target = 'gns3',
   }) {
     final issues = <ValidationIssue>[];
+    if (isPacketTracerTarget(target)) {
+      issues.addAll(
+        PtHardwareCheck.inspect(intent).map(
+          (issue) => ValidationIssue(
+            issue.blocking ? 'error' : 'warning',
+            issue.message,
+            blocking: issue.blocking,
+          ),
+        ),
+      );
+    }
 
     if (intent.nodes.isEmpty) {
       issues.add(const ValidationIssue('error', 'No nodes defined.'));
@@ -90,7 +111,8 @@ class ValidatorService {
 
     // Hostname rules (Cisco)
     for (final n in intent.nodes) {
-      if (n.name.contains(' ')) {
+      if (n.name.contains(' ') &&
+          !const ['packet-tracer', 'packet_tracer', 'pt'].contains(target)) {
         issues.add(
           ValidationIssue('error', 'Hostname "${n.name}" contains spaces.'),
         );
@@ -174,8 +196,8 @@ class ValidatorService {
           ValidationIssue(
             'error',
             'Duplicate IP $ip is assigned to both ${nets[ip]} and '
-            '${a.node} ${a.iface}; give one of them the next free host '
-            'address on its own LAN.',
+                '${a.node} ${a.iface}; give one of them the next free host '
+                'address on its own LAN.',
           ),
         );
       } else {
@@ -192,19 +214,44 @@ class ValidatorService {
     for (final a in intent.addressing) {
       addrByNode.putIfAbsent(a.node.toLowerCase(), () => []).add(a);
     }
+    final missingAddressNodes = <String>[];
     for (final node in intent.nodes) {
       if (!(deviceKindOf(node.type)?.ipConfig ?? false)) continue;
+      // A wireless laptop with an SSID profile is configured by its WLAN
+      // client profile and receives DHCP; it does not have a wired Desktop
+      // static-address row to validate here.
+      if ((node.serviceRules['wireless'] as Map?)?['mode'] == 'client') {
+        continue;
+      }
       final addrs = addrByNode[node.name.toLowerCase()] ?? const [];
       final usable = addrs.where((a) {
         final ip = a.ipCidr.split('/').first.trim();
         return _ipv4(ip) != null && ip != '0.0.0.0';
       }).toList();
       if (usable.isEmpty) {
+        missingAddressNodes.add(node.name);
+      }
+    }
+    if (intent.nodes.length > packetTracerMaxDevices &&
+        missingAddressNodes.isNotEmpty) {
+      final examples = missingAddressNodes.take(4).join(', ');
+      final rest = missingAddressNodes.length > 4
+          ? ', plus ${missingAddressNodes.length - 4} more'
+          : '';
+      issues.add(
+        ValidationIssue(
+          'error',
+          '${missingAddressNodes.length} devices need Desktop > IP '
+              'Configuration but have no addressing entry (for example $examples$rest).',
+        ),
+      );
+    } else {
+      for (final name in missingAddressNodes) {
         issues.add(
           ValidationIssue(
             'error',
-            '${node.name} needs Desktop > IP Configuration but has no addressing entry; '
-            'assign ${node.name} the next free .10+ host on its switch LAN.',
+            '$name needs Desktop > IP Configuration but has no addressing entry; '
+                'assign $name the next free .10+ host on its switch LAN.',
           ),
         );
       }
@@ -315,10 +362,10 @@ class ValidatorService {
         ValidationIssue(
           'info',
           '${placedNotWired.join(', ')} '
-          '${placedNotWired.length == 1 ? 'is' : 'are'} placed but not cabled '
-          'by the plan: Packet Tracer names this device type\'s port '
-          'differently across builds, so the cable is left to the canvas '
-          '(the live run discovers the port on the device).',
+              '${placedNotWired.length == 1 ? 'is' : 'are'} placed but not cabled '
+              'by the plan: Packet Tracer names this device type\'s port '
+              'differently across builds, so the cable is left to the canvas '
+              '(the live run discovers the port on the device).',
           blocking: false,
         ),
       );
@@ -365,12 +412,12 @@ class ValidatorService {
           ValidationIssue(
             'warning',
             '${endpoint.key} requests serial interface $iface, but a '
-            'default Packet Tracer $model has no serial module; the '
-            'cable will be remapped to a spare routed port at build '
-            'time, so the result is not the requested exact interface. '
-            'Remedy: open the router Physical tab, power it off, drag '
-            'an HWIC-2T into an empty HWIC slot, power it back on, then '
-            're-run - $iface exists after that and no remap is needed.',
+                'default Packet Tracer $model has no serial module; the '
+                'cable will be remapped to a spare routed port at build '
+                'time, so the result is not the requested exact interface. '
+                'Remedy: open the router Physical tab, power it off, drag '
+                'an HWIC-2T into an empty HWIC slot, power it back on, then '
+                're-run - $iface exists after that and no remap is needed.',
             // The build DOES the remap, so this cannot be a decision only the
             // user can make: with it blocking, every serial WAN brief was
             // unbuildable and "fix the plan" answered with a hardware note.
@@ -390,7 +437,9 @@ class ValidatorService {
         if (!_switchPortPattern.hasMatch(endpoint.value.toLowerCase())) {
           continue;
         }
-        (usedPorts[endpoint.key] ??= <String>{}).add(endpoint.value.toLowerCase());
+        (usedPorts[endpoint.key] ??= <String>{}).add(
+          endpoint.value.toLowerCase(),
+        );
       }
     }
     for (final node in intent.nodes) {
@@ -404,10 +453,10 @@ class ValidatorService {
         ValidationIssue(
           'error',
           '${node.name} is cabled to ${used.length} devices but a Packet '
-          'Tracer ${node.model ?? '2960'} has only $capacity ports; '
-          '$over cable(s) land on interfaces the switch does not have. '
-          'Remedy: add another switch, or use a model with more ports '
-          '(a 3560 has 24 FastEthernet plus 4 GigabitEthernet).',
+              'Tracer ${node.model ?? '2960'} has only $capacity ports; '
+              '$over cable(s) land on interfaces the switch does not have. '
+              'Remedy: add another switch, or use a model with more ports '
+              '(a 3560 has 24 FastEthernet plus 4 GigabitEthernet).',
         ),
       );
     }
@@ -516,12 +565,12 @@ class ValidatorService {
         const ValidationIssue(
           'warning',
           'The IPsec/site-to-site VPN block is generated into the config, but a '
-          'stock Packet Tracer ISR image rejects crypto isakmp / crypto ipsec / '
-          'crypto map until the Security Technology package is licensed, so the '
-          'live executor reports the block as skipped. To make it take effect: '
-          'license boot module c2900 technology-package securityk9, then '
-          'reload, then re-run - the same commands are already in the config '
-          'view for pasting by hand.',
+              'stock Packet Tracer ISR image rejects crypto isakmp / crypto ipsec / '
+              'crypto map until the Security Technology package is licensed, so the '
+              'live executor reports the block as skipped. To make it take effect: '
+              'license boot module c2900 technology-package securityk9, then '
+              'reload, then re-run - the same commands are already in the config '
+              'view for pasting by hand.',
           // A Packet Tracer licensing gap the plan cannot act on: the config
           // is generated either way, so it is a note, not a refusal.
           blocking: false,
@@ -530,18 +579,22 @@ class ValidatorService {
     }
     final officeHours = security.officeHours?.trim() ?? '';
     if (security.hsrp &&
-        !intent.nodes.where((n) => n.type == 'router').any(
-          (n) => intent.addressing.any(
-            (a) =>
-                a.node == n.name &&
-                !intent.links.any((l) => _isTransitEndpoint(l, a.node, a.iface)),
-          ),
-        )) {
+        !intent.nodes
+            .where((n) => n.type == 'router')
+            .any(
+              (n) => intent.addressing.any(
+                (a) =>
+                    a.node == n.name &&
+                    !intent.links.any(
+                      (l) => _isTransitEndpoint(l, a.node, a.iface),
+                    ),
+              ),
+            )) {
       issues.add(
         const ValidationIssue(
           'warning',
           'HSRP is requested but no router has a LAN interface; the standby '
-          'groups were not applied.',
+              'groups were not applied.',
         ),
       );
     }
@@ -559,7 +612,7 @@ class ValidatorService {
         const ValidationIssue(
           'warning',
           'Inter-VLAN routing was requested but the plan defines no VLANs; '
-          'no dot1Q sub-interfaces were created.',
+              'no dot1Q sub-interfaces were created.',
         ),
       );
     }
@@ -578,9 +631,9 @@ class ValidatorService {
         ValidationIssue(
           'warning',
           'Packet Tracer does not implement time-range, so the office-hours VTY '
-          'restriction ($officeHours) cannot be enforced on the device; the '
-          'plain manager-only ACL is applied instead and the time window is '
-          'reported as unsupported.',
+              'restriction ($officeHours) cannot be enforced on the device; the '
+              'plain manager-only ACL is applied instead and the time window is '
+              'reported as unsupported.',
           blocking: false,
         ),
       );
@@ -616,8 +669,7 @@ class ValidatorService {
         final server = intent.nodes
             .where((n) => n.name == security.aaaServer)
             .firstOrNull;
-        final users =
-            (server?.serviceRules['aaa'] as Map?)?['users'];
+        final users = (server?.serviceRules['aaa'] as Map?)?['users'];
         final hasAccount =
             (users is List && users.isNotEmpty) ||
             ((security.aaaUsername ?? '').isNotEmpty &&
@@ -627,8 +679,8 @@ class ValidatorService {
             const ValidationIssue(
               'warning',
               'The AAA server holds no account, so no login can be verified. '
-              'Add one - for example "AAA client name admin password 123" - '
-              'and it is written into the server\'s Services tab.',
+                  'Add one - for example "AAA client name admin password 123" - '
+                  'and it is written into the server\'s Services tab.',
             ),
           );
         }
@@ -684,24 +736,24 @@ class ValidatorService {
             const ValidationIssue(
               'error',
               'IPSec is requested but no router-to-router link exists for the '
-              'tunnel to run over.',
+                  'tunnel to run over.',
             ),
           );
         } else if (peerLink.isSerial && target == 'packet-tracer') {
-            issues.add(
-              const ValidationIssue(
-                'info',
-                'A serial WAN needs a serial module on each router. The '
-                'executor fits an HWIC-2T itself (Physical tab: power '
-                'off -> module into an empty HWIC slot -> power on), '
-                'wires the link with a Serial DCE/DTE cable and puts the '
-                'clock rate on the clocking end. If the module cannot be '
-                'fitted, the run reports the exact step it stopped at and '
-                'either uses another serial port it proved on the device '
-                'or remaps the WAN to a spare routed port - which is an '
-                'exact-interface mismatch and cannot pass validation.',
-              ),
-            );
+          issues.add(
+            const ValidationIssue(
+              'info',
+              'A serial WAN needs a serial module on each router. The '
+                  'executor fits an HWIC-2T itself (Physical tab: power '
+                  'off -> module into an empty HWIC slot -> power on), '
+                  'wires the link with a Serial DCE/DTE cable and puts the '
+                  'clock rate on the clocking end. If the module cannot be '
+                  'fitted, the run reports the exact step it stopped at and '
+                  'either uses another serial port it proved on the device '
+                  'or remaps the WAN to a spare routed port - which is an '
+                  'exact-interface mismatch and cannot pass validation.',
+            ),
+          );
         }
       }
       if (security.portSecurity &&
@@ -716,7 +768,7 @@ class ValidatorService {
     }
 
     // Target-specific
-    if (target == 'packet-tracer') {
+    if (isPacketTracerTarget(target)) {
       // Every kind the plan model knows is placeable and cableable: the
       // executor's palette table is gated against this very list
       // (sidecar/test_device_palette.py), so the two cannot drift apart.
@@ -731,7 +783,7 @@ class ValidatorService {
           );
         }
       }
-      if (intent.nodes.length > 50) {
+      if (intent.nodes.length > packetTracerMaxDevices) {
         issues.add(
           const ValidationIssue(
             'error',

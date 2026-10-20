@@ -8,8 +8,10 @@
 /// Everything here is local file IO and pure Dart. No network, no server.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import '../../models/network_intent.dart';
@@ -19,6 +21,56 @@ import 'pkt_codec.dart';
 import 'pkt_engine_builder.dart';
 import 'seed_library.dart';
 import 'template_library.dart';
+
+Future<(PktEngineBuild, Uint8List)> _compilePrepared(
+  Map<String, dynamic> request,
+) async {
+  final library = PktTemplateLibrary.fromSnapshot(
+    Map<String, dynamic>.from(request['library']),
+  );
+  final built = await buildPkt(
+    plan: Map<String, dynamic>.from(request['plan']),
+    library: library,
+    project: '${request['project']}',
+  );
+  return (built, encryptPkt(built.xml));
+}
+
+/// Isolate entry point kept top-level so it is available in release builds.
+@pragma('vm:entry-point')
+void _compileWorker(List<dynamic> message) {
+  final request = Map<String, dynamic>.from(message[0] as Map);
+  final reply = message[1] as SendPort;
+  _compilePrepared(request)
+      .then((result) {
+        final (built, bytes) = result;
+        reply.send({
+          'xml': built.xml,
+          'version': built.version,
+          'project': built.project,
+          'refIds': built.refIds,
+          'devices': built.devices,
+          'links': built.links,
+          'warnings': built.warnings,
+          'deviceCount': built.deviceCount,
+          'linkCount': built.linkCount,
+          'plannedDevices': built.plannedDevices,
+          'plannedLinks': built.plannedLinks,
+          'layout': built.layout,
+          'bytes': bytes,
+        });
+      })
+      .catchError((Object error, StackTrace stack) {
+        reply.send({'error': error.toString()});
+      });
+}
+
+/// The user cancelled a phone build before its file was committed.
+class OnDeviceBuildCancelled implements Exception {
+  const OnDeviceBuildCancelled();
+  @override
+  String toString() => 'Build cancelled.';
+}
 
 /// A build that finished, and where the file landed.
 class OnDeviceBuild {
@@ -75,6 +127,70 @@ class OnDeviceBuildError implements Exception {
 class OnDevicePktBuilder {
   const OnDevicePktBuilder._();
 
+  static Isolate? _compileIsolate;
+  static Completer<Map<String, dynamic>>? _compileResult;
+
+  /// Stop the active CPU compilation. The build checks the cancellation flag
+  /// again before it writes a file, so a cancelled build never leaves a
+  /// partial result behind.
+  static void cancelActiveBuild() {
+    final result = _compileResult;
+    if (result == null || result.isCompleted) return;
+    _compileIsolate?.kill(priority: Isolate.immediate);
+    _compileIsolate = null;
+    result.completeError(const OnDeviceBuildCancelled());
+  }
+
+  static void _throwIfCancelled(bool Function()? isCancelled) {
+    if (isCancelled?.call() ?? false) {
+      throw const OnDeviceBuildCancelled();
+    }
+  }
+
+  static Future<Map<String, dynamic>> _compileInIsolate(
+    Map<String, dynamic> request,
+  ) async {
+    if (_compileResult != null) {
+      throw StateError('A Packet Tracer build is already compiling.');
+    }
+    final receive = ReceivePort();
+    final result = Completer<Map<String, dynamic>>();
+    _compileResult = result;
+    receive.listen((message) {
+      if (result.isCompleted) return;
+      if (message is List && message.isNotEmpty) {
+        result.completeError(StateError('${message.first}'));
+        return;
+      }
+      if (message is! Map) return;
+      final response = Map<String, dynamic>.from(message);
+      final error = response.remove('error');
+      if (error != null) {
+        result.completeError(StateError('$error'));
+      } else {
+        result.complete(response);
+      }
+    });
+    try {
+      final isolate = await Isolate.spawn<List<dynamic>>(
+        _compileWorker,
+        <dynamic>[request, receive.sendPort],
+        onError: receive.sendPort,
+        errorsAreFatal: true,
+      );
+      if (result.isCompleted) {
+        isolate.kill(priority: Isolate.immediate);
+      } else {
+        _compileIsolate = isolate;
+      }
+      return await result.future;
+    } finally {
+      receive.close();
+      _compileIsolate = null;
+      if (identical(_compileResult, result)) _compileResult = null;
+    }
+  }
+
   /// Where the imported seed lives inside [appDir].
   ///
   /// One fixed name, so re-importing replaces the previous seed rather than
@@ -90,9 +206,8 @@ class OnDevicePktBuilder {
   /// needs no runtime permission - but which is also somewhere the user cannot
   /// browse. It is a working fallback, not a destination: callers that know of
   /// a folder the user chose should pass [buildFromPlan]'s `outDir` instead.
-  static Directory outDirIn(Directory appDir) => Directory(
-        '${appDir.path}${Platform.pathSeparator}pkt',
-      );
+  static Directory outDirIn(Directory appDir) =>
+      Directory('${appDir.path}${Platform.pathSeparator}pkt');
 
   /// The seed already imported into [appDir], or null if there is none.
   ///
@@ -263,10 +378,13 @@ class OnDevicePktBuilder {
     required Future<Directory> Function() appDir,
     String filename = 'lab.pkt',
     String project = '',
+
     /// Where to write the finished lab, when the caller knows of a folder the
     /// user can browse. Falls back to [appDir]'s private `pkt` directory -
     /// which on Android is somewhere no file manager can see.
     Future<Directory> Function()? outDir,
+    void Function(String stage, double? progress)? onProgress,
+    bool Function()? isCancelled,
   }) async {
     var planned = 0;
     for (final step in (plan['steps'] as List?) ?? const <dynamic>[]) {
@@ -279,41 +397,85 @@ class OnDevicePktBuilder {
     // devices is answered before any plugin call, and the library build is
     // pure Dart over bundled assets. The directory is resolved only when
     // there is a file to write into it.
+    _throwIfCancelled(isCancelled);
+    onProgress?.call('Loading Packet Tracer device library', 0.08);
     final library = await PktTemplateLibrary.loadBundled();
-    final built = await buildPkt(
-      plan: plan,
-      library: library,
-      project: project,
+    _throwIfCancelled(isCancelled);
+    onProgress?.call('Compiling devices, cables, and configurations', null);
+    final librarySnapshot = await library.prepareSnapshot();
+    _throwIfCancelled(isCancelled);
+    final response = await _compileInIsolate({
+      'plan': plan,
+      'project': project,
+      'library': librarySnapshot,
+    });
+    _throwIfCancelled(isCancelled);
+    onProgress?.call('Writing the .pkt and build report', 0.92);
+    final built = PktEngineBuild(
+      xml: '${response['xml']}',
+      version: '${response['version']}',
+      project: '${response['project']}',
+      refIds: Map<String, int>.from(response['refIds'] as Map),
+      devices: List<Map<String, dynamic>>.from(
+        (response['devices'] as List).map(
+          (item) => Map<String, dynamic>.from(item as Map),
+        ),
+      ),
+      links: List<Map<String, dynamic>>.from(
+        (response['links'] as List).map(
+          (item) => Map<String, dynamic>.from(item as Map),
+        ),
+      ),
+      warnings: List<String>.from(response['warnings'] as List),
+      deviceCount: response['deviceCount'] as int,
+      linkCount: response['linkCount'] as int,
+      plannedDevices: response['plannedDevices'] as int,
+      plannedLinks: response['plannedLinks'] as int,
+      layout: Map<String, dynamic>.from(response['layout'] as Map),
     );
+    final bytes = Uint8List.fromList(response['bytes'] as List<int>);
+    _throwIfCancelled(isCancelled);
     final out = outDir == null ? outDirIn(await appDir()) : await outDir();
-    if (!out.existsSync()) out.createSync(recursive: true);
+    if (!await out.exists()) await out.create(recursive: true);
     final file = File('${out.path}${Platform.pathSeparator}$filename');
     // Atomic write, the way the sidecar does it: a torn file must never be
     // mistaken for a save.
     final tmp = File('${file.path}.tmp');
-    tmp.writeAsBytesSync(encryptPkt(built.xml), flush: true);
-    tmp.renameSync(file.path);
+    try {
+      await tmp.writeAsBytes(bytes, flush: true);
+      _throwIfCancelled(isCancelled);
+      await tmp.rename(file.path);
+    } catch (_) {
+      if (await tmp.exists()) await tmp.delete();
+      rethrow;
+    }
 
-    final refIds = {
-      for (final e in built.refIds.entries) e.key: '${e.value}',
-    };
+    final refIds = {for (final e in built.refIds.entries) e.key: '${e.value}'};
     // The manifest is what tells a generated file apart from a real
     // Packet Tracer save, so it must be written wherever the file is.
     final manifest = File('${file.path}.netbuilder.json');
-    manifest.writeAsStringSync(
-      const JsonEncoder.withIndent('  ').convert({
-        'generator': 'on-device',
-        'source': 'dart-template-library',
-        'file': file.uri.pathSegments.last,
-        'devices': built.deviceCount,
-        'links': built.linkCount,
-        'plannedDevices': built.plannedDevices,
-        'plannedLinks': built.plannedLinks,
-        'refIds': refIds,
-        'warnings': built.warnings,
-      }),
-      flush: true,
-    );
+    try {
+      _throwIfCancelled(isCancelled);
+      manifest.writeAsStringSync(
+        const JsonEncoder.withIndent('  ').convert({
+          'generator': 'on-device',
+          'source': 'dart-template-library',
+          'file': file.uri.pathSegments.last,
+          'devices': built.deviceCount,
+          'links': built.linkCount,
+          'plannedDevices': built.plannedDevices,
+          'plannedLinks': built.plannedLinks,
+          'refIds': refIds,
+          'warnings': built.warnings,
+        }),
+        flush: true,
+      );
+      _throwIfCancelled(isCancelled);
+    } catch (_) {
+      if (await manifest.exists()) await manifest.delete();
+      if (await file.exists()) await file.delete();
+      rethrow;
+    }
 
     return OnDeviceBuild(
       file: file,
@@ -374,9 +536,9 @@ class OnDevicePktBuilder {
     for (final block in SeedLibrary.deviceBlocksOf(doc)) {
       final device = SeedLibrary.deviceFromBlock(block);
       if (device == null) continue;
-      final ref = RegExp(r'<SAVE_REF_ID>save-ref-id:([^<]+)</SAVE_REF_ID>')
-          .firstMatch(block)
-          ?.group(1);
+      final ref = RegExp(
+        r'<SAVE_REF_ID>save-ref-id:([^<]+)</SAVE_REF_ID>',
+      ).firstMatch(block)?.group(1);
       if (ref != null) refNames[ref] = device.name;
       final configMatch = RegExp(
         r'<RUNNINGCONFIG(?:\s[^>]*)?>.*?</RUNNINGCONFIG>',
@@ -403,14 +565,15 @@ class OnDevicePktBuilder {
     final linkBlockRe = RegExp(r'<LINK>.*?</LINK>', dotAll: true);
     for (final match in linkBlockRe.allMatches(doc)) {
       final block = match.group(0)!;
-      final fromRef =
-          RegExp(r'<FROM>save-ref-id:([^<]+)</FROM>').firstMatch(block)?.group(1);
-      final toRef =
-          RegExp(r'<TO>save-ref-id:([^<]+)</TO>').firstMatch(block)?.group(1);
-      final typeTags = RegExp(r'<TYPE>([^<]*)</TYPE>')
-          .allMatches(block)
-          .map((m) => m.group(1)!)
-          .toList();
+      final fromRef = RegExp(
+        r'<FROM>save-ref-id:([^<]+)</FROM>',
+      ).firstMatch(block)?.group(1);
+      final toRef = RegExp(
+        r'<TO>save-ref-id:([^<]+)</TO>',
+      ).firstMatch(block)?.group(1);
+      final typeTags = RegExp(
+        r'<TYPE>([^<]*)</TYPE>',
+      ).allMatches(block).map((m) => m.group(1)!).toList();
       links.add({
         'a': refNames[fromRef ?? ''] ?? (fromRef ?? ''),
         'aIf': firstPortAfter(block, '<FROM>'),
@@ -532,13 +695,15 @@ class OnDevicePktBuilder {
   static String firstPortAfter(String block, String marker) {
     final at = block.indexOf(marker);
     if (at < 0) return '';
-    final match =
-        RegExp(r'<PORT>([^<]*)</PORT>').firstMatch(block.substring(at));
+    final match = RegExp(
+      r'<PORT>([^<]*)</PORT>',
+    ).firstMatch(block.substring(at));
     return match?.group(1) ?? '';
   }
 
   /// The Services-tab roles a device block carries in the enabled state.
-  static List<String> _enabledServices(String block) {    final enabled = <String>[];
+  static List<String> _enabledServices(String block) {
+    final enabled = <String>[];
     void check(String role, RegExp pattern) {
       if (pattern.hasMatch(block)) enabled.add(role);
     }

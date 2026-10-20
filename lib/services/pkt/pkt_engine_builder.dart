@@ -33,6 +33,7 @@ import 'package:xml/xml.dart' as xml;
 import 'package:uuid/uuid.dart';
 
 import 'template_library.dart';
+import '../packet_tracer/catalog.dart';
 
 // ---------------------------------------------------------------------------
 // Vocabulary
@@ -40,7 +41,8 @@ import 'template_library.dart';
 
 /// Node types (the app's vocabulary) -> substrings of Packet Tracer's kind
 /// text inside `<TYPE ...>Router</TYPE>`.
-const Map<String, List<String>> _kindPatterns = {  'router': ['router'],
+const Map<String, List<String>> _kindPatterns = {
+  'router': ['router'],
   'wireless-router': ['wirelessrouter', 'wireless router', 'homerouter'],
   'switch': ['switch', 'multilayerswitch', 'internetswitch'],
   'pc': ['pc', 'workstation'],
@@ -60,18 +62,6 @@ const Map<String, List<String>> _kindPatterns = {  'router': ['router'],
 };
 
 /// Cable kind -> (link medium, cable type) as Packet Tracer names them.
-const Map<String, (String, String)> _linkMediums = {
-  'copper': ('eCopper', 'eStraightThrough'),
-  'straight': ('eCopper', 'eStraightThrough'),
-  'copper-cross': ('eCopper', 'eCrossOver'),
-  'cross': ('eCopper', 'eCrossOver'),
-  'crossover': ('eCopper', 'eCrossOver'),
-  'serial': ('eSerial', 'eSerial'),
-  'serial-dce': ('eSerial', 'eSerial'),
-  'serial-dte': ('eSerial', 'eSerial'),
-  'fiber': ('eFiber', 'eFiber'),
-  'console': ('eConsole', 'eConsole'),
-};
 
 /// Copper LAN families a spare-port remap may use (never serial/wireless).
 const List<String> _ethernetFamilies = [
@@ -98,29 +88,15 @@ const Set<String> _nonConfigLines = {
 /// ASA (Firewall-PT) interfaces that are not physical ports: an ASA-5505
 /// routes through `interface Vlan1`, and Packet Tracer stores no `<PORT>`
 /// for one. They are real config lines and must survive untouched.
-final RegExp _virtualInterfaces =
-    RegExp(r'^(vlan|bvi|management|inside|outside|dmz)[0-9]*$', caseSensitive: false);
+final RegExp _virtualInterfaces = RegExp(
+  r'^(vlan|bvi|management|inside|outside|dmz)[0-9]*$',
+  caseSensitive: false,
+);
 
 /// A dot1Q sub-interface: `<parent-port>.<vlan>` (router-on-a-stick). The
 /// parent is the hardware; the suffix is config on it.
 final RegExp _subinterface = RegExp(r'^(\S+)\.(\d+)$');
 
-final RegExp _positionRe = RegExp(r'^([a-z]+)((?:[0-9]+(?:/[0-9]+)*)?)$');
-const Map<String, String> _portAliases = {
-  'f': 'fastethernet',
-  'fa': 'fastethernet',
-  'fe': 'fastethernet',
-  'g': 'gigabitethernet',
-  'gi': 'gigabitethernet',
-  'ge': 'gigabitethernet',
-  'e': 'ethernet',
-  'eth': 'ethernet',
-  's': 'serial',
-  'se': 'serial',
-  'ser': 'serial',
-  'w': 'wireless',
-  'wlan': 'wireless',
-};
 const List<String> _portFamilies = [
   'fastethernet',
   'gigabitethernet',
@@ -166,11 +142,7 @@ const List<String> _serviceTags = [
 
 /// 'g0/1' and 'GigabitEthernet0/1' become 'gigabitethernet0/1'.
 String normalizePortName(String name) {
-  final text = name.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
-  final match = _positionRe.firstMatch(text);
-  if (match == null) return text;
-  final prefix = _portAliases[match.group(1)] ?? match.group(1)!;
-  return prefix + (match.group(2) ?? '');
+  return ptPortName(name);
 }
 
 String _familyFromRequest(String want) {
@@ -226,7 +198,8 @@ String _familyFromRequest(String want) {
     'fastethernet': ['fastethernet', 'ethernet', 'gigabitethernet'],
     'gigabitethernet': ['gigabitethernet', 'fastethernet', 'ethernet'],
   };
-  final candidates = families[family] ?? (family.isEmpty ? <String>[] : [family]);
+  final candidates =
+      families[family] ?? (family.isEmpty ? <String>[] : [family]);
   for (final candidate in candidates) {
     for (final port in ports) {
       if (port.name.isEmpty || port.family != candidate) continue;
@@ -234,7 +207,8 @@ String _familyFromRequest(String want) {
       if (exactTaken) {
         return (
           port: port,
-          note: '$requested -> ${port.name} '
+          note:
+              '$requested -> ${port.name} '
               '($requested is already carrying a cable)',
         );
       }
@@ -308,7 +282,11 @@ bool _kindMatches(String kind, String nodeType) {
 }
 
 bool _kindTextMatches(String kind, String nodeType) {
-  final text = kind.trim().toLowerCase().replaceAll(' ', '').replaceAll('-', '');
+  final text = kind
+      .trim()
+      .toLowerCase()
+      .replaceAll(' ', '')
+      .replaceAll('-', '');
   final node = nodeType.trim().toLowerCase().replaceAll(' ', '');
   return text.isNotEmpty &&
       node.isNotEmpty &&
@@ -321,6 +299,14 @@ bool _kindTextMatches(String kind, String nodeType) {
 /// pointing at a block cloned from a different device. Packet Tracer may
 /// reject that otherwise well-formed XML while loading its workspace.
 Future<String> _templateIdentityMismatch(
+  PktTemplateLibrary library,
+  PktTemplateDevice entry,
+) => library.identityChecks.putIfAbsent(
+  entry.key,
+  () => _readTemplateIdentity(library, entry),
+);
+
+Future<String> _readTemplateIdentity(
   PktTemplateLibrary library,
   PktTemplateDevice entry,
 ) async {
@@ -372,11 +358,35 @@ Future<(PktTemplateDevice?, List<String>)> selectVariant(
   final nodeType = '${node['type'] ?? ''}'.trim().toLowerCase();
   final name = '${node['name'] ?? ''}';
   final wanted = [for (final p in wantedPorts) p];
+  final hint = '${node['model'] ?? ''}'.trim();
+  final requested = PacketTracerCatalog.instance.device(hint);
+  final requiredModules = List<String>.from(node['modules'] ?? const []);
+  final exact = node['exactModel'] == true || requiredModules.isNotEmpty;
+  if (exact && (requested == null || requested.type != nodeType)) {
+    throw PktBuildFailure(
+      '$name: exact model "$hint" is not a known $nodeType. Choose a model from the device catalog.',
+    );
+  }
   var candidates = [
     for (final entry in library.devices)
-      if (_kindMatches(entry.kind, nodeType)) entry,
+      if (exact
+          ? ptIdentity(entry.model) == ptIdentity(requested!.model) &&
+                requiredModules.every(
+                  (module) => entry.modules.any(
+                    (m) => ptIdentity(m) == ptIdentity(module),
+                  ),
+                )
+          : _kindMatches(entry.kind, nodeType))
+        entry,
   ];
-  if (candidates.isEmpty) {
+  if (candidates.isEmpty && exact) {
+    throw PktBuildFailure(
+      '$name: the library cannot build exact model $hint'
+      '${requiredModules.isEmpty ? '' : ' with ${requiredModules.join(', ')}'}. '
+      'The request was preserved. Select an available variant or add a verified template.',
+    );
+  }
+  if (candidates.isEmpty && !exact) {
     candidates = [
       for (final entry in library.devices)
         if (_kindTextMatches(entry.kind, nodeType)) entry,
@@ -387,13 +397,43 @@ Future<(PktTemplateDevice?, List<String>)> selectVariant(
   for (final entry in candidates) {
     final mismatch = await _templateIdentityMismatch(library, entry);
     if (mismatch.isNotEmpty) {
-      rejected.add('$name: ignored incompatible template ${entry.key}: '
-          '$mismatch');
+      rejected.add(
+        '$name: ignored incompatible template ${entry.key}: '
+        '$mismatch',
+      );
     } else {
       validCandidates.add(entry);
     }
   }
   candidates = validCandidates;
+  final media = Map<String, dynamic>.from(
+    node['portMedia'] as Map? ?? const {},
+  );
+  if (media.isNotEmpty) {
+    final compatible = candidates.where((entry) {
+      final named = entry.withNamedPorts();
+      for (final constraint in media.entries) {
+        final cable = PacketTracerCatalog.instance.cable('${constraint.value}');
+        if (cable == null) return false;
+        final resolved = resolvePort(named, constraint.key).port;
+        if (resolved == null ||
+            !cable.accepts(
+              PtPort(resolved.name, resolved.type, resolved.family),
+            )) {
+          return false;
+        }
+        if (cable.id == 'fiber-single' || cable.id == 'fiber-multi') {
+          final single = entry.modules.any(
+            (m) =>
+                const ['GLC-LH-SMD', 'GLC-LX-SM-RGD'].contains(m.toUpperCase()),
+          );
+          if ((cable.id == 'fiber-single') != single) return false;
+        }
+      }
+      return true;
+    }).toList();
+    if (compatible.isNotEmpty) candidates = compatible;
+  }
   if (candidates.isEmpty) {
     return (
       null,
@@ -404,7 +444,7 @@ Future<(PktTemplateDevice?, List<String>)> selectVariant(
           ],
     );
   }
-  final modelHint = '${node['model'] ?? ''}'.trim().toLowerCase();
+  final modelHint = (requested?.model ?? hint).toLowerCase();
 
   int coverage(PktTemplateDevice entry) {
     var hits = 0;
@@ -443,7 +483,12 @@ Future<(PktTemplateDevice?, List<String>)> selectVariant(
     if (ca != cb) return ca.compareTo(cb);
     final (ha, hb) = (hintFor(a), hintFor(b));
     if (ha != hb) return ha == true ? 1 : -1;
-    return b.ports.length.compareTo(a.ports.length); // fewer ports wins
+    return b.ports
+        .where((p) => p.index >= 0)
+        .length
+        .compareTo(
+          a.ports.where((p) => p.index >= 0).length,
+        ); // intrinsic connectors do not affect sizing
   }
 
   PktTemplateDevice best = candidates.first;
@@ -457,8 +502,10 @@ Future<(PktTemplateDevice?, List<String>)> selectVariant(
     if (resolved == null) missing.add(port);
   }
   if (missing.isNotEmpty) {
-    notes.add('$name: template ${best.key} has no port for '
-        '${missing.join(', ')}');
+    notes.add(
+      '$name: template ${best.key} has no port for '
+      '${missing.join(', ')}',
+    );
   }
   if (modelHint.isNotEmpty && !best.model.toLowerCase().contains(modelHint)) {
     // Say *why*, not just that: the hinted model usually exists and was
@@ -491,50 +538,34 @@ Future<(PktTemplateDevice?, List<String>)> selectVariant(
 // Block surgery
 // ---------------------------------------------------------------------------
 
-String _esc(String text) => xmlSafeText(text
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;'));
+String _esc(String text) => xmlSafeText(
+  text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;'),
+);
 
 /// Match `<TAG ...>` / `<TAG .../>` (or the closing form), tolerating
 /// attributes: Packet Tracer writes attributes on some fields - `<NAME
 /// translate="true">` always - so a matcher that only knows the plain form
 /// silently skips a tag that is really there.
 RegExp _tagPattern(String tag, {bool closing = false}) {
-  final attrs = r"((?:\s+[^>\s/]+(?:\s*=\s*(?:""[^""]*""|'[^']*'))?)*)";
+  final attrs =
+      r"((?:\s+[^>\s/]+(?:\s*=\s*(?:"
+      "[^"
+      "]*"
+      "|'[^']*'))?)*)";
   final name = RegExp.escape(tag);
   return RegExp('<${closing ? '/' : ''}$name$attrs\\s*/?>');
 }
 
-bool _hasTag(String block, String tag) =>
-    _tagPattern(tag).hasMatch(block);
-
-/// Replace the first TAG element's text, keeping its own attributes.
-/// Set [tag] inside [block], creating the element when it is absent.
-///
-/// [_setTag] deliberately leaves a block untouched when the tag is not there:
-/// a device block's own tags (RUNNINGCONFIG, SYSCONTACT) are PT-authored and
-/// must not be invented. A `<PORT>`'s `<NAME>` is the opposite - a port the
-/// source save never named NEEDS one, or the cable that references it points
-/// at nothing. So the insert happens only where it is asked for, never as a
-/// blanket default.
-String _setTagOrInsert(String block, String tag, String value) {
-  final out = _setTag(block, tag, value);
-  if (!identical(out, block)) return out;
-  final opener = RegExp('<PORT(?:\\s[^>]*)?>');
-  final at = opener.firstMatch(block);
-  if (at == null) return block;
-  final insertAt = at.end;
-  return '${block.substring(0, insertAt)}<$tag>${_esc(value)}</$tag>'
-      '${block.substring(insertAt)}';
-}
+bool _hasTag(String block, String tag) => _tagPattern(tag).hasMatch(block);
 
 String _setTag(String block, String tag, String value) {
   final name = RegExp.escape(tag);
-  final attrs = r"((?:\s+[^>\s/]+(?:\s*=\s*(?:""[^""]*""|'[^']*'))?)*)";
-  final pattern = RegExp(
-    '<$name$attrs\\s*/>|<$name$attrs\\s*>.*?</$name>',
-  );
+  final attrs =
+      r"((?:\s+[^>\s/]+(?:\s*=\s*(?:"
+      "[^"
+      "]*"
+      "|'[^']*'))?)*)";
+  final pattern = RegExp('<$name$attrs\\s*/>|<$name$attrs\\s*>.*?</$name>');
   var replaced = false;
   final out = block.replaceFirstMapped(pattern, (m) {
     replaced = true;
@@ -618,8 +649,7 @@ List<(int, int)> iterPortSpans(String block) {
 }
 
 String _macFor(String seed, int index) {
-  final digest =
-      crypto.sha1.convert(utf8.encode('$seed:$index')).bytes;
+  final digest = crypto.sha1.convert(utf8.encode('$seed:$index')).bytes;
   final first = (digest[0] | 0x02) & 0xFF;
   String hex(int b) => b.toRadixString(16).padLeft(2, '0').toUpperCase();
   return '${hex(first)}${hex(digest[1])}.${hex(digest[2])}${hex(digest[3])}.'
@@ -649,18 +679,15 @@ String _setMacs(String block, String seed) {
 }
 
 String _setPosition(String block, int x, int y) {
-  final match = RegExp(r'<LOGICAL>.*?</LOGICAL>', dotAll: true)
-      .firstMatch(block);
+  final match = RegExp(
+    r'<LOGICAL>.*?</LOGICAL>',
+    dotAll: true,
+  ).firstMatch(block);
   if (match == null) return block;
   final logical = match.group(0)!;
-  var fixed = logical.replaceFirst(
-    RegExp(r'<X>[^<]*</X>'),
-    '<X>$x</X>',
-  );
+  var fixed = logical.replaceFirst(RegExp(r'<X>[^<]*</X>'), '<X>$x</X>');
   fixed = fixed.replaceFirst(RegExp(r'<Y>[^<]*</Y>'), '<Y>$y</Y>');
-  return block.substring(0, match.start) +
-      fixed +
-      block.substring(match.end);
+  return block.substring(0, match.start) + fixed + block.substring(match.end);
 }
 
 String _setConfigTag(String block, String tag, List<String> lines) {
@@ -694,6 +721,7 @@ String _setConfig(String block, List<String> lines) {
 }
 
 String _patchPort(String block, int portIndex, Map<String, String> fields) {
+  if (portIndex < 0) return block;
   final spans = iterPortSpans(block);
   if (portIndex < 0 || portIndex >= spans.length) return block;
   final (start, end) = spans[portIndex];
@@ -708,27 +736,6 @@ String _patchPort(String block, int portIndex, Map<String, String> fields) {
   return block.substring(0, start) + port + block.substring(end);
 }
 
-/// Write [portName] onto the port at [portIndex], creating the `<NAME>`
-/// element when the source block has none.
-///
-/// Every access point is that case: Packet Tracer names the port from the
-/// host module and never writes it into the save, so the block has no
-/// `<NAME>` at all. A LINK block references its ports by name, so a cable
-/// pointing at `FastEthernet0` resolves to nothing and the whole link is
-/// dropped - which is how a plan that SW1plumbed to an AP came out with the
-/// AP floating, cabled to nothing.
-String _stampPortName(String block, int portIndex, String portName) {
-  final spans = iterPortSpans(block);
-  if (portIndex < 0 || portIndex >= spans.length) return block;
-  final (start, end) = spans[portIndex];
-  final port = _setTagOrInsert(
-    block.substring(start, end),
-    'NAME',
-    portName,
-  );
-  return block.substring(0, start) + port + block.substring(end);
-}
-
 // ---------------------------------------------------------------------------
 // Config text helpers
 // ---------------------------------------------------------------------------
@@ -736,8 +743,7 @@ String _stampPortName(String block, int portIndex, String portName) {
 (List<String>, List<String>) _sanitizeConfigLines(String text) {
   final lines = <String>[];
   final dropped = <String>[];
-  for (final raw
-      in text.replaceAll('\r\n', '\n').split('\n')) {
+  for (final raw in text.replaceAll('\r\n', '\n').split('\n')) {
     final line = raw.replaceFirst(RegExp(r'\s+$'), '');
     final stripped = line.trim();
     if (stripped.isEmpty) {
@@ -759,8 +765,10 @@ String _stampPortName(String block, int portIndex, String portName) {
 List<String> _interfaceLines(List<String> lines) {
   final names = <String>[];
   for (final line in lines) {
-    final match =
-        RegExp(r'^interface\s+(\S+)\s*$', caseSensitive: false).firstMatch(line);
+    final match = RegExp(
+      r'^interface\s+(\S+)\s*$',
+      caseSensitive: false,
+    ).firstMatch(line);
     if (match != null) {
       final name = match.group(1)!;
       // A dot1Q sub-interface rides on its parent's hardware, so it must not
@@ -771,9 +779,10 @@ List<String> _interfaceLines(List<String> lines) {
       names.add(name);
       continue;
     }
-    final range = RegExp(r'^interface\s+range\s+(\S+)\s*-\s*(\S+)\s*$',
-            caseSensitive: false)
-        .firstMatch(line);
+    final range = RegExp(
+      r'^interface\s+range\s+(\S+)\s*-\s*(\S+)\s*$',
+      caseSensitive: false,
+    ).firstMatch(line);
     if (range != null) {
       names.add(range.group(1)!);
       // `interface range f0/2 - 24` names the second end as a bare number:
@@ -800,8 +809,10 @@ List<String> _interfaceLines(List<String> lines) {
   final notes = <String>[];
   final out = <String>[];
   for (var line in lines) {
-    final sub = RegExp(r'^interface\s+(\S+?)\.(\d+)\s*$', caseSensitive: false)
-        .firstMatch(line);
+    final sub = RegExp(
+      r'^interface\s+(\S+?)\.(\d+)\s*$',
+      caseSensitive: false,
+    ).firstMatch(line);
     if (sub != null) {
       // Sub-interface: rewrite only the parent to the port this model really
       // has and keep the VLAN suffix. The parent resolution is shared with
@@ -817,8 +828,10 @@ List<String> _interfaceLines(List<String> lines) {
       out.add(line);
       continue;
     }
-    final match =
-        RegExp(r'^interface\s+(\S+)\s*$', caseSensitive: false).firstMatch(line);
+    final match = RegExp(
+      r'^interface\s+(\S+)\s*$',
+      caseSensitive: false,
+    ).firstMatch(line);
     if (match != null) {
       final requested = match.group(1)!;
       if (_virtualInterfaces.hasMatch(requested)) {
@@ -829,17 +842,19 @@ List<String> _interfaceLines(List<String> lines) {
       if (port != null) {
         if (note.isNotEmpty) notes.add('config: $note');
         line = 'interface ${port.name}';
-      } else if (_familyFromRequest(normalizePortName(requested))
-          .isNotEmpty) {
-        notes.add('config references $requested, which ${variant.key} does '
-            'not have');
+      } else if (_familyFromRequest(normalizePortName(requested)).isNotEmpty) {
+        notes.add(
+          'config references $requested, which ${variant.key} does '
+          'not have',
+        );
       }
       out.add(line);
       continue;
     }
-    final range = RegExp(r'^interface\s+range\s+(\S+)\s*-\s*(\S+)\s*$',
-            caseSensitive: false)
-        .firstMatch(line);
+    final range = RegExp(
+      r'^interface\s+range\s+(\S+)\s*-\s*(\S+)\s*$',
+      caseSensitive: false,
+    ).firstMatch(line);
     if (range != null) {
       final (port: first, note: _) = resolved.resolve(variant, range.group(1)!);
       final (port: last, note: _) = resolved.resolve(variant, range.group(2)!);
@@ -859,8 +874,10 @@ Map<String, List<String>> _interfaceBlocks(List<String> lines) {
   final blocks = <String, List<String>>{};
   var current = '';
   for (final line in lines) {
-    final match =
-        RegExp(r'^interface\s+(\S+)\s*$', caseSensitive: false).firstMatch(line);
+    final match = RegExp(
+      r'^interface\s+(\S+)\s*$',
+      caseSensitive: false,
+    ).firstMatch(line);
     if (match != null) {
       current = match.group(1)!;
       blocks.putIfAbsent(current, () => <String>[]);
@@ -876,14 +893,18 @@ String _clockRateFor(List<String> lines, String portName) {
   final wanted = normalizePortName(portName);
   var current = '';
   for (final line in lines) {
-    final match =
-        RegExp(r'^interface\s+(\S+)\s*$', caseSensitive: false).firstMatch(line);
+    final match = RegExp(
+      r'^interface\s+(\S+)\s*$',
+      caseSensitive: false,
+    ).firstMatch(line);
     if (match != null) {
       current = normalizePortName(match.group(1)!);
       continue;
     }
-    final clock =
-        RegExp(r'^clock rate\s+(\d+)\s*$', caseSensitive: false).firstMatch(line);
+    final clock = RegExp(
+      r'^clock rate\s+(\d+)\s*$',
+      caseSensitive: false,
+    ).firstMatch(line);
     if (clock != null && current == wanted) return clock.group(1)!;
   }
   return '';
@@ -902,8 +923,9 @@ int _refId(String seed, Set<int> used) {
   ref &= 0x7FFFFFFFFFFFFFFF;
   var guard = 0;
   while ((ref == 0 || used.contains(ref)) && guard < 64) {
-    ref = ((ref * 6364136223846793005 + 1442695040888963407) &
-            0x7FFFFFFFFFFFFFFF);
+    ref =
+        ((ref * 6364136223846793005 + 1442695040888963407) &
+        0x7FFFFFFFFFFFFFFF);
     guard++;
   }
   used.add(ref);
@@ -926,33 +948,34 @@ String _stableGuid(List<String> parts) {
   PktTemplateLibrary library,
   String cable,
 ) {
-  final (medium, cableType) =
-      _linkMediums[cable.trim().toLowerCase()] ?? ('eCopper', 'eStraightThrough');
+  final definition = PacketTracerCatalog.instance.cable(cable);
+  if (definition == null) {
+    throw PktBuildFailure(
+      'Unknown cable "$cable". Choose a cable from the catalog; no substitute was made.',
+    );
+  }
+  final medium = definition.medium, cableType = definition.variant;
   for (final entry in library.links) {
     if (entry.type == medium && entry.cable == cableType) return (entry, '');
   }
   for (final entry in library.links) {
-    if (entry.type == medium) return (entry, '');
+    if (entry.type == medium && (cableType.isEmpty || medium == 'eCopper')) {
+      return (entry, '');
+    }
   }
-  // A console link cannot be built offline, and the reason is deeper than one
-  // missing XML file: the template library was extracted from real saves, and
-  // neither its link list nor any device template carries a console cable or a
-  // Console/RS232 port, so the link's endpoints could not be resolved anyway.
-  // Say what IS possible instead of a bare "not found" - the autopilot engine
-  // wires console cables in the Packet Tracer window itself (it clicks the
-  // Console entry in the Connections palette), and so can the user by hand.
   if (medium == 'eConsole') {
     return (
       null,
-      'no console cable template in the library, and no device template '
-          'carries a Console/RS232 port to cable it to - an offline file '
-          'cannot carry this link; wire the console cable in Packet Tracer '
-          'itself (the autopilot engine can click it from the Connections '
-          'palette)'
+      'no console cable template in the library; wire this connection in Packet Tracer on desktop',
     );
   }
-  return (null, medium == 'eCopper' ? '' : 'no $medium cable template in the '
-      'library');
+  return (
+    null,
+    medium == 'eCopper'
+        ? ''
+        : 'no $medium cable template in the '
+              'library',
+  );
 }
 
 /// A free copper Ethernet port for [device], or ''.
@@ -996,6 +1019,10 @@ String? _buildLink({
     return null;
   }
   final requestedCable = '${link['cable'] ?? 'copper'}';
+  final definition = PacketTracerCatalog.instance.cable(requestedCable);
+  if (definition == null) {
+    throw PktBuildFailure('Unknown cable "$requestedCable".');
+  }
   final block = templateBlock;
   if (block.isEmpty) {
     warnings.add('link $nameA-$nameB: template block missing');
@@ -1008,9 +1035,8 @@ String? _buildLink({
   // A copper LAN whose interface could not be resolved can fall back to a
   // free Ethernet port - a LAN on another Ethernet slot is still a LAN.
   // Serial, fiber, and console links must retain their requested medium.
-  final (medium, _) =
-      _linkMediums[requestedCable.trim().toLowerCase()] ?? ('eCopper', '');
-  final allowEthernetRemap = medium == 'eCopper';
+  final medium = definition.medium;
+  final allowEthernetRemap = medium == 'eCopper' && link['exactPorts'] != true;
   if (allowEthernetRemap && portA == null) {
     final spare = _spareEthernetPort(
       usedPorts,
@@ -1020,8 +1046,10 @@ String? _buildLink({
     if (spare.isNotEmpty) {
       portA = spare;
       portNames[keyA] = spare;
-      warnings.add('link $nameA-$nameB: ${link['aIf']} not usable on $nameA; '
-          'cabled on $spare (spare-port remap)');
+      warnings.add(
+        'link $nameA-$nameB: ${link['aIf']} not usable on $nameA; '
+        'cabled on $spare (spare-port remap)',
+      );
     }
   }
   if (allowEthernetRemap && portB == null) {
@@ -1033,8 +1061,10 @@ String? _buildLink({
     if (spare.isNotEmpty) {
       portB = spare;
       portNames[keyB] = spare;
-      warnings.add('link $nameA-$nameB: ${link['bIf']} not usable on $nameB; '
-          'cabled on $spare (spare-port remap)');
+      warnings.add(
+        'link $nameA-$nameB: ${link['bIf']} not usable on $nameB; '
+        'cabled on $spare (spare-port remap)',
+      );
     }
   }
   if (portA == null) {
@@ -1044,6 +1074,27 @@ String? _buildLink({
   if (portB == null) {
     warnings.add('link $nameA-$nameB: ${link['bIf']} not usable on $nameB');
     return null;
+  }
+  final variantA = variants[nameA], variantB = variants[nameB];
+  final actualA = variantA?.ports.where((p) => p.name == portA).firstOrNull;
+  final actualB = variantB?.ports.where((p) => p.name == portB).firstOrNull;
+  if (actualA != null && actualB != null) {
+    PtPort asPort(PktTemplatePort p) => PtPort(
+      p.name,
+      p.type.isEmpty && _ethernetFamilies.contains(p.family)
+          ? 'eCopper'
+          : p.type,
+      p.family,
+    );
+    final mismatch = definition.mismatch(
+      asPort(actualA),
+      asPort(actualB),
+      modulesA: variantA!.modules,
+      modulesB: variantB!.modules,
+    );
+    if (mismatch != null) {
+      throw PktBuildFailure('link $nameA-$nameB: $mismatch');
+    }
   }
   var out = block;
   out = _replaceFirst(
@@ -1069,9 +1120,7 @@ String? _buildLink({
       RegExp(r'<PORT>[^<]*</PORT>'),
       '<PORT>${_esc(portB)}</PORT>',
     );
-    out = out.substring(0, toPort.start) +
-        fixed +
-        out.substring(toPort.end);
+    out = out.substring(0, toPort.start) + fixed + out.substring(toPort.end);
   }
   out = out.replaceAllMapped(
     RegExp(r'<([A-Z_]*MEM_ADDR)>[^<]*</\1>'),
@@ -1084,8 +1133,7 @@ String? _buildLink({
       ? 'a'
       : (dcePorts.containsKey((nameB, portB)) ? 'b' : '');
   if (dceSide.isNotEmpty) {
-    final (dceName, dcePort) =
-        dceSide == 'a' ? (nameA, portA) : (nameB, portB);
+    final (dceName, dcePort) = dceSide == 'a' ? (nameA, portA) : (nameB, portB);
     out = _replaceFirst(
       out,
       RegExp(r'<DCEDEV>[^<]*</DCEDEV>'),
@@ -1097,32 +1145,35 @@ String? _buildLink({
       '<DCEPORT>${_esc(dcePort)}</DCEPORT>',
     );
   } else if (out.contains('<DCEDEV>')) {
-    out = out.replaceAllMapped(
-      RegExp(r'<DCEDEV>[^<]*</DCEDEV>\s*'),
-      (_) => '',
-    );
+    out = out.replaceAllMapped(RegExp(r'<DCEDEV>[^<]*</DCEDEV>\s*'), (_) => '');
     out = out.replaceAllMapped(
       RegExp(r'<DCEPORT>[^<]*</DCEPORT>\s*'),
       (_) => '',
     );
-    warnings.add('link $nameA-$nameB: the plan gave neither end a clock rate, '
-        'so the serial link has no DCE side');
+    warnings.add(
+      'link $nameA-$nameB: the plan gave neither end a clock rate, '
+      'so the serial link has no DCE side',
+    );
   }
   // The template's cable kind may differ from the one the plan asked for (a
   // crossover on the straight-through block is the same structure).
-  final (_, wantedCable) =
-      _linkMediums[requestedCable.trim().toLowerCase()] ?? ('', '');
+  final wantedCable = definition.variant;
   if (wantedCable.isNotEmpty &&
       template.cable.isNotEmpty &&
       template.cable != wantedCable) {
-    final cableSegment =
-        RegExp(r'<CABLE>.*?</CABLE>', dotAll: true).firstMatch(out);
+    final cableSegment = RegExp(
+      r'<CABLE>.*?</CABLE>',
+      dotAll: true,
+    ).firstMatch(out);
     if (cableSegment != null) {
-      final fixed = cableSegment.group(0)!.replaceFirst(
+      final fixed = cableSegment
+          .group(0)!
+          .replaceFirst(
             RegExp(r'<TYPE>[^<]*</TYPE>'),
             '<TYPE>$wantedCable</TYPE>',
           );
-      out = out.substring(0, cableSegment.start) +
+      out =
+          out.substring(0, cableSegment.start) +
           fixed +
           out.substring(cableSegment.end);
     }
@@ -1203,12 +1254,8 @@ String _svc(String text) => _esc(text);
   if (parts.any((p) => p == null) || bits.any((p) => p == null)) {
     return (ip, ip);
   }
-  final net = [
-    for (var i = 0; i < 4; i++) parts[i]! & bits[i]!,
-  ];
-  final last = [
-    for (var i = 0; i < 4; i++) net[i] + (255 - bits[i]!),
-  ];
+  final net = [for (var i = 0; i < 4; i++) parts[i]! & bits[i]!];
+  final last = [for (var i = 0; i < 4; i++) net[i] + (255 - bits[i]!)];
   last[3] = last[3] - 1 >= net[3] ? last[3] - 1 : net[3];
   return (net.join('.'), last.join('.'));
 }
@@ -1232,11 +1279,13 @@ Map<String, String> _serviceElements(
   // Every panel is rewritten even when the plan does not ask for it, so a
   // template's leftover state can never ship inside a generated file.
   final http = planFor('http');
-  out['HTTP_SERVER'] = '<HTTP_SERVER><ENABLED>${_flag(http.isNotEmpty)}'
+  out['HTTP_SERVER'] =
+      '<HTTP_SERVER><ENABLED>${_flag(http.isNotEmpty)}'
       '</ENABLED><USERNAME>${_svc('${http['username'] ?? ''}')}</USERNAME>'
       '<PASSWORD>${_svc('${http['password'] ?? ''}')}</PASSWORD>'
       '</HTTP_SERVER>';
-  out['HTTPS_SERVER'] = '<HTTPS_SERVER><HTTPSENABLED>'
+  out['HTTPS_SERVER'] =
+      '<HTTPS_SERVER><HTTPSENABLED>'
       '${_flag(http['https'] == true || '${http['https'] ?? ''}' == 'true')}'
       '</HTTPSENABLED></HTTPS_SERVER>';
   if (http.isNotEmpty) {
@@ -1248,17 +1297,20 @@ Map<String, String> _serviceElements(
 
   // --- DNS ----------------------------------------------------------------
   final rows = <String>[];
-  for (final record in (planFor('dns')['records'] as List?) ??
-      const <dynamic>[]) {
+  for (final record
+      in (planFor('dns')['records'] as List?) ?? const <dynamic>[]) {
     if (record is! Map) continue;
     final name = '${record['name'] ?? ''}'.trim();
     final address = '${record['address'] ?? ''}'.trim();
     if (name.isEmpty || address.isEmpty) continue;
-    rows.add('<RESOURCE-RECORD><TYPE>A-REC</TYPE><NAME>${_svc(name)}'
-        '</NAME><TTL>86400</TTL><IPADDRESS>${_svc(address)}'
-        '</IPADDRESS></RESOURCE-RECORD>');
+    rows.add(
+      '<RESOURCE-RECORD><TYPE>A-REC</TYPE><NAME>${_svc(name)}'
+      '</NAME><TTL>86400</TTL><IPADDRESS>${_svc(address)}'
+      '</IPADDRESS></RESOURCE-RECORD>',
+    );
   }
-  out['DNS_SERVER'] = '<DNS_SERVER><ENABLED>${_flag(rows.isNotEmpty)}'
+  out['DNS_SERVER'] =
+      '<DNS_SERVER><ENABLED>${_flag(rows.isNotEmpty)}'
       '</ENABLED><NAMESERVER-DATABASE>${rows.join()}'
       '</NAMESERVER-DATABASE></DNS_SERVER>';
   if (rows.isNotEmpty) {
@@ -1283,19 +1335,22 @@ Map<String, String> _serviceElements(
     if (poolName.isEmpty) poolName = 'pool${poolIndex + 1}';
     if (seen.contains(poolName)) poolName = '${poolName}_${poolIndex + 1}';
     seen.add(poolName);
-    poolRows.add('<POOL><NAME>${_svc(poolName)}</NAME><NETWORK>'
-        '${_svc(network)}</NETWORK><MASK>${_svc(mask)}</MASK>'
-        '<DEFAULT_ROUTER>${_svc('${pool['gateway'] ?? '0.0.0.0'}')}'
-        '</DEFAULT_ROUTER><TFTP_ADDRESS>0.0.0.0</TFTP_ADDRESS>'
-        '<START_IP>${_svc(start)}</START_IP><END_IP>${_svc(end)}</END_IP>'
-        '<DNS_SERVER>${_svc('${pool['dnsServer'] ?? '0.0.0.0'}')}'
-        '</DNS_SERVER><MAX_USERS>${_svc('${pool['maxUsers'] ?? '100'}')}'
-        '</MAX_USERS><DOMAIN_NAME/><DHCP_POOL_LEASES/>'
-        '<LEASE_TIME>86400000</LEASE_TIME>'
-        '<WLC_ADDRESS>0.0.0.0</WLC_ADDRESS></POOL>');
+    poolRows.add(
+      '<POOL><NAME>${_svc(poolName)}</NAME><NETWORK>'
+      '${_svc(network)}</NETWORK><MASK>${_svc(mask)}</MASK>'
+      '<DEFAULT_ROUTER>${_svc('${pool['gateway'] ?? '0.0.0.0'}')}'
+      '</DEFAULT_ROUTER><TFTP_ADDRESS>0.0.0.0</TFTP_ADDRESS>'
+      '<START_IP>${_svc(start)}</START_IP><END_IP>${_svc(end)}</END_IP>'
+      '<DNS_SERVER>${_svc('${pool['dnsServer'] ?? '0.0.0.0'}')}'
+      '</DNS_SERVER><MAX_USERS>${_svc('${pool['maxUsers'] ?? '100'}')}'
+      '</MAX_USERS><DOMAIN_NAME/><DHCP_POOL_LEASES/>'
+      '<LEASE_TIME>86400000</LEASE_TIME>'
+      '<WLC_ADDRESS>0.0.0.0</WLC_ADDRESS></POOL>',
+    );
     poolIndex++;
   }
-  out['DHCP_SERVERS'] = '<DHCP_SERVERS><ASSOCIATED_PORTS><ASSOCIATED_PORT>'
+  out['DHCP_SERVERS'] =
+      '<DHCP_SERVERS><ASSOCIATED_PORTS><ASSOCIATED_PORT>'
       '<NAME>${_svc(portName)}</NAME><DHCP_SERVER><ENABLED>'
       '${_flag(poolRows.isNotEmpty)}</ENABLED><POOLS>${poolRows.join()}'
       '</POOLS><DHCP_RESERVATIONS/><AUTOCONFIG/></DHCP_SERVER>'
@@ -1323,25 +1378,27 @@ Map<String, String> _serviceElements(
   final userRows = [
     for (final u in users)
       '<USER><NAME>${_svc('${u['username']}')}</NAME><PASSWORD>'
-      '${_svc('${u['password'] ?? ''}')}</PASSWORD><DESCRIPTION>'
-      '${_svc('${u['description'] ?? ''}')}</DESCRIPTION></USER>',
+          '${_svc('${u['password'] ?? ''}')}</PASSWORD><DESCRIPTION>'
+          '${_svc('${u['description'] ?? ''}')}</DESCRIPTION></USER>',
   ];
   final clientRows = [
     for (final c in clients)
       '<CLIENT><HOST_IP>${_svc('${c['hostIp']}')}</HOST_IP><KEY>'
-      '${_svc('${c['key'] ?? ''}')}</KEY><DESCRIPTION>'
-      '${_svc('${c['description'] ?? c['name'] ?? ''}')}</DESCRIPTION>'
-      '<SERVER_TYPE>${_svc(_serverType(c['serverType'] ?? c['type']))}'
-      '</SERVER_TYPE></CLIENT>',
+          '${_svc('${c['key'] ?? ''}')}</KEY><DESCRIPTION>'
+          '${_svc('${c['description'] ?? c['name'] ?? ''}')}</DESCRIPTION>'
+          '<SERVER_TYPE>${_svc(_serverType(c['serverType'] ?? c['type']))}'
+          '</SERVER_TYPE></CLIENT>',
   ];
   // Packet Tracer leaves AAA *Off* and its tab empty unless the server has
   // at least one account and one client.
-  final aaaOn = aaa.isNotEmpty &&
+  final aaaOn =
+      aaa.isNotEmpty &&
       aaa['enabled'] != false &&
       (userRows.isNotEmpty || clientRows.isNotEmpty);
   var authPort = '${aaa['authPort'] ?? ''}'.trim();
   if (!RegExp(r'^\d+$').hasMatch(authPort)) authPort = '1645';
-  out['ACS_SERVER'] = '<ACS_SERVER><ENABLED>${_flag(aaaOn)}</ENABLED><USERS>'
+  out['ACS_SERVER'] =
+      '<ACS_SERVER><ENABLED>${_flag(aaaOn)}</ENABLED><USERS>'
       '${userRows.join()}</USERS><ACS_CLIENTS>${clientRows.join()}'
       '</ACS_CLIENTS><RADIUS_SETTINGS><AUTH_PORT>${_svc(authPort)}'
       '</AUTH_PORT></RADIUS_SETTINGS></ACS_SERVER>';
@@ -1356,12 +1413,16 @@ Map<String, String> _serviceElements(
       'authPort': authPort,
     };
     if (users.isEmpty) {
-      notes.add('AAA is enabled on the server but the plan names no user, so '
-          'no login can succeed until one is added');
+      notes.add(
+        'AAA is enabled on the server but the plan names no user, so '
+        'no login can succeed until one is added',
+      );
     }
     if (clients.isEmpty) {
-      notes.add('AAA is enabled but the plan names no client router, so the '
-          'router IP and shared key are missing from the server');
+      notes.add(
+        'AAA is enabled but the plan names no client router, so the '
+        'router IP and shared key are missing from the server',
+      );
     }
   }
 
@@ -1384,22 +1445,25 @@ Map<String, String> _serviceElements(
     final length = '${pool['prefixLength'] ?? ''}'.trim();
     final len = length.isEmpty ? '64' : length;
     final cidr = '$prefix/$len';
-    pool6Rows.add('<DHCPV6_POOL><POOL_NAME>${_svc(name)}</POOL_NAME>'
-        '<DNS_SERVER>${_svc('${pool['dnsServer'] ?? ''}')}</DNS_SERVER>'
-        '<DOMAIN_NAME>${_svc('${pool['domainName'] ?? ''}')}</DOMAIN_NAME>'
-        '<PORT_NAME>${_svc(portName)}</PORT_NAME><STATIC_PDS/>'
-        '<ADDRESS_PREFIXES><ADDRESS_PREFIX><PREFIX_ID>${_svc(cidr)}'
-        '</PREFIX_ID><DHCPV6_PREFIX_DELEGATION><PREFIX_ID>${_svc(cidr)}'
-        '</PREFIX_ID><PREFIX_POOL_NAME>${_svc(name)}</PREFIX_POOL_NAME>'
-        '<VALID_LIFETIME>2592000</VALID_LIFETIME>'
-        '<PREFERRED_LIFETIME>604800</PREFERRED_LIFETIME>'
-        '<PREFIX_LENGTH>${_svc(len)}</PREFIX_LENGTH><PREFIX>${_svc(prefix)}'
-        '</PREFIX></DHCPV6_PREFIX_DELEGATION></ADDRESS_PREFIX>'
-        '</ADDRESS_PREFIXES></DHCPV6_POOL>');
+    pool6Rows.add(
+      '<DHCPV6_POOL><POOL_NAME>${_svc(name)}</POOL_NAME>'
+      '<DNS_SERVER>${_svc('${pool['dnsServer'] ?? ''}')}</DNS_SERVER>'
+      '<DOMAIN_NAME>${_svc('${pool['domainName'] ?? ''}')}</DOMAIN_NAME>'
+      '<PORT_NAME>${_svc(portName)}</PORT_NAME><STATIC_PDS/>'
+      '<ADDRESS_PREFIXES><ADDRESS_PREFIX><PREFIX_ID>${_svc(cidr)}'
+      '</PREFIX_ID><DHCPV6_PREFIX_DELEGATION><PREFIX_ID>${_svc(cidr)}'
+      '</PREFIX_ID><PREFIX_POOL_NAME>${_svc(name)}</PREFIX_POOL_NAME>'
+      '<VALID_LIFETIME>2592000</VALID_LIFETIME>'
+      '<PREFERRED_LIFETIME>604800</PREFERRED_LIFETIME>'
+      '<PREFIX_LENGTH>${_svc(len)}</PREFIX_LENGTH><PREFIX>${_svc(prefix)}'
+      '</PREFIX></DHCPV6_PREFIX_DELEGATION></ADDRESS_PREFIX>'
+      '</ADDRESS_PREFIXES></DHCPV6_POOL>',
+    );
   }
   var port6 = '';
   if (pool6Rows.isNotEmpty) {
-    port6 = '<ASSOCIATED_PORTS><ASSOCIATED_PORT><PORT_NAME>'
+    port6 =
+        '<ASSOCIATED_PORTS><ASSOCIATED_PORT><PORT_NAME>'
         '${_svc(portName)}</PORT_NAME><DHCPV6_SERVER>'
         '<DHCPV6_SERVER_PORT_DATA><ENABLED>1</ENABLED>'
         '<RAPID_COMMIT>0</RAPID_COMMIT><HINT>0</HINT><POOL_NAME>'
@@ -1413,7 +1477,8 @@ Map<String, String> _serviceElements(
         '</DHCPV6_SERVER_PORT_DATA><BINDING_TABLE/></DHCPV6_SERVER>'
         '</ASSOCIATED_PORT></ASSOCIATED_PORTS>';
   }
-  out['DHCPV6_SERVER_LIST'] = '<DHCPV6_SERVER_LIST>$port6<DHCPv6_POOLS>'
+  out['DHCPV6_SERVER_LIST'] =
+      '<DHCPV6_SERVER_LIST>$port6<DHCPv6_POOLS>'
       '${pool6Rows.join()}</DHCPv6_POOLS><IPv6_LOCAL_POOLS/>'
       '</DHCPV6_SERVER_LIST>';
   if (pool6Rows.isNotEmpty) {
@@ -1430,10 +1495,11 @@ Map<String, String> _serviceElements(
   final ftpRows = [
     for (final a in accounts)
       '<ACCOUNT><USERNAME>${_svc('${a['username']}')}</USERNAME><PASSWORD>'
-      '${_svc('${a['password'] ?? ''}')}</PASSWORD><PERMISSIONS>'
-      '${_svc('${a['permissions'] ?? 'RWDNL'}')}</PERMISSIONS></ACCOUNT>',
+          '${_svc('${a['password'] ?? ''}')}</PASSWORD><PERMISSIONS>'
+          '${_svc('${a['permissions'] ?? 'RWDNL'}')}</PERMISSIONS></ACCOUNT>',
   ];
-  out['FTP_SERVER'] = '<FTP_SERVER><ENABLED>${_flag(ftp.isNotEmpty)}'
+  out['FTP_SERVER'] =
+      '<FTP_SERVER><ENABLED>${_flag(ftp.isNotEmpty)}'
       '</ENABLED><USER_ACCOUNT_MNGR>${ftpRows.join()}'
       '</USER_ACCOUNT_MNGR></FTP_SERVER>';
   if (ftp.isNotEmpty) {
@@ -1457,7 +1523,8 @@ Map<String, String> _serviceElements(
       ..write(_indexed('NO_OF_MAILS', index, '0'));
   }
   final emailOn = email.isNotEmpty && email['enabled'] != false;
-  out['EMAIL_SERVER'] = '<EMAIL_SERVER><SMTP_ENABLED>${_flag(emailOn)}'
+  out['EMAIL_SERVER'] =
+      '<EMAIL_SERVER><SMTP_ENABLED>${_flag(emailOn)}'
       '</SMTP_ENABLED><SMTP_DOMAIN>${_svc('${email['domain'] ?? ''}')}'
       '</SMTP_DOMAIN><POP3_ENABLED>${_flag(emailOn)}</POP3_ENABLED>'
       '<FORWARD_MAIL>${_flag(email['forward'] == true)}</FORWARD_MAIL>'
@@ -1481,14 +1548,16 @@ Map<String, String> _serviceElements(
   final iotRows = [
     for (final u in iotUsers)
       '<USER><NAME>${_svc('${u['username']}')}</NAME><PASSWORD>'
-      '${_svc('${u['password'] ?? ''}')}</PASSWORD><DEVICES/>'
-      '<IOE_CONDITIONS/><IOE_RULES/></USER>',
+          '${_svc('${u['password'] ?? ''}')}</PASSWORD><DEVICES/>'
+          '<IOE_CONDITIONS/><IOE_RULES/></USER>',
   ];
-  out['IOE_USER_MANAGER'] = '<IOE_USER_MANAGER><USERS>${iotRows.join()}'
+  out['IOE_USER_MANAGER'] =
+      '<IOE_USER_MANAGER><USERS>${iotRows.join()}'
       '</USERS></IOE_USER_MANAGER>';
   if (iot.isNotEmpty) {
     final registration = iot['registration'] != false;
-    out['REGISTRATION_SEVER'] = '<REGISTRATION_SEVER>'
+    out['REGISTRATION_SEVER'] =
+        '<REGISTRATION_SEVER>'
         '${registration ? 'true' : 'false'}</REGISTRATION_SEVER>';
     report['iot'] = {'users': iotRows.length, 'registration': registration};
   }
@@ -1501,10 +1570,11 @@ Map<String, String> _serviceElements(
   final vmRows = [
     for (final v in vms)
       '<VM><VM_ID>${_svc('${v['id']}')}</VM_ID><VM_PATH>'
-      '${_svc('${v['path'] ?? v['id']}')}</VM_PATH><VM_STATUS>'
-      '${_svc('${v['status'] ?? '1'}')}</VM_STATUS></VM>',
+          '${_svc('${v['path'] ?? v['id']}')}</VM_PATH><VM_STATUS>'
+          '${_svc('${v['status'] ?? '1'}')}</VM_STATUS></VM>',
   ];
-  out['IOX_VM_MANAGER'] = '<IOX_VM_MANAGER><VMS>${vmRows.join()}</VMS>'
+  out['IOX_VM_MANAGER'] =
+      '<IOX_VM_MANAGER><VMS>${vmRows.join()}</VMS>'
       '</IOX_VM_MANAGER>';
   if (vm.isNotEmpty) {
     report['vm'] = {'vms': vmRows.length};
@@ -1518,7 +1588,8 @@ Map<String, String> _serviceElements(
   ];
   if (methods.isNotEmpty) {
     final eapRows = [
-      for (final m in methods) '<EAP_METHOD><NAME>${_svc(m)}</NAME></EAP_METHOD>',
+      for (final m in methods)
+        '<EAP_METHOD><NAME>${_svc(m)}</NAME></EAP_METHOD>',
     ];
     out['EAP_METHODS'] = '<EAP_METHODS>${eapRows.join()}</EAP_METHODS>';
     report['radiusEap'] = {'methods': methods};
@@ -1536,7 +1607,8 @@ Map<String, String> _serviceElements(
     if (tag == 'NTP_SERVER') {
       // The panel's authentication fields are real state; the server list is
       // a live NTP client list and is left empty on purpose.
-      out[tag] = '<NTP_SERVER><ENABLED>${_flag(on)}</ENABLED>'
+      out[tag] =
+          '<NTP_SERVER><ENABLED>${_flag(on)}</ENABLED>'
           '<ENABLED_SERVER_AUTHENTICATE>'
           '${_flag(plan['authenticate'] == true)}'
           '</ENABLED_SERVER_AUTHENTICATE><KEY>${_svc('${plan['key'] ?? '0'}')}'
@@ -1551,7 +1623,8 @@ Map<String, String> _serviceElements(
   // --- SNMP ---------------------------------------------------------------
   final snmp = planFor('snmp');
   final snmpOn = snmp.isNotEmpty && snmp['enabled'] != false;
-  out['SNMP_MANAGER'] = '<SNMP_MANAGER><AGENT_IP>'
+  out['SNMP_MANAGER'] =
+      '<SNMP_MANAGER><AGENT_IP>'
       '${_svc('${snmp['agentIp'] ?? '0.0.0.0'}')}</AGENT_IP><AGENT_PORT>'
       '${_svc('${snmp['agentPort'] ?? '161'}')}</AGENT_PORT><MANAGER_PORT>'
       '${_svc('${snmp['managerPort'] ?? '161'}')}</MANAGER_PORT>'
@@ -1583,7 +1656,8 @@ Map<String, String> _wirelessElements(
   final ssid = '${wl['ssid'] ?? ''}'.trim();
   if (ssid.isEmpty) return {};
 
-  String common(String sub) => '<WIRELESS_COMMON>\r\n'
+  String common(String sub) =>
+      '<WIRELESS_COMMON>\r\n'
       '       <NETWORK_MODE>7</NETWORK_MODE>\r\n'
       '       <SSID>${_esc(ssid)}</SSID>\r\n'
       '       <ENCRYPT_TYPE>$sub</ENCRYPT_TYPE>\r\n'
@@ -1606,8 +1680,10 @@ Map<String, String> _wirelessElements(
       'wpa2': true,
       'verification': 'manual_step',
     };
-    notes.add('wireless: WPA2-PSK must be confirmed in the device GUI; the '
-        'SSID is set');
+    notes.add(
+      'wireless: WPA2-PSK must be confirmed in the device GUI; the '
+      'SSID is set',
+    );
   } else if ('${wl['wep'] ?? ''}'.trim().isNotEmpty) {
     code = '1';
     wep = '${wl['wep']}';
@@ -1624,7 +1700,8 @@ Map<String, String> _wirelessElements(
     };
   }
 
-  var apBody = '<WIRELESS_SERVER>\r\n      ${common(code)}'
+  var apBody =
+      '<WIRELESS_SERVER>\r\n      ${common(code)}'
       '      <SSID_BROADCAST_ENABLED>'
       '${(wl['broadcast'] ?? true) == false ? '0' : '1'}'
       '</SSID_BROADCAST_ENABLED>\r\n'
@@ -1635,7 +1712,8 @@ Map<String, String> _wirelessElements(
     apBody += '      <WEP_KEY>${_esc(wep)}</WEP_KEY>\r\n';
   }
 
-  final clientBody = '<WIRELESS_CLIENT>\r\n         ${common(code)}'
+  final clientBody =
+      '<WIRELESS_CLIENT>\r\n         ${common(code)}'
       '         <PROFILES>\r\n'
       '          <WIRELESS_PROFILE>\r\n'
       '           <NAME>${_esc(ssid)}</NAME>\r\n'
@@ -1658,7 +1736,9 @@ Map<String, String> _wirelessElements(
 
 /// Span of the first `<TAG>...</TAG>`, or of a self-closing `<TAG/>`.
 (int, int)? _elementSpan(String block, String tag) {
-  final match = RegExp('<${RegExp.escape(tag)}(?:\\s[^>]*)?>').firstMatch(block);
+  final match = RegExp(
+    '<${RegExp.escape(tag)}(?:\\s[^>]*)?>',
+  ).firstMatch(block);
   if (match == null) return null;
   if (match.group(0)!.endsWith('/>')) return (match.start, match.end);
   final close = block.indexOf('</$tag>', match.end);
@@ -1708,8 +1788,7 @@ Map<String, String> _wirelessElements(
     engine = out.substring(span.$1, span.$2);
     tail = out.substring(span.$2);
   }
-  final hasAnyService =
-      _serviceTags.any((tag) => engine.contains('<$tag>'));
+  final hasAnyService = _serviceTags.any((tag) => engine.contains('<$tag>'));
   if (!hasAnyService) {
     return (head + engine + tail, notes, report);
   }
@@ -1723,9 +1802,8 @@ Map<String, String> _wirelessElements(
   _serviceElements(services, portName, report, notes).forEach((tag, body) {
     final tagSpan = _elementSpan(engine, tag);
     if (tagSpan != null) {
-      engine = engine.substring(0, tagSpan.$1) +
-          body +
-          engine.substring(tagSpan.$2);
+      engine =
+          engine.substring(0, tagSpan.$1) + body + engine.substring(tagSpan.$2);
       return;
     }
     // The template came from a save where this service was never configured,
@@ -1733,8 +1811,10 @@ Map<String, String> _wirelessElements(
     // </ENGINE> instead - skipping it left the service silently off.
     final close = engine.lastIndexOf('</ENGINE>');
     if (close < 0) {
-      notes.add('$tag: the device template has nowhere to put this service, '
-          'so it was left unset');
+      notes.add(
+        '$tag: the device template has nowhere to put this service, '
+        'so it was left unset',
+      );
       return;
     }
     engine = engine.substring(0, close) + body + engine.substring(close);
@@ -1776,9 +1856,10 @@ String _setPhysicalIdentity({
   required String identity,
 }) {
   var out = _setTag(block, 'PHYSICAL', physicalPath);
-  final cpur =
-      RegExp(r'<PHYSICAL_CPUR>.*?</PHYSICAL_CPUR>', dotAll: true)
-          .firstMatch(out);
+  final cpur = RegExp(
+    r'<PHYSICAL_CPUR>.*?</PHYSICAL_CPUR>',
+    dotAll: true,
+  ).firstMatch(out);
   if (cpur == null) {
     throw PktBuildFailure('$name: device template has no PHYSICAL_CPUR data');
   }
@@ -1796,9 +1877,10 @@ String _setPhysicalIdentity({
           'Y': '$y',
         }
       : <String, String>{
-          'PARENT_PATH': [parentPath, containerId]
-              .where((part) => part.isNotEmpty)
-              .join(','),
+          'PARENT_PATH': [
+            parentPath,
+            containerId,
+          ].where((part) => part.isNotEmpty).join(','),
           'X': '$x',
           'Y': '$y',
         };
@@ -1813,9 +1895,7 @@ String _setPhysicalIdentity({
   if (_hasTag(chunk, 'ORIGINAL_DEVICE_UUID')) {
     chunk = _setTag(chunk, 'ORIGINAL_DEVICE_UUID', identity);
   }
-  return out.substring(0, cpur.start) +
-      chunk +
-      out.substring(cpur.end);
+  return out.substring(0, cpur.start) + chunk + out.substring(cpur.end);
 }
 
 /// Recreate physical device leaves so the workspace matches the output.
@@ -1868,10 +1948,7 @@ String _setPhysicalIdentity({
   void walk(xml.XmlElement node, List<String> ancestorPath) {
     final kind = _childText(node, 'TYPE');
     final nodeUuid = _childText(node, 'UUID_STR');
-    final path = [
-      ...ancestorPath,
-      if (nodeUuid.isNotEmpty) nodeUuid,
-    ];
+    final path = [...ancestorPath, if (nodeUuid.isNotEmpty) nodeUuid];
     final children = node.getElement('CHILDREN');
     if (kind == '6') {
       if (ancestorPath.isNotEmpty) {
@@ -1909,138 +1986,150 @@ String _setPhysicalIdentity({
   void clearDeviceLeaves(xml.XmlElement node) {
     final children = node.getElement('CHILDREN');
     if (children == null) return;
-      final doomed = <xml.XmlNode>[];
-      for (final child in children.childElements) {
-        if (child.name.local != 'NODE') continue;
-        if (_childText(child, 'TYPE') == '6') {
-          doomed.add(child);
-        } else {
-          clearDeviceLeaves(child);
-        }
+    final doomed = <xml.XmlNode>[];
+    for (final child in children.childElements) {
+      if (child.name.local != 'NODE') continue;
+      if (_childText(child, 'TYPE') == '6') {
+        doomed.add(child);
+      } else {
+        clearDeviceLeaves(child);
       }
-      for (final node in doomed) {
-        children.children.remove(node);
-      }
+    }
+    for (final node in doomed) {
+      children.children.remove(node);
+    }
   }
 
-    for (final node in root.childElements) {
-      if (node.name.local == 'NODE') clearDeviceLeaves(node);
+  for (final node in root.childElements) {
+    if (node.name.local == 'NODE') clearDeviceLeaves(node);
+  }
+  final usedUuids = <String>{
+    for (final e in root.descendantElements)
+      if (e.name.local == 'UUID_STR') e.innerText.trim(),
+  };
+  final usedNames = <String>{};
+  final perContainer = <String, int>{};
+  final rebuiltBlocks = <String>[];
+
+  for (var index = 0; index < deviceBlocks.length; index++) {
+    var block = deviceBlocks[index];
+    final report = deviceReport[index];
+    final name = '${report['name'] ?? ''}'.trim();
+    final kind = '${report['type'] ?? ''}'.trim().toLowerCase();
+    if (!block.contains('<PHYSICAL_CPUR')) {
+      // Packet Tracer's own sample labs save a few models with no
+      // physical-workspace data at all. Such a block has nowhere to point a
+      // physical leaf, so it is placed in the Logical workspace only: the
+      // file stays valid and the device is still fully cabled and
+      // configured.
+      if (_hasTag(block, 'PHYSICAL')) {
+        block = _setTag(block, 'PHYSICAL', '');
+      }
+      rebuiltBlocks.add(block);
+      notes.add(
+        '$name: its saved model has no physical-workspace data; the '
+        'device is placed in the Logical workspace only',
+      );
+      continue;
     }
-    final usedUuids = <String>{
-      for (final e in root.descendantElements)
-        if (e.name.local == 'UUID_STR') e.innerText.trim(),
-    };
-    final usedNames = <String>{};
-    final perContainer = <String, int>{};
-    final rebuiltBlocks = <String>[];
+    if (name.isEmpty) {
+      throw const PktBuildFailure(
+        'a generated device has no name for its physical workspace entry',
+      );
+    }
+    if (usedNames.contains(name)) {
+      throw PktBuildFailure(
+        'duplicate device name in Physical Workspace: $name',
+      );
+    }
+    usedNames.add(name);
+    final wantRack = [
+      'router',
+      'switch',
+      'firewall',
+      'wireless-router',
+    ].contains(kind);
+    final preferredType = wantRack ? '4' : '2';
+    var candidates = [
+      for (final c in containers)
+        if (c['type'] == preferredType && '${c['uuid']}'.isNotEmpty) c,
+    ];
+    if (candidates.isEmpty) {
+      final fallbackTypes = wantRack
+          ? ['2', '3', '1', '0']
+          : ['3', '4', '1', '0'];
+      for (final fallbackType in fallbackTypes) {
+        candidates = [
+          for (final c in containers)
+            if (c['type'] == fallbackType && '${c['uuid']}'.isNotEmpty) c,
+        ];
+        if (candidates.isNotEmpty) break;
+      }
+    }
+    if (candidates.isEmpty) {
+      throw const PktBuildFailure(
+        'no compatible physical container has a UUID in PHYSICALWORKSPACE',
+      );
+    }
+    final container = candidates.first;
+    final containerUuid = '${container['uuid']}';
+    final path = (container['path'] as List<String>);
+    if (path.any((part) => part.isEmpty)) {
+      throw PktBuildFailure(
+        '$name: physical container ancestry has a missing UUID',
+      );
+    }
+    var prototype = prototypes[containerUuid];
+    prototype ??= prototypes.values.isEmpty ? null : prototypes.values.first;
+    if (prototype == null) {
+      throw const PktBuildFailure(
+        'PHYSICALWORKSPACE has no PT-authored device leaf to clone',
+      );
+    }
 
-    for (var index = 0; index < deviceBlocks.length; index++) {
-      var block = deviceBlocks[index];
-      final report = deviceReport[index];
-      final name = '${report['name'] ?? ''}'.trim();
-      final kind = '${report['type'] ?? ''}'.trim().toLowerCase();
-      if (!block.contains('<PHYSICAL_CPUR')) {
-        // Packet Tracer's own sample labs save a few models with no
-        // physical-workspace data at all. Such a block has nowhere to point a
-        // physical leaf, so it is placed in the Logical workspace only: the
-        // file stays valid and the device is still fully cabled and
-        // configured.
-        if (_hasTag(block, 'PHYSICAL')) {
-          block = _setTag(block, 'PHYSICAL', '');
-        }
-        rebuiltBlocks.add(block);
-        notes.add('$name: its saved model has no physical-workspace data; the '
-            'device is placed in the Logical workspace only');
-        continue;
-      }
-      if (name.isEmpty) {
-        throw const PktBuildFailure(
-          'a generated device has no name for its physical workspace entry',
-        );
-      }
-      if (usedNames.contains(name)) {
-        throw PktBuildFailure(
-          'duplicate device name in Physical Workspace: $name',
-        );
-      }
-      usedNames.add(name);
-      final wantRack = ['router', 'switch', 'firewall', 'wireless-router']
-          .contains(kind);
-      final preferredType = wantRack ? '4' : '2';
-      var candidates = [
-        for (final c in containers)
-          if (c['type'] == preferredType && '${c['uuid']}'.isNotEmpty) c,
-      ];
-      if (candidates.isEmpty) {
-        final fallbackTypes =
-            wantRack ? ['2', '3', '1', '0'] : ['3', '4', '1', '0'];
-        for (final fallbackType in fallbackTypes) {
-          candidates = [
-            for (final c in containers)
-              if (c['type'] == fallbackType && '${c['uuid']}'.isNotEmpty) c,
-          ];
-          if (candidates.isNotEmpty) break;
-        }
-      }
-      if (candidates.isEmpty) {
-        throw const PktBuildFailure(
-          'no compatible physical container has a UUID in PHYSICALWORKSPACE',
-        );
-      }
-      final container = candidates.first;
-      final containerUuid = '${container['uuid']}';
-      final path = (container['path'] as List<String>);
-      if (path.any((part) => part.isEmpty)) {
-        throw PktBuildFailure(
-          '$name: physical container ancestry has a missing UUID',
-        );
-      }
-      var prototype = prototypes[containerUuid];
-      prototype ??= prototypes.values.isEmpty ? null : prototypes.values.first;
-      if (prototype == null) {
-        throw const PktBuildFailure(
-          'PHYSICALWORKSPACE has no PT-authored device leaf to clone',
-        );
-      }
+    final slot = perContainer[containerUuid] ?? 0;
+    perContainer[containerUuid] = slot + 1;
+    final int px;
+    final int py;
+    if (wantRack) {
+      px = 4 + slot * 4;
+      py = 0;
+    } else {
+      px = 86 + slot * 86;
+      py = 215 + (slot ~/ 8) * 86;
+    }
 
-      final slot = perContainer[containerUuid] ?? 0;
-      perContainer[containerUuid] = slot + 1;
-      final int px;
-      final int py;
-      if (wantRack) {
-        px = 4 + slot * 4;
-        py = 0;
-      } else {
-        px = 86 + slot * 86;
-        py = 215 + (slot ~/ 8) * 86;
-      }
+    var leafUuid = _stableGuid([project, name, '$index', 'physical-leaf']);
+    var suffix = 1;
+    while (usedUuids.contains(leafUuid)) {
+      leafUuid = _stableGuid([
+        project,
+        name,
+        '$index',
+        'physical-leaf-$suffix',
+      ]);
+      suffix++;
+    }
+    usedUuids.add(leafUuid);
+    final leaf = prototype.copy();
 
-      var leafUuid = _stableGuid([project, name, '$index', 'physical-leaf']);
-      var suffix = 1;
-      while (usedUuids.contains(leafUuid)) {
-        leafUuid = _stableGuid(
-            [project, name, '$index', 'physical-leaf-$suffix']);
-        suffix++;
+    void setChildText(String tag, String value) {
+      var element = leaf.getElement(tag);
+      if (element == null) {
+        element = xml.XmlElement(xml.XmlName.parts(tag));
+        leaf.children.add(element);
       }
-      usedUuids.add(leafUuid);
-      final leaf = prototype.copy();
-
-      void setChildText(String tag, String value) {
-        var element = leaf.getElement(tag);
-        if (element == null) {
-          element = xml.XmlElement(xml.XmlName.parts(tag));
-          leaf.children.add(element);
+      if (tag == 'NAME') {
+        // ET's setdefault: an existing translate attribute keeps its value.
+        if (!element.attributes.any((a) => a.name.local == 'translate')) {
+          element.attributes.add(
+            xml.XmlAttribute(xml.XmlName.parts('translate'), 'true'),
+          );
         }
-        if (tag == 'NAME') {
-          // ET's setdefault: an existing translate attribute keeps its value.
-          if (!element.attributes.any((a) => a.name.local == 'translate')) {
-            element.attributes
-                .add(xml.XmlAttribute(xml.XmlName.parts('translate'), 'true'));
-          }
-        }
-        element.children.removeWhere((n) => n is xml.XmlText);
-        element.children.add(xml.XmlText(value));
       }
+      element.children.removeWhere((n) => n is xml.XmlText);
+      element.children.add(xml.XmlText(value));
+    }
 
     setChildText('NAME', name);
     setChildText('UUID_STR', leafUuid);
@@ -2057,25 +2146,24 @@ String _setPhysicalIdentity({
 
     final physicalPath = [...path, leafUuid].join(',');
     final parentPath = path.sublist(0, path.length - 1).join(',');
-    final identity =
-        _stableGuid([project, name, '$index', 'device-identity']);
-    rebuiltBlocks.add(_setPhysicalIdentity(
-      block: block,
-      name: name,
-      physicalPath: physicalPath,
-      parentPath: parentPath,
-      containerId: containerUuid,
-      x: px,
-      y: py,
-      identity: identity,
-    ));
+    final identity = _stableGuid([project, name, '$index', 'device-identity']);
+    rebuiltBlocks.add(
+      _setPhysicalIdentity(
+        block: block,
+        name: name,
+        physicalPath: physicalPath,
+        parentPath: parentPath,
+        containerId: containerUuid,
+        x: px,
+        y: py,
+        identity: identity,
+      ),
+    );
   }
 
   final pwsXml = root.toXmlString(pretty: false);
   return (
-    skeleton.substring(0, match.start) +
-        pwsXml +
-        skeleton.substring(match.end),
+    skeleton.substring(0, match.start) + pwsXml + skeleton.substring(match.end),
     rebuiltBlocks,
   );
 }
@@ -2092,9 +2180,9 @@ void _validate(String xmlText, Map<String, int> refs) {
     throw PktBuildFailure('generated XML does not parse: $e');
   }
   final ids = [
-    for (final m
-        in RegExp(r'<SAVE_REF_ID>save-ref-id:(\d+)</SAVE_REF_ID>')
-            .allMatches(xmlText))
+    for (final m in RegExp(
+      r'<SAVE_REF_ID>save-ref-id:(\d+)</SAVE_REF_ID>',
+    ).allMatches(xmlText))
       m.group(1)!,
   ];
   if (ids.length != ids.toSet().length) {
@@ -2108,8 +2196,9 @@ void _validate(String xmlText, Map<String, int> refs) {
       );
     }
   });
-  for (final m in RegExp(r'<(FROM|TO)>save-ref-id:(\d+)</(FROM|TO)>')
-      .allMatches(xmlText)) {
+  for (final m in RegExp(
+    r'<(FROM|TO)>save-ref-id:(\d+)</(FROM|TO)>',
+  ).allMatches(xmlText)) {
     if (!present.contains(int.parse(m.group(2)!))) {
       throw const PktBuildFailure(
         'a link points at a device that is not in the generated document',
@@ -2140,9 +2229,7 @@ void _validatePhysicalWorkspace(xml.XmlDocument document) {
     final path = [...ancestors, if (nodeUuid.isNotEmpty) nodeUuid];
     if (nodeUuid.isNotEmpty) {
       if (pathByUuid.containsKey(nodeUuid)) {
-        throw PktBuildFailure(
-          'duplicate Physical Workspace UUID: $nodeUuid',
-        );
+        throw PktBuildFailure('duplicate Physical Workspace UUID: $nodeUuid');
       }
       pathByUuid[nodeUuid] = path;
     }
@@ -2200,12 +2287,11 @@ void _validatePhysicalWorkspace(xml.XmlDocument document) {
   // in the Logical workspace only, so it is expected to have no leaf.
   final logicalOnly = <String>{
     for (final device in devices)
-      if (_findFirst(device, 'WORKSPACE')
-                  ?.getElement('PHYSICAL')
-                  ?.innerText
-                  .trim()
-                  .isEmpty ??
-              true)
+      if (_findFirst(
+            device,
+            'WORKSPACE',
+          )?.getElement('PHYSICAL')?.innerText.trim().isEmpty ??
+          true)
         if (_findFirstText(device, 'NAME').isNotEmpty)
           _findFirstText(device, 'NAME'),
   };
@@ -2213,8 +2299,8 @@ void _validatePhysicalWorkspace(xml.XmlDocument document) {
   // Python's `set != set` compares contents; Dart's `==` is identity, so the
   // comparison is structural by hand.
   final leafNames = leaves.values.toSet();
-  final sameLeaves = leafNames.length == expected.length &&
-      leafNames.every(expected.contains);
+  final sameLeaves =
+      leafNames.length == expected.length && leafNames.every(expected.contains);
   if (!sameLeaves) {
     final stale = leafNames.difference(expected).toList()..sort();
     final missing = expected.difference(leafNames).toList()..sort();
@@ -2228,15 +2314,16 @@ void _validatePhysicalWorkspace(xml.XmlDocument document) {
   }
   for (final device in devices) {
     final name = _findFirstText(device, 'NAME');
-    final physicalElement =
-        _findFirst(device, 'WORKSPACE')?.getElement('PHYSICAL');
+    final physicalElement = _findFirst(
+      device,
+      'WORKSPACE',
+    )?.getElement('PHYSICAL');
     final physical = physicalElement?.innerText.trim() ?? '';
     if (physical.isEmpty) {
       // Such a device is in the Logical workspace only, which is a valid
       // file, but it must not still carry the template's ancestry fields.
-      if (_findFirst(device, 'WORKSPACE')
-                  ?.getElement('PHYSICAL_CPUR') !=
-              null) {
+      if (_findFirst(device, 'WORKSPACE')?.getElement('PHYSICAL_CPUR') !=
+          null) {
         throw PktBuildFailure(
           '${name.isEmpty ? 'device' : name} has Physical Workspace data '
           'but no leaf path',
@@ -2283,8 +2370,8 @@ void _validatePhysicalWorkspace(xml.XmlDocument document) {
       );
     }
     final parentPath = (cpur.getElement('PARENT_PATH')?.innerText ?? '').trim();
-    final containerId =
-        (cpur.getElement('CONTAINER_ID')?.innerText ?? '').trim();
+    final containerId = (cpur.getElement('CONTAINER_ID')?.innerText ?? '')
+        .trim();
     final parts = [
       for (final part in parentPath.split(','))
         if (part.trim().isNotEmpty) part.trim(),
@@ -2368,13 +2455,22 @@ Map<String, (int, int)> _resolvedPositions(Object? raw) {
 
 int _tierOf(String nodeType) {
   final kind = nodeType.trim().toLowerCase();
-  if (['router', 'firewall', 'cloud', 'modem', 'wireless-router']
-      .contains(kind)) {
+  if ([
+    'router',
+    'firewall',
+    'cloud',
+    'modem',
+    'wireless-router',
+  ].contains(kind)) {
     return 0;
   }
   if (['multilayer switch', 'wlc'].contains(kind)) return 1;
-  if (['switch', 'wireless', 'accesspoint', 'wireless access point']
-      .contains(kind)) {
+  if ([
+    'switch',
+    'wireless',
+    'accesspoint',
+    'wireless access point',
+  ].contains(kind)) {
     return 2;
   }
   if (kind == 'server') return 3;
@@ -2389,10 +2485,9 @@ Map<String, (int, int)> _fallbackRows(List<Map<String, dynamic>> nodes) {
   for (final node in nodes) {
     final name = '${node['name'] ?? ''}';
     if (name.isEmpty) continue;
-    bands.putIfAbsent(
-      _tierOf('${node['type'] ?? ''}'),
-      () => <String>[],
-    ).add(name);
+    bands
+        .putIfAbsent(_tierOf('${node['type'] ?? ''}'), () => <String>[])
+        .add(name);
   }
   final sortedTiers = bands.keys.toList()..sort();
   for (var i = 0; i < sortedTiers.length; i++) {
@@ -2404,7 +2499,8 @@ Map<String, (int, int)> _fallbackRows(List<Map<String, dynamic>> nodes) {
       final inRow = (columns < group.length - row * columns)
           ? columns
           : group.length - row * columns;
-      final rowLeft = _xStart +
+      final rowLeft =
+          _xStart +
           (((_canvasWidth - 2 * _xStart - inRow * _devicePitch) / 2)
               .floor()
               .clamp(0, 1 << 31));
@@ -2470,8 +2566,7 @@ Future<PktEngineBuild> buildPkt({
       if ('${node['name'] ?? ''}'.isNotEmpty) node,
   ];
   final projectName =
-      (project.isNotEmpty ? project : '${plan['project'] ?? 'default'}')
-          .trim();
+      (project.isNotEmpty ? project : '${plan['project'] ?? 'default'}').trim();
   final effectiveProject = projectName.isEmpty ? 'default' : projectName;
   final warnings = <String>[];
 
@@ -2519,8 +2614,9 @@ Future<PktEngineBuild> buildPkt({
   // Every device's canvas spot. The drawing the app was shown wins spot for
   // spot; only devices it does not name fall back to the computed rows.
   final layoutRaw = plan['layout'];
-  final resolved =
-      _resolvedPositions(layoutRaw is Map ? layoutRaw['positions'] : null);
+  final resolved = _resolvedPositions(
+    layoutRaw is Map ? layoutRaw['positions'] : null,
+  );
   final fallback = _fallbackRows(nodes);
   final positions = <String, (int, int)>{...fallback};
   resolved.forEach((name, spot) {
@@ -2544,8 +2640,7 @@ Future<PktEngineBuild> buildPkt({
     ],
     'sideEdge': '${layoutRawMap['sideEdge'] ?? 'left'}',
     'zones': [
-      for (final z in (layoutRawMap['zones'] as List? ?? const <dynamic>[]))
-        z,
+      for (final z in (layoutRawMap['zones'] as List? ?? const <dynamic>[])) z,
     ],
     'positions': {
       for (final entry in positions.entries)
@@ -2557,17 +2652,34 @@ Future<PktEngineBuild> buildPkt({
     final name = '${node['name'] ?? ''}';
     final nodeType = '${node['type'] ?? ''}'.trim().toLowerCase();
     var deviceReportServices = <String, dynamic>{};
-    final (selected, notes) = await selectVariant(
-      library,
-      node,
-      wanted[name] ?? const <String>[],
-    );
+    final (selected, notes) = await selectVariant(library, {
+      ...node,
+      'portMedia': {
+        for (final link in sections.links.where((l) => l['exactPorts'] == true))
+          for (final side in ['a', 'b'])
+            if (link[side] == name && link['cable'] != null)
+              '${link['${side}If']}': link['cable'],
+      },
+    }, wanted[name] ?? const <String>[]);
     warnings.addAll(notes);
     if (selected == null) continue;
     // Name the CHOSEN model's cableable ports only now it has won - see
     // [PktTemplateDevice.withNamedPorts]. Judging the whole library by named
     // ports changes which model is picked.
     final variant = selected.withNamedPorts();
+    for (final link in sections.links.where((l) => l['exactPorts'] == true)) {
+      for (final side in ['a', 'b']) {
+        if (link[side] != name) continue;
+        final spec = '${link['${side}If'] ?? ''}';
+        if (exactPort(variant, spec) == null) {
+          throw PktBuildFailure(
+            '$name: $spec is not an exact port on ${variant.key}. '
+            'Available ports: ${variant.ports.where((p) => p.name.isNotEmpty).map((p) => p.name).join(', ')}. '
+            'The connection was not moved to another port.',
+          );
+        }
+      }
+    }
     String block;
     try {
       block = await library.blockFor(variant.file);
@@ -2604,11 +2716,16 @@ Future<PktEngineBuild> buildPkt({
       final (lines, dropped) = _sanitizeConfigLines(sections.configs[name]!);
       if (dropped.isNotEmpty) {
         final unique = dropped.toSet().toList()..sort();
-        warnings.add('$name: dropped exec-only line(s) from the saved '
-            'config: ${unique.join(', ')}');
+        warnings.add(
+          '$name: dropped exec-only line(s) from the saved '
+          'config: ${unique.join(', ')}',
+        );
       }
-      final (remapped, remapNotes) =
-          _remapConfigInterfaces(variant, lines, resolvedPorts);
+      final (remapped, remapNotes) = _remapConfigInterfaces(
+        variant,
+        lines,
+        resolvedPorts,
+      );
       configLines = remapped;
       warnings.addAll(remapNotes);
       block = _setConfig(block, configLines);
@@ -2628,17 +2745,13 @@ Future<PktEngineBuild> buildPkt({
         }
       }
     }
-    // Stamp the resolved name onto the PORT element itself.
-    //
-    // A model whose port block carries no <NAME> (every access point - the
-    // port is named from the host module and never written into the save)
-    // is addressable by name in the manifest but not in its own XML, so a
-    // LINK that says <PORT>FastEthernet0</PORT> points at a port the device
-    // block never declares. Writing the name closes that gap: the device says
-    // "this port is called FastEthernet0" and the cable references it.
-    for (final port in planPorts.values) {
-      block = _stampPortName(block, port.index, port.name);
-    }
+    // The resolved port name is what a `<LINK>` block references, and Packet
+    // Tracer matches it against its own module layout. It does NOT need - and
+    // will not accept - the device block declaring a `<NAME>`: 0 of 46 PORT
+    // blocks in a real save carry one, and injecting one produced a file
+    // Packet Tracer rejected as "not compatible with this version". What made
+    // an access point cableable is the manifest naming the port the source
+    // save left nameless, which is [PktTemplateDevice.withNamedPorts].
     // Clocking: a serial DCE end needs the flag set on the port itself.
     planPorts.forEach((spec, port) {
       final clock = _clockRateFor(configLines, port.name);
@@ -2763,13 +2876,13 @@ Future<PktEngineBuild> buildPkt({
     final nodeRules = node['serviceRules'];
     final nodeWireless = nodeRules is Map ? nodeRules['wireless'] : null;
     if (nodeWireless != null) {
-      serverServices = {
-        ...serverServices,
-        'wireless': nodeWireless,
-      };
+      serverServices = {...serverServices, 'wireless': nodeWireless};
     }
-    final (servicedBlock, serviceNotes, serviceReport) =
-        _applyServices(block, variant, serverServices);
+    final (servicedBlock, serviceNotes, serviceReport) = _applyServices(
+      block,
+      variant,
+      serverServices,
+    );
     block = servicedBlock;
     warnings.addAll([for (final n in serviceNotes) '$name: $n']);
     if (serviceReport.isNotEmpty) {
@@ -2794,13 +2907,32 @@ Future<PktEngineBuild> buildPkt({
 
   final linkBlocks = <String>[];
   final linkReport = <Map<String, dynamic>>[];
-  for (final link in sections.links) {
+  for (final originalLink in sections.links) {
     // Load and pick the cable template the link will clone.
+    var link = originalLink;
+    if (PacketTracerCatalog.instance
+            .cable('${link['cable'] ?? 'copper'}')
+            ?.id ==
+        'fiber') {
+      final modules = variantsUsed['${link['a']}']?.modules ?? const <String>[];
+      final single = modules.any(
+        (m) => const ['GLC-LH-SMD', 'GLC-LX-SM-RGD'].contains(m.toUpperCase()),
+      );
+      link = {...link, 'cable': single ? 'fiber-single' : 'fiber-multi'};
+    }
     final requestedCable = '${link['cable'] ?? 'copper'}';
     final (template, note) = _pickLinkTemplate(library, requestedCable);
     if (template == null) {
-      warnings.add('link ${link['a'] ?? ''}-${link['b'] ?? ''}: '
-          '${note.isEmpty ? 'the library has no copper cable template' : note}');
+      if (link['exactPorts'] == true) {
+        throw PktBuildFailure(
+          'link ${link['a']}-${link['b']}: $note. '
+          'This connection is understood but cannot be generated by this template library.',
+        );
+      }
+      warnings.add(
+        'link ${link['a'] ?? ''}-${link['b'] ?? ''}: '
+        '${note.isEmpty ? 'the library has no copper cable template' : note}',
+      );
       continue;
     }
     String templateBlock;
@@ -2857,15 +2989,19 @@ Future<PktEngineBuild> buildPkt({
   for (final key in sortedCables) {
     final count = cableCount[key]!;
     if (count > 1) {
-      warnings.add('${key.$1}: ${key.$2} is cabled $count times - one '
-          'interface cannot carry two cables, so only one of them can work');
+      warnings.add(
+        '${key.$1}: ${key.$2} is cabled $count times - one '
+        'interface cannot carry two cables, so only one of them can work',
+      );
     }
   }
 
   if (sections.servers.isNotEmpty &&
       !deviceReport.any((entry) => entry['services'] != null)) {
-    warnings.add('no server in this plan declares a service role, so every '
-        'Services tab was left at its off state');
+    warnings.add(
+      'no server in this plan declares a service role, so every '
+      'Services tab was left at its off state',
+    );
   }
 
   var xmlText = library.skeleton;
@@ -2873,7 +3009,8 @@ Future<PktEngineBuild> buildPkt({
     xmlText,
     RegExp(r'<VERSION>[^<]*</VERSION>'),
     '<VERSION>${_esc(version.isNotEmpty ? version : (library.version.isNotEmpty ? library.version : '9.0.0.0810'))}</VERSION>',
-  );  final (rebuiltXml, rebuiltBlocks) = _rebuildPhysicalWorkspace(
+  );
+  final (rebuiltXml, rebuiltBlocks) = _rebuildPhysicalWorkspace(
     skeleton: xmlText,
     deviceBlocks: deviceBlocks,
     deviceReport: deviceReport,
@@ -2885,12 +3022,10 @@ Future<PktEngineBuild> buildPkt({
     ..clear()
     ..addAll(rebuiltBlocks);
   final devicesDoc = deviceBlocks
-      .map((block) =>
-          block.split('\n').map((line) => '   $line').join('\n'))
+      .map((block) => block.split('\n').map((line) => '   $line').join('\n'))
       .join('\n');
   final linksDoc = linkBlocks
-      .map((block) =>
-          block.split('\n').map((line) => '   $line').join('\n'))
+      .map((block) => block.split('\n').map((line) => '   $line').join('\n'))
       .join('\n');
   xmlText = xmlText.replaceFirstMapped(
     RegExp(r'<DEVICES\s*>\s*</DEVICES>'),

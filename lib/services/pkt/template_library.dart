@@ -44,13 +44,12 @@ class PktTemplatePort {
     required this.name,
   });
 
-  static PktTemplatePort fromJson(Map<String, dynamic> json) =>
-      PktTemplatePort(
-        index: (json['index'] as num?)?.toInt() ?? 0,
-        type: '${json['type'] ?? ''}',
-        family: '${json['family'] ?? ''}',
-        name: '${json['name'] ?? ''}',
-      );
+  static PktTemplatePort fromJson(Map<String, dynamic> json) => PktTemplatePort(
+    index: (json['index'] as num?)?.toInt() ?? 0,
+    type: '${json['type'] ?? ''}',
+    family: '${json['family'] ?? ''}',
+    name: '${json['name'] ?? ''}',
+  );
 }
 
 /// One device model the library can clone.
@@ -203,13 +202,12 @@ class PktTemplateLink {
     required this.file,
   });
 
-  static PktTemplateLink fromJson(Map<String, dynamic> json) =>
-      PktTemplateLink(
-        key: '${json['key'] ?? ''}',
-        type: '${json['type'] ?? ''}',
-        cable: '${json['cable'] ?? ''}',
-        file: '${json['file'] ?? ''}',
-      );
+  static PktTemplateLink fromJson(Map<String, dynamic> json) => PktTemplateLink(
+    key: '${json['key'] ?? ''}',
+    type: '${json['type'] ?? ''}',
+    cable: '${json['cable'] ?? ''}',
+    file: '${json['file'] ?? ''}',
+  );
 }
 
 /// The library as a whole: manifest records plus lazily loaded blocks.
@@ -226,6 +224,10 @@ class PktTemplateLibrary {
 
   final String assetRoot;
   final Map<String, String> _blockCache = {};
+  final Map<String, Future<String>> identityChecks = {};
+  late final Map<String, PktTemplateDevice> _devicesByKey = {
+    for (final device in devices) device.key: device,
+  };
 
   PktTemplateLibrary({
     required this.version,
@@ -237,6 +239,7 @@ class PktTemplateLibrary {
 
   static const _bundledRoot = 'sidecar/pkt_templates';
   static PktTemplateLibrary? _bundled;
+  static Future<PktTemplateLibrary>? _loading;
 
   /// Load the bundled library. Throws [PktBuildFailure] when the assets are
   /// missing or unreadable - the caller reports that rather than building
@@ -244,13 +247,78 @@ class PktTemplateLibrary {
   static Future<PktTemplateLibrary> loadBundled() async {
     final cached = _bundled;
     if (cached != null) return cached;
-    final library = await _load(_bundledRoot);
+    final library = await (_loading ??= _load(_bundledRoot).catchError((
+      Object error,
+    ) {
+      _loading = null;
+      throw error;
+    }));
     _bundled = library;
     return library;
   }
 
   /// Test hook: drop the cached bundled library.
-  static void resetCacheForTests() => _bundled = null;
+  static void resetCacheForTests() {
+    _bundled = null;
+    _loading = null;
+  }
+
+  Future<Map<String, dynamic>> prepareSnapshot() async {
+    await Future.wait(
+      {
+        for (final d in devices) d.file,
+        for (final l in links) l.file,
+      }.map(blockFor),
+    );
+    return {
+      'version': version,
+      'skeleton': skeleton,
+      'blocks': Map<String, String>.of(_blockCache),
+      'devices': [
+        for (final d in devices)
+          {
+            'key': d.key,
+            'model': d.model,
+            'kind': d.kind,
+            'modules': d.modules,
+            'hasConfig': d.hasConfig,
+            'hasPhysical': d.hasPhysical,
+            'file': d.file,
+            'ports': [
+              for (final p in d.ports)
+                {
+                  'index': p.index,
+                  'type': p.type,
+                  'family': p.family,
+                  'name': p.name,
+                },
+            ],
+          },
+      ],
+      'links': [
+        for (final l in links)
+          {'key': l.key, 'type': l.type, 'cable': l.cable, 'file': l.file},
+      ],
+    };
+  }
+
+  factory PktTemplateLibrary.fromSnapshot(Map<String, dynamic> raw) {
+    final result = PktTemplateLibrary(
+      version: '${raw['version']}',
+      skeleton: '${raw['skeleton']}',
+      devices: [
+        for (final d in raw['devices'] as List)
+          PktTemplateDevice.fromJson(Map<String, dynamic>.from(d)),
+      ],
+      links: [
+        for (final l in raw['links'] as List)
+          PktTemplateLink.fromJson(Map<String, dynamic>.from(l)),
+      ],
+      assetRoot: '',
+    );
+    result._blockCache.addAll(Map<String, String>.from(raw['blocks']));
+    return result;
+  }
 
   static Future<PktTemplateLibrary> _load(String root) async {
     Map<String, dynamic> manifest;
@@ -305,6 +373,9 @@ class PktTemplateLibrary {
     if (relative.isEmpty) return '';
     final cached = _blockCache[relative];
     if (cached != null) return cached;
+    if (assetRoot.isEmpty) {
+      throw PktBuildFailure('Prepared template $relative is missing.');
+    }
     String raw;
     try {
       raw = await rootBundle.loadString('$assetRoot/$relative');
@@ -320,19 +391,17 @@ class PktTemplateLibrary {
 
   /// The device record with [key], if the library has it.
   PktTemplateDevice? deviceByKey(String key) {
-    for (final d in devices) {
-      if (d.key == key) return d;
-    }
-    return null;
+    return _devicesByKey[key];
   }
 }
 
 /// Sanitize a whole block or document read from the library: control
 /// characters that Packet Tracer tolerates inside its own saves are not legal
 /// XML 1.0, and one of them makes the block unparseable downstream.
-String xmlSafeText(String text) =>
-    utf8.decode(xmlSafe(Uint8List.fromList(utf8.encode(text))),
-        allowMalformed: true);
+String xmlSafeText(String text) => utf8.decode(
+  xmlSafe(Uint8List.fromList(utf8.encode(text))),
+  allowMalformed: true,
+);
 
 /// The library cannot produce a file. Port of `pkt_builder.BuildError`.
 class PktBuildFailure implements Exception {

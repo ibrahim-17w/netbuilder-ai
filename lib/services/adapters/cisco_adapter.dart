@@ -13,7 +13,7 @@ class CiscoAdapter {
     for (final n in intent.nodes) {
       if (!cliTypes.contains(n.type)) continue;
       final sb = StringBuffer();
-      sb.writeln('hostname ${n.name}');
+      sb.writeln('hostname ${n.name.replaceAll(RegExp(r'\s+'), '-')}');
       sb.writeln('no ip domain-lookup');
       sb.writeln('service password-encryption');
       sb.writeln('!');
@@ -34,12 +34,13 @@ class CiscoAdapter {
         sb.writeln('exit');
       }
       if (n.type == 'switch') {
-        for (final v in intent.vlans) {
+        for (final v in _vlansForSwitch(intent, n)) {
           sb.writeln('vlan $v');
           sb.writeln(' name VLAN$v');
           sb.writeln('exit');
         }
         _renderSwitchVlanPorts(sb, intent, n);
+        _renderSwitchManagement(sb, intent, n);
         _renderSpanningTree(sb, intent, n);
         _renderEtherChannel(sb, intent, n);
       }
@@ -62,7 +63,9 @@ class CiscoAdapter {
         for (final a in addrs) {
           // EIGRP speaks classful-ish network statements with a wildcard;
           // dedupe so two interfaces on one subnet never repeat a line.
-          nets.add(' network ${_netBase(a.ipCidr)} ${_wildcard(_prefix(a.ipCidr))}');
+          nets.add(
+            ' network ${_netBase(a.ipCidr)} ${_wildcard(_prefix(a.ipCidr))}',
+          );
         }
         for (final net in nets) {
           sb.writeln(net);
@@ -76,9 +79,7 @@ class CiscoAdapter {
         sb.writeln(' bgp log-neighbor-changes');
         final peers = <String>{};
         for (final l in intent.links) {
-          final peer = l.a == n.name
-              ? l.b
-              : (l.b == n.name ? l.a : null);
+          final peer = l.a == n.name ? l.b : (l.b == n.name ? l.a : null);
           if (peer == null ||
               !intent.nodes.any((x) => x.name == peer && x.type == 'router')) {
             continue;
@@ -89,7 +90,9 @@ class CiscoAdapter {
         final nets = <String>{};
         for (final a in addrs) {
           if (_onTransitLink(intent, n.name, a.iface)) continue;
-          nets.add(' network ${_netBase(a.ipCidr)} mask ${_mask(_prefix(a.ipCidr))}');
+          nets.add(
+            ' network ${_netBase(a.ipCidr)} mask ${_mask(_prefix(a.ipCidr))}',
+          );
         }
         for (final p in peers) {
           sb.writeln(p);
@@ -263,11 +266,14 @@ class CiscoAdapter {
     NetNode device,
   ) {
     if (intent.vlans.isEmpty) return;
-    final nativeVlan = intent.vlans.first;
+    final vlans = _vlansForSwitch(intent, device);
+    final nativeVlan = vlans.contains(99) ? 99 : vlans.first;
     // Every link this switch has, with the interface it uses.
     for (final l in intent.links) {
       final String? myIf;
-      final other = l.a == device.name ? l.b : (l.b == device.name ? l.a : null);
+      final other = l.a == device.name
+          ? l.b
+          : (l.b == device.name ? l.a : null);
       if (other == null) {
         myIf = null;
       } else {
@@ -280,27 +286,108 @@ class CiscoAdapter {
       );
       final toRouterOrSwitch =
           otherNode.type == 'router' || otherNode.type == 'switch';
-      final isMultiVlan = intent.vlans.length > 1;
+      final isMultiVlan = vlans.length > 1;
       if (toRouterOrSwitch && isMultiVlan) {
         // Trunk: carries every VLAN to the router-on-a-stick or the peer
         // switch, with VLAN 1 native so unused traffic keeps a home.
         sb.writeln('interface $myIf');
         sb.writeln(' switchport mode trunk');
-        sb.writeln(' switchport trunk allowed vlan ${intent.vlans.join(",")}');
+        sb.writeln(' switchport trunk allowed vlan ${vlans.join(",")}');
         sb.writeln(' switchport trunk native vlan $nativeVlan');
         sb.writeln('exit');
       } else if (!toRouterOrSwitch) {
         // Access port for the end device hanging off this switch.
         sb.writeln('interface $myIf');
         sb.writeln(' switchport mode access');
-        if (intent.vlans.length > 1) {
-          // Round-robin the end devices over the requested VLANs so each
-          // one is populated and testable.
-          final idx = intent.links.indexOf(l);
-          sb.writeln(' switchport access vlan ${intent.vlans[idx % intent.vlans.length]}');
+        final accessVlan = _accessVlan(intent, otherNode, vlans, l);
+        if (accessVlan != null) {
+          sb.writeln(' switchport access vlan $accessVlan');
+        }
+        if (otherNode.type == 'phone' && vlans.contains(20)) {
+          sb.writeln(' switchport voice vlan 20');
         }
         sb.writeln('exit');
       }
+    }
+  }
+
+  /// A site-tagged VLAN plan keeps the explicitly requested server VLAN at
+  /// HQ only. Generic plans retain their original shared VLAN list.
+  static List<int> _vlansForSwitch(NetworkIntent intent, NetNode device) {
+    final requested = intent.vlans.toSet();
+    final hasSitePlan = [10, 20, 40, 99].every(requested.contains);
+    if (!hasSitePlan) return intent.vlans;
+    final name = device.name.toUpperCase();
+    if (name.contains('HQ')) {
+      return [10, 20, if (requested.contains(30)) 30, 40, 99];
+    }
+    if (name.contains('EAST') || name.contains('WEST')) {
+      return [10, 20, 40, 99];
+    }
+    return intent.vlans;
+  }
+
+  /// Put the port in the VLAN implied by its addressed subnet and endpoint
+  /// role. Phones have an access VLAN plus a separate voice VLAN.
+  static int? _accessVlan(
+    NetworkIntent intent,
+    NetNode endpoint,
+    List<int> siteVlans,
+    NetLink link,
+  ) {
+    if (endpoint.type == 'phone') return siteVlans.contains(10) ? 10 : null;
+    if (endpoint.type == 'wireless' || endpoint.type == 'ap') {
+      return siteVlans.contains(40) ? 40 : null;
+    }
+    final address = intent.addressing
+        .where((item) => item.node == endpoint.name)
+        .firstOrNull;
+    final octets = address?.ipCidr.split('/').first.split('.') ?? const [];
+    final subnetVlan = octets.length == 4 ? int.tryParse(octets[2]) : null;
+    if (subnetVlan != null && siteVlans.contains(subnetVlan)) {
+      return subnetVlan;
+    }
+    final localPort = link.a == endpoint.name ? link.aIf : link.bIf;
+    if (localPort.toLowerCase().contains('f')) {
+      return siteVlans.contains(10) ? 10 : siteVlans.firstOrNull;
+    }
+    return siteVlans.firstOrNull;
+  }
+
+  /// A VLAN 99 SVI gets its default gateway from the router-on-a-stick .1
+  /// address on the same subnet, including the second HQ switch behind the
+  /// distribution switch.
+  static void _renderSwitchManagement(
+    StringBuffer sb,
+    NetworkIntent intent,
+    NetNode device,
+  ) {
+    final management = intent.addressing
+        .where(
+          (address) =>
+              address.node == device.name &&
+              address.iface.toLowerCase() == 'vlan99',
+        )
+        .firstOrNull;
+    if (management == null) return;
+    final host = management.ipCidr.split('/').first.split('.');
+    if (host.length != 4) return;
+    final gateway = intent.addressing.where((address) {
+      if (address.node == device.name || !address.iface.contains('.')) {
+        return false;
+      }
+      final peer = intent.nodes
+          .where((node) => node.name == address.node)
+          .firstOrNull;
+      if (peer?.type != 'router' ||
+          !address.iface.toLowerCase().endsWith('.99')) {
+        return false;
+      }
+      return address.ipCidr.split('/').first.split('.').take(3).join('.') ==
+          host.take(3).join('.');
+    }).firstOrNull;
+    if (gateway != null) {
+      sb.writeln('ip default-gateway ${gateway.ipCidr.split('/').first}');
     }
   }
 
@@ -354,7 +441,8 @@ class CiscoAdapter {
         ? (initiator ? 'desirable' : 'auto')
         : (initiator ? 'active' : 'passive');
     for (final l in intent.links) {
-      final isPeerLink = (l.a == device.name && l.b == peer) ||
+      final isPeerLink =
+          (l.a == device.name && l.b == peer) ||
           (l.a == peer && l.b == device.name);
       if (!isPeerLink) continue;
       final myIf = l.a == device.name ? l.aIf : l.bIf;
@@ -401,8 +489,6 @@ class CiscoAdapter {
     sb.writeln('exit');
   }
 
-
-
   /// HSRP on the router's LAN interfaces: the first router is active
   /// (.254 virtual IP unless the plan pinned one), the second standby.
   static void _renderHsrp(
@@ -422,7 +508,8 @@ class CiscoAdapter {
       if (_onTransitLink(intent, device.name, a.iface)) continue;
       final octets = a.ipCidr.split('/').first.split('.');
       if (octets.length != 4) continue;
-      final vip = intent.security.hsrpVirtualIp ??
+      final vip =
+          intent.security.hsrpVirtualIp ??
           '${octets[0]}.${octets[1]}.${octets[2]}.254';
       sb.writeln('interface ${a.iface}');
       sb.writeln(' standby 1 ip $vip');
@@ -481,11 +568,19 @@ class CiscoAdapter {
     }
     if (device.type != 'router') return;
 
-    final lan = intent.addressing
+    final localAddresses = intent.addressing
         .where(
           (a) => a.node == device.name && a.iface.toLowerCase().contains('g'),
         )
         .toList();
+    final subinterfaces = localAddresses
+        .where((a) => a.iface.contains('.'))
+        .toList();
+    final lan = subinterfaces.isNotEmpty
+        ? subinterfaces
+        : localAddresses
+              .where((a) => !_onTransitLink(intent, device.name, a.iface))
+              .toList();
     final dhcpIp = _findNodeIp(intent, 'DHCP1');
     if (dhcpIp != null && lan.isNotEmpty) {
       for (final a in lan) {
@@ -518,7 +613,9 @@ class CiscoAdapter {
         // the server holds, not with the shared key.
         final accountUser = (s.aaaUsername ?? '').trim();
         if (accountUser.isNotEmpty) {
-          sb.writeln('username $accountUser secret 0 ${_localAccountSecret(s)}');
+          sb.writeln(
+            'username $accountUser secret 0 ${_localAccountSecret(s)}',
+          );
         }
         if (isRadius) {
           sb.writeln('radius-server host $aaaIp key $key');
@@ -656,7 +753,9 @@ class CiscoAdapter {
       // them; they are the note that makes the block usable by hand, and they
       // travel inside the generated .pkt's running config.
       sb.writeln('! Site-to-site IPSec');
-      sb.writeln('! Packet Tracer needs the Security Technology package for the');
+      sb.writeln(
+        '! Packet Tracer needs the Security Technology package for the',
+      );
       sb.writeln('! crypto commands below. Enable it once, then reload:');
       sb.writeln('!   license boot module c2900 technology-package securityk9');
       sb.writeln('crypto isakmp policy 10');
@@ -785,13 +884,9 @@ class CiscoAdapter {
         );
         final fwIf = l.a == fw.name ? l.aIf : l.bIf;
         final addr = intent.addressing.firstWhere(
-          (a) => a.node == fw.name &&
-              _normIface(a.iface) == _normIface(fwIf),
-          orElse: () => const InterfaceAddr(
-            node: '',
-            iface: '',
-            ipCidr: '0.0.0.0/24',
-          ),
+          (a) => a.node == fw.name && _normIface(a.iface) == _normIface(fwIf),
+          orElse: () =>
+              const InterfaceAddr(node: '', iface: '', ipCidr: '0.0.0.0/24'),
         );
         if (otherIsRouter && addr.ipCidr != '0.0.0.0/24') {
           insideIface = _fullAsaIface(fwIf);
@@ -828,7 +923,9 @@ class CiscoAdapter {
           if (_onTransitLink(intent, a.node, a.iface)) continue;
           final net = _netBase(a.ipCidr);
           final mask = _mask(_prefix(a.ipCidr));
-          sb.writeln('route inside $net $mask ${_routerSideOf(intent, fw.name)}');
+          sb.writeln(
+            'route inside $net $mask ${_routerSideOf(intent, fw.name)}',
+          );
         }
       }
       // Named access policy from the plan's security intent, mirroring the
@@ -836,16 +933,22 @@ class CiscoAdapter {
       // reach the web server, everything else to the protected host drops.
       final s = intent.security;
       if (s.extendedAcl && s.protectedServerIp != null) {
-        sb.writeln('access-list INSIDE_POLICY extended permit tcp any host ${s.allowedWebServerIp ?? s.protectedServerIp} eq www');
+        sb.writeln(
+          'access-list INSIDE_POLICY extended permit tcp any host ${s.allowedWebServerIp ?? s.protectedServerIp} eq www',
+        );
         if (s.allowedWebServerIp != null &&
             s.allowedWebServerIp != s.protectedServerIp) {
-          sb.writeln('access-list INSIDE_POLICY extended deny ip any host ${s.protectedServerIp}');
+          sb.writeln(
+            'access-list INSIDE_POLICY extended deny ip any host ${s.protectedServerIp}',
+          );
         }
         sb.writeln('access-list INSIDE_POLICY extended permit ip any any');
         sb.writeln('access-group INSIDE_POLICY in interface inside');
       }
       if (s.managerIp != null) {
-        sb.writeln('access-list MGMT_ONLY extended permit ip host ${s.managerIp} any');
+        sb.writeln(
+          'access-list MGMT_ONLY extended permit ip host ${s.managerIp} any',
+        );
         sb.writeln('access-list MGMT_ONLY extended deny ip any any');
         sb.writeln('access-group MGMT_ONLY in interface outside');
       }
@@ -896,9 +999,7 @@ class CiscoAdapter {
   /// number and an ephone bound to its MAC-pattern slot.  PT's 7960
   /// registers against `ip source-address` when its TFTP points here.
   static Map<String, String> voiceConfig(NetworkIntent intent) {
-    final phones = intent.nodes
-        .where((n) => n.type == 'phone')
-        .toList();
+    final phones = intent.nodes.where((n) => n.type == 'phone').toList();
     if (phones.isEmpty) return {};
 
     // The gateway is the router with the CME-carrying server on its LAN (or
@@ -926,10 +1027,12 @@ class CiscoAdapter {
       }
       if (gateway != null) break;
     }
-    gateway ??= intent.nodes.firstWhere(
-      (n) => n.type == 'router',
-      orElse: () => const NetNode(name: '', type: ''),
-    ).name;
+    gateway ??= intent.nodes
+        .firstWhere(
+          (n) => n.type == 'router',
+          orElse: () => const NetNode(name: '', type: ''),
+        )
+        .name;
     if (gateway.isEmpty) return {};
 
     // Phones hang off a switch that hangs off the gateway; find the switch
@@ -942,7 +1045,9 @@ class CiscoAdapter {
         .toList();
 
     final sb = StringBuffer();
-    sb.writeln('! Cisco Unified CME: telephony service for ${phones.length} phone(s)');
+    sb.writeln(
+      '! Cisco Unified CME: telephony service for ${phones.length} phone(s)',
+    );
     sb.writeln('telephony-service');
     sb.writeln(' max-ephones ${phones.length}');
     sb.writeln(' max-dn ${phones.length}');
@@ -951,7 +1056,9 @@ class CiscoAdapter {
         .map((a) => a.ipCidr.split('/').first)
         .where((ip) => ip != '0.0.0.0')
         .toList();
-    sb.writeln(' ip source-address ${srcIp.isNotEmpty ? srcIp.first : '10.0.0.1'} port 2000');
+    sb.writeln(
+      ' ip source-address ${srcIp.isNotEmpty ? srcIp.first : '10.0.0.1'} port 2000',
+    );
     sb.writeln(' auto assign 1 to ${phones.length}');
     sb.writeln('exit');
     for (var i = 0; i < phones.length; i++) {
@@ -1052,7 +1159,9 @@ class CiscoAdapter {
       sb.writeln(' permit $net $wild');
     }
     sb.writeln('exit');
-    sb.writeln('ip nat inside source list $aclName interface ${_normIface(outside)} overload');
+    sb.writeln(
+      'ip nat inside source list $aclName interface ${_normIface(outside)} overload',
+    );
     for (final iface in lanIfaces) {
       sb.writeln('interface $iface');
       sb.writeln(' ip nat inside');
@@ -1118,8 +1227,19 @@ class CiscoAdapter {
   }
 
   static String? _findNodeIp(NetworkIntent intent, String node) {
+    final named = intent.nodes.where((n) => n.name == node).firstOrNull;
+    final owner =
+        named ??
+        (node.toUpperCase() == 'DHCP1'
+            ? intent.nodes
+                  .where(
+                    (n) => n.type == 'server' && n.services.contains('dhcp'),
+                  )
+                  .firstOrNull
+            : null);
+    if (owner == null) return null;
     for (final a in intent.addressing) {
-      if (a.node == node) return a.ipCidr.split('/').first;
+      if (a.node == owner.name) return a.ipCidr.split('/').first;
     }
     return null;
   }

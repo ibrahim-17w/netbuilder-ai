@@ -28,12 +28,9 @@ class AutopilotService {
   final String Function()? baseProvider;
   final http.Client _client;
 
-  AutopilotService({
-    String? base,
-    this.baseProvider,
-    http.Client? c,
-  }) : _baseOverride = base?.trim(),
-       _client = c ?? http.Client();
+  AutopilotService({String? base, this.baseProvider, http.Client? c})
+    : _baseOverride = base?.trim(),
+      _client = c ?? http.Client();
 
   /// Where the next request goes. Resolved per call, so a settings change is
   /// picked up without rebuilding anything.
@@ -114,9 +111,7 @@ class AutopilotService {
     Duration timeout = healthTimeout,
   }) async {
     try {
-      final r = await _client
-          .get(Uri.parse('$base/health'))
-          .timeout(timeout);
+      final r = await _client.get(Uri.parse('$base/health')).timeout(timeout);
       if (r.statusCode != 200) {
         throw Exception('sidecar HTTP ${r.statusCode}: ${r.body}');
       }
@@ -545,6 +540,10 @@ class AutopilotService {
     bool? autoSuggest,
     bool? autoTeach,
     bool offDevice = false,
+    String provider = 'gemini',
+    String baseUrl = '',
+    Map<String, String> extraHeaders = const {},
+    int? configRevision,
   }) async {
     try {
       final r = await _client
@@ -555,6 +554,10 @@ class AutopilotService {
               'apiKey': apiKey,
               'model': model,
               'enabled': enabled,
+              'provider': provider,
+              'baseUrl': baseUrl,
+              'extraHeaders': extraHeaders,
+              'configRevision': ?configRevision,
               'autoLearn': ?autoLearn,
               'autoSuggest': ?autoSuggest,
               'autoTeach': ?autoTeach,
@@ -665,8 +668,7 @@ class AutopilotService {
               if (store.isNotEmpty) 'store': store,
               if (key.isNotEmpty) 'key': key,
               if (steps.isNotEmpty) 'steps': steps,
-              if (project != null && project.isNotEmpty)
-                'project': project,
+              if (project != null && project.isNotEmpty) 'project': project,
             }),
           )
           .timeout(const Duration(seconds: 10));
@@ -1143,14 +1145,10 @@ class AutopilotService {
     required Map<String, dynamic> after,
     required List<Map<String, dynamic>> fixes,
   }) async {
-    final res = await _postJson(
-      '/tools/call',
-      {
-        'name': 'verify_repair',
-        'args': {'before': before, 'after': after, 'fixes': fixes},
-      },
-      timeoutSeconds: 60,
-    );
+    final res = await _postJson('/tools/call', {
+      'name': 'verify_repair',
+      'args': {'before': before, 'after': after, 'fixes': fixes},
+    }, timeoutSeconds: 60);
     final result = res['result'];
     return result is Map
         ? Map<String, dynamic>.from(result)
@@ -1193,9 +1191,8 @@ class AutopilotService {
 
   /// Apply ONLY the approved fixes to a .pkt and encrypt a valid save again.
   /// The source file is never modified, and Packet Tracer is not involved.
-  Future<Map<String, dynamic>> pktApplyFixes(
-    Map<String, dynamic> request,
-  ) => _postJson('/pkt/apply_fixes', request, timeoutSeconds: 120);
+  Future<Map<String, dynamic>> pktApplyFixes(Map<String, dynamic> request) =>
+      _postJson('/pkt/apply_fixes', request, timeoutSeconds: 120);
 
   /// Record a rejection - the approval gate's audit trail. Nothing is
   /// written, exported or changed by this call.
@@ -1416,8 +1413,8 @@ class CorrectionRow {
     final where = device.isNotEmpty
         ? device
         : dtype.isNotEmpty
-            ? dtype
-            : 'any device';
+        ? dtype
+        : 'any device';
     final scope = project.isNotEmpty ? ' [$project]' : '';
     return '${failureKind.isEmpty ? 'correction' : failureKind}'
         '$scope on $where';
@@ -1466,15 +1463,17 @@ class CorrectionSnapshot {
       // `rejected` key.
       rejected: rows(j['rejected']).isNotEmpty
           ? rows(j['rejected'])
-          : rows(summary['corrections'])
-              .where((r) => r.status == 'rejected')
-              .toList(),
+          : rows(
+              summary['corrections'],
+            ).where((r) => r.status == 'rejected').toList(),
       pending: rows(j['pending']),
       thrash: rows(j['thrash']),
-      proposedCount:
-          summary['proposed'] is num ? summary['proposed'] as int : 0,
-      verifiedCount:
-          summary['verified'] is num ? summary['verified'] as int : 0,
+      proposedCount: summary['proposed'] is num
+          ? summary['proposed'] as int
+          : 0,
+      verifiedCount: summary['verified'] is num
+          ? summary['verified'] as int
+          : 0,
       hits: summary['hits'] is num ? summary['hits'] as int : 0,
     );
   }

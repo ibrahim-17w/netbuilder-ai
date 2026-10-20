@@ -15,7 +15,8 @@ class _FakeStorage extends FlutterSecureStorage {
     this.dropWrites = false,
     this.throwOnKeys = const {},
     this.dropWriteKeys = const {},
-    this.readFailureText = 'javax.crypto.BadPaddingException: could not decrypt',
+    this.readFailureText =
+        'javax.crypto.BadPaddingException: could not decrypt',
   });
 
   final bool throwOnRead;
@@ -81,6 +82,18 @@ class _FakeStorage extends FlutterSecureStorage {
 }
 
 void main() {
+  test('the installed Packet Tracer version survives an app restart', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final first = SettingsService(secure: _FakeStorage());
+    await first.load();
+
+    await first.setPacketTracerVersion('9.0.0.0810');
+
+    final afterRestart = SettingsService(secure: _FakeStorage());
+    await afterRestart.load();
+    expect(afterRestart.packetTracerVersion, '9.0.0.0810');
+  });
+
   test('a saved key survives the app being rebuilt from scratch', () async {
     final storage = _FakeStorage();
     final first = SettingsService(secure: storage);
@@ -112,8 +125,11 @@ void main() {
   test('a write that does not persist is not reported as saved', () async {
     final settings = SettingsService(secure: _FakeStorage(dropWrites: true));
 
-    expect(await settings.setApiKey('AIzaSyTESTKEY-0123456789'), isFalse,
-        reason: 'the round trip failed, so nothing was saved');
+    expect(
+      await settings.setApiKey('AIzaSyTESTKEY-0123456789'),
+      isFalse,
+      reason: 'the round trip failed, so nothing was saved',
+    );
     expect(settings.keyUnreadable, isTrue);
     expect(await settings.getApiKey(), isNull);
   });
@@ -185,8 +201,7 @@ void main() {
       );
     });
 
-    test('input that could never be called is refused, not normalized',
-        () {
+    test('input that could never be called is refused, not normalized', () {
       for (final unusable in const [
         '',
         '   ',
@@ -213,10 +228,16 @@ void main() {
       await settings.setEngineBase('192.168.1.20:5005');
 
       await settings.setEngineBase('ftp://192.168.1.20:5005');
-      expect(settings.engineBase, 'http://192.168.1.20:5005',
-          reason: 'a scheme that cannot work must not be stored');
-      expect(settings.engineBaseError, isNotEmpty,
-          reason: 'the user is told why the value was refused');
+      expect(
+        settings.engineBase,
+        'http://192.168.1.20:5005',
+        reason: 'a scheme that cannot work must not be stored',
+      );
+      expect(
+        settings.engineBaseError,
+        isNotEmpty,
+        reason: 'the user is told why the value was refused',
+      );
 
       await settings.setEngineBase('   ');
       expect(settings.engineBase, 'http://192.168.1.20:5005');
@@ -224,8 +245,11 @@ void main() {
 
       await settings.setEngineBase('10.0.2.2');
       expect(settings.engineBase, 'http://10.0.2.2:5005');
-      expect(settings.engineBaseError, isEmpty,
-          reason: 'a good address clears the previous complaint');
+      expect(
+        settings.engineBaseError,
+        isEmpty,
+        reason: 'a good address clears the previous complaint',
+      );
     });
 
     test('a saved address is normalized on load, not only on save', () async {
@@ -238,15 +262,17 @@ void main() {
       expect(settings.engineBase, 'http://192.168.1.20:5005');
     });
 
-    test('an unusable saved address falls back instead of propagating',
-        () async {
-      SharedPreferences.setMockInitialValues(<String, Object>{
-        'engine_base': 'ftp://192.168.1.20:5005',
-      });
-      final settings = SettingsService(secure: _FakeStorage());
-      await settings.load();
-      expect(settings.engineBase, SettingsService.defaultEngineBase());
-    });
+    test(
+      'an unusable saved address falls back instead of propagating',
+      () async {
+        SharedPreferences.setMockInitialValues(<String, Object>{
+          'engine_base': 'ftp://192.168.1.20:5005',
+        });
+        final settings = SettingsService(secure: _FakeStorage());
+        await settings.load();
+        expect(settings.engineBase, SettingsService.defaultEngineBase());
+      },
+    );
 
     test('the installer address is normalized on the same rules', () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -306,48 +332,64 @@ void main() {
       expect(settings.outputDir, 'C:/mine');
       expect(settings.defaultTarget, 'cisco-ssh');
       expect(settings.contextBudget, 12345);
-      expect(settings.loadError, isNotEmpty,
-          reason: 'the user is told something was not read');
-    });
-
-    test('the reported error is safe to show and to paste in a bug report',
-        () async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final settings = SettingsService(
-        secure: _FakeStorage(
-          throwOnKeys: {'gns3_pass'},
-          readFailureText: 'PlatformException(keychain): gns3_pass AIzaSecret',
-        ),
+      expect(
+        settings.loadError,
+        isNotEmpty,
+        reason: 'the user is told something was not read',
       );
-      await settings.load();
-
-      expect(settings.loadError, isNotEmpty);
-      expect(settings.loadError, isNot(contains('AIzaSecret')),
-          reason: 'a keystore error can quote the value it failed on, and '
-              'this string is shown in the UI and pasted into reports');
-      expect(settings.loadError, isNot(contains('gns3_pass')));
     });
 
-    test('a credential that cannot be migrated is kept in prefs, not lost',
-        () async {
-      // The plaintext migration path: the secure read fails, so the old value
-      // has to stay usable instead of being cleared by a failed write.
-      SharedPreferences.setMockInitialValues(<String, Object>{
-        'gns3_user': 'labadmin',
-        'gns3_pass': 's3cret',
-      });
-      final storage = _FakeStorage(
-        dropWriteKeys: {'gns3_user', 'gns3_pass'},
-      );
-      final settings = SettingsService(secure: storage);
-      await settings.load();
+    test(
+      'the reported error is safe to show and to paste in a bug report',
+      () async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        final settings = SettingsService(
+          secure: _FakeStorage(
+            throwOnKeys: {'gns3_pass'},
+            readFailureText:
+                'PlatformException(keychain): gns3_pass AIzaSecret',
+          ),
+        );
+        await settings.load();
 
-      expect(settings.gns3User, 'labadmin');
-      expect(settings.gns3Pass, 's3cret',
-          reason: 'a failed migration must not lose the credential');
-      expect(storage.values.containsKey('gns3_user'), isFalse,
-          reason: 'nothing claims to be in secure storage when it is not');
-    });
+        expect(settings.loadError, isNotEmpty);
+        expect(
+          settings.loadError,
+          isNot(contains('AIzaSecret')),
+          reason:
+              'a keystore error can quote the value it failed on, and '
+              'this string is shown in the UI and pasted into reports',
+        );
+        expect(settings.loadError, isNot(contains('gns3_pass')));
+      },
+    );
+
+    test(
+      'a credential that cannot be migrated is kept in prefs, not lost',
+      () async {
+        // The plaintext migration path: the secure read fails, so the old value
+        // has to stay usable instead of being cleared by a failed write.
+        SharedPreferences.setMockInitialValues(<String, Object>{
+          'gns3_user': 'labadmin',
+          'gns3_pass': 's3cret',
+        });
+        final storage = _FakeStorage(dropWriteKeys: {'gns3_user', 'gns3_pass'});
+        final settings = SettingsService(secure: storage);
+        await settings.load();
+
+        expect(settings.gns3User, 'labadmin');
+        expect(
+          settings.gns3Pass,
+          's3cret',
+          reason: 'a failed migration must not lose the credential',
+        );
+        expect(
+          storage.values.containsKey('gns3_user'),
+          isFalse,
+          reason: 'nothing claims to be in secure storage when it is not',
+        );
+      },
+    );
 
     test('a healthy load reports no error at all', () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});

@@ -44,8 +44,7 @@ int _mask(int v) => v & 0xFFFFFFFF;
 
 int _byte(int word, int n) => (word >> (8 * n)) & 0xFF;
 
-int _rotr32(int value, int n) =>
-    _mask((value >> n) | _mask(value) << (32 - n));
+int _rotr32(int value, int n) => _mask((value >> n) | _mask(value) << (32 - n));
 
 int _rotl32(int value, int n) =>
     _mask(_mask(value) << n | _mask(value) >> (32 - n));
@@ -232,13 +231,17 @@ class TwofishKey {
     );
     for (var value = 0; value < 256; value++) {
       mk[0][value] =
-          mTab[0][qTab[0][qTab[0][value] ^ _byte(sKey[1], 0)] ^ _byte(sKey[0], 0)];
+          mTab[0][qTab[0][qTab[0][value] ^ _byte(sKey[1], 0)] ^
+              _byte(sKey[0], 0)];
       mk[1][value] =
-          mTab[1][qTab[0][qTab[1][value] ^ _byte(sKey[1], 1)] ^ _byte(sKey[0], 1)];
+          mTab[1][qTab[0][qTab[1][value] ^ _byte(sKey[1], 1)] ^
+              _byte(sKey[0], 1)];
       mk[2][value] =
-          mTab[2][qTab[1][qTab[0][value] ^ _byte(sKey[1], 2)] ^ _byte(sKey[0], 2)];
+          mTab[2][qTab[1][qTab[0][value] ^ _byte(sKey[1], 2)] ^
+              _byte(sKey[0], 2)];
       mk[3][value] =
-          mTab[3][qTab[1][qTab[1][value] ^ _byte(sKey[1], 3)] ^ _byte(sKey[0], 3)];
+          mTab[3][qTab[1][qTab[1][value] ^ _byte(sKey[1], 3)] ^
+              _byte(sKey[0], 3)];
     }
     return mk;
   }
@@ -276,8 +279,12 @@ class TwofishKey {
       x0 = _rotr32(_mask(x0 ^ _mask(t0b + t1b + lk[4 * i + 10])), 1);
       x1 = _mask(_rotl32(x1, 1) ^ _mask(t0b + 2 * t1b + lk[4 * i + 11]));
     }
-    return _pack32(_mask(x2 ^ lk[4]), _mask(x3 ^ lk[5]), _mask(x0 ^ lk[6]),
-        _mask(x1 ^ lk[7]));
+    return _pack32(
+      _mask(x2 ^ lk[4]),
+      _mask(x3 ^ lk[5]),
+      _mask(x0 ^ lk[6]),
+      _mask(x1 ^ lk[7]),
+    );
   }
 
   Uint8List decryptBlock(Uint8List block) {
@@ -313,8 +320,12 @@ class TwofishKey {
       x0 = _mask(_rotl32(x0, 1) ^ _mask(t0b + t1b + lk[4 * i + 8]));
       x1 = _rotr32(_mask(x1 ^ _mask(t0b + 2 * t1b + lk[4 * i + 9])), 1);
     }
-    return _pack32(_mask(x2 ^ lk[0]), _mask(x3 ^ lk[1]), _mask(x0 ^ lk[2]),
-        _mask(x1 ^ lk[3]));
+    return _pack32(
+      _mask(x2 ^ lk[0]),
+      _mask(x3 ^ lk[1]),
+      _mask(x0 ^ lk[2]),
+      _mask(x1 ^ lk[3]),
+    );
   }
 
   static Uint8List _pack32(int a, int b, int c, int d) {
@@ -450,11 +461,7 @@ class Eax {
     );
   }
 
-  Uint8List decryptPkt(
-    Uint8List nonce,
-    Uint8List ciphertext,
-    Uint8List tag,
-  ) {
+  Uint8List decryptPkt(Uint8List nonce, Uint8List ciphertext, Uint8List tag) {
     final nonceTag = _omac(0x00, nonce);
     final plaintext = _ctr(nonceTag, ciphertext);
     final headerTag = _omac(0x01, Uint8List(0));
@@ -538,19 +545,52 @@ Uint8List _qtUncompress(Uint8List blob) {
   if (blob.length < 6) {
     throw const PktFormatError('compressed payload is too short');
   }
-  final declared =
-      ByteData.view(blob.buffer, blob.offsetInBytes).getUint32(0, Endian.big);
-  if (declared > maxXmlBytes) {
+  final declared = ByteData.view(
+    blob.buffer,
+    blob.offsetInBytes,
+  ).getUint32(0, Endian.big);
+  if (declared == 0 || declared > maxXmlBytes) {
     throw PktFormatError(
       'declared size $declared exceeds the $maxXmlBytes byte cap',
     );
   }
   final body = Uint8List.sublistView(blob, 4);
-  final data = Uint8List.fromList(ZLibDecoder().convert(body));
-  if (data.isEmpty || data[0] != 0x3C /* < */) {
+  final collector = _BoundedXmlSink(declared);
+  final decoder = ZLibDecoder().startChunkedConversion(collector);
+  // Feed small pieces so a compressed bomb cannot be expanded in one convert.
+  for (var at = 0; at < body.length; at += 256) {
+    decoder.add(body.sublist(at, (at + 256).clamp(0, body.length)));
+  }
+  decoder.close();
+  final data = collector.takeBytes();
+  if (data.length != declared) {
+    throw const PktFormatError(
+      'compressed payload size does not match its declaration',
+    );
+  }
+  if (data.isEmpty || data[0] != 0x3C /* < */ ) {
     throw const PktFormatError('payload does not decompress to XML');
   }
-  return data.length > declared ? Uint8List.sublistView(data, 0, declared) : data;
+  return data;
+}
+
+class _BoundedXmlSink implements Sink<List<int>> {
+  _BoundedXmlSink(this.limit);
+  final int limit;
+  final BytesBuilder _bytes = BytesBuilder(copy: false);
+  @override
+  void add(List<int> data) {
+    if (_bytes.length + data.length > limit) {
+      throw const PktFormatError(
+        'decompressed payload exceeds its declared size',
+      );
+    }
+    _bytes.add(data);
+  }
+
+  @override
+  void close() {}
+  Uint8List takeBytes() => _bytes.takeBytes();
 }
 
 /// Replace XML-illegal control characters so a document stays parseable.
@@ -576,7 +616,11 @@ Uint8List xmlSafe(Uint8List data) {
 bool isPkt(List<int> data) {
   if (data.length < _minPktBytes) return false;
   for (final b in data) {
-    if (b == 0x20 || b == 0x09 || b == 0x0A || b == 0x0D || b == 0x0B ||
+    if (b == 0x20 ||
+        b == 0x09 ||
+        b == 0x0A ||
+        b == 0x0D ||
+        b == 0x0B ||
         b == 0x0C) {
       continue;
     }
@@ -596,9 +640,7 @@ Uint8List decryptPkt(List<int> raw) {
   }
   final first = isPkt(data) ? data.first : 0x3C;
   if (first == 0x3C) {
-    throw const PktFormatError(
-      'this file is plain XML, not an encrypted save',
-    );
+    throw const PktFormatError('this file is plain XML, not an encrypted save');
   }
   final stage1 = _stageOuterDecode(data);
   final key = TwofishKey(ptKey);
@@ -632,7 +674,10 @@ Uint8List encryptPkt(String xml) {
   final result = Eax(key.encryptBlock).encryptPkt(ptNonce, compressed);
   final joined = Uint8List(result.ciphertext.length + result.tag.length)
     ..setRange(0, result.ciphertext.length, result.ciphertext)
-    ..setRange(result.ciphertext.length, result.ciphertext.length + result.tag.length,
-        result.tag);
+    ..setRange(
+      result.ciphertext.length,
+      result.ciphertext.length + result.tag.length,
+      result.tag,
+    );
   return _stageOuterEncode(joined);
 }

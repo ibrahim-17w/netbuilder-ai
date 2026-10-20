@@ -35,26 +35,57 @@ class PacketTracerAdapter {
           '8': '255.0.0.0',
         }[prefix.length > 1 ? prefix[1] : '24'] ??
         '255.255.255.0';
-    // device -> switch -> router: the router's address on that link
-    // is the gateway
+    // device -> switch -> router: find the router-on-a-stick subinterface
+    // in the endpoint's subnet. Matching only the physical trunk used to
+    // leave every endpoint with gateway 0.0.0.0 on multi-VLAN sites.
     var gw = '0.0.0.0';
-    for (final up in intent.links) {
-      if (up.a != device && up.b != device) continue;
-      final sw = up.a == device ? up.b : up.a;
+    final endpointOctets = prefix[0].split('.');
+    bool sameSubnet(String cidr) {
+      final routerIp = cidr.split('/').first.split('.');
+      return endpointOctets.length == 4 &&
+          routerIp.length == 4 &&
+          endpointOctets.take(3).join('.') == routerIp.take(3).join('.');
+    }
+
+    String normalizedPort(String value) => value
+        .toLowerCase()
+        .replaceAll('gigabitethernet', 'g')
+        .replaceAll('fastethernet', 'f')
+        .replaceAll(' ', '');
+
+    final kinds = {for (final node in intent.nodes) node.name: node.type};
+    final pendingSwitches = <String>[
+      for (final link in intent.links)
+        if (link.a == device && kinds[link.b] == 'switch')
+          link.b
+        else if (link.b == device && kinds[link.a] == 'switch')
+          link.a,
+    ];
+    final visitedSwitches = <String>{};
+    while (pendingSwitches.isNotEmpty && gw == '0.0.0.0') {
+      final sw = pendingSwitches.removeAt(0);
+      if (!visitedSwitches.add(sw)) continue;
       for (final rlink in intent.links) {
         if (rlink.a != sw && rlink.b != sw) continue;
         final other = rlink.a == sw ? rlink.b : rlink.a;
-        if (other == device) continue; // skip the device's own access link
-        final isRouter = intent.nodes.any(
-          (n) => n.name == other && n.type == 'router',
-        );
-        if (!isRouter) continue;
-        final rt = intent.addressing
-            .where((a) => a.node == other)
-            .where(
-              (a) => a.iface == (rlink.a == other ? rlink.aIf : rlink.bIf),
-            );
-        if (rt.isNotEmpty) gw = rt.first.ipCidr.split('/')[0];
+        if (kinds[other] == 'switch') {
+          if (!visitedSwitches.contains(other)) pendingSwitches.add(other);
+          continue;
+        }
+        if (kinds[other] != 'router') continue;
+        final routerPort = rlink.a == other ? rlink.aIf : rlink.bIf;
+        final physical = normalizedPort(routerPort);
+        final gateway = intent.addressing.where((address) {
+          if (address.node != other || !sameSubnet(address.ipCidr)) {
+            return false;
+          }
+          final candidate = normalizedPort(address.iface);
+          return candidate == physical || candidate.startsWith('$physical.');
+        }).firstOrNull;
+        if (gateway != null) {
+          gw = gateway.ipCidr.split('/').first;
+          break;
+        }
       }
     }
     final out = <String, String>{'ip': prefix[0], 'mask': mask, 'gw': gw};
@@ -64,9 +95,11 @@ class PacketTracerAdapter {
     // advertisements instead of a spelled-out address (see the builder's
     // IPV6_ENABLED/IPV6_ADDRESS_AUTOCONFIG port fields).
     final anyV6 = intent.addressing.any(
-      (a) => a.ip6Cidr != null &&
+      (a) =>
+          a.ip6Cidr != null &&
           intent.nodes.any(
-            (n) => n.name == a.node &&
+            (n) =>
+                n.name == a.node &&
                 (n.type == 'router' || n.type == 'firewall'),
           ),
     );
@@ -139,13 +172,15 @@ class PacketTracerAdapter {
           // dot1Q sub-interface addresses in the plan's addressing (the
           // single source of truth), so a lease's gateway always matches
           // the interface that actually serves that VLAN.
-          final subIfaces = intent.addressing.where(
-            (a) =>
-                intent.nodes.any(
-                  (n) => n.name == a.node && n.type == 'router',
-                ) &&
-                a.iface.contains('.'),
-          ).toList();
+          final subIfaces = intent.addressing
+              .where(
+                (a) =>
+                    intent.nodes.any(
+                      (n) => n.name == a.node && n.type == 'router',
+                    ) &&
+                    a.iface.contains('.'),
+              )
+              .toList();
           if (subIfaces.isNotEmpty) {
             out['dhcp'] = {
               'pools': [
@@ -153,8 +188,9 @@ class PacketTracerAdapter {
                   {
                     'poolName': 'VLAN${a.iface.split('.').last}',
                     'gateway': a.ipCidr.split('/').first,
-                    'dnsServer':
-                        node.services.contains('dns') ? srvIp : a.ipCidr.split('/').first,
+                    'dnsServer': node.services.contains('dns')
+                        ? srvIp
+                        : a.ipCidr.split('/').first,
                     'startIp': _poolStart(a.ipCidr.split('/').first),
                     'mask': '255.255.255.0',
                     'maxUsers': '100',
@@ -211,11 +247,12 @@ class PacketTracerAdapter {
           // A router's LAN address is the one worth publishing: the transit
           // serial address is claimed first in the addressing list, so
           // without this the record for R1 pointed at its WAN IP.
-          final ordered = [...intent.addressing]..sort((a, b) {
-            int rank(InterfaceAddr addr) =>
-                addr.iface.toLowerCase().startsWith('s') ? 1 : 0;
-            return rank(a).compareTo(rank(b));
-          });
+          final ordered = [...intent.addressing]
+            ..sort((a, b) {
+              int rank(InterfaceAddr addr) =>
+                  addr.iface.toLowerCase().startsWith('s') ? 1 : 0;
+              return rank(a).compareTo(rank(b));
+            });
           for (final addressed in ordered) {
             final addressedNode = intent.nodes.firstWhere(
               (candidate) => candidate.name == addressed.node,
@@ -273,7 +310,8 @@ class PacketTracerAdapter {
         case 'vm':
           final explicit = explicitRules('vm');
           out['vm'] = {
-            'vms': explicit['vms'] ??
+            'vms':
+                explicit['vms'] ??
                 [
                   {'id': 'vm1', 'path': 'vm1', 'status': '1'},
                 ],
@@ -283,7 +321,8 @@ class PacketTracerAdapter {
           final explicit = explicitRules('iot');
           out['iot'] = {
             'registration': explicit['registration'] ?? true,
-            'users': explicit['users'] ??
+            'users':
+                explicit['users'] ??
                 [
                   {'username': 'admin', 'password': 'cisco'},
                 ],
@@ -307,9 +346,7 @@ class PacketTracerAdapter {
           final clientKey = (secAaa.aaaPassword ?? '').trim().isNotEmpty
               ? secAaa.aaaPassword!.trim()
               : 'cisco';
-          if (secAaa.requested &&
-              secAaa.aaa &&
-              secAaa.aaaRouter != null) {
+          if (secAaa.requested && secAaa.aaa && secAaa.aaaRouter != null) {
             final routerIp = intent.addressing
                 .where((a) => a.node == secAaa.aaaRouter)
                 .where((a) => !a.iface.toLowerCase().startsWith('s'))
@@ -378,7 +415,8 @@ class PacketTracerAdapter {
           final explicit = explicitRules('radiusEap');
           out['radiusEap'] = {
             'enabled': true,
-            'methods': explicit['methods'] ??
+            'methods':
+                explicit['methods'] ??
                 const ['PEAP', 'TLS', 'TTLS', 'FAST', 'LEAP'],
             ...explicit,
           };
@@ -427,72 +465,75 @@ class PacketTracerAdapter {
         : intentLayoutFromNotes(intent);
     return {
       'project': intent.projectName,
-      if (effective.isNotEmpty) 'layout': resolveLayoutForEngine(intent, effective),
+      if (effective.isNotEmpty || intent.layout.isNotEmpty)
+        'layout': resolveLayoutForEngine(intent, effective),
       'requirement': 'PT window open, maximized, focused, uninterrupted',
-    'steps': [
-      {
-        'action': 'create_nodes',
-        'nodes': [for (final n in intent.nodes) n.toJson()],
-      },
-      {
-        'action': 'create_links',
-        // `wiredLinks`, not `links`: a copper link between two routers (or two
-        // switches, or two hosts) needs a CROSSOVER cable, and Packet Tracer
-        // holds the link down with a straight-through - red cable, both ports
-        // down, every packet across it dropped. The plan used to leave the
-        // cable kind unset for those pairs, so the default straight-through
-        // went in and the whole transit network was dead in simulation.
-        'links': [for (final l in intent.wiredLinks) l.toJson()],
-      },
-      {
-        'action': 'paste_cli',
-        // Firewalls speak ASA, not IOS, so they are never typed at live -
-        // but their generated config still travels in the plan and lands in
-        // the saved device inside the .pkt (see CiscoAdapter.firewallConfigs).
-        'configs': {
-          ...deviceConfigs(intent),
-          ...CiscoAdapter.firewallConfigs(intent),
-          // CME telephony config lands on the voice gateway router when the
-          // plan carries phones + a cme-role server.
-          ...CiscoAdapter.voiceConfig(intent),
+      'steps': [
+        {
+          'action': 'create_nodes',
+          'nodes': [for (final n in intent.nodes) n.toJson()],
         },
-        'typing_delay_ms': 25,
-        'verify_hostname': true,
-      },
-      {
-        // Every kind PT configures through Desktop > IP Configuration:
-        // PCs, servers, laptops and printers.  Phones/APs/cloud devices have
-        // their own GUI and must not be typed at.
-        'action': 'config_pcs',
-        'pcs': {
-          for (final n in intent.nodes.where(
-            (n) => deviceKindOf(n.type)?.ipConfig ?? false,
-          ))
-            n.name: endpointIpConfig(intent, n.name),
+        {
+          'action': 'create_links',
+          // `wiredLinks`, not `links`: a copper link between two routers (or two
+          // switches, or two hosts) needs a CROSSOVER cable, and Packet Tracer
+          // holds the link down with a straight-through - red cable, both ports
+          // down, every packet across it dropped. The plan used to leave the
+          // cable kind unset for those pairs, so the default straight-through
+          // went in and the whole transit network was dead in simulation.
+          'links': [for (final l in intent.wiredLinks) l.toJson()],
         },
-      },
-      {
-        'action': 'config_servers',
-        'servers': {
-          for (final n in intent.nodes.where(
-            (n) => n.type == 'server' && n.services.isNotEmpty,
-          ))
-            n.name: {'services': serverServices(intent, n.name)},
+        {
+          'action': 'paste_cli',
+          // Firewalls speak ASA, not IOS, so they are never typed at live -
+          // but their generated config still travels in the plan and lands in
+          // the saved device inside the .pkt (see CiscoAdapter.firewallConfigs).
+          'configs': {
+            ...deviceConfigs(intent),
+            ...CiscoAdapter.firewallConfigs(intent),
+            // CME telephony config lands on the voice gateway router when the
+            // plan carries phones + a cme-role server.
+            ...CiscoAdapter.voiceConfig(intent),
+          },
+          'typing_delay_ms': 25,
+          'verify_hostname': true,
         },
-      },
-      if (intent.security.requested)
-        {'action': 'verify_security', 'checks': securityChecks(intent)},
+        {
+          // Every kind PT configures through Desktop > IP Configuration:
+          // PCs, servers, laptops and printers.  Phones/APs/cloud devices have
+          // their own GUI and must not be typed at.
+          'action': 'config_pcs',
+          'pcs': {
+            for (final n in intent.nodes.where(
+              (n) =>
+                  (deviceKindOf(n.type)?.ipConfig ?? false) &&
+                  !((n.serviceRules['wireless'] as Map?)?['mode'] == 'client'),
+            ))
+              n.name: endpointIpConfig(intent, n.name),
+          },
+        },
+        {
+          'action': 'config_servers',
+          'servers': {
+            for (final n in intent.nodes.where(
+              (n) => n.type == 'server' && n.services.isNotEmpty,
+            ))
+              n.name: {'services': serverServices(intent, n.name)},
+          },
+        },
+        if (intent.security.requested)
+          {'action': 'verify_security', 'checks': securityChecks(intent)},
       ],
     };
   }
 
-/// The drawing a plan's own notes ask for, as an engine payload.
-///
-/// A chosen layout is stamped into the plan as `layout: <style>`; reading it
-/// here is what makes that choice reach the engine on every build path. An
-/// unknown or absent note returns an empty map, so the engine keeps its
-/// default rather than being handed a style it does not know.
-static Map<String, dynamic> intentLayoutFromNotes(NetworkIntent intent) {
+  /// The drawing a plan's own notes ask for, as an engine payload.
+  ///
+  /// A chosen layout is stamped into the plan as `layout: <style>`; reading it
+  /// here is what makes that choice reach the engine on every build path. An
+  /// unknown or absent note returns an empty map, so the engine keeps its
+  /// default rather than being handed a style it does not know.
+  static Map<String, dynamic> intentLayoutFromNotes(NetworkIntent intent) {
     for (final note in intent.notes) {
       final style = LayoutRequest.styleFromNote(note);
       if (style.isEmpty) continue;
@@ -523,82 +564,90 @@ static Map<String, dynamic> intentLayoutFromNotes(NetworkIntent intent) {
     return const {};
   }
 
-/// Turn a drawing request into the payload the engine actually places with.
-///
-/// The request speaks in kinds ("the servers"); the engine speaks in device
-/// names. This is the only place that holds both the plan and the payload, so
-/// it is the only place that can do the translation - and doing it here means
-/// every build path (chat redraw, gallery pick, builder screen, action hub)
-/// parks the same devices, with no chance of one of them quietly drawing the
-/// default instead.
-////// A `grouped` request that names devices the plan does not have keeps its
-/// style but carries no side list: the engine then draws it exactly as a tree,
-/// which is honest rather than arbitrary.
-///
-/// The resolved payload also carries the spot every device was drawn at, so
-/// the `.pkt` is parked on the coordinates the user was shown. Sending only
-/// the style meant the sidecar recomputed the whole drawing from that string
-/// alone: a second, independent implementation of the same ten algorithms,
-/// which happened to agree until one side was edited and the preview quietly
-/// stopped being the picture that got built. Resolving once here makes the
-/// preview the single source of truth - the sidecar places what it is told,
-/// and only falls back to computing its own when a caller sends a bare style.
-static Map<String, dynamic> resolveLayoutForEngine(
-  NetworkIntent intent,
-  Map<String, dynamic> layout,
-) {
-  final out = _resolvedLayoutSettings(intent, layout);
-  final spots = resolvedCanvasPositions(intent, out);
-  if (spots.isNotEmpty) out['positions'] = spots;
-  return out;
-}
-
-/// The drawing's resolved spot for every device, as the engine payload wants
-/// it: `{"R1": [700, 60]}`, one whole-pixel `[x, y]` per device.
-///
-/// Exposed on its own so the parity test can compare what the preview draws
-/// against what the build is handed, without reaching through the payload.
-static Map<String, List<int>> resolvedCanvasPositions(
-  NetworkIntent intent,
-  Map<String, dynamic> layout,
-) {
-  final zones = <LayoutZone>[];
-  final raw = layout['zones'];
-  if (raw is List) {
-    for (final zone in raw) {
-      if (zone is! Map) continue;
-      final names = _stringsIn(zone['side']);
-      if (names.isEmpty) continue;
-      zones.add(LayoutZone(names, edge: '${zone['sideEdge'] ?? ''}'));
-    }
-  }
-  final snapshot = computeLayoutSnapshot(
-    intent,
-    style: '${layout['style'] ?? 'tree'}',
-    side: zones.isEmpty ? _stringsIn(layout['side']) : const <String>[],
-    sideEdge: '${layout['sideEdge'] ?? 'left'}',
-    zones: zones,
-  );
-  return <String, List<int>>{
-    for (final spot in snapshot.spots)
-      spot.name: <int>[spot.x.toInt(), spot.y.toInt()],
-  };
-}
-
-/// The payload the engine places with, from a drawing request - kinds
-/// translated to device names - without the resolved spots, which
-/// [resolveLayoutForEngine] adds on top.
-static Map<String, dynamic> _resolvedLayoutSettings(
-  NetworkIntent intent,
-  Map<String, dynamic> layout,
-) {
-  final out = Map<String, dynamic>.from(layout);
-  if ('${out['style'] ?? ''}' != 'grouped') {
-    out.remove('sideKinds');
-    out.remove('sideNames');
-    out.remove('zones');
+  /// Turn a drawing request into the payload the engine actually places with.
+  ///
+  /// The request speaks in kinds ("the servers"); the engine speaks in device
+  /// names. This is the only place that holds both the plan and the payload, so
+  /// it is the only place that can do the translation - and doing it here means
+  /// every build path (chat redraw, gallery pick, builder screen, action hub)
+  /// parks the same devices, with no chance of one of them quietly drawing the
+  /// default instead.
+  ////// A `grouped` request that names devices the plan does not have keeps its
+  /// style but carries no side list: the engine then draws it exactly as a tree,
+  /// which is honest rather than arbitrary.
+  ///
+  /// The resolved payload also carries the spot every device was drawn at, so
+  /// the `.pkt` is parked on the coordinates the user was shown. Sending only
+  /// the style meant the sidecar recomputed the whole drawing from that string
+  /// alone: a second, independent implementation of the same ten algorithms,
+  /// which happened to agree until one side was edited and the preview quietly
+  /// stopped being the picture that got built. Resolving once here makes the
+  /// preview the single source of truth - the sidecar places what it is told,
+  /// and only falls back to computing its own when a caller sends a bare style.
+  static Map<String, dynamic> resolveLayoutForEngine(
+    NetworkIntent intent,
+    Map<String, dynamic> layout,
+  ) {
+    final out = _resolvedLayoutSettings(intent, layout);
+    final spots = resolvedCanvasPositions(intent, out);
+    if (spots.isNotEmpty) out['positions'] = spots;
     return out;
   }
+
+  /// The drawing's resolved spot for every device, as the engine payload wants
+  /// it: `{"R1": [700, 60]}`, one whole-pixel `[x, y]` per device.
+  ///
+  /// Exposed on its own so the parity test can compare what the preview draws
+  /// against what the build is handed, without reaching through the payload.
+  static Map<String, List<int>> resolvedCanvasPositions(
+    NetworkIntent intent,
+    Map<String, dynamic> layout,
+  ) {
+    final zones = <LayoutZone>[];
+    final raw = layout['zones'];
+    if (raw is List) {
+      for (final zone in raw) {
+        if (zone is! Map) continue;
+        final names = _stringsIn(zone['side']);
+        if (names.isEmpty) continue;
+        zones.add(
+          LayoutZone(names, edge: '${zone['edge'] ?? zone['sideEdge'] ?? ''}'),
+        );
+      }
+    }
+    final snapshot = computeLayoutSnapshot(
+      intent,
+      style: '${layout['style'] ?? 'tree'}',
+      side: zones.isEmpty ? _stringsIn(layout['side']) : const <String>[],
+      sideEdge: '${layout['sideEdge'] ?? 'left'}',
+      zones: zones,
+    );
+    return <String, List<int>>{
+      for (final spot in snapshot.spots)
+        spot.name: switch (intent.layout[spot.name]) {
+          final point? when point.dx.isFinite && point.dy.isFinite => <int>[
+            point.dx.round(),
+            point.dy.round(),
+          ],
+          _ => <int>[spot.x.toInt(), spot.y.toInt()],
+        },
+    };
+  }
+
+  /// The payload the engine places with, from a drawing request - kinds
+  /// translated to device names - without the resolved spots, which
+  /// [resolveLayoutForEngine] adds on top.
+  static Map<String, dynamic> _resolvedLayoutSettings(
+    NetworkIntent intent,
+    Map<String, dynamic> layout,
+  ) {
+    final out = Map<String, dynamic>.from(layout);
+    if ('${out['style'] ?? ''}' != 'grouped') {
+      out.remove('sideKinds');
+      out.remove('sideNames');
+      out.remove('zones');
+      return out;
+    }
     final zones = <Map<String, dynamic>>[];
     final raw = out['zones'];
     if (raw is List) {
@@ -607,12 +656,15 @@ static Map<String, dynamic> _resolvedLayoutSettings(
         final names = resolveSideNames(
           intent,
           kinds: _stringsIn(zone['sideKinds']),
-          names: _stringsIn(zone['sideNames']),
+          names: [
+            ..._stringsIn(zone['sideNames']),
+            ..._stringsIn(zone['side']),
+          ],
         );
         if (names.isEmpty) continue;
         zones.add(<String, dynamic>{
           'side': names,
-          'edge': '${zone['sideEdge'] ?? ''}',
+          'edge': '${zone['edge'] ?? zone['sideEdge'] ?? ''}',
         });
       }
     }
@@ -625,7 +677,10 @@ static Map<String, dynamic> _resolvedLayoutSettings(
       final names = resolveSideNames(
         intent,
         kinds: _stringsIn(layout['sideKinds']),
-        names: _stringsIn(layout['sideNames']),
+        names: [
+          ..._stringsIn(layout['sideNames']),
+          ..._stringsIn(layout['side']),
+        ],
       );
       if (names.isEmpty) {
         out.remove('side');
@@ -637,9 +692,8 @@ static Map<String, dynamic> _resolvedLayoutSettings(
     return out;
   }
 
-  static List<String> _stringsIn(Object? raw) => raw is List
-      ? raw.map((e) => '$e').toList()
-      : const <String>[];
+  static List<String> _stringsIn(Object? raw) =>
+      raw is List ? raw.map((e) => '$e').toList() : const <String>[];
 
   /// Live checks are deliberately expressed as read-only CLI commands.  The
   /// sidecar runs them after configuration and reports evidence, rather than
@@ -752,7 +806,8 @@ static Map<String, dynamic> _resolvedLayoutSettings(
       if (a.node != router) continue;
       var wan = false;
       for (final l in intent.links) {
-        final onThis = (l.a == router && l.aIf == a.iface) ||
+        final onThis =
+            (l.a == router && l.aIf == a.iface) ||
             (l.b == router && l.bIf == a.iface);
         if (!onThis) continue;
         bool isRouter(String name) =>

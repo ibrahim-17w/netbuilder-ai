@@ -5,6 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/network_intent.dart';
 import 'ai_provider.dart';
 import 'gemini_model_catalog.dart';
+import 'openai_chat_service.dart';
+import 'stored_privacy.dart';
+import 'package:crypto/crypto.dart';
 
 /// Minimal Gemini REST client (BYOK). No SDK download needed beyond `http`.
 /// Docs: https://ai.google.dev/gemini-api/docs
@@ -28,24 +31,40 @@ class GeminiService {
     return h.toRadixString(16).padLeft(8, '0');
   }
 
-  static String _cacheKey(String instruction, String target) =>
-      'planner_cache_${briefKey(instruction, target)}';
+  static String _cacheKey(String instruction, String target, String identity) =>
+      'planner_cache_v2_${briefKey(instruction, target)}_${sha256.convert(utf8.encode(identity))}';
+
+  static String cacheIdentity({
+    required AiProviderConfig config,
+    required String contextBlock,
+    required Map<String, dynamic> offlineCandidate,
+  }) => jsonEncode({
+    'schema': 2,
+    'provider': config.kind.name,
+    'base': config.baseUrl,
+    'model': config.model,
+    'context': contextBlock,
+    'candidate': offlineCandidate,
+  });
 
   /// Cached plan for a brief (null on miss). Set by [generateIntent] after a
   /// successful API call; cleared by [invalidateCachedPlan] when a build
   /// fails so the next attempt re-plans.
   static Future<NetworkIntent?> cachedPlan(
     String instruction,
-    String target,
-  ) async {
+    String target, {
+    String contextIdentity = '',
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_cacheKey(instruction, target));
+      final raw = prefs.getString(
+        _cacheKey(instruction, target, contextIdentity),
+      );
       if (raw == null || raw.isEmpty) return null;
       final intent = NetworkIntent.fromJson(
         Map<String, dynamic>.from(jsonDecode(raw) as Map),
       );
-      return intent.copyWith(planningSource: 'gemini-cache');
+      return intent.copyWith(planningSource: 'planner-cache');
     } catch (_) {
       return null; // corrupt cache entries behave like a miss
     }
@@ -57,7 +76,13 @@ class GeminiService {
   ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_cacheKey(instruction, target));
+      final prefix = 'planner_cache_v2_${briefKey(instruction, target)}_';
+      for (final key in prefs.getKeys().where(
+        (key) => key.startsWith(prefix),
+      )) {
+        await prefs.remove(key);
+      }
+      await prefs.remove('planner_cache_${briefKey(instruction, target)}');
     } catch (_) {}
   }
 
@@ -65,12 +90,13 @@ class GeminiService {
     String instruction,
     String target,
     NetworkIntent intent,
+    String identity,
   ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
-        _cacheKey(instruction, target),
-        jsonEncode(intent.toJson(includeSecrets: false)),
+        _cacheKey(instruction, target, identity),
+        jsonEncode(StoredPrivacy.redact(intent.toJson(includeSecrets: false))),
       );
     } catch (_) {}
   }
@@ -142,14 +168,9 @@ class GeminiService {
     required String contextBlock,
     required String target,
     required Map<String, dynamic> offlineCandidate,
+    AiProviderConfig? providerConfig,
   }) async {
-    final safeInstruction = instruction.replaceAll(
-      RegExp(
-        r'((?:password|passwd|pass|pre[- ]shared key|secret)\s*[:=]?\s*)[^\s,.]+',
-        caseSensitive: false,
-      ),
-      r'\1[REDACTED]',
-    );
+    final safeInstruction = NetworkIntent.redactSecrets(instruction);
     final prompt =
         '''
 You are NetBuilder's network-planning component, not its execution component.
@@ -232,62 +253,96 @@ Never invent credentials. Keep questions short. If the request is ambiguous,
 make the safest reasonable plan and disclose the ambiguity in assumptions or
 questions. The app will validate this plan before anything is executed.
 ''';
-    final r = await _client
-        .post(
-          Uri.parse(_url(model)),
-          headers: _headers(apiKey.trim()),
-          body: jsonEncode({
-            'contents': [
-              {
-                'parts': [
-                  {'text': prompt},
-                ],
-              },
-            ],
-            'generationConfig': {'responseMimeType': 'application/json'},
-          }),
-        )
-        .timeout(const Duration(seconds: 60));
-    if (r.statusCode != 200) {
-      throw Exception(_friendlyError(r.statusCode, r.body, model));
+    final config =
+        providerConfig ??
+        AiProviderConfig(kind: AiProviderKind.gemini, model: model);
+    final String raw;
+    if (config.kind == AiProviderKind.openai) {
+      raw =
+          (await OpenAiChatService(
+                config: config,
+                apiKey: apiKey,
+                client: _client,
+              ).complete([
+                {
+                  'role': 'user',
+                  'content': NetworkIntent.redactSecrets(prompt),
+                },
+              ]))
+              .trim();
+    } else {
+      final r = await _client
+          .post(
+            Uri.parse(_url(model)),
+            headers: _headers(apiKey.trim()),
+            body: jsonEncode({
+              'contents': [
+                {
+                  'parts': [
+                    {'text': NetworkIntent.redactSecrets(prompt)},
+                  ],
+                },
+              ],
+              'generationConfig': {'responseMimeType': 'application/json'},
+            }),
+          )
+          .timeout(const Duration(seconds: 60));
+      if (r.statusCode != 200) {
+        throw Exception(_friendlyError(r.statusCode, r.body, model));
+      }
+      final j = jsonDecode(r.body) as Map<String, dynamic>;
+      final cands = j['candidates'] as List?;
+      if (cands == null || cands.isEmpty) {
+        throw Exception('Gemini returned no candidates');
+      }
+      final content = cands.first['content'] as Map<String, dynamic>?;
+      final parts = content?['parts'] as List?;
+      if (parts == null || parts.isEmpty) {
+        throw Exception('Gemini returned no parts');
+      }
+      raw = (parts.first['text'] as String? ?? '').trim();
     }
-    final j = jsonDecode(r.body) as Map<String, dynamic>;
-    final cands = j['candidates'] as List?;
-    if (cands == null || cands.isEmpty) {
-      throw Exception('Gemini returned no candidates');
+    if (raw.isEmpty) {
+      throw Exception('${config.label} returned an empty network plan');
     }
-    final content = cands.first['content'] as Map<String, dynamic>?;
-    final parts = content?['parts'] as List?;
-    if (parts == null || parts.isEmpty) {
-      throw Exception('Gemini returned no parts');
-    }
-    final raw = (parts.first['text'] as String? ?? '').trim();
-    if (raw.isEmpty) throw Exception('Gemini returned an empty network plan');
     try {
       final cleaned = raw
           .replaceFirst(RegExp(r'^```json\s*'), '')
           .replaceFirst(RegExp(r'^```\s*'), '')
           .replaceFirst(RegExp(r'\s*```$'), '')
           .trim();
-      final data = jsonDecode(cleaned) as Map<String, dynamic>;
+      final data = Map<String, dynamic>.from(
+        StoredPrivacy.redact(jsonDecode(cleaned)) as Map,
+      );
       final candidateProject =
           (offlineCandidate['projectName'] as String?)?.trim() ?? 'net1';
       final modelProject = (data['projectName'] as String?)?.trim();
       final intent = NetworkIntent.fromJson(data);
       if (intent.nodes.isEmpty) {
-        throw Exception('Gemini plan contains no devices');
+        throw Exception('${config.label} plan contains no devices');
       }
       final planned = intent.copyWith(
         projectName: modelProject == null || modelProject.isEmpty
             ? candidateProject
             : modelProject,
-        planningSource: 'gemini',
+        planningSource: config.kind.name,
       );
       // cache the successful plan: identical asks skip the API next time
-      await _storeCachedPlan(instruction, target, planned);
+      await _storeCachedPlan(
+        instruction,
+        target,
+        planned,
+        cacheIdentity(
+          config: config,
+          contextBlock: contextBlock,
+          offlineCandidate: offlineCandidate,
+        ),
+      );
       return planned;
     } on FormatException catch (e) {
-      throw Exception('Gemini returned invalid plan JSON: ${e.message}');
+      throw Exception(
+        '${config.label} returned invalid plan JSON: ${e.message}',
+      );
     }
   }
 

@@ -125,6 +125,22 @@ void main() {
         ChatAction(kind: 'save_preference', payload: {}).touchesPacketTracer,
         isFalse,
       );
+      expect(
+        ChatAction(kind: 'pkt_fix', payload: {}).touchesPacketTracer,
+        isFalse,
+        reason: 'file repairs create a separate .pkt copy without opening PT',
+      );
+      expect(
+        ChatAction(kind: 'pkt_open', payload: {}).touchesPacketTracer,
+        isFalse,
+      );
+    });
+
+    test('an offline fix card names the copied-file action', () {
+      expect(
+        ChatAction(kind: 'pkt_fix', payload: {}).label,
+        'Create a repaired .pkt copy',
+      );
     });
 
     test('labels name the devices an action would touch', () {
@@ -145,7 +161,11 @@ void main() {
         role: 'model',
         text: 'Try the second port.',
         images: const [
-          ChatImage(path: r'C:\tmp\before.png', name: 'before.png', bytes: 2048),
+          ChatImage(
+            path: r'C:\tmp\before.png',
+            name: 'before.png',
+            bytes: 2048,
+          ),
         ],
         actions: const [
           ChatAction(
@@ -265,16 +285,12 @@ void main() {
       final contents = client.sent!['contents'] as List;
       // history turn + current turn with text and the image
       expect(contents, hasLength(2));
-      final parts =
-          (contents.last as Map)['parts'] as List;
+      final parts = (contents.last as Map)['parts'] as List;
       expect(parts.first['text'], 'what is wrong here?');
       final inline = (parts.last as Map)['inlineData'] as Map;
       expect(inline['mimeType'], 'image/png');
       expect(inline['data'], isNotEmpty);
-      expect(
-        (client.sent!['systemInstruction'] as Map)['parts'],
-        isNotEmpty,
-      );
+      expect((client.sent!['systemInstruction'] as Map)['parts'], isNotEmpty);
       await dir.delete(recursive: true);
     });
 

@@ -29,6 +29,7 @@ class SettingsService extends ChangeNotifier {
   static const _kGns3User = 'gns3_user';
   static const _kGns3Pass = 'gns3_pass';
   static const _kTarget = 'default_target';
+  static const _kPacketTracerVersion = 'packet_tracer_installed_version';
   static const _kLlmFix = 'llm_fix_when_stuck';
   static const _kContext = 'context_budget';
   static const _kRuntimeWindow = 'runtime_window';
@@ -56,6 +57,7 @@ class SettingsService extends ChangeNotifier {
   String _openAiOrg = '';
   bool _privateMode = false;
   bool _llmFix = true;
+
   /// Auto-learning: with these on, the engine proposes, verifies and settles
   /// corrections on its own after a run with recurring failures - no button
   /// press.  Every promotion still has to pass the verify-before-promote
@@ -63,14 +65,17 @@ class SettingsService extends ChangeNotifier {
   bool _autoLearn = true;
   bool _autoSuggest = true;
   bool _autoTeach = true;
+
   /// Whether the live run summary is included in the prompt. It used to be a
   /// chip on the chat screen; it is a preference, so it lives here.
   bool _liveContext = true;
+
   /// Build .pkt files on this device (bundled template library) instead of
   /// waiting for the PC engine. A phone has no engine and usually no
   /// reachable PC, so this is ON by default there; a desktop keeps the
   /// engine first, because its builds also drive the Packet Tracer window.
   bool _preferOnDevicePkt = SettingsService.isMobile;
+
   /// 'system' | 'light' | 'dark'. A preference rather than a constant: the
   /// app is read for hours, and which theme is comfortable is not something
   /// the operating system should decide for everyone.
@@ -79,13 +84,16 @@ class SettingsService extends ChangeNotifier {
   String _gns3User = 'admin';
   String _gns3Pass = '';
   String _defaultTarget = 'gns3';
+  String _packetTracerVersion = '';
   // The chat's context ceiling. Documented in one place
   // (ContextBudget.defaultContextTokens ~= 256k) and editable in Settings.
   int _contextBudget = ContextBudget.defaultContextTokens;
+
   /// The runtime's own context window, when the user knows it better than the
   /// probe does. 0 = detect it (the default), which is what makes the chat
   /// work without anyone configuring anything.
   int _runtimeWindow = 0;
+
   /// Print every assembled request with its token breakdown. Off by default:
   /// this is a development view, not something a user needs.
   bool _contextDebug = false;
@@ -117,20 +125,16 @@ class SettingsService extends ChangeNotifier {
       encryptedSharedPreferences: true,
       resetOnError: true,
     ),
-    iOptions: IOSOptions(
-      accessibility: KeychainAccessibility.first_unlock,
-    ),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
   );
 
   /// Where the installer's install.json lives, when it is not beside the
   /// executable. Only tests set this.
   final String? _installConfigPathOverride;
 
-  SettingsService({
-    FlutterSecureStorage? secure,
-    String? installConfigPath,
-  }) : _secure = secure ?? _defaultStorage,
-       _installConfigPathOverride = installConfigPath;
+  SettingsService({FlutterSecureStorage? secure, String? installConfigPath})
+    : _secure = secure ?? _defaultStorage,
+      _installConfigPathOverride = installConfigPath;
 
   /// What the installer recorded for this machine: the folders it created and
   /// the addresses it decided on. Empty when the app was not installed.
@@ -358,12 +362,14 @@ class SettingsService extends ChangeNotifier {
     await _prefs?.setBool(_kLiveContext, value);
     notifyListeners();
   }
+
   bool get preferOnDevicePkt => _preferOnDevicePkt;
   Future<void> setPreferOnDevicePkt(bool value) async {
     _preferOnDevicePkt = value;
     await _prefs?.setBool(_kPreferOnDevicePkt, value);
     notifyListeners();
   }
+
   String get themeMode => _themeMode;
   Future<void> setThemeMode(String value) async {
     _themeMode = const ['system', 'light', 'dark'].contains(value)
@@ -372,6 +378,7 @@ class SettingsService extends ChangeNotifier {
     await _prefs?.setString(_kThemeMode, _themeMode);
     notifyListeners();
   }
+
   String get providerName => _provider;
   bool get usesOpenAi => _provider == 'openai';
   String get openAiBaseUrl => _openAiBase;
@@ -400,6 +407,7 @@ class SettingsService extends ChangeNotifier {
     }
     return out;
   }
+
   bool get privateMode => _privateMode;
   bool get llmFix => _llmFix;
   bool get autoLearn => _autoLearn;
@@ -409,6 +417,7 @@ class SettingsService extends ChangeNotifier {
   String get gns3User => _gns3User;
   String get gns3Pass => _gns3Pass;
   String get defaultTarget => _defaultTarget;
+  String get packetTracerVersion => _packetTracerVersion;
   int get contextBudget => _contextBudget;
   int get runtimeWindow => _runtimeWindow;
   bool get contextDebug => _contextDebug;
@@ -467,7 +476,12 @@ class SettingsService extends ChangeNotifier {
     _provider = _prefs!.getString(_kProvider) ?? _provider;
     _openAiBase = _prefs!.getString(_kOpenAiBase) ?? _openAiBase;
     _openAiModel = _prefs!.getString(_kOpenAiModel) ?? _openAiModel;
-    _openAiHeaders = _prefs!.getString(_kOpenAiHeaders) ?? _openAiHeaders;
+    final legacyHeaders = _prefs!.getString(_kOpenAiHeaders);
+    _openAiHeaders = await _readSecure(_kOpenAiHeaders) ?? legacyHeaders ?? '';
+    if (legacyHeaders != null &&
+        await _saveCredential(_kOpenAiHeaders, _openAiHeaders)) {
+      await _prefs!.remove(_kOpenAiHeaders);
+    }
     _openAiOrg = _prefs!.getString(_kOpenAiOrg) ?? _openAiOrg;
     _privateMode = _prefs!.getBool(_kPrivate) ?? false;
     _llmFix = _prefs!.getBool(_kLlmFix) ?? true;
@@ -504,6 +518,8 @@ class SettingsService extends ChangeNotifier {
       await _prefs!.remove(_kGns3Pass);
     }
     _defaultTarget = _prefs!.getString(_kTarget) ?? _defaultTarget;
+    _packetTracerVersion =
+        _prefs!.getString(_kPacketTracerVersion) ?? _packetTracerVersion;
     _contextBudget = _prefs!.getInt(_kContext) ?? _contextBudget;
     _runtimeWindow = _prefs!.getInt(_kRuntimeWindow) ?? 0;
     _contextDebug = _prefs!.getBool(_kContextDebug) ?? false;
@@ -521,7 +537,8 @@ class SettingsService extends ChangeNotifier {
     // A choice the user made always wins; otherwise a fresh install uses the
     // folders the installer created, so the app works without anyone typing a
     // path or editing a file.
-    _outputDir = _prefs!.getString(_kOutputDir) ??
+    _outputDir =
+        _prefs!.getString(_kOutputDir) ??
         (_installInfo['outputDir'] ?? '').toString().trim();
 
     if (!_prefs!.containsKey(_kEngineBase)) {
@@ -555,8 +572,8 @@ class SettingsService extends ChangeNotifier {
     try {
       openAi = await _secure.read(key: _kOpenAiKey);
     } catch (_) {}
-    final present = (gemini ?? '').trim().isNotEmpty ||
-        (openAi ?? '').trim().isNotEmpty;
+    final present =
+        (gemini ?? '').trim().isNotEmpty || (openAi ?? '').trim().isNotEmpty;
     final changed = present != aiKeyPresent;
     aiKeyPresent = present;
     if (changed) notifyListeners();
@@ -571,7 +588,8 @@ class SettingsService extends ChangeNotifier {
     try {
       return await _secure.read(key: key);
     } catch (_) {
-      _loadError = 'Some saved credentials could not be read from secure '
+      _loadError =
+          'Some saved credentials could not be read from secure '
           'storage on this device. Everything else was loaded; re-enter the '
           'credentials to store them again.';
       return null;
@@ -582,7 +600,8 @@ class SettingsService extends ChangeNotifier {
     try {
       await _secure.write(key: key, value: value);
     } catch (_) {
-      _loadError = 'Some credentials could not be written to secure storage '
+      _loadError =
+          'Some credentials could not be written to secure storage '
           'on this device. Everything else was saved.';
     }
   }
@@ -653,14 +672,14 @@ class SettingsService extends ChangeNotifier {
 
   Future<void> setPrivateMode(bool v) async {
     _privateMode = v;
-    await _prefs?.setBool(_kPrivate, v);
     notifyListeners();
+    await _prefs?.setBool(_kPrivate, v);
   }
 
   Future<void> setLlmFix(bool v) async {
     _llmFix = v;
-    await _prefs?.setBool(_kLlmFix, v);
     notifyListeners();
+    await _prefs?.setBool(_kLlmFix, v);
   }
 
   /// Master switch for engine-driven learning.  Off means the app never lets
@@ -744,7 +763,7 @@ class SettingsService extends ChangeNotifier {
       _engineBaseError = value.trim().isEmpty
           ? 'Enter an engine address, for example 192.168.1.20:5005.'
           : '"${value.trim()}" is not an address the app can call. Use a host '
-              'or host:port, optionally with http:// or https://.';
+                'or host:port, optionally with http:// or https://.';
       notifyListeners();
       return;
     }
@@ -787,10 +806,15 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setOpenAiHeaders(String value) async {
-    _openAiHeaders = value.trim();
-    await _prefs?.setString(_kOpenAiHeaders, _openAiHeaders);
+  Future<bool> setOpenAiHeaders(String value) async {
+    final next = value.trim();
+    final ok = await _saveCredential(_kOpenAiHeaders, next);
+    if (ok) {
+      _openAiHeaders = next;
+      await _prefs?.remove(_kOpenAiHeaders);
+    }
     notifyListeners();
+    return ok;
   }
 
   Future<void> setOpenAiOrganization(String value) async {
@@ -808,12 +832,28 @@ class SettingsService extends ChangeNotifier {
     }
   }
 
-  Future<void> setOpenAiKey(String value) async {
+  Future<bool> _saveCredential(String key, String value) async {
     try {
-      await _secure.write(key: _kOpenAiKey, value: value.trim());
-      await refreshKeyPresence();
-      notifyListeners();
-    } catch (_) {}
+      if (value.isEmpty) {
+        await _secure.delete(key: key);
+      } else {
+        await _secure.write(key: key, value: value);
+      }
+      final back = await _secure.read(key: key);
+      if ((back ?? '') != value) throw StateError('credential not persisted');
+      return true;
+    } catch (_) {
+      _loadError =
+          'Credentials could not be saved securely. Re-enter them and try again.';
+      return false;
+    }
+  }
+
+  Future<bool> setOpenAiKey(String value) async {
+    final ok = await _saveCredential(_kOpenAiKey, value.trim());
+    await refreshKeyPresence();
+    notifyListeners();
+    return ok;
   }
 
   /// Remember the conversation the user was last in, so the app reopens
@@ -827,6 +867,12 @@ class SettingsService extends ChangeNotifier {
   Future<void> setDefaultTarget(String v) async {
     _defaultTarget = v;
     await _prefs?.setString(_kTarget, v);
+    notifyListeners();
+  }
+
+  Future<void> setPacketTracerVersion(String value) async {
+    _packetTracerVersion = value.trim();
+    await _prefs?.setString(_kPacketTracerVersion, _packetTracerVersion);
     notifyListeners();
   }
 }
@@ -904,7 +950,8 @@ class LocalModelProber {
       return const LocalModelProbe(
         reachable: false,
         local: true,
-        message: 'Enter a base URL first - a preset above fills in a '
+        message:
+            'Enter a base URL first - a preset above fills in a '
             'working one.',
       );
     }
@@ -936,7 +983,8 @@ class LocalModelProber {
         return LocalModelProbe(
           reachable: false,
           local: local,
-          message: '$uri answered 404 - there is no model list there. The '
+          message:
+              '$uri answered 404 - there is no model list there. The '
               'base URL has to be the OpenAI-compatible one; for Ollama it '
               'is http://127.0.0.1:11434/v1.',
         );
@@ -945,7 +993,8 @@ class LocalModelProber {
         return LocalModelProbe(
           reachable: false,
           local: local,
-          message: '$uri answered ${r.statusCode} - that address wants an '
+          message:
+              '$uri answered ${r.statusCode} - that address wants an '
               'API key. A local server normally needs none; for a cloud '
               'gateway, save the key and use the main Test connection, '
               'which sends it.',
@@ -955,7 +1004,8 @@ class LocalModelProber {
         return LocalModelProbe(
           reachable: false,
           local: local,
-          message: '$uri answered HTTP ${r.statusCode} instead of a model '
+          message:
+              '$uri answered HTTP ${r.statusCode} instead of a model '
               'list.',
         );
       }
@@ -975,7 +1025,8 @@ class LocalModelProber {
       return LocalModelProbe(
         reachable: false,
         local: false,
-        message: 'Nothing answered at $authority. Check the address, and '
+        message:
+            'Nothing answered at $authority. Check the address, and '
             'that the server is reachable from this device.',
       );
     }
@@ -983,14 +1034,16 @@ class LocalModelProber {
       return LocalModelProbe(
         reachable: false,
         local: true,
-        message: 'Nothing answered on $authority - is ${known[0]} running? '
+        message:
+            'Nothing answered on $authority - is ${known[0]} running? '
             'Start it with: ${known[1]}',
       );
     }
     return LocalModelProbe(
       reachable: false,
       local: true,
-      message: 'Nothing answered on $authority - is a server running there? '
+      message:
+          'Nothing answered on $authority - is a server running there? '
           'The app bundles none; you start one yourself (Ollama, LM Studio '
           'or llama.cpp).',
     );
@@ -1052,7 +1105,8 @@ class LocalModelProber {
       return LocalModelProbe(
         reachable: true,
         local: local,
-        message: 'The server answered, but lists no models yet. Pull or '
+        message:
+            'The server answered, but lists no models yet. Pull or '
             'load one first (for Ollama: `ollama pull llama3.2`), then '
             'test again.',
       );
@@ -1079,7 +1133,8 @@ class LocalModelProber {
     return LocalModelProbe(
       reachable: false,
       local: local,
-      message: '${_modelsUrl(baseUrl) ?? baseUrl} answered, but not with a '
+      message:
+          '${_modelsUrl(baseUrl) ?? baseUrl} answered, but not with a '
           'model list the app could read.',
     );
   }
