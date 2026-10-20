@@ -1,12 +1,17 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/build_record.dart';
+import '../models/network_intent.dart';
 import '../services/memory_service.dart';
 import '../theme/app_kit.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
+import '../widgets/topology_canvas.dart';
+import '../widgets/pkt_build_history_panel.dart';
 
 /// Every network this app has built.
 ///
@@ -43,12 +48,14 @@ class _HomeScreenState extends State<HomeScreen> {
   final _search = TextEditingController();
   List<BuildRecord> _items = [];
   bool _loading = true;
+
   /// Why the list could not be read, verbatim. Null means the read worked -
   /// which is the only way to tell "no networks yet" from "I could not look".
   String? _loadError;
   String _query = '';
   String _statusFilter = 'all';
   _HistorySort _sort = _HistorySort.newest;
+  final Set<int> _selectedForCompare = {};
 
   @override
   void initState() {
@@ -112,9 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case _HistorySort.status:
         rows.sort((a, b) {
           final byStatus = a.status.compareTo(b.status);
-          return byStatus != 0
-              ? byStatus
-              : b.createdAt.compareTo(a.createdAt);
+          return byStatus != 0 ? byStatus : b.createdAt.compareTo(a.createdAt);
         });
     }
     return rows;
@@ -158,30 +163,34 @@ class _HomeScreenState extends State<HomeScreen> {
             OutlinedButton.icon(
               onPressed: widget.onNewBuild,
               icon: const Icon(Icons.add_circle_outline),
-              label: const Text('Plan a network'),
+              label: const Text('Plan in chat'),
             ),
         ],
       );
     }
     if (_items.isEmpty) {
-      return AppEmptyState(
-        icon: Icons.hub_outlined,
-        title: 'No networks yet',
-        body:
-            'Describe a network in a sentence and this app plans it, '
-            'validates it, builds it and remembers the result. It will be '
-            'listed here.',
-        actions: [
-          if (widget.onNewBuild != null)
-            FilledButton.icon(
-              onPressed: widget.onNewBuild,
-              icon: const Icon(Icons.add_circle_outline),
-              label: const Text('Plan a network'),
-            ),
-          OutlinedButton.icon(
-            onPressed: _refresh,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Refresh'),
+      return AppPage(
+        maxWidth: 1000,
+        children: [
+          PktBuildHistoryPanel(onOpenPlan: widget.onOpen),
+          AppEmptyState(
+            icon: Icons.hub_outlined,
+            title: 'No saved plans yet',
+            body:
+                'Describe a network in chat to create a design. Its plan and generated .pkt file will be linked here.',
+            actions: [
+              if (widget.onNewBuild != null)
+                FilledButton.icon(
+                  onPressed: widget.onNewBuild,
+                  icon: const Icon(Icons.forum_outlined),
+                  label: const Text('Plan in chat'),
+                ),
+              OutlinedButton.icon(
+                onPressed: _refresh,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Refresh'),
+              ),
+            ],
           ),
         ],
       );
@@ -204,6 +213,12 @@ class _HomeScreenState extends State<HomeScreen> {
               statuses: _statuses,
               onChanged: (value) => setState(() => _statusFilter = value),
             ),
+            if (_selectedForCompare.length == 2)
+              OutlinedButton.icon(
+                onPressed: _compareSelected,
+                icon: const Icon(Icons.compare_arrows, size: 17),
+                label: const Text('Compare versions'),
+              ),
             PopupMenuButton<_HistorySort>(
               tooltip: 'Sort',
               initialValue: _sort,
@@ -212,10 +227,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 for (final option in _HistorySort.values)
                   PopupMenuItem(value: option, child: Text(option.label)),
               ],
-              child: _MenuChip(
-                icon: Icons.swap_vert,
-                label: _sort.label,
-              ),
+              child: _MenuChip(icon: Icons.swap_vert, label: _sort.label),
             ),
             IconButton(
               tooltip: 'Refresh',
@@ -235,6 +247,8 @@ class _HomeScreenState extends State<HomeScreen> {
               AppTheme.s24,
             ),
             children: [
+              PktBuildHistoryPanel(onOpenPlan: widget.onOpen),
+              const SizedBox(height: AppTheme.s8),
               if (_statusFilter == 'all' && _query.trim().isEmpty)
                 HistoryDashboard(items: _items),
               const SizedBox(height: AppTheme.s8),
@@ -278,6 +292,20 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (record.id != null)
+                Checkbox(
+                  value: _selectedForCompare.contains(record.id),
+                  onChanged: (selected) => setState(() {
+                    if (selected == true) {
+                      if (_selectedForCompare.length == 2) {
+                        _selectedForCompare.remove(_selectedForCompare.first);
+                      }
+                      _selectedForCompare.add(record.id!);
+                    } else {
+                      _selectedForCompare.remove(record.id);
+                    }
+                  }),
+                ),
               AppIconBubble(icon: status.icon, tone: status.tone, size: 34),
               const SizedBox(width: AppTheme.s12),
               Expanded(
@@ -386,6 +414,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     onSelected: (value) => _rowAction(value, record),
                     itemBuilder: (context) => const [
                       PopupMenuItem(
+                        value: 'checkpoint',
+                        child: Text('Save named checkpoint'),
+                      ),
+                      PopupMenuItem(
                         value: 'copy-brief',
                         child: Text('Copy the brief'),
                       ),
@@ -407,17 +439,270 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _rowAction(String action, BuildRecord record) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
     switch (action) {
+      case 'checkpoint':
+        final name = TextEditingController();
+        final checkpointName = await showDialog<String>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Save plan checkpoint'),
+            content: TextField(
+              controller: name,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Checkpoint name',
+                hintText: 'Before adding guest Wi-Fi',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, name.text.trim()),
+                child: const Text('Save checkpoint'),
+              ),
+            ],
+          ),
+        );
+        name.dispose();
+        if (checkpointName == null || checkpointName.isEmpty || !mounted) {
+          return;
+        }
+        try {
+          await context.read<MemoryService>().logBuild(
+            BuildRecord(
+              projectName: record.projectName,
+              instruction:
+                  'Checkpoint: $checkpointName · ${record.instruction}',
+              intentJson: record.intentJson,
+              target: record.target,
+              success: false,
+              status: 'checkpoint',
+              createdAt: DateTime.now(),
+            ),
+          );
+          if (!mounted) return;
+          messenger?.showSnackBar(
+            const SnackBar(content: Text('Named checkpoint saved in history.')),
+          );
+          await _refresh();
+        } catch (e) {
+          if (!mounted) return;
+          messenger?.showSnackBar(
+            SnackBar(content: Text('Could not save checkpoint: $e')),
+          );
+        }
       case 'copy-brief':
         await Clipboard.setData(ClipboardData(text: record.instruction));
-        messenger?.showSnackBar(
-          const SnackBar(content: Text('Brief copied')),
-        );
+        messenger?.showSnackBar(const SnackBar(content: Text('Brief copied')));
       case 'copy-json':
         await Clipboard.setData(ClipboardData(text: record.intentJson));
         messenger?.showSnackBar(
           const SnackBar(content: Text('Plan JSON copied')),
         );
     }
+  }
+
+  Future<void> _compareSelected() async {
+    if (_selectedForCompare.length != 2) return;
+    final records =
+        _items
+            .where((r) => r.id != null && _selectedForCompare.contains(r.id))
+            .toList()
+          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    if (records.length != 2) return;
+    final changes = <String>[];
+    NetworkIntent? beforeIntent;
+    NetworkIntent? afterIntent;
+    try {
+      final before = NetworkIntent.fromJson(
+        Map<String, dynamic>.from(jsonDecode(records[0].intentJson) as Map),
+      );
+      final after = NetworkIntent.fromJson(
+        Map<String, dynamic>.from(jsonDecode(records[1].intentJson) as Map),
+      );
+      beforeIntent = before;
+      afterIntent = after;
+      final oldNodes = {for (final n in before.nodes) n.name: n};
+      final newNodes = {for (final n in after.nodes) n.name: n};
+      if (before.projectName != after.projectName) {
+        changes.add(
+          'Project name: ${before.projectName} → ${after.projectName}',
+        );
+      }
+      final names = {...oldNodes.keys, ...newNodes.keys}.toList()..sort();
+      for (final name in names) {
+        final oldNode = oldNodes[name];
+        final newNode = newNodes[name];
+        if (oldNode == null) {
+          changes.add('Device added: $name (${newNode!.type})');
+        } else if (newNode == null) {
+          changes.add('Device removed: $name (${oldNode.type})');
+        } else {
+          final oldJson = oldNode.toJson(includeSecrets: false);
+          final newJson = newNode.toJson(includeSecrets: false);
+          final fields = {...oldJson.keys, ...newJson.keys}.toList()..sort();
+          for (final field in fields) {
+            if (jsonEncode(oldJson[field]) != jsonEncode(newJson[field])) {
+              changes.add(
+                'Device $name $field: ${jsonEncode(oldJson[field] ?? 'unset')} → ${jsonEncode(newJson[field] ?? 'unset')}',
+              );
+            }
+          }
+        }
+      }
+      String linkKey(NetLink link) {
+        final ends = ['${link.a}:${link.aIf}', '${link.b}:${link.bIf}']..sort();
+        final clock = link.dce == null ? '' : ', clock ${link.dce}';
+        return '${ends[0]} <-> ${ends[1]} (${link.cable ?? 'auto'}$clock)';
+      }
+
+      final oldLinks = before.links.map(linkKey).toSet();
+      final newLinks = after.links.map(linkKey).toSet();
+      for (final link in (newLinks.difference(oldLinks).toList()..sort())) {
+        changes.add('Cable added: $link');
+      }
+      for (final link in (oldLinks.difference(newLinks).toList()..sort())) {
+        changes.add('Cable removed: $link');
+      }
+      if (before.routing != after.routing) {
+        changes.add('Routing: ${before.routing} → ${after.routing}');
+      }
+      final oldVlans = before.vlans.toList()..sort();
+      final newVlans = after.vlans.toList()..sort();
+      if (jsonEncode(oldVlans) != jsonEncode(newVlans)) {
+        changes.add('VLANs: ${oldVlans.join(', ')} → ${newVlans.join(', ')}');
+      }
+      if (jsonEncode(before.security.toJson(includeSecrets: false)) !=
+          jsonEncode(after.security.toJson(includeSecrets: false))) {
+        final oldSecurity = before.security.toJson(includeSecrets: false);
+        final newSecurity = after.security.toJson(includeSecrets: false);
+        final fields = {...oldSecurity.keys, ...newSecurity.keys}.toList()
+          ..sort();
+        for (final field in fields) {
+          if (jsonEncode(oldSecurity[field]) !=
+              jsonEncode(newSecurity[field])) {
+            changes.add(
+              'Security $field: ${jsonEncode(oldSecurity[field] ?? 'unset')} → ${jsonEncode(newSecurity[field] ?? 'unset')}',
+            );
+          }
+        }
+      }
+      final oldAddresses = {
+        for (final a in before.addressing)
+          '${a.node}/${a.iface}':
+              '${a.ipCidr}${a.ip6Cidr == null ? '' : ' · ${a.ip6Cidr}'}',
+      };
+      final newAddresses = {
+        for (final a in after.addressing)
+          '${a.node}/${a.iface}':
+              '${a.ipCidr}${a.ip6Cidr == null ? '' : ' · ${a.ip6Cidr}'}',
+      };
+      final addressKeys = {...oldAddresses.keys, ...newAddresses.keys}.toList()
+        ..sort();
+      for (final key in addressKeys) {
+        if (oldAddresses[key] != newAddresses[key]) {
+          changes.add(
+            'Address $key: ${oldAddresses[key] ?? 'none'} → ${newAddresses[key] ?? 'none'}',
+          );
+        }
+      }
+    } catch (e) {
+      changes.add('These plan versions could not be compared: $e');
+    }
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Plan version comparison'),
+        content: SizedBox(
+          width: 780,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${records[0].projectName} · ${_whenFull(records[0].createdAt)}',
+                ),
+                Text('compared with ${_whenFull(records[1].createdAt)}'),
+                const SizedBox(height: AppTheme.s12),
+                if (beforeIntent != null && afterIntent != null) ...[
+                  const Text(
+                    'Topology preview',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: AppTheme.s8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          children: [
+                            const Text('Earlier version'),
+                            SizedBox(
+                              height: 230,
+                              child: TopologyCanvas(
+                                key: ValueKey('before-${records[0].id}'),
+                                intent: beforeIntent,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: AppTheme.s8),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            const Text('Newer version'),
+                            SizedBox(
+                              height: 230,
+                              child: TopologyCanvas(
+                                key: ValueKey('after-${records[1].id}'),
+                                intent: afterIntent,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppTheme.s12),
+                ],
+                const Text(
+                  'Changes in the saved plan',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: AppTheme.s6),
+                if (changes.isEmpty)
+                  const Text(
+                    'No device, cable, address, routing, VLAN, or security changes found.',
+                  ),
+                for (final change in changes)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppTheme.s6),
+                    child: Text('• $change'),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              widget.onOpen(records[0]);
+            },
+            child: const Text('Open earlier version'),
+          ),
+        ],
+      ),
+    );
   }
 
   ({String label, IconData icon, AppTone tone}) _status(
@@ -444,6 +729,11 @@ class _HomeScreenState extends State<HomeScreen> {
         label: 'planned',
         icon: Icons.schedule,
         tone: AppTone.accent,
+      ),
+      'checkpoint' => (
+        label: 'checkpoint',
+        icon: Icons.bookmark_outline,
+        tone: AppTone.info,
       ),
       _ => (
         label: record.status,
@@ -552,10 +842,7 @@ class _MenuChip extends StatelessWidget {
         children: [
           Icon(icon, size: 17, color: fg),
           const SizedBox(width: AppTheme.s6),
-          Text(
-            label,
-            style: theme.textTheme.labelLarge?.copyWith(color: fg),
-          ),
+          Text(label, style: theme.textTheme.labelLarge?.copyWith(color: fg)),
           const SizedBox(width: AppTheme.s4),
           Icon(Icons.expand_more, size: 16, color: fg),
         ],
@@ -576,11 +863,12 @@ class HistoryDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final total = items.length;
-    final verified = items.where((r) => r.status == 'verified').length;
-    final failed = items.where((r) => r.status == 'failed').length;
+    final builds = items.where((r) => r.status != 'checkpoint').toList();
+    final total = builds.length;
+    final verified = builds.where((r) => r.status == 'verified').length;
+    final failed = builds.where((r) => r.status == 'failed').length;
     final weekAgo = DateTime.now().subtract(const Duration(days: 7));
-    final recent = items.where((r) => r.createdAt.isAfter(weekAgo)).length;
+    final recent = builds.where((r) => r.createdAt.isAfter(weekAgo)).length;
     final rate = total == 0 ? 0 : (verified * 100 / total).round();
 
     final cells = [
@@ -600,9 +888,7 @@ class HistoryDashboard extends StatelessWidget {
         label: 'Needs attention',
         value: '$failed',
         icon: Icons.report_gmailerrorred_outlined,
-        color: failed > 0
-            ? theme.colorScheme.error
-            : theme.colorScheme.outline,
+        color: failed > 0 ? theme.colorScheme.error : theme.colorScheme.outline,
       ),
       (
         label: 'Last 7 days',

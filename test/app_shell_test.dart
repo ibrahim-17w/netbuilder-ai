@@ -7,7 +7,6 @@ import 'package:net_builder/services/settings_service.dart';
 import 'package:provider/provider.dart';
 import 'package:net_builder/screens/chat_screen.dart';
 import 'package:net_builder/screens/home_screen.dart';
-import 'package:net_builder/screens/new_build_screen.dart';
 import 'package:net_builder/screens/settings_screen.dart';
 import 'package:net_builder/widgets/action_hub.dart';
 
@@ -45,18 +44,18 @@ Future<void> _desktop(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('the desktop rail offers every screen by name', (tester) async {
+  testWidgets('the desktop rail offers every workspace without a build form', (
+    tester,
+  ) async {
     await _desktop(tester);
 
     // Each of these was a screen with no way in before the rail existed.
     for (final label in const [
       'Chat',
-      'New build',
       'Analyze and fix',
       'Packet Tracer files',
       'Saved networks',
       'Memory and learning',
-      'Settings',
     ]) {
       expect(
         find.text(label),
@@ -64,30 +63,39 @@ void main() {
         reason: '"$label" must be reachable by name',
       );
     }
+    expect(
+      find.byTooltip('Settings'),
+      findsOneWidget,
+      reason: 'settings have one app-bar entry',
+    );
+    expect(
+      find.text('New build'),
+      findsNothing,
+      reason: 'new network design starts in chat',
+    );
     // The brand lives once, on the rail.
     expect(find.text('NetBuilder'), findsOneWidget);
     expect(find.text('All features'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the rail actually moves between screens', (tester) async {
+  testWidgets('chat, saved networks, and settings open from one shell', (
+    tester,
+  ) async {
     await _desktop(tester);
-
-    await tester.tap(find.text('New build'));
-    await tester.pumpAndSettle();
-    expect(find.byType(NewBuildScreen), findsOneWidget);
 
     await tester.tap(find.text('Saved networks'));
     await tester.pumpAndSettle();
     expect(find.byType(HomeScreen), findsOneWidget);
 
-    await tester.tap(find.text('Settings'));
-    await tester.pumpAndSettle();
-    expect(find.byType(SettingsScreen), findsOneWidget);
-
-    await tester.tap(find.text('Chat'));
+    await tester.tap(find.text('Plan in chat'));
     await tester.pumpAndSettle();
     expect(find.byType(ChatScreen), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SettingsScreen), findsOneWidget);
+    expect(find.byType(Scaffold).first, findsOneWidget);
   });
 
   testWidgets('the hub opens from the app bar', (tester) async {
@@ -99,7 +107,7 @@ void main() {
     expect(find.byType(ActionHubPanel), findsOneWidget);
     expect(find.text('Find a feature'), findsOneWidget);
     expect(find.text('PLAN A NETWORK'), findsOneWidget);
-    expect(find.text('Plan a network from a sentence'), findsOneWidget);
+    expect(find.text('Plan a network in chat'), findsOneWidget);
 
     // The network operations that had no interface at all before are in here
     // too - reached by the hub's own search, which is how it is meant to be
@@ -128,8 +136,9 @@ void main() {
     expect(find.text('Find a feature'), findsOneWidget);
   });
 
-  testWidgets('the toolkit opens from the app bar, on the calculator',
-      (tester) async {
+  testWidgets('the toolkit opens from the app bar, on the calculator', (
+    tester,
+  ) async {
     await _desktop(tester);
 
     // The rail carries the same control, so the app bar's is the first.
@@ -141,8 +150,9 @@ void main() {
     expect(find.text('255.255.255.0'), findsOneWidget);
   });
 
-  testWidgets('the chat offers openers, and one fills the composer',
-      (tester) async {
+  testWidgets('the chat offers openers, and one fills the composer', (
+    tester,
+  ) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
@@ -170,8 +180,9 @@ void main() {
     expect(composer.controller!.text.toLowerCase(), contains('network'));
   });
 
-  testWidgets('the chat names the conversation and can start another one',
-      (tester) async {
+  testWidgets('the chat names the conversation and can start another one', (
+    tester,
+  ) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
@@ -179,8 +190,11 @@ void main() {
     // status tag, a message count and a project chip all used to sit here,
     // and the chat read like a dashboard rather than a conversation.
     expect(find.byTooltip('New chat'), findsOneWidget);
-    expect(find.byTooltip('Clear this conversation'), findsNothing,
-        reason: 'clear is destructive and moved into the tools sheet');
+    expect(
+      find.byTooltip('Clear this conversation'),
+      findsNothing,
+      reason: 'clear is destructive and moved into the tools sheet',
+    );
     expect(find.textContaining('message(s)'), findsNothing);
 
     await tester.tap(find.byTooltip('New chat'));
@@ -194,8 +208,9 @@ void main() {
     expect(find.text("What are we building today?"), findsOneWidget);
   });
 
-  testWidgets('a sent message gets its own name, time and actions',
-      (tester) async {
+  testWidgets('a sent message gets its own name, time and actions', (
+    tester,
+  ) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
@@ -209,7 +224,7 @@ void main() {
     // The message is presented as a turn in a conversation: who said it, the
     // text, and the things you can do with it afterwards.
     expect(find.text('You'), findsWidgets);
-    expect(find.text('Copy'), findsWidgets);
-    expect(find.text('Edit and resend'), findsWidgets);
+    expect(find.byTooltip('Copy message'), findsWidgets);
+    expect(find.text('Edit'), findsWidgets);
   });
 }

@@ -35,16 +35,22 @@ void main() {
       expect(SidecarSupervisor.canRunLocally, isFalse);
     });
 
-    test('it never tries to start a sidecar, and says where the engine is', () async {
-      final result = await SidecarSupervisor.ensureStarted(force: true);
-      expect(result.ok, isFalse);
-      expect(result.method, 'phone');
-      expect(result.message, contains('PC'));
-      expect(result.message, contains('5005'));
-      expect(SidecarSupervisor.searchRoots(), isEmpty,
-          reason: 'there is nothing to find on a phone');
-      expect(SidecarSupervisor.weStartedIt, isFalse);
-    });
+    test(
+      'it never tries to start a sidecar, and says where the engine is',
+      () async {
+        final result = await SidecarSupervisor.ensureStarted(force: true);
+        expect(result.ok, isFalse);
+        expect(result.method, 'phone');
+        expect(result.message, contains('PC'));
+        expect(result.message, contains('5005'));
+        expect(
+          SidecarSupervisor.searchRoots(),
+          isEmpty,
+          reason: 'there is nothing to find on a phone',
+        );
+        expect(SidecarSupervisor.weStartedIt, isFalse);
+      },
+    );
 
     test('engine status refuses to launch and explains why', () async {
       var launched = 0;
@@ -58,8 +64,11 @@ void main() {
 
       expect(status.canStartLocally, isFalse);
       expect(await status.ensure(force: true), isFalse);
-      expect(launched, 0,
-          reason: 'a phone must not spawn a process that cannot exist');
+      expect(
+        launched,
+        0,
+        reason: 'a phone must not spawn a process that cannot exist',
+      );
       expect(status.detail, contains('PC'));
       expect(status.summary, contains('PC'));
     });
@@ -69,10 +78,14 @@ void main() {
       expect(
         AutopilotService.startHint,
         isNot(contains('python.org')),
-        reason: 'Python cannot be installed on a phone, so that advice is noise',
+        reason:
+            'Python cannot be installed on a phone, so that advice is noise',
       );
-      expect(AutopilotService.desktopStartHint, contains('python.org'),
-          reason: 'on a desktop the Python steps are exactly what is needed');
+      expect(
+        AutopilotService.desktopStartHint,
+        contains('python.org'),
+        reason: 'on a desktop the Python steps are exactly what is needed',
+      );
     });
 
     test('the default engine address is the host, not the phone', () {
@@ -98,8 +111,9 @@ void main() {
       expect(report, contains('platform:'));
     });
 
-    testWidgets('the engine screen tells a phone what to do instead',
-        (tester) async {
+    testWidgets('the phone page shows local tools without engine errors', (
+      tester,
+    ) async {
       await asMobile(true, () async {
         await tester.pumpWidget(const MaterialApp(home: EngineScreen()));
         await tester.pumpAndSettle();
@@ -107,29 +121,30 @@ void main() {
         expect(find.text('Start the engine'), findsNothing);
         expect(find.text('Restart'), findsNothing);
         expect(find.text('Stop'), findsNothing);
-        expect(find.textContaining('The engine runs on a PC'), findsOneWidget);
-        expect(find.textContaining('10.0.2.2'), findsWidgets,
-            reason: 'the emulator host is the one address that always works');
+        expect(find.text('On this phone'), findsOneWidget);
+        expect(find.text('Ready on this phone'), findsOneWidget);
+        expect(find.textContaining('Not running'), findsNothing);
+        expect(find.textContaining('10.0.2.2'), findsNothing);
       });
     });
 
-    testWidgets('the chat offers the address, never a start button',
-        (tester) async {
+    testWidgets('the chat hides desktop engine status on a phone', (
+      tester,
+    ) async {
       await asMobile(true, () async {
         await tester.pumpWidget(const NetBuilderApp());
         for (var i = 0; i < 12; i++) {
           await tester.pump(const Duration(milliseconds: 250));
         }
 
-        expect(find.textContaining('No .pkt engine at'), findsOneWidget);
-        // On a phone the engine is optional: the bundled template library
-        // builds the file on the device, so the banner is a status, not an
-        // alarm.
-        expect(find.textContaining('Builds run on this device'),
-            findsOneWidget);
-        expect(find.text('Set address'), findsOneWidget);
-        expect(find.text('Start engine'), findsNothing,
-            reason: 'a button that cannot work is worse than no button');
+        expect(find.textContaining('No .pkt engine at'), findsNothing);
+        expect(find.text('Engine'), findsNothing);
+        expect(find.text('Set address'), findsNothing);
+        expect(
+          find.text('Start engine'),
+          findsNothing,
+          reason: 'the phone should show the on-device build path',
+        );
       });
     });
   });

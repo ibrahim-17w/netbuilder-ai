@@ -1578,7 +1578,8 @@ class _ExporterTool extends StatelessWidget {
           ),
           _ExportTile(
             title: 'Terraform (AWS VPC)',
-            description: 'The cloud equivalent of the same topology.',
+            description:
+                'A minimal AWS VPC example; device topology and network policies require additional cloud resources.',
             icon: Icons.cloud_outlined,
             render: () => TerraformAdapter.renderAwsVpc(plan),
           ),

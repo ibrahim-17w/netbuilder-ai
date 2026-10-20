@@ -86,12 +86,13 @@ void main() {
     // CustomPaint exists (at least ours)
     expect(find.byType(CustomPaint), findsWidgets);
 
-    // tap where the canvas places R1 (layout is deterministic at this size)
-    final positions = layoutPlan(_intent(), const Size(800, 600));
-    await tester.tapAt(positions['R1']!);
+    // The viewport fits network coordinates uniformly to the available space.
+    final semantics = tester.ensureSemantics();
+    await tester.tap(find.bySemanticsLabel(RegExp(r'^router R1\.')));
     await tester.pumpAndSettle();
     // inspector bottom sheet shows the node name and its interface
     expect(find.text('R1'), findsOneWidget);
     expect(find.textContaining('g0/0'), findsOneWidget);
+    semantics.dispose();
   });
 }

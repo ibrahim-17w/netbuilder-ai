@@ -97,7 +97,8 @@ class _PktViewerScreenState extends State<PktViewerScreen> {
                     // drawing of the same file - not Packet Tracer itself.
                     'Packet Tracer was not found on this device, so this is '
                     'the built-in viewer: the same network the file '
-                    'contains, drawn Packet Tracer-style. Drag to explore; '
+                    'contains, drawn Packet Tracer-style. Drag or pinch to '
+                    'explore; '
                     'tap a device for details. Install Packet Tracer and '
                     'the same file will open there.',
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -111,6 +112,7 @@ class _PktViewerScreenState extends State<PktViewerScreen> {
                     child: TopologyCanvas(
                       intent: intent,
                       layout: _layout,
+                      allowNodeDrag: false,
                     ),
                   ),
                 ),

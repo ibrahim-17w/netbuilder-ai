@@ -1,8 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:net_builder/models/chat_message.dart';
 import 'package:net_builder/models/network_intent.dart';
 import 'package:net_builder/screens/chat_screen.dart';
+import 'package:net_builder/screens/layout_gallery_screen.dart';
+import 'package:net_builder/services/layout_intent.dart';
 import 'package:net_builder/services/memory_service.dart';
 import 'package:net_builder/services/session_state.dart';
 import 'package:net_builder/services/settings_service.dart';
@@ -52,8 +56,11 @@ class _FakeStore extends MemoryService {
     required this.transcripts,
     Map<String, String>? titles,
     Map<String, String>? projects,
+    this.stateJson = '{}',
   }) : titles = titles ?? {},
        projects = projects ?? {};
+
+  final String stateJson;
 
   @override
   bool get ready => true;
@@ -78,9 +85,7 @@ class _FakeStore extends MemoryService {
       // The store stamps a conversation with the time of its last turn; the
       // sidebar groups on that, so the fake derives it from the transcript.
       final last = entry.value.isEmpty ? null : entry.value.last.createdAt;
-      final at = last == null
-          ? DateTime.now()
-          : DateTime.parse(last);
+      final at = last == null ? DateTime.now() : DateTime.parse(last);
       out.add({
         'id': entry.key,
         'title': titles[entry.key] ?? entry.value.first.text,
@@ -100,7 +105,7 @@ class _FakeStore extends MemoryService {
     'title': titles[id] ?? '',
     'project': projects[id] ?? '',
     'summary': '',
-    'stateJson': '{}',
+    'stateJson': stateJson,
   };
 
   @override
@@ -131,30 +136,47 @@ class _FakeStore extends MemoryService {
   final List<ChatMessage> logged = <ChatMessage>[];
 
   @override
-  Future<int> logChat(ChatMessage message, {String conversation = 'default'})
-      async {
+  Future<int> logChat(
+    ChatMessage message, {
+    String conversation = 'default',
+  }) async {
     logged.add(message);
     return logged.length;
   }
 
   @override
-  Future<void> ensureConversation(String id, {String project = '', String title = ''})
-      async {}
+  Future<void> ensureConversation(
+    String id, {
+    String project = '',
+    String title = '',
+  }) async {}
+
+  String? savedState;
 
   @override
-  Future<void> setSessionState(String id, String stateJson) async {}
+  Future<void> setSessionState(String id, String stateJson) async {
+    savedState = stateJson;
+  }
 
   @override
-  Future<void> setConversationSummary(String id, String summary, {int upToId = 0})
-      async {}
+  Future<void> setConversationSummary(
+    String id,
+    String summary, {
+    int upToId = 0,
+  }) async {}
 
   @override
   Future<void> updateChat(int id, ChatMessage message) async {}
 
   /// Every history rewrite the screen asked for, in order: the store side of
   /// "Answer again" and "Edit and resend".
-  final List<({String conversation, int? fromId, String fromRole, String fromText})>
-  truncations = <({String conversation, int? fromId, String fromRole, String fromText})>[];
+  final List<
+    ({String conversation, int? fromId, String fromRole, String fromText})
+  >
+  truncations =
+      <
+        ({String conversation, int? fromId, String fromRole, String fromText})
+      >[];
 
   @override
   Future<int> deleteChatFrom(
@@ -177,7 +199,8 @@ class _FakeStore extends MemoryService {
     var anchor = -1;
     for (var i = 0; i < transcript.length; i++) {
       final m = transcript[i];
-      final matched = (fromId != null && m.id == fromId) ||
+      final matched =
+          (fromId != null && m.id == fromId) ||
           (fromId == null &&
               m.createdAt == fromCreatedAt &&
               m.role == fromRole &&
@@ -191,6 +214,29 @@ class _FakeStore extends MemoryService {
     final removed = transcript.length - anchor;
     transcripts[conversation] = transcript.sublist(0, anchor);
     return removed;
+  }
+
+  @override
+  Future<int?> replaceChatMessage({
+    required String conversation,
+    required ChatMessage previous,
+    required ChatMessage replacement,
+  }) async {
+    final transcript = transcripts[conversation];
+    if (transcript == null) return null;
+    final index = transcript.indexWhere(
+      (message) =>
+          (previous.id != null && message.id == previous.id) ||
+          (previous.id == null &&
+              message.createdAt == previous.createdAt &&
+              message.role == previous.role &&
+              message.text == previous.text),
+    );
+    if (index < 0) return null;
+    final id = previous.id ?? index + 1;
+    transcript[index] = replacement.copyWith(id: id);
+    logged.add(replacement);
+    return id;
   }
 
   @override
@@ -228,7 +274,8 @@ _FakeStore _seeded() => _FakeStore(
 Widget _chat(MemoryService mem, {SettingsService? settings}) => MultiProvider(
   providers: [
     ChangeNotifierProvider<SettingsService>.value(
-        value: settings ?? _FakeSettings()),
+      value: settings ?? _FakeSettings(),
+    ),
     ChangeNotifierProvider<MemoryService>.value(value: mem),
   ],
   child: const MaterialApp(home: Scaffold(body: ChatScreen())),
@@ -248,9 +295,71 @@ void _wide(WidgetTester tester) {
 }
 
 void main() {
+  testWidgets(
+    'a gallery selection replaces old positions and survives reopening',
+    (tester) async {
+      _wide(tester);
+      final plan = NetworkIntent.parseSimple(
+        'office',
+        '1 router, 2 switches and 6 PCs',
+      ).copyWith(layout: const {'R1': Offset(999, 999)});
+      final initial = SessionState()..withIntentJson(jsonEncode(plan.toJson()));
+      final store = _FakeStore(
+        transcripts: {
+          'default': [_turn('model', 'Network ready')],
+        },
+        stateJson: initial.encode(),
+      );
+      await tester.pumpWidget(_chat(store));
+      await tester.pumpAndSettle();
+      await tester.enterText(_composer(), 'Preview this drawing');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      expect(find.byType(LayoutGalleryScreen), findsOneWidget);
+      // Even confirming the default must persist it: otherwise a first build
+      // silently uses the compiler's independent fallback arrangement.
+      await tester.tap(find.text('Use this layout'));
+      await tester.pumpAndSettle();
+      expect(store.savedState, isNotNull);
+      final saved = SessionState.decode(store.savedState!);
+      final selected = NetworkIntent.fromJson(jsonDecode(saved.intentJson));
+      expect(selected.notes.map(LayoutRequest.styleFromNote), contains('tree'));
+      expect(selected.layout, isEmpty);
+
+      final reopened = _FakeStore(
+        transcripts: {
+          'default': [_turn('model', 'Network ready')],
+        },
+        stateJson: store.savedState!,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(_chat(reopened));
+      await tester.pumpAndSettle();
+      await tester.enterText(_composer(), 'Preview this drawing');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<LayoutGalleryScreen>(find.byType(LayoutGalleryScreen))
+            .currentStyle,
+        'tree',
+      );
+      await tester.tap(find.text('Show more designs'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Straight rows'));
+      await tester.tap(find.text('Use this layout'));
+      await tester.pumpAndSettle();
+      final changed = NetworkIntent.fromJson(
+        jsonDecode(SessionState.decode(reopened.savedState!).intentJson),
+      );
+      expect(changed.notes.map(LayoutRequest.styleFromNote), contains('rows'));
+    },
+  );
+
   group('the conversation sidebar', () {
-    testWidgets('lists the saved conversations, grouped by time',
-        (tester) async {
+    testWidgets('lists the saved conversations, grouped by time', (
+      tester,
+    ) async {
       _wide(tester);
       await tester.pumpWidget(_chat(_seeded()));
       await tester.pumpAndSettle();
@@ -260,13 +369,22 @@ void main() {
       // matters is that a chat can be started from the list.
       expect(find.text('New chat'), findsWidgets);
       expect(find.text('Search'), findsOneWidget);
-      expect(find.text('Trunk Problem'), findsOneWidget,
-          reason: 'a generated/renamed title is what the list shows');
-      expect(find.text('R7 lost its route'), findsOneWidget,
-          reason: 'a chat with no stored title falls back to its first turn');
+      expect(
+        find.text('Trunk Problem'),
+        findsOneWidget,
+        reason: 'a generated/renamed title is what the list shows',
+      );
+      expect(
+        find.text('R7 lost its route'),
+        findsOneWidget,
+        reason: 'a chat with no stored title falls back to its first turn',
+      );
       expect(find.text('Today'), findsWidgets);
-      expect(find.text('Previous 7 days'), findsWidgets,
-          reason: 'older chats are grouped by time');
+      expect(
+        find.text('Previous 7 days'),
+        findsWidgets,
+        reason: 'older chats are grouped by time',
+      );
     });
 
     testWidgets('searches by message text, not just by title', (tester) async {
@@ -297,8 +415,11 @@ void main() {
 
       await tester.tap(find.text('Trunk Problem'));
       await tester.pumpAndSettle();
-      expect(find.text('SW1 f0/1 is not trunking.'), findsWidgets,
-          reason: 'opening a chat restores its transcript');
+      expect(
+        find.text('SW1 f0/1 is not trunking.'),
+        findsWidgets,
+        reason: 'opening a chat restores its transcript',
+      );
 
       await tester.tap(find.text('New chat').first);
       await tester.pumpAndSettle();
@@ -326,8 +447,9 @@ void main() {
       expect(find.byType(ConversationSidebar), findsOneWidget);
     });
 
-    testWidgets('the back gesture closes the panel over the chat',
-        (tester) async {
+    testWidgets('the back gesture closes the panel over the chat', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(700, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -347,8 +469,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('a narrow window slides the list over the chat',
-        (tester) async {
+    testWidgets('a narrow window slides the list over the chat', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(700, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -368,8 +491,9 @@ void main() {
   });
 
   group('the welcome screen', () {
-    testWidgets('asks the networking question and offers openers',
-        (tester) async {
+    testWidgets('asks the networking question and offers openers', (
+      tester,
+    ) async {
       _wide(tester);
       await tester.pumpWidget(_chat(_seeded()));
       await tester.pumpAndSettle();
@@ -409,7 +533,10 @@ void main() {
               entries: const [
                 ActivityEntry('Loaded office-network.pkt'),
                 ActivityEntry('Validated the plan', detail: '12 devices'),
-                ActivityEntry('Checked PC1 -> SRV1', status: ActivityStatus.failed),
+                ActivityEntry(
+                  'Checked PC1 -> SRV1',
+                  status: ActivityStatus.failed,
+                ),
               ],
               expanded: true,
               onToggle: _noop,
@@ -421,8 +548,11 @@ void main() {
       expect(find.text('Loaded office-network.pkt'), findsOneWidget);
       expect(find.textContaining('3 step(s)'), findsOneWidget);
       expect(find.textContaining('found 2 issue(s)'), findsOneWidget);
-      expect(find.byIcon(Icons.close), findsOneWidget,
-          reason: 'a failed step is marked, not hidden');
+      expect(
+        find.byIcon(Icons.close),
+        findsOneWidget,
+        reason: 'a failed step is marked, not hidden',
+      );
     });
 
     testWidgets('collapses', (tester) async {
@@ -445,8 +575,9 @@ void main() {
   });
 
   group('the network inspector', () {
-    testWidgets('shows the plan, the findings and the change log',
-        (tester) async {
+    testWidgets('shows the plan, the findings and the change log', (
+      tester,
+    ) async {
       // A plan the validator really flags, so the findings section carries
       // the checker's own words rather than a decorative list.
       final intent = NetworkIntent(
@@ -502,8 +633,11 @@ void main() {
         find.textContaining('Detected problems'.toUpperCase()),
         findsOneWidget,
       );
-      expect(issues, isNotEmpty,
-          reason: 'the panel shows the validator\'s own output');
+      expect(
+        issues,
+        isNotEmpty,
+        reason: 'the panel shows the validator\'s own output',
+      );
       expect(find.textContaining('Duplicate device names.'), findsOneWidget);
     });
 
@@ -524,8 +658,9 @@ void main() {
   });
 
   group('a keyless conversation is a conversation', () {
-    testWidgets('it answers, writes its answer down, and offers the next tap',
-        (tester) async {
+    testWidgets('it answers, writes its answer down, and offers the next tap', (
+      tester,
+    ) async {
       _wide(tester);
       final store = _seeded();
       await tester.pumpWidget(_chat(store));
@@ -540,21 +675,31 @@ void main() {
       // THE BRIEF CONVERSATION: a brief with critical gaps (scale, routing)
       // asks instead of dumping a plan with a build button. The way out is
       // still a tap: answer the questions, or take the defaults.
-      expect(find.textContaining('before I plan this'), findsOneWidget,
-          reason: 'a brief with critical gaps asks before it plans');
+      expect(
+        find.textContaining('before I plan this'),
+        findsOneWidget,
+        reason: 'a brief with critical gaps asks before it plans',
+      );
       expect(
         store.logged.where((m) => m.role == 'model'),
         isNotEmpty,
         reason: 'an answer that is not stored is an answer lost on restart',
       );
-      expect(find.text('Just build it with defaults'), findsOneWidget,
-          reason: 'its own way out is a tap, not a typing exercise');
-      expect(find.textContaining('Still open'), findsNothing,
-          reason: 'the questions ARE the still-open list');
+      expect(
+        find.text('Just build it with defaults'),
+        findsOneWidget,
+        reason: 'its own way out is a tap, not a typing exercise',
+      );
+      expect(
+        find.textContaining('Still open'),
+        findsNothing,
+        reason: 'the questions ARE the still-open list',
+      );
     });
 
-    testWidgets('a screen reader hears the suggestions and the field',
-        (tester) async {
+    testWidgets('a screen reader hears the suggestions and the field', (
+      tester,
+    ) async {
       final semantics = tester.ensureSemantics();
       _wide(tester);
       final store = _seeded();
@@ -576,8 +721,9 @@ void main() {
       semantics.dispose();
     });
 
-    testWidgets('a screen reader reaches an advice answer and its chips',
-        (tester) async {
+    testWidgets('a screen reader reaches an advice answer and its chips', (
+      tester,
+    ) async {
       final semantics = tester.ensureSemantics();
       _wide(tester);
       final store = _seeded();
@@ -611,8 +757,9 @@ void main() {
       semantics.dispose();
     });
 
-    testWidgets('a follow-up about the same lab does not become a new one',
-        (tester) async {
+    testWidgets('a follow-up about the same lab does not become a new one', (
+      tester,
+    ) async {
       _wide(tester);
       final store = _seeded();
       await tester.pumpWidget(_chat(store));
@@ -620,7 +767,8 @@ void main() {
       await tester.tap(find.text('New chat').first);
       await tester.pumpAndSettle();
 
-      await tester.enterText(_composer(),
+      await tester.enterText(
+        _composer(),
         'I have 10 Pcs and want to build a network for them add switches and '
         'routers and servers and make security maximum',
       );
@@ -628,8 +776,11 @@ void main() {
       await tester.pumpAndSettle();
       // The brief conversation: the lab parsed (10 PCs, a server), but the
       // segmentation gap asks before a plan is committed.
-      expect(find.textContaining('before I plan this'), findsOneWidget,
-          reason: 'the lab parsed, but the ask comes before the plan dump');
+      expect(
+        find.textContaining('before I plan this'),
+        findsOneWidget,
+        reason: 'the lab parsed, but the ask comes before the plan dump',
+      );
 
       // Answer the one gap this lab has (one router: no routing question).
       await tester.enterText(_composer(), 'one flat network');
@@ -637,7 +788,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.textContaining('VLANs: one flat network'), findsWidgets);
 
-      await tester.enterText(_composer(), 'can we add AAA server to it as well ?');
+      await tester.enterText(
+        _composer(),
+        'can we add AAA server to it as well ?',
+      );
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pumpAndSettle();
 
@@ -645,13 +799,17 @@ void main() {
       // links, because the follow-up named a device. The answer now describes
       // the change against the lab that exists.
       expect(find.textContaining('AAA added'), findsOneWidget);
-      expect(find.textContaining('10 PCs'), findsWidgets,
-          reason: 'the ten PCs are still part of the answer');
+      expect(
+        find.textContaining('10 PCs'),
+        findsWidgets,
+        reason: 'the ten PCs are still part of the answer',
+      );
       expect(find.textContaining('Devices: 1,'), findsNothing);
     });
 
-    testWidgets('an answer is a real turn, and it fills the brief',
-        (tester) async {
+    testWidgets('an answer is a real turn, and it fills the brief', (
+      tester,
+    ) async {
       _wide(tester);
       final store = _seeded();
       await tester.pumpWidget(_chat(store));
@@ -670,14 +828,15 @@ void main() {
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pumpAndSettle();
 
-      expect(store.logged.where((m) => m.role == 'user'),
-          contains(predicate((ChatMessage m) => m.text.trim() == '25')));
+      expect(
+        store.logged.where((m) => m.role == 'user'),
+        contains(predicate((ChatMessage m) => m.text.trim() == '25')),
+      );
       expect(find.textContaining('Scale: 25 users'), findsWidgets);
       expect(find.byKey(const ValueKey('brief-card')), findsWidgets);
       // Routing is still open: the conversation continues with the next
       // question rather than a plan.
-      expect(find.textContaining('How should the routers route'),
-          findsWidgets);
+      expect(find.textContaining('How should the routers route'), findsWidgets);
 
       // Answering the last question readies the brief - the way out is a
       // tap, and the ack says so.
@@ -689,8 +848,9 @@ void main() {
       expect(find.text('Build the .pkt'), findsOneWidget);
     });
 
-    testWidgets('a what-if about the lab does not change the lab',
-        (tester) async {
+    testWidgets('a what-if about the lab does not change the lab', (
+      tester,
+    ) async {
       _wide(tester);
       final store = _seeded();
       await tester.pumpWidget(_chat(store));
@@ -701,8 +861,11 @@ void main() {
       await tester.enterText(_composer(), '2 routers and 4 switches');
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pumpAndSettle();
-      expect(find.textContaining('before I plan this'), findsOneWidget,
-          reason: 'the brief is open, with scale and routing unanswered');
+      expect(
+        find.textContaining('before I plan this'),
+        findsOneWidget,
+        reason: 'the brief is open, with scale and routing unanswered',
+      );
 
       // The wondering turn. It is answered like any other - it lands in the
       // transcript and it is written down - but nothing about the lab moves.
@@ -739,8 +902,9 @@ void main() {
       expect(find.textContaining('Scale: 25 users'), findsWidgets);
     });
 
-    testWidgets('a what-if does not answer the open question either',
-        (tester) async {
+    testWidgets('a what-if does not answer the open question either', (
+      tester,
+    ) async {
       _wide(tester);
       final store = _seeded();
       await tester.pumpWidget(_chat(store));
@@ -759,8 +923,11 @@ void main() {
       await tester.enterText(_composer(), 'what if we used OSPF instead?');
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pumpAndSettle();
-      expect(find.textContaining('Routing: OSPF'), findsNothing,
-          reason: 'a what-if must not fill in the open question');
+      expect(
+        find.textContaining('Routing: OSPF'),
+        findsNothing,
+        reason: 'a what-if must not fill in the open question',
+      );
       expect(
         find.textContaining('Nothing in your lab changed'),
         findsWidgets,
@@ -772,9 +939,108 @@ void main() {
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pumpAndSettle();
       expect(find.textContaining('Scale: 25 users'), findsWidgets);
-      expect(find.textContaining('How should the routers route'), findsWidgets,
-          reason: 'routing is still open - the what-if did not answer it');
+      expect(
+        find.textContaining('How should the routers route'),
+        findsWidgets,
+        reason: 'routing is still open - the what-if did not answer it',
+      );
     });
+  });
+
+  group('offline Packet Tracer analysis follow-ups', () {
+    Map<String, dynamic> analysis() => {
+      'version': 1,
+      'name': 'serial.pkt',
+      'path': '/labs/serial.pkt',
+      'deviceCount': 2,
+      'linkCount': 1,
+      'devices': const [],
+      'interfaces': const [],
+      'links': const [],
+      'findings': [
+        {
+          'id': 'Router0:offline:link:1',
+          'kind': 'connected_interface_down',
+          'severity': 'medium',
+          'device': 'Router0 <-> Router1',
+          'text':
+              'Cabled link Router0 Serial0/2/0 <-> Router1 '
+              'Serial0/2/0 has a saved-down endpoint. If active, check both '
+              'interfaces and serial clocking. If unused, leaving it down '
+              'is normal.',
+          'fix_cli': const [],
+          'repairs': [
+            {
+              'id': 'Router0:offline:link:1',
+              'device': 'Router0',
+              'fix_cli': ['interface Serial0/2/0', 'no shutdown'],
+            },
+            {
+              'id': 'Router0:offline:link:1',
+              'device': 'Router1',
+              'fix_cli': ['interface Serial0/2/0', 'no shutdown'],
+            },
+          ],
+        },
+      ],
+    };
+
+    _FakeStore seededStore() {
+      final scan = analysis();
+      final state = SessionState().withCaptureAnalysis(
+        path: '/labs/serial.pkt',
+        name: 'serial.pkt',
+        analysisJson: jsonEncode(scan),
+      );
+      return _FakeStore(
+        transcripts: {
+          'default': [_turn('model', 'Offline review of serial.pkt')],
+        },
+        stateJson: state.encode(),
+      );
+    }
+
+    testWidgets('why questions explain the scan without a repair card', (
+      tester,
+    ) async {
+      _wide(tester);
+      final store = seededStore();
+      await tester.pumpWidget(_chat(store));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), 'why no shutdown is important?');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('unused spare port should usually stay shut'),
+        findsOneWidget,
+      );
+      expect(find.text('Create fixed copy'), findsNothing);
+      expect(store.logged.where((m) => m.role == 'user'), hasLength(1));
+    });
+
+    testWidgets(
+      'a specific fix request shows commands and waits for approval',
+      (tester) async {
+        _wide(tester);
+        final store = seededStore();
+        await tester.pumpWidget(_chat(store));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(_composer(), 'fix Router0 Serial0/2/0');
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Create fixed copy'), findsOneWidget);
+        expect(find.textContaining('no shutdown'), findsWidgets);
+        expect(
+          find.textContaining('original file stays untouched'),
+          findsOneWidget,
+        );
+        expect(store.logged.where((m) => m.role == 'model'), hasLength(1));
+      },
+    );
   });
 
   group('clearing a conversation', () {
@@ -803,12 +1069,19 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, 'Clear'));
       await tester.pumpAndSettle();
 
-      expect(store.cleared, ['trunk-lab'],
-          reason: 'one chat was cleared, named');
-      expect(store.cleared, isNot(contains('')),
-          reason: 'an empty id means "every conversation" to the store');
-      expect(store.transcripts.containsKey('routing-lab'), isTrue,
-          reason: 'the other conversation is untouched');
+      expect(store.cleared, [
+        'trunk-lab',
+      ], reason: 'one chat was cleared, named');
+      expect(
+        store.cleared,
+        isNot(contains('')),
+        reason: 'an empty id means "every conversation" to the store',
+      );
+      expect(
+        store.transcripts.containsKey('routing-lab'),
+        isTrue,
+        reason: 'the other conversation is untouched',
+      );
     });
   });
 
@@ -844,9 +1117,60 @@ void main() {
     });
   });
 
+  group('fast offline conversation', () {
+    testWidgets(
+      'a plain hello is answered immediately without a thinking turn',
+      (tester) async {
+        _wide(tester);
+        final store = _FakeStore(transcripts: {});
+        await tester.pumpWidget(_chat(store));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(_composer(), 'hello');
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        await tester.pumpAndSettle();
+
+        expect(find.text('hello'), findsOneWidget);
+        expect(find.text('Thinking...'), findsNothing);
+        expect(store.logged.where((m) => m.role == 'user'), hasLength(1));
+        expect(store.logged.where((m) => m.role == 'model'), hasLength(1));
+        expect(
+          store.logged.singleWhere((m) => m.role == 'model').text.toLowerCase(),
+          contains('offline'),
+        );
+      },
+    );
+
+    testWidgets('a greeting stays fast when this chat already has a lab', (
+      tester,
+    ) async {
+      _wide(tester);
+      final plan = NetworkIntent.parseSimple(
+        'office',
+        '2 routers and 1 switch',
+      );
+      final state = SessionState()..withIntentJson(jsonEncode(plan.toJson()));
+      final store = _FakeStore(transcripts: {}, stateJson: state.encode());
+      await tester.pumpWidget(_chat(store));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), 'hello');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Thinking...'), findsNothing);
+      expect(find.textContaining('Read as: a greeting'), findsNothing);
+      expect(
+        store.logged.singleWhere((m) => m.role == 'model').text.toLowerCase(),
+        contains('offline'),
+      );
+    });
+  });
+
   group('the context report tells the truth about the window', () {
-    testWidgets('it names the runtime window when it is asked for',
-        (tester) async {
+    testWidgets('it names the runtime window when it is asked for', (
+      tester,
+    ) async {
       _wide(tester);
       await tester.pumpWidget(_chat(_seeded()));
       await tester.pumpAndSettle();
@@ -893,8 +1217,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('a tapped skill lands in the composer instead of sending',
-        (tester) async {
+    testWidgets('a tapped skill lands in the composer instead of sending', (
+      tester,
+    ) async {
       _wide(tester);
       final store = _seeded();
       await tester.pumpWidget(_chat(store));
@@ -913,8 +1238,9 @@ void main() {
       expect(store.logged.where((m) => m.role == 'user'), isEmpty);
     });
 
-    testWidgets('Enter on a partial command completes it and runs it',
-        (tester) async {
+    testWidgets('Enter on a partial command completes it and runs it', (
+      tester,
+    ) async {
       _wide(tester);
       await tester.pumpWidget(_chat(_seeded()));
       await tester.pumpAndSettle();
@@ -929,12 +1255,16 @@ void main() {
 
       // "/sk" completed to "/skills", which answered in the chat itself.
       expect(find.textContaining('What this app can do'), findsOneWidget);
-      expect(find.textContaining('Read a .pkt'), findsOneWidget,
-          reason: 'the catalog itself is readable text');
+      expect(
+        find.textContaining('Read a .pkt'),
+        findsOneWidget,
+        reason: 'the catalog itself is readable text',
+      );
     });
 
-    testWidgets('/target switches where builds are aimed, and says so',
-        (tester) async {
+    testWidgets('/target switches where builds are aimed, and says so', (
+      tester,
+    ) async {
       _wide(tester);
       final settings = _FakeSettings();
       await tester.pumpWidget(_chat(_seeded(), settings: settings));
@@ -951,8 +1281,11 @@ void main() {
       await tester.enterText(_composer(), '/target banana');
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pumpAndSettle();
-      expect(settings.lastTarget, 'cisco-ssh',
-          reason: 'a refused switch must not change anything');
+      expect(
+        settings.lastTarget,
+        'cisco-ssh',
+        reason: 'a refused switch must not change anything',
+      );
       expect(find.textContaining('Unknown target'), findsOneWidget);
     });
   });
@@ -967,6 +1300,8 @@ void main() {
       await tester.tap(find.text('Trunk Problem'));
       await tester.pumpAndSettle();
 
+      await tester.tap(find.byTooltip('More message actions'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Answer again'));
       await tester.pumpAndSettle();
 
@@ -977,8 +1312,11 @@ void main() {
       expect(cut.conversation, 'trunk-lab');
       expect(cut.fromRole, 'user');
       expect(cut.fromText, 'why is the trunk down?');
-      expect(store.transcripts['trunk-lab'], isEmpty,
-          reason: 'the old turn is gone from the store, not just the screen');
+      expect(
+        store.transcripts['trunk-lab'],
+        isEmpty,
+        reason: 'the old turn is gone from the store, not just the screen',
+      );
 
       // The old answer does not survive under the new one...
       expect(find.text('SW1 f0/1 is not trunking.'), findsNothing);
@@ -992,8 +1330,8 @@ void main() {
       expect(find.text('why is the trunk down?'), findsOneWidget);
     });
 
-    testWidgets('"Edit and resend" removes the branch and refills the '
-        'composer', (tester) async {
+    testWidgets('editing a user message rewinds the answer and replaces the '
+        'same turn on send', (tester) async {
       _wide(tester);
       final store = _seeded();
       await tester.pumpWidget(_chat(store));
@@ -1001,22 +1339,29 @@ void main() {
       await tester.tap(find.text('Trunk Problem'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Edit and resend'));
+      await tester.tap(find.text('Edit'));
       await tester.pumpAndSettle();
 
-      // The turn being edited and everything after it are gone, in the store
-      // as well as on the screen.
+      // The answer branch is removed from the store and screen immediately;
+      // the original user turn stays in place until the edit is sent.
       expect(store.truncations, hasLength(1));
       expect(store.truncations.single.conversation, 'trunk-lab');
-      expect(store.truncations.single.fromText, 'why is the trunk down?');
-      expect(store.transcripts['trunk-lab'], isEmpty);
+      expect(store.truncations.single.fromText, 'SW1 f0/1 is not trunking.');
+      expect(store.transcripts['trunk-lab'], hasLength(1));
+      expect(
+        store.transcripts['trunk-lab']!.single.text,
+        'why is the trunk down?',
+      );
       expect(find.text('SW1 f0/1 is not trunking.'), findsNothing);
 
-      // The original words are back in the composer for editing; exactly one
-      // copy of them is on screen (the field), so the bubble is gone too.
+      // The original words are back in the composer for editing, and the
+      // inline status makes clear that sending replaces this turn.
       final composer = tester.widget<TextField>(_composer());
       expect(composer.controller?.text, 'why is the trunk down?');
-      expect(find.text('why is the trunk down?'), findsOneWidget);
+      expect(
+        find.text('Editing your message. Sending replaces this turn.'),
+        findsOneWidget,
+      );
       // Nothing was sent by choosing to edit.
       expect(store.logged.where((m) => m.role == 'user'), isEmpty);
 
@@ -1028,14 +1373,25 @@ void main() {
         store.logged.where((m) => m.role == 'user').map((m) => m.text).last,
         'why is the trunk down on SW1?',
       );
-      expect(find.text('why is the trunk down on SW1?'), findsOneWidget,
-          reason: 'the edited turn took the old one\'s place');
+      expect(
+        store.transcripts['trunk-lab']!
+            .where((message) => message.isUser)
+            .map((message) => message.text),
+        ['why is the trunk down on SW1?'],
+        reason: 'editing replaces the prior turn instead of adding a copy',
+      );
+      expect(
+        find.text('why is the trunk down on SW1?'),
+        findsOneWidget,
+        reason: 'the edited turn took the old one\'s place',
+      );
     });
   });
 
   group('the in-conversation search', () {
-    testWidgets('finds the turn, says where it is, and jumps to it',
-        (tester) async {
+    testWidgets('finds the turn, says where it is, and jumps to it', (
+      tester,
+    ) async {
       _wide(tester);
       final store = _seeded();
       await tester.pumpWidget(_chat(store));
@@ -1059,7 +1415,8 @@ void main() {
         find.descendant(
           of: find.byType(BottomSheet),
           matching: find.textContaining(
-              'No messages in this conversation match that.'),
+            'No messages in this conversation match that.',
+          ),
         ),
         findsOneWidget,
       );
@@ -1070,8 +1427,11 @@ void main() {
         of: find.byType(BottomSheet),
         matching: find.textContaining('why is the trunk down?'),
       );
-      expect(hit, findsOneWidget,
-          reason: 'the hit shows the line it was found on');
+      expect(
+        hit,
+        findsOneWidget,
+        reason: 'the hit shows the line it was found on',
+      );
 
       await tester.tap(hit);
       await tester.pumpAndSettle();
@@ -1138,8 +1498,9 @@ void main() {
   });
 
   group('the parse can be argued with', () {
-    testWidgets('a count chip fixes the plan where the user can see it',
-        (tester) async {
+    testWidgets('a count chip fixes the plan where the user can see it', (
+      tester,
+    ) async {
       _wide(tester);
       await tester.pumpWidget(_chat(_seeded()));
       await tester.pumpAndSettle();
@@ -1168,16 +1529,18 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('5 routers'), findsOneWidget);
-      expect(find.text('2 routers'), findsNothing,
-          reason: 'the wrong parse must not still be on screen');
+      expect(
+        find.text('2 routers'),
+        findsNothing,
+        reason: 'the wrong parse must not still be on screen',
+      );
       // A correction is never silent: the card says what it became.
       expect(find.textContaining('Fixed: 5 routers'), findsOneWidget);
       expect(find.text('Understood'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('a fix the user backs out of changes nothing',
-        (tester) async {
+    testWidgets('a fix the user backs out of changes nothing', (tester) async {
       _wide(tester);
       await tester.pumpWidget(_chat(_seeded()));
       await tester.pumpAndSettle();
@@ -1206,8 +1569,9 @@ void main() {
       expect(find.byType(AlertDialog), findsNothing);
     });
 
-    testWidgets('the routing protocol is a slot too, and it is always shown',
-        (tester) async {
+    testWidgets('the routing protocol is a slot too, and it is always shown', (
+      tester,
+    ) async {
       _wide(tester);
       await tester.pumpWidget(_chat(_seeded()));
       await tester.pumpAndSettle();

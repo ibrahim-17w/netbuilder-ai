@@ -80,7 +80,11 @@ Widget _chat() => MultiProvider(
   child: const MaterialApp(home: Scaffold(body: ChatScreen())),
 );
 
-Future<void> _size(WidgetTester tester, Size size, {double textScale = 1.0}) async {
+Future<Object?> _size(
+  WidgetTester tester,
+  Size size, {
+  double textScale = 1.0,
+}) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
@@ -96,16 +100,7 @@ Future<void> _size(WidgetTester tester, Size size, {double textScale = 1.0}) asy
     ),
   );
   await tester.pumpAndSettle();
-  _reportOverflow(tester, size);
-}
-
-/// The widget that overflowed, named. "A RenderFlex overflowed" on its own
-/// says nothing about which row; this finds the offending flex and its owner.
-void _reportOverflow(WidgetTester tester, Size size) {
-  final problem = tester.takeException();
-  if (problem is! FlutterError) return;
-  // ignore: avoid_print
-  print('LAYOUT PROBLEM at $size: ${problem.message}');
+  return tester.takeException();
 }
 
 /// The full report, including which widget overflowed, captured before the
@@ -123,18 +118,15 @@ void _watchLayoutErrors(WidgetTester tester) {
 void main() {
   group('the chat survives a small window', () {
     testWidgets('320x568 at normal text', (tester) async {
-      await _size(tester, const Size(320, 568));
-      expect(tester.takeException(), isNull);
+      expect(await _size(tester, const Size(320, 568)), isNull);
     });
 
     testWidgets('360x640 at 1.5x text', (tester) async {
-      await _size(tester, const Size(360, 640), textScale: 1.5);
-      expect(tester.takeException(), isNull);
+      expect(await _size(tester, const Size(360, 640), textScale: 1.5), isNull);
     });
 
     testWidgets('640x360 landscape', (tester) async {
-      await _size(tester, const Size(640, 360));
-      expect(tester.takeException(), isNull);
+      expect(await _size(tester, const Size(640, 360)), isNull);
     });
   });
 
@@ -192,7 +184,6 @@ void main() {
                   go: (_) {},
                   push: (_) {},
                   openChat: ({String prefill = '', required String project}) {},
-                  openDrawer: () {},
                 ),
                 onClose: () => closed = true,
               ),
@@ -233,7 +224,10 @@ void main() {
                 child: ElevatedButton(
                   onPressed: () => showDialog<void>(
                     context: context,
-                    builder: (_) => GeminiModelPickerDialog(apiKey: 'not-a-real-key', currentModel: 'gemini-2.5-flash'),
+                    builder: (_) => GeminiModelPickerDialog(
+                      apiKey: 'not-a-real-key',
+                      currentModel: 'gemini-2.5-flash',
+                    ),
                   ),
                   child: const Text('open'),
                 ),
@@ -259,8 +253,9 @@ void main() {
       final background = Theme.of(
         tester.element(find.byType(Scaffold)),
       ).scaffoldBackgroundColor.computeLuminance();
-      for (final container
-          in tester.widgetList<Container>(find.byType(Container))) {
+      for (final container in tester.widgetList<Container>(
+        find.byType(Container),
+      )) {
         final decoration = container.decoration;
         if (decoration is! BoxDecoration) continue;
         final color = decoration.color;
@@ -286,12 +281,14 @@ void main() {
         MaterialApp(
           theme: ThemeData.dark(useMaterial3: true),
           home: Scaffold(
-            body: VerificationReport(report: const {
+            body: VerificationReport(
+              report: const {
                 'tests': [
                   {'name': 'PC1 -> 192.168.10.1', 'ok': true},
                   {'name': 'PC5 -> 192.168.20.1', 'ok': false},
                 ],
-              }),
+              },
+            ),
           ),
         ),
       );
@@ -316,9 +313,10 @@ void main() {
                 children: [
                   const AppStatusPill(label: 'Engine up'),
                   const SizedBox(height: 8),
-                  const ChatMarkdownView(source: 
-                    '# Heading\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n\n'
-                    '- one\n- two',
+                  const ChatMarkdownView(
+                    source:
+                        '# Heading\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n\n'
+                        '- one\n- two',
                   ),
                 ],
               ),

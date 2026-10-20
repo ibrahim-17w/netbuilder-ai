@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -29,36 +32,45 @@ class MemoryScreen extends StatefulWidget {
   State<MemoryScreen> createState() => _MemoryScreenState();
 }
 
-enum _MemoryTab { rules, phrasings, learned, environment, learning, attempts, tools }
+enum _MemoryTab {
+  rules,
+  phrasings,
+  learned,
+  environment,
+  learning,
+  attempts,
+  tools,
+}
 
 class _MemoryScreenState extends State<MemoryScreen> {
   List<LearnedRule> _rules = [];
   List<BuildAttempt> _attempts = [];
   Map<String, String> _prefs = {};
+
   /// Learned answers from keyed-model replies (question -> answer),
   /// newest-seen first. Each row replays offline when the same question is
   /// asked with no key - and can be dropped here.
   List<Map<String, dynamic>> _learnedAnswers = [];
+
   /// Learned phrasings (words -> resolved brief), newest first. The app's
   /// own replay index: each row is a lesson the user can review and drop.
   List<Map<String, dynamic>> _phrasings = [];
+
   /// The misparse ledger: corrections the user made to a parse, newest
   /// first. Counted by [MemoryService], not by the sidecar - so the review
   /// list and the rate below still read when the sidecar is offline.
   List<MisparseEntry> _misparse = [];
+
   /// The rate's own numbers (turns, corrections, and what became of each
   /// row), kept apart from the sidecar health so a missing sidecar never
   /// blanks the strip.
-  ({
-    int turns,
-    int corrections,
-    int proposed,
-    int taught,
-    int dismissed,
-  })? _misparseStats;
+  ({int turns, int corrections, int proposed, int taught, int dismissed})?
+  _misparseStats;
+
   /// One decision at a time: teach/dismiss are writes to the same blob, and
   /// a double tap would file the same lesson twice.
   bool _misparseBusy = false;
+
   /// The remembered environment (venue, scale, budget, skill), with its
   /// editor's working values. Learned automatically when the user states a
   /// fact in chat; edited here by hand.
@@ -87,6 +99,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
   Timer? _learningTimer;
   bool _includeScreenshots = false;
   bool _diagnosticsBusy = false;
+  bool _backupBusy = false;
+  bool _restoreGuardAvailable = false;
   String? _diagnosticsPath;
   _MemoryTab _tab = _MemoryTab.rules;
 
@@ -98,6 +112,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
     _refreshCorrections();
     _refreshMemoryHealth();
     _refreshMisparse();
+    _refreshRestoreGuard();
     _learningTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (mounted) {
         _refreshLearning(quiet: true);
@@ -226,9 +241,9 @@ class _MemoryScreenState extends State<MemoryScreen> {
     try {
       await engine.revertCorrection(row.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Un-taught ${row.summaryLine}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Un-taught ${row.summaryLine}')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -309,9 +324,9 @@ class _MemoryScreenState extends State<MemoryScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not save: $e')));
     }
     await _refresh();
   }
@@ -322,9 +337,9 @@ class _MemoryScreenState extends State<MemoryScreen> {
     final mem = context.read<MemoryService>();
     await mem.forgetEnvironmentProfile();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Environment forgotten')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Environment forgotten')));
     await _refresh();
   }
 
@@ -335,9 +350,9 @@ class _MemoryScreenState extends State<MemoryScreen> {
     await mem.forgetLearnedAnswer(id);
     if (!mounted) return;
     setState(() => _learnedAnswers.removeWhere((a) => a['id'] == id));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Learned answer forgotten')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Learned answer forgotten')));
   }
 
   /// Drop one learned phrasing. The store also refreshes the live index,
@@ -347,9 +362,9 @@ class _MemoryScreenState extends State<MemoryScreen> {
     await mem.forgetPhrasing(key);
     if (!mounted) return;
     setState(() => _phrasings.removeWhere((p) => p['phrasing'] == key));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Phrasing forgotten')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Phrasing forgotten')));
   }
 
   /// AUTO-LEARN: recurring failure patterns are filed automatically - no
@@ -430,6 +445,220 @@ class _MemoryScreenState extends State<MemoryScreen> {
       ).showSnackBar(SnackBar(content: Text('Diagnostics export failed: $e')));
     } finally {
       if (mounted) setState(() => _diagnosticsBusy = false);
+    }
+  }
+
+  Future<void> _exportMemoryBackup() async {
+    if (_backupBusy) return;
+    setState(() => _backupBusy = true);
+    try {
+      final contents = await context.read<MemoryService>().exportJson();
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save NetBuilder memory backup',
+        fileName: 'netbuilder_memory_backup.json',
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+      );
+      if (path == null) return;
+      await File(path).writeAsString(contents, flush: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Memory backup saved to $path')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Backup export failed: $e')));
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
+    }
+  }
+
+  Future<void> _restoreMemoryBackup() async {
+    if (_backupBusy) return;
+    final memory = context.read<MemoryService>();
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final selection = await FilePicker.platform.pickFiles(
+      dialogTitle: 'Choose a NetBuilder memory backup',
+      type: FileType.custom,
+      allowedExtensions: const ['json'],
+      withData: true,
+    );
+    if (selection == null || selection.files.isEmpty || !mounted) return;
+    final file = selection.files.single;
+    try {
+      if (file.size > 50 * 1024 * 1024) {
+        throw const FormatException('This backup is larger than 50 MB.');
+      }
+      final bytes =
+          file.bytes ??
+          (file.path == null ? null : await File(file.path!).readAsBytes());
+      if (bytes == null) {
+        throw const FormatException('The selected file could not be read.');
+      }
+      final contents = utf8.decode(bytes);
+      final preview = jsonDecode(contents);
+      if (preview is! Map) {
+        throw const FormatException('This is not a NetBuilder backup.');
+      }
+      final counts = <String, int>{};
+      for (final key in [
+        'builds',
+        'attempts',
+        'rules',
+        'conversations',
+        'chat',
+        'changes',
+        'phrasing',
+        'learnedAnswers',
+        'clarificationAnswers',
+      ]) {
+        if (preview[key] is List) counts[key] = (preview[key] as List).length;
+      }
+      final details = counts.entries
+          .map((e) => '${e.value} ${e.key}')
+          .join(' · ');
+      final version = preview['schemaVersion'] ?? 'unknown';
+      if (!mounted) return;
+      var preferBackupSettings = false;
+      final choice = await showDialog<(String, bool)?>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, refreshDialog) => AlertDialog(
+            title: const Text('Restore or merge memory?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Backup version $version${details.isEmpty ? '' : '\n$details'}',
+                ),
+                const SizedBox(height: AppTheme.s10),
+                const Text(
+                  'Replace clears current saved history first. Merge keeps current history, adds new backup records, and avoids exact duplicates. Both actions save a local recovery copy first.',
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: preferBackupSettings,
+                  onChanged: (value) => refreshDialog(
+                    () => preferBackupSettings = value ?? false,
+                  ),
+                  title: const Text(
+                    'For merge, use backup values for matching settings',
+                  ),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+                const Text(
+                  'Credentials remain in secure storage and are not carried by the backup.',
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, (
+                  'merge',
+                  preferBackupSettings,
+                )),
+                child: const Text('Merge backup'),
+              ),
+              FilledButton(
+                onPressed: () =>
+                    Navigator.pop(dialogContext, ('replace', false)),
+                child: const Text('Replace all'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (choice == null || !mounted) return;
+      setState(() => _backupBusy = true);
+      final restored = choice.$1 == 'merge'
+          ? await memory.mergeJson(contents, preferBackupSettings: choice.$2)
+          : await memory.restoreJson(contents);
+      if (!mounted) return;
+      setState(() => _restoreGuardAvailable = true);
+      await _refresh();
+      await _refreshMisparse();
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            choice.$1 == 'merge'
+                ? 'Merged ${restored.values.fold<int>(0, (a, b) => a + b)} new records from backup.'
+                : 'Restored ${restored.values.fold<int>(0, (a, b) => a + b)} records from backup.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text('Backup restore failed; current memory was kept: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
+    }
+  }
+
+  Future<void> _refreshRestoreGuard() async {
+    try {
+      final available = await context.read<MemoryService>().hasRestoreGuard();
+      if (mounted) setState(() => _restoreGuardAvailable = available);
+    } catch (_) {
+      if (mounted) setState(() => _restoreGuardAvailable = false);
+    }
+  }
+
+  Future<void> _undoLastRestore() async {
+    if (_backupBusy || !_restoreGuardAvailable) return;
+    final memory = context.read<MemoryService>();
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Restore the previous memory state?'),
+        content: const Text(
+          'This reapplies the local copy made before your last restore. '
+          'The current state will become the next recovery copy.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Restore previous state'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _backupBusy = true);
+    try {
+      final restored = await memory.restoreLastRestoreGuard();
+      if (!mounted) return;
+      await _refresh();
+      await _refreshMisparse();
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Previous memory restored (${restored.values.fold<int>(0, (a, b) => a + b)} records).',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger?.showSnackBar(
+        SnackBar(content: Text('Could not restore the previous state: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
     }
   }
 
@@ -518,12 +747,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
               'Attempts',
               _attempts.length,
             ),
-            _tabSegment(
-              _MemoryTab.tools,
-              Icons.build_outlined,
-              'Tools',
-              null,
-            ),
+            _tabSegment(_MemoryTab.tools, Icons.build_outlined, 'Tools', null),
           ],
           selected: {_tab},
           onSelectionChanged: (values) => setState(() => _tab = values.first),
@@ -571,13 +795,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
   /// rate is still there when the sidecar is not.
   Widget _healthStrip(
     ({int stores, int rows, List<String> failed, String autoLearn}) health,
-    ({
-      int turns,
-      int corrections,
-      int proposed,
-      int taught,
-      int dismissed,
-    })? misparse,
+    ({int turns, int corrections, int proposed, int taught, int dismissed})?
+    misparse,
   ) {
     // The rate is a measurement, not an alarm: it counts what the user had
     // to fix, so red would punish the one number meant to show progress.
@@ -628,7 +847,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
               : AppTone.neutral,
           hint: measured
               ? 'Your corrections per parsed turn - falling means the '
-                  'learned phrasings are landing.'
+                    'learned phrasings are landing.'
               : 'Nothing measured yet - one parsed turn starts the count.',
         ),
       ],
@@ -824,10 +1043,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _misparseReview(theme),
-        _phrasingsPanel(theme),
-      ],
+      children: [_misparseReview(theme), _phrasingsPanel(theme)],
     );
   }
 
@@ -1098,9 +1314,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
       await mem.dismissMisparse(e.key, e.corrected);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Dismissed - counted, never taught'),
-        ),
+        const SnackBar(content: Text('Dismissed - counted, never taught')),
       );
     } finally {
       if (mounted) setState(() => _misparseBusy = false);
@@ -1190,9 +1404,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
                     IconButton(
                       tooltip: 'Forget this answer',
                       icon: const Icon(Icons.close, size: 18),
-                      onPressed: () => _forgetLearnedAnswer(
-                        (a['id'] as num?)?.toInt() ?? 0,
-                      ),
+                      onPressed: () =>
+                          _forgetLearnedAnswer((a['id'] as num?)?.toInt() ?? 0),
                     ),
                   ],
                 ),
@@ -1272,10 +1485,22 @@ class _MemoryScreenState extends State<MemoryScreen> {
                   DropdownMenuItem(value: '', child: Text('(not set)')),
                   DropdownMenuItem(value: 'home', child: Text('Home')),
                   DropdownMenuItem(value: 'office', child: Text('Office')),
-                  DropdownMenuItem(value: 'school', child: Text('School / campus')),
-                  DropdownMenuItem(value: 'clinic', child: Text('Clinic / hospital')),
-                  DropdownMenuItem(value: 'hospitality', child: Text('Cafe / hotel / shop')),
-                  DropdownMenuItem(value: 'industrial', child: Text('Industrial / warehouse')),
+                  DropdownMenuItem(
+                    value: 'school',
+                    child: Text('School / campus'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'clinic',
+                    child: Text('Clinic / hospital'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'hospitality',
+                    child: Text('Cafe / hotel / shop'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'industrial',
+                    child: Text('Industrial / warehouse'),
+                  ),
                 ],
                 onChanged: (v) => setStateSafe(() => _envVenue = v ?? ''),
               ),
@@ -1301,7 +1526,10 @@ class _MemoryScreenState extends State<MemoryScreen> {
                 items: const [
                   DropdownMenuItem(value: '', child: Text('(not set)')),
                   DropdownMenuItem(value: 'beginner', child: Text('Beginner')),
-                  DropdownMenuItem(value: 'intermediate', child: Text('Intermediate')),
+                  DropdownMenuItem(
+                    value: 'intermediate',
+                    child: Text('Intermediate'),
+                  ),
                   DropdownMenuItem(value: 'advanced', child: Text('Advanced')),
                 ],
                 onChanged: (v) => setStateSafe(() => _envSkill = v ?? ''),
@@ -1561,10 +1789,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
                     '${a.correction == null ? '' : '  ·  correction saved'}',
                 badges: [
                   if (a.correction != null)
-                    const AppTag(
-                      label: 'corrected',
-                      tone: AppTone.warning,
-                    ),
+                    const AppTag(label: 'corrected', tone: AppTone.warning),
                 ],
               ),
             ),
@@ -1579,6 +1804,37 @@ class _MemoryScreenState extends State<MemoryScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        AppPanel(
+          icon: Icons.backup_outlined,
+          title: 'Memory backup',
+          subtitle:
+              'Export or restore local networks, chats, rules, and preferences. '
+              'Passwords, keys, and the separate Packet Tracer journal are excluded.',
+          children: [
+            Wrap(
+              spacing: AppTheme.s8,
+              runSpacing: AppTheme.s8,
+              children: [
+                FilledButton.icon(
+                  onPressed: _backupBusy ? null : _exportMemoryBackup,
+                  icon: const Icon(Icons.download_outlined, size: 18),
+                  label: Text(_backupBusy ? 'Working...' : 'Export backup'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _backupBusy ? null : _restoreMemoryBackup,
+                  icon: const Icon(Icons.restore_outlined, size: 18),
+                  label: const Text('Restore backup'),
+                ),
+                if (_restoreGuardAvailable)
+                  TextButton.icon(
+                    onPressed: _backupBusy ? null : _undoLastRestore,
+                    icon: const Icon(Icons.undo, size: 18),
+                    label: const Text('Undo last restore'),
+                  ),
+              ],
+            ),
+          ],
+        ),
         AppPanel(
           icon: Icons.archive_outlined,
           title: 'Tester diagnostics',
@@ -1610,8 +1866,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
                   value: _includeScreenshots,
                   onChanged: _diagnosticsBusy
                       ? null
-                      : (value) =>
-                            setState(() => _includeScreenshots = value),
+                      : (value) => setState(() => _includeScreenshots = value),
                 ),
               ],
             ),

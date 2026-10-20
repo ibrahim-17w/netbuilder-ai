@@ -44,8 +44,9 @@ Widget _narrowApp() => MultiProvider(
 Finder _composer() => find.byType(TextField).last;
 
 void main() {
-  testWidgets('the chat is the only screen: no tabs, no floating controls',
-      (tester) async {
+  testWidgets('the chat is the only screen: no tabs, no floating controls', (
+    tester,
+  ) async {
     await tester.pumpWidget(const NetBuilderApp());
     await tester.pumpAndSettle();
 
@@ -64,8 +65,9 @@ void main() {
     expect(find.byIcon(Icons.pause_circle_outline), findsNothing);
   });
 
-  testWidgets('Enter sends the message and clears the composer',
-      (tester) async {
+  testWidgets('Enter sends the message and clears the composer', (
+    tester,
+  ) async {
     await tester.pumpWidget(_chatHarness());
     await tester.pumpAndSettle();
 
@@ -109,8 +111,9 @@ void main() {
     );
   });
 
-  testWidgets('composer + run controls hold at a narrow phone width',
-      (tester) async {
+  testWidgets('composer + run controls hold at a narrow phone width', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(360, 640);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -119,22 +122,25 @@ void main() {
     await tester.pumpWidget(_narrowApp());
     await tester.pumpAndSettle();
 
-    expect(tester.takeException(), isNull,
-        reason: 'nothing may overflow at 360x640');
+    expect(
+      tester.takeException(),
+      isNull,
+      reason: 'nothing may overflow at 360x640',
+    );
     expect(find.byIcon(Icons.send), findsOneWidget);
 
     // The tools sheet must survive the narrowest phone.
     await tester.tap(find.byTooltip('Tools: run, capture, and integrations'));
     await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull,
-        reason: 'the tools sheet must not overflow at 360x640');
+    expect(
+      tester.takeException(),
+      isNull,
+      reason: 'the tools sheet must not overflow at 360x640',
+    );
     expect(find.text('Build a .pkt from the current plan'), findsOneWidget);
 
-    // The settings drawer no longer uses a fixed 380px width (which was wider
-    // than this phone and overflowed): it takes 86% of a narrow screen. That
-    // is asserted by the drawer tests at the default size, where the drawer
-    // reliably opens; at this width the harness does not open it, so claiming
-    // more here would be claiming something untested.
+    // Settings is a separate scrollable page and is covered on a 320px phone
+    // by the focused settings-layout test.
   });
 
   testWidgets('composer holds at a wide desktop width', (tester) async {

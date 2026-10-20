@@ -23,8 +23,7 @@ class _FakePathProvider extends PathProviderPlatform {
   Future<String?> getApplicationDocumentsPath() async => 'build/test-docs';
 }
 
-final _toolsButton =
-    find.byTooltip('Tools: run, capture, and integrations');
+final _toolsButton = find.byTooltip('Tools: run, capture, and integrations');
 final _buildTile = find.text('Build a .pkt from the current plan');
 
 /// Open the tools sheet, where the capture actions now live.
@@ -35,8 +34,9 @@ Future<void> _openTools(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('the build action is reachable from the chat screen',
-      (tester) async {
+  testWidgets('the build action is reachable from the chat screen', (
+    tester,
+  ) async {
     await tester.pumpWidget(const NetBuilderApp());
     await tester.pumpAndSettle();
 
@@ -47,8 +47,9 @@ void main() {
     expect(_buildTile, findsOneWidget);
   });
 
-  testWidgets('pressing it with no plan explains how to make one',
-      (tester) async {
+  testWidgets('pressing it with no plan explains how to make one', (
+    tester,
+  ) async {
     await tester.pumpWidget(const NetBuilderApp());
     await tester.pumpAndSettle();
 
@@ -57,19 +58,24 @@ void main() {
     await _settle(tester);
 
     // The empty path, through the UI: no exception, no blank bubble.
-    expect(find.textContaining('There is no plan to compile yet'),
-        findsOneWidget);
+    expect(
+      find.textContaining('There is no plan to compile yet'),
+      findsOneWidget,
+    );
     expect(find.textContaining('No API key is needed'), findsOneWidget);
   });
 
-  testWidgets('a described network builds a .pkt with no engine and no key',
-      (tester) async {
+  testWidgets('a described network builds a .pkt with no engine and no key', (
+    tester,
+  ) async {
     PathProviderPlatform.instance = _FakePathProvider();
-    addTearDown(() => PathProviderPlatform.instance = MethodChannelPathProvider());
+    addTearDown(
+      () => PathProviderPlatform.instance = MethodChannelPathProvider(),
+    );
     await tester.pumpWidget(const NetBuilderApp());
     await tester.pumpAndSettle();
 
-    // The settings sidebar has text fields too, so the composer is addressed
+    // Settings has text fields too, so the composer is addressed
     // by its label rather than by position.
     final composer = find.byWidgetPredicate(
       (w) => w is TextField && w.decoration?.labelText == 'Message',
@@ -83,6 +89,17 @@ void main() {
     await _settle(tester);
     expect(find.textContaining('2 routers and 4 switches'), findsWidgets);
 
+    // Building now asks for an explicit design first. Confirm the preview
+    // without writing a file, then use the build action created for that
+    // selected plan revision.
+    await _openTools(tester);
+    await tester.tap(_buildTile);
+    await tester.pumpAndSettle();
+    expect(find.text('Choose a layout'), findsOneWidget);
+    await tester.tap(find.text('Use this layout'));
+    await tester.pumpAndSettle();
+    expect(find.text('Build .pkt'), findsOneWidget);
+
     // Now the action has something to compile. The sidecar is not running in
     // a test, and it does not need to be: the build runs on this device from
     // the bundled template library, and says so. The build is real CPU work
@@ -90,12 +107,13 @@ void main() {
     // going until the answer lands. The build loads its library over the
     // asset channel, which inside a fake-async test only progresses when
     // real time is given back between pumps.
-    await _openTools(tester);
-    await tester.tap(_buildTile);
-    for (var i = 0;
-        i < 120 &&
-            find.textContaining('Built a .pkt on this device').evaluate().isEmpty;
-        i++) {
+    await tester.tap(find.text('Build .pkt'));
+    for (
+      var i = 0;
+      i < 120 &&
+          find.textContaining('Built a .pkt on this device').evaluate().isEmpty;
+      i++
+    ) {
       await tester.pump(const Duration(milliseconds: 250));
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 1)),
@@ -105,19 +123,21 @@ void main() {
     expect(find.textContaining('Built a .pkt on this device'), findsOneWidget);
     // THE FILE IS NAMED FOR THE NETWORK: the brief's own words, not a
     // timestamp - "2 routers and 4 switches" saves as routers-switches.pkt.
-expect(find.textContaining('routers-switches.pkt'), findsWidgets);
-    // The verification step ran against the file it wrote, not skipped.
-    expect(find.textContaining('Verification:'), findsWidgets);
+    expect(find.textContaining('routers-switches.pkt'), findsWidgets);
+    expect(find.textContaining('Devices:'), findsOneWidget);
+    expect(find.textContaining('Cables:'), findsOneWidget);
   });
 
-  testWidgets('an unreachable engine is stated up front, with a way to fix it',
-      (tester) async {
-    await tester.pumpWidget(const NetBuilderApp());
-    // No engine is listening in a test, so the banner is expected once the
-    // reachability check has run.
-    await _settle(tester);
+  testWidgets(
+    'an unreachable engine is stated up front, with a way to fix it',
+    (tester) async {
+      await tester.pumpWidget(const NetBuilderApp());
+      // No engine is listening in a test, so the banner is expected once the
+      // reachability check has run.
+      await _settle(tester);
 
-    expect(find.textContaining('No .pkt engine at'), findsOneWidget);
-    expect(find.text('Set address'), findsOneWidget);
-  });
+      expect(find.textContaining('No .pkt engine at'), findsOneWidget);
+      expect(find.text('Set address'), findsOneWidget);
+    },
+  );
 }

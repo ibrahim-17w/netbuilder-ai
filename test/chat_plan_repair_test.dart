@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:net_builder/models/chat_message.dart';
 import 'package:net_builder/models/network_intent.dart';
 import 'package:net_builder/services/casual_english.dart';
 import 'package:net_builder/services/offline_assistant_service.dart';
@@ -20,13 +21,42 @@ const _corporateBrief =
 NetworkIntent _plan(String brief, [String project = 'repair']) =>
     NetworkIntent.parseSimple(project, CasualEnglish.normalize(brief));
 
+NetworkIntent _oversizedPrinterPlan({
+  int count = 60,
+  bool missingAaa = false,
+}) => NetworkIntent(
+  projectName: 'oversized-printers',
+  nodes: [
+    for (var i = 1; i <= count; i++)
+      NetNode(
+        name: 'PRINTER$i',
+        type: 'printer',
+        model: 'Printer-PT',
+        exactModel: true,
+      ),
+    if (missingAaa) ...[
+      const NetNode(name: 'R1', type: 'router', model: '2911'),
+      const NetNode(
+        name: 'SRV4',
+        type: 'server',
+        model: 'Server-PT',
+        services: ['aaa'],
+      ),
+    ],
+  ],
+  security: missingAaa
+      ? const SecurityIntent(aaa: true, aaaRouter: 'R1', aaaServer: 'SRV4')
+      : const SecurityIntent(),
+);
+
 /// Exactly the finding set the build card withholds on
 /// (`ValidationIssue.blocks`), so a test can never call a plan buildable that
 /// the card still refuses.
 List<ValidationIssue> _blocking(NetworkIntent plan) =>
-    ValidatorService.validate(plan, target: 'packet-tracer')
-        .where((i) => i.blocks)
-        .toList();
+    ValidatorService.validate(
+      plan,
+      target: 'packet-tracer',
+    ).where((i) => i.blocks).toList();
 
 int _of(NetworkIntent plan, String type) =>
     plan.nodes.where((n) => n.type == type).length;
@@ -75,7 +105,9 @@ void main() {
     });
 
     test('no address is used twice', () {
-      final ips = plan.addressing.map((a) => a.ipCidr.split('/').first).toList();
+      final ips = plan.addressing
+          .map((a) => a.ipCidr.split('/').first)
+          .toList();
       expect(ips.toSet().length, ips.length);
     });
 
@@ -162,9 +194,7 @@ void main() {
           NetNode(name: 'SW1', type: 'switch', model: '2960'),
           NetNode(name: 'PC1', type: 'pc', model: 'PC-PT'),
         ],
-        links: [
-          NetLink(a: 'R1', aIf: 'g0/1', b: 'SW1', bIf: 'f0/1'),
-        ],
+        links: [NetLink(a: 'R1', aIf: 'g0/1', b: 'SW1', bIf: 'f0/1')],
         addressing: [
           InterfaceAddr(node: 'R1', iface: 'g0/1', ipCidr: '192.168.1.1/24'),
         ],
@@ -305,7 +335,9 @@ void main() {
       // the parser turns into nothing at all, so a user who followed the app's
       // own advice pressed Fix again forever. Six phrasings of that
       // instruction were measured to produce no account.
-      final aaa = _plan('1 router 1 switch and 5 pcs with aaa on the vty lines');
+      final aaa = _plan(
+        '1 router 1 switch and 5 pcs with aaa on the vty lines',
+      );
       final reply = OfflineAssistantService.fixPlan(
         plan: aaa,
         target: 'packet-tracer',
@@ -316,15 +348,12 @@ void main() {
       // The account exists on the repaired plan, so the next validator run
       // does not come back with the same finding.
       final repaired = reply.repairedPlan!;
-      expect(
-        (repaired.security.aaaAccountPassword ?? '').isNotEmpty,
-        isTrue,
-      );
+      expect((repaired.security.aaaAccountPassword ?? '').isNotEmpty, isTrue);
       expect(repaired.security.aaaUsername, isNotNull);
       expect(
-        _blocking(repaired)
-            .map((i) => i.message)
-            .where((m) => m.contains('holds no account')),
+        _blocking(
+          repaired,
+        ).map((i) => i.message).where((m) => m.contains('holds no account')),
         isEmpty,
         reason: 'the placeholder account clears the login finding',
       );
@@ -336,16 +365,19 @@ void main() {
       // cannot be a decision the user has to make, because withholding the
       // build over it left an ordinary brief ("two routers over a serial
       // link") unbuildable, with no reply able to clear it.
-      final serial = _plan('connect two routers over a serial WAN with 1 switch');
+      final serial = _plan(
+        'connect two routers over a serial WAN with 1 switch',
+      );
       final reply = OfflineAssistantService.fixPlan(
         plan: serial,
         target: 'packet-tracer',
       );
       expect(reply.intent, 'fix');
       expect(
-        ValidatorService.validate(serial, target: 'packet-tracer')
-            .map((i) => i.message)
-            .any((m) => m.contains('serial module')),
+        ValidatorService.validate(
+          serial,
+          target: 'packet-tracer',
+        ).map((i) => i.message).any((m) => m.contains('serial module')),
         isTrue,
         reason: 'the note is still reported',
       );
@@ -368,6 +400,128 @@ void main() {
         isNotEmpty,
         reason: 'the advice is still given, as info',
       );
+    });
+  });
+
+  group('oversized plans explain the blocker instead of looping', () {
+    final plan = _oversizedPrinterPlan();
+
+    test('the question button is recognized as a plan-blocker question', () {
+      const question = 'What do I need to change to fix the plan?';
+      expect(OfflineAssistantService.asksHowToFixPlan(question), isTrue);
+      expect(
+        OfflineAssistantService.looksLikeRepairRequest(question),
+        isFalse,
+        reason: 'asking what to change must not apply a repair or re-plan',
+      );
+    });
+
+    test('repeated printer-template findings are grouped by model', () {
+      final findings = _blocking(plan);
+      expect(findings.length, lessThanOrEqualTo(4));
+      expect(
+        findings.any(
+          (issue) =>
+              issue.message.contains('60 printer device(s)') &&
+              issue.message.contains('Printer-PT'),
+        ),
+        isTrue,
+      );
+    });
+
+    test('an oversized Packet Tracer plan is not partially rewired', () {
+      final repair = PlanRepairService.repair(plan, target: 'packet-tracer');
+      expect(repair.changes, isEmpty);
+      expect(repair.plan.revision, plan.revision);
+      expect(repair.remaining, isNotEmpty);
+    });
+
+    test('an oversized plan still applies the promised local AAA repair', () {
+      final oversized = _oversizedPrinterPlan(missingAaa: true);
+      final repair = PlanRepairService.repair(
+        oversized,
+        target: 'packet-tracer',
+      );
+
+      expect(repair.changes, hasLength(1));
+      expect(repair.changes.single, contains('placeholder account admin'));
+      expect(repair.plan.security.aaaUsername, 'admin');
+      expect(repair.plan.security.aaaAccountPassword, 'cisco123');
+      expect(repair.plan.nodes.length, oversized.nodes.length);
+      expect(repair.plan.links, oversized.links);
+      expect(repair.plan.addressing, oversized.addressing);
+      expect(
+        repair.remaining.any((issue) => issue.message.contains('more than 50')),
+        isTrue,
+        reason: 'the independent size gate remains in force',
+      );
+
+      final reply = OfflineAssistantService.fixPlan(
+        plan: oversized,
+        target: 'packet-tracer',
+      );
+      expect(reply.text, contains('Fixed 1 thing(s)'));
+      expect(reply.text, contains('placeholder account admin'));
+      expect(reply.text, contains('Packet Tracer build limit'));
+      expect(reply.repairedPlan?.security.aaaAccountPassword, 'cisco123');
+    });
+
+    test('Fix the plan says why it stopped and what choice is needed', () {
+      final reply = OfflineAssistantService.fixPlan(
+        plan: plan,
+        target: 'packet-tracer',
+      );
+      expect(reply.text, contains('left this plan unchanged'));
+      expect(reply.text, contains('50-device Packet Tracer build limit'));
+      expect(reply.text, contains('60 printer device(s)'));
+      expect(reply.text, isNot(contains('Fixed ')));
+    });
+
+    test('the change-advice answer does not alter the plan', () {
+      final reply = OfflineAssistantService.explainPlanRepair(
+        plan: plan,
+        target: 'packet-tracer',
+      );
+      expect(reply.text, contains('This plan has 60 devices'));
+      expect(reply.text, contains('Packet Tracer builder is limited to 50'));
+      expect(reply.text, contains('60 printer device(s)'));
+      expect(reply.repairedPlan, isNull);
+      expect(reply.quickReplies, isEmpty);
+    });
+
+    test('oversized advice exposes Fix only when a local repair will run', () {
+      final reply = OfflineAssistantService.explainPlanRepair(
+        plan: _oversizedPrinterPlan(missingAaa: true),
+        target: 'packet-tracer',
+      );
+      expect(reply.text, contains('Press "Fix the plan" below'));
+      expect(reply.quickReplies, contains('Fix the plan'));
+      expect(reply.repairedPlan, isNull, reason: 'advice remains read-only');
+    });
+
+    test('a conflicting stated total is shown and the inventory stays short', () {
+      final reply = OfflineAssistantService.reply(
+        rawText: 'Build a 28-device design with printers.',
+        normalized: 'build a 28-device design with printers.',
+        target: 'packet-tracer',
+        plan: plan,
+        history: const [
+          ChatMessage(
+            role: 'user',
+            text: 'Create a 28-device design with redundant links.',
+          ),
+        ],
+        modelError: 'HTTP 503: {}',
+      );
+      expect(
+        reply.text,
+        contains(
+          'Count mismatch: your brief says 28 devices, but this plan contains 60.',
+        ),
+      );
+      expect(reply.text, contains('printer: 60'));
+      expect(reply.text.length, lessThan(5000));
+      expect(reply.text, isNot(contains('PRINTER60')));
     });
   });
 }

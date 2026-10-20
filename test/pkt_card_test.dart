@@ -55,7 +55,7 @@ class _FakeSettings extends SettingsService {
 }
 
 void main() {
-  testWidgets('a fix card offers Approve, Reject and Modify', (tester) async {
+  testWidgets('a fix card clearly creates an offline copy', (tester) async {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -69,7 +69,9 @@ void main() {
 
     expect(find.text('Reject'), findsOneWidget);
     expect(find.text('Modify'), findsOneWidget);
-    expect(find.text('Approve'), findsNWidgets(2));
+    expect(find.text('Create fixed copy'), findsOneWidget);
+    expect(find.text('Approve'), findsOneWidget);
+    expect(find.textContaining('Packet Tracer is not opened'), findsOneWidget);
     expect(find.textContaining('GigabitEthernet0/1'), findsWidgets);
   });
 }

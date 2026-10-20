@@ -98,6 +98,14 @@ class _ActionHubPanelState extends State<ActionHubPanel> {
 
   bool _enabled(AppAction action) => !action.needsPlan || widget.host.hasPlan;
 
+  bool _availableForDevice(AppAction action) {
+    if (action.id == 'pt.chooseLayout') return true;
+    if (action.id == 'pt.generate') return widget.host.hasChosenLayout;
+    if (!SettingsService.isMobile) return true;
+    if (!action.phoneAvailable) return false;
+    return true;
+  }
+
   /// The hub has to render without a SettingsService (a widget test mounts it
   /// bare), so the changelog card is optional rather than required.
   SettingsService? _settingsOrNull(BuildContext context) {
@@ -121,9 +129,17 @@ class _ActionHubPanelState extends State<ActionHubPanel> {
     await _run(matches[index]);
   }
 
+  /// Phone users see only actions that have an on-device implementation.
+  /// Design selection is shared by both platforms, and a .pkt build stays
+  /// hidden until that design is chosen.
+  List<AppAction> _matches() => [
+    for (final action in CapabilityRegistry.search(_query))
+      if (_availableForDevice(action)) action,
+  ];
+
   /// The results the keyboard can walk, in the order they are drawn.
   List<AppAction> _runnable() => [
-    for (final action in CapabilityRegistry.search(_query))
+    for (final action in _matches())
       if (_enabled(action)) action,
   ];
 
@@ -139,7 +155,7 @@ class _ActionHubPanelState extends State<ActionHubPanel> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final matches = CapabilityRegistry.search(_query);
+    final matches = _matches();
     final searching = _query.trim().isNotEmpty;
     final runnable = _runnable();
     final selected = runnable.isEmpty
@@ -217,7 +233,7 @@ class _ActionHubPanelState extends State<ActionHubPanel> {
                       child: Text(
                         searching
                             ? '${matches.length} feature(s) match "$_query"'
-                            : '${CapabilityRegistry.all.length} features, grouped. '
+                            : '${matches.length} features, grouped. '
                                   'Up/Down to choose, Enter to run the highlighted '
                                   'one.',
                         style: theme.textTheme.bodySmall?.copyWith(

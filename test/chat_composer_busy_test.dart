@@ -65,7 +65,8 @@ class _ParkingStore extends MemoryService {
           payload: {
             'topic': 'ap_selection',
             'recommendation': 'Wired access points beat mesh.',
-            'planBrief': 'Build a small office with 2 wireless routers and '
+            'planBrief':
+                'Build a small office with 2 wireless routers and '
                 '30 PCs',
             'basis': 'the lab on the table',
           },
@@ -126,7 +127,7 @@ Widget _chat() => MultiProvider(
 /// On the default 800x600 the seeded advice card's button lands underneath
 /// the composer, so a real tap there hits the message box instead and the
 /// test would only "pass" because nothing happened (the draft-protection
-/// test passes vacuously on a missed tap). The drawer test in
+/// test passes vacuously on a missed tap). The phone settings test in
 /// `test/chat_conversations_test.dart` gets its room the same way. How tall
 /// the sheet is is not what this file is about - the draft is.
 Future<void> _pumpChat(WidgetTester tester) async {
@@ -144,13 +145,13 @@ Finder _composer() => find.byWidgetPredicate(
   (w) => w is TextField && w.decoration?.labelText == 'Message',
 );
 
-Finder _attach() => find.byType(PopupMenuButton<String>);
+Finder _attach() => find.byWidgetPredicate(
+  (widget) => widget is PopupMenuButton<String> && widget.tooltip == 'Attach',
+);
 
 /// What the field is really made of, below the TextField wrapper.
-Finder _editable() => find.descendant(
-  of: _composer(),
-  matching: find.byType(EditableText),
-);
+Finder _editable() =>
+    find.descendant(of: _composer(), matching: find.byType(EditableText));
 
 String _draft(WidgetTester tester) =>
     tester.widget<TextField>(_composer()).controller!.text;
@@ -189,15 +190,18 @@ Future<void> _pump(WidgetTester tester) async {
 Future<void> _revealTranscriptTop(WidgetTester tester) async {
   await tester.drag(find.byType(ListView).first, const Offset(0, 100000));
   await tester.pump();
-  expect(_planThis(), findsOneWidget,
-      reason: 'the seeded advice card must be back on screen');
+  expect(
+    _planThis(),
+    findsOneWidget,
+    reason: 'the seeded advice card must be back on screen',
+  );
 }
 
 Finder _planThis() => find.byKey(const ValueKey('advice-plan-this'));
 
 void main() {
   testWidgets('the send button becomes Stop while a turn runs', (tester) async {
-  await _pumpChat(tester);
+    await _pumpChat(tester);
 
     await _sendAndPark(tester, 'add a switch to it');
 
@@ -208,7 +212,7 @@ void main() {
   });
 
   testWidgets('the composer stays enabled while a turn runs', (tester) async {
-  await _pumpChat(tester);
+    await _pumpChat(tester);
 
     await _sendAndPark(tester, 'add a switch to it');
 
@@ -236,7 +240,7 @@ void main() {
 
   testWidgets('text typed mid-turn survives, and a send attempt does not '
       'throw it away', (tester) async {
-  await _pumpChat(tester);
+    await _pumpChat(tester);
 
     await _sendAndPark(tester, 'add a switch to it');
 
@@ -260,7 +264,7 @@ void main() {
   });
 
   testWidgets('the attach menu stays usable while a turn runs', (tester) async {
-  await _pumpChat(tester);
+    await _pumpChat(tester);
 
     await _sendAndPark(tester, 'add a switch to it');
 
@@ -286,7 +290,7 @@ void main() {
 
   testWidgets('a suggestion tapped mid-turn keeps the draft instead of '
       'replacing it', (tester) async {
-  await _pumpChat(tester);
+    await _pumpChat(tester);
 
     // The transcript is seeded with an advice card, so its "Plan this"
     // button is on screen - the one suggestion route with no busy guard.
@@ -311,7 +315,7 @@ void main() {
 
   testWidgets('an empty composer still receives the suggestion, so the tap '
       'is not lost', (tester) async {
-  await _pumpChat(tester);
+    await _pumpChat(tester);
 
     expect(_planThis(), findsOneWidget);
 
@@ -333,9 +337,10 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Shift+Enter still adds a line rather than sending mid-turn',
-      (tester) async {
-  await _pumpChat(tester);
+  testWidgets('Shift+Enter still adds a line rather than sending mid-turn', (
+    tester,
+  ) async {
+    await _pumpChat(tester);
 
     await _sendAndPark(tester, 'add a switch to it');
 

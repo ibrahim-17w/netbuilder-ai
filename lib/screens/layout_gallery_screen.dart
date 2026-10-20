@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../models/network_intent.dart';
@@ -65,31 +67,108 @@ class LayoutGalleryScreen extends StatefulWidget {
 }
 
 class _LayoutGalleryScreenState extends State<LayoutGalleryScreen> {
-  late Map<String, LayoutSnapshot> _layouts;
+  static final Map<String, LayoutSnapshot> _sharedLayouts = {};
+  static const int _smallPlanBatchSize = 3;
+  static const int _mediumPlanBatchSize = 2;
+  static const int _largePlanBatchSize = 1;
+  static const int _largePlanThreshold = 200;
+  static const int _mediumPlanThreshold = 50;
+  static const int _maxSharedLayouts = 24;
+  final Map<String, LayoutSnapshot> _layouts = {};
+  late final List<String> _orderedStyles;
+  late final String _planRevision;
+  late final int _batchSize;
+  late int _visibleStyleCount;
   late String _selected;
   String? _zoomed;
 
   @override
   void initState() {
     super.initState();
-    _layouts = computeAllLayouts(
-      widget.intent,
-      side: widget.side.isEmpty ? const <String>['server'] : widget.side,
-      zones: _zones(),
-    );
     _selected = kLayoutStyles.contains(widget.currentStyle)
         ? widget.currentStyle
         : kLayoutStyles.first;
+    _orderedStyles = <String>[
+      _selected,
+      ...kLayoutStyles.where((style) => style != _selected),
+    ];
+    _planRevision = widget.intent.revision;
+    _batchSize = widget.intent.nodes.length > _largePlanThreshold
+        ? _largePlanBatchSize
+        : widget.intent.nodes.length > _mediumPlanThreshold
+        ? _mediumPlanBatchSize
+        : _smallPlanBatchSize;
+    _visibleStyleCount = _orderedStyles.length < _batchSize
+        ? _orderedStyles.length
+        : _batchSize;
+  }
+
+  LayoutSnapshot _layoutFor(String style) {
+    final local = _layouts[style];
+    if (local != null) return local;
+    final side = style == 'grouped'
+        ? resolveSideNames(
+            widget.intent,
+            kinds: widget.side.isEmpty ? const ['server'] : widget.side,
+            names: widget.side,
+          )
+        : const <String>[];
+    final zones = style == 'grouped' ? _zones() : const <LayoutZone>[];
+    // The plan revision already fingerprints every node and cable detail used
+    // by layout. Keep the shared-cache key small instead of serializing the
+    // whole topology again for every style preview.
+    final key = jsonEncode({
+      'revision': _planRevision,
+      'style': style,
+      'side': side.toList(),
+      'zones': [
+        for (final zone in zones) {'side': zone.side, 'edge': zone.edge},
+      ],
+    });
+    final snapshot = _sharedLayouts.putIfAbsent(
+      key,
+      () => computeLayoutSnapshot(
+        widget.intent,
+        style: style,
+        side: side,
+        zones: zones,
+      ),
+    );
+    _layouts[style] = snapshot;
+    while (_sharedLayouts.length > _maxSharedLayouts) {
+      _sharedLayouts.remove(_sharedLayouts.keys.first);
+    }
+    return snapshot;
+  }
+
+  void _showMoreStyles() {
+    setState(() {
+      final nextCount = _visibleStyleCount + _batchSize;
+      _visibleStyleCount = nextCount < _orderedStyles.length
+          ? nextCount
+          : _orderedStyles.length;
+    });
   }
 
   /// The zones the grouped tile draws with, falling back to a single column of
   /// servers so the tile is never a grouped tree with nothing in it.
   List<LayoutZone> _zones() {
-    if (widget.zones.isNotEmpty) return widget.zones;
-    final names = widget.side.isEmpty
-        ? const <String>['server']
-        : widget.side;
-    return <LayoutZone>[LayoutZone(names, edge: 'left')];
+    if (widget.zones.isNotEmpty) {
+      return [
+        for (final zone in widget.zones)
+          LayoutZone(
+            resolveSideNames(widget.intent, kinds: zone.side, names: zone.side),
+            edge: zone.edge,
+          ),
+      ];
+    }
+    final names = widget.side.isEmpty ? const <String>['server'] : widget.side;
+    return <LayoutZone>[
+      LayoutZone(
+        resolveSideNames(widget.intent, kinds: names, names: names),
+        edge: 'left',
+      ),
+    ];
   }
 
   @override
@@ -116,22 +195,22 @@ class _LayoutGalleryScreenState extends State<LayoutGalleryScreen> {
             leading: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                  AppTag(
-                    label: intent.projectName,
-                    tone: AppTone.accent,
-                    icon: Icons.folder_outlined,
-                  ),
-                  const SizedBox(width: AppTheme.s6),
-                  AppTag(
-                    label: '${intent.nodes.length} devices',
-                    tone: AppTone.neutral,
-                  ),
-                  const SizedBox(width: AppTheme.s6),
-                  AppTag(
-                    label: '${intent.links.length} cables',
-                    tone: AppTone.neutral,
-                  ),
-                  const SizedBox(width: AppTheme.s8),
+                AppTag(
+                  label: intent.projectName,
+                  tone: AppTone.accent,
+                  icon: Icons.folder_outlined,
+                ),
+                const SizedBox(width: AppTheme.s6),
+                AppTag(
+                  label: '${intent.nodes.length} devices',
+                  tone: AppTone.neutral,
+                ),
+                const SizedBox(width: AppTheme.s6),
+                AppTag(
+                  label: '${intent.links.length} cables',
+                  tone: AppTone.neutral,
+                ),
+                const SizedBox(width: AppTheme.s8),
                 Flexible(
                   child: Text(
                     'Pick how it should be drawn - the build uses exactly '
@@ -155,12 +234,12 @@ class _LayoutGalleryScreenState extends State<LayoutGalleryScreen> {
                 crossAxisSpacing: AppTheme.s12,
                 childAspectRatio: 1.25,
               ),
-              itemCount: kLayoutStyles.length,
+              itemCount: _visibleStyleCount,
               itemBuilder: (context, index) {
-                final style = kLayoutStyles[index];
+                final style = _orderedStyles[index];
                 return _LayoutCard(
                   style: style,
-                  snapshot: _layouts[style]!,
+                  snapshot: _layoutFor(style),
                   intent: intent,
                   selected: style == _selected,
                   isCurrent: style == widget.currentStyle,
@@ -170,6 +249,49 @@ class _LayoutGalleryScreenState extends State<LayoutGalleryScreen> {
               },
             ),
           ),
+          if (_visibleStyleCount < _orderedStyles.length)
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppTheme.gutter(context),
+                AppTheme.s8,
+                AppTheme.gutter(context),
+                AppTheme.gutter(context),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '$_visibleStyleCount of ${_orderedStyles.length} designs shown',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: _showMoreStyles,
+                    icon: const Icon(Icons.expand_more),
+                    label: const Text('Show more designs'),
+                  ),
+                ],
+              ),
+            )
+          else
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppTheme.gutter(context),
+                AppTheme.s8,
+                AppTheme.gutter(context),
+                AppTheme.gutter(context),
+              ),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'All ${_orderedStyles.length} designs shown',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -184,7 +306,7 @@ class _LayoutGalleryScreenState extends State<LayoutGalleryScreen> {
     NetworkIntent intent,
     String style,
   ) {
-    final snapshot = _layouts[style]!;
+    final snapshot = _layoutFor(style);
     final laidOut = _intentWithSnapshot(intent, snapshot);
     return Scaffold(
       appBar: AppBar(
@@ -207,7 +329,7 @@ class _LayoutGalleryScreenState extends State<LayoutGalleryScreen> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(AppTheme.s8),
-        child: TopologyCanvas(intent: laidOut),
+        child: TopologyCanvas(intent: laidOut, allowNodeDrag: false),
       ),
     );
   }

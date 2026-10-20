@@ -21,17 +21,19 @@ void main() {
         NetLink(a: 'SW1', aIf: 'f0/2', b: 'PC1', bIf: 'f0'),
       ],
     );
-    await tester.pumpWidget(MaterialApp(
-      home: PktViewerScreen(
-        filePath: r'C:\pkt_output\office-lab.pkt',
-        intent: intent,
-        positions: const {
-          'R1': Offset(400, 80),
-          'SW1': Offset(400, 200),
-          'PC1': Offset(400, 320),
-        },
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PktViewerScreen(
+          filePath: r'C:\pkt_output\office-lab.pkt',
+          intent: intent,
+          positions: const {
+            'R1': Offset(400, 80),
+            'SW1': Offset(400, 200),
+            'PC1': Offset(400, 320),
+          },
+        ),
       ),
-    ));
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('office-lab.pkt'), findsOneWidget);
@@ -43,11 +45,71 @@ void main() {
     expect(find.textContaining('Packet Tracer was not found'), findsOneWidget);
   });
 
-  testWidgets('no plan in the conversation says so instead of guessing',
-      (tester) async {
-    await tester.pumpWidget(MaterialApp(
-      home: PktViewerScreen(filePath: '/tmp/lab.pkt', intent: null),
-    ));
+  testWidgets('fits off-screen desktop coordinates into a phone preview', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 740);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    const intent = NetworkIntent(
+      projectName: 'phone-lab',
+      nodes: [
+        NetNode(name: 'R1', type: 'router'),
+        NetNode(name: 'SW1', type: 'switch'),
+        NetNode(name: 'PC1', type: 'pc'),
+        NetNode(name: 'PC2', type: 'pc'),
+        NetNode(name: 'PC3', type: 'pc'),
+        NetNode(name: 'PC4', type: 'pc'),
+      ],
+      links: [
+        NetLink(a: 'R1', aIf: 'g0/0', b: 'SW1', bIf: 'f0/1'),
+        NetLink(a: 'SW1', aIf: 'f0/2', b: 'PC1', bIf: 'f0'),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PktViewerScreen(
+          filePath: '/tmp/phone-lab.pkt',
+          intent: intent,
+          positions: const {
+            'R1': Offset(1800, 1200),
+            'SW1': Offset(2200, 1500),
+            'PC1': Offset(1800, 2200),
+            'PC2': Offset(1950, 2200),
+            'PC3': Offset(2100, 2200),
+            'PC4': Offset(2250, 2200),
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final semantics = tester.ensureSemantics();
+
+    for (final name in ['R1', 'SW1', 'PC1', 'PC2', 'PC3', 'PC4']) {
+      final node = find.bySemanticsLabel(RegExp('^[^ ]+ $name\\.'));
+      expect(
+        node,
+        findsOneWidget,
+        reason: '$name should be in the fitted view',
+      );
+      final rect = tester.getRect(node);
+      expect(rect.left, greaterThanOrEqualTo(0));
+      expect(rect.top, greaterThanOrEqualTo(0));
+      expect(rect.right, lessThanOrEqualTo(360));
+      expect(rect.bottom, lessThanOrEqualTo(740));
+    }
+    semantics.dispose();
+  });
+
+  testWidgets('no plan in the conversation says so instead of guessing', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PktViewerScreen(filePath: '/tmp/lab.pkt', intent: null),
+      ),
+    );
     expect(find.text('Nothing to draw yet'), findsOneWidget);
     expect(find.textContaining('lab.pkt'), findsWidgets);
   });

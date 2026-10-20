@@ -11,56 +11,113 @@ import 'package:net_builder/widgets/topology_thumbnail.dart';
 
 void main() {
   final intent = NetworkIntent.parseSimple(
-      'chat', '2 routers, 2 switches and 6 PCs with OSPF');
+    'chat',
+    '2 routers, 2 switches and 6 PCs with OSPF',
+  );
 
   Widget host(Widget child) => MaterialApp(home: child);
 
-  /// The gallery is a lazy grid, so counting its cards needs a surface big
-  /// enough to hold them all - otherwise the count is a viewport artefact and
-  /// the test passes or fails for the wrong reason.
+  /// The gallery reveals a few designs at a time; a large surface makes the
+  /// loaded-card count independent of viewport virtualization.
   void bigSurface(WidgetTester tester) {
     tester.view.physicalSize = const Size(1600, 2600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
   }
 
-  testWidgets('shows one card per layout style', (tester) async {
+  testWidgets('reveals small batches of layout styles on demand', (
+    tester,
+  ) async {
     bigSurface(tester);
     await tester.pumpWidget(host(LayoutGalleryScreen(intent: intent)));
     await tester.pumpAndSettle();
 
-    for (final style in kLayoutStyles) {
-      expect(find.text(layoutStyleLabel(style)), findsOneWidget,
-          reason: 'style $style has no card');
+    expect(find.byType(TopologyThumbnail), findsNWidgets(3));
+    expect(find.text('3 of 14 designs shown'), findsOneWidget);
+    expect(find.text('Show more designs'), findsOneWidget);
+    expect(find.text(layoutStyleLabel(kLayoutStyles[3])), findsNothing);
+
+    await tester.tap(find.text('Show more designs'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TopologyThumbnail), findsNWidgets(6));
+    expect(find.text('6 of 14 designs shown'), findsOneWidget);
+
+    while (find.text('Show more designs').evaluate().isNotEmpty) {
+      await tester.tap(find.text('Show more designs'));
+      await tester.pumpAndSettle();
     }
-    // One thumbnail per card, all painting.
+    for (final style in kLayoutStyles) {
+      expect(
+        find.text(layoutStyleLabel(style)),
+        findsOneWidget,
+        reason: 'style $style has no card',
+      );
+    }
+    // Every style appears only after its batch is requested.
     expect(find.byType(TopologyThumbnail), findsNWidgets(kLayoutStyles.length));
+    expect(find.text('All 14 designs shown'), findsOneWidget);
   });
 
-  testWidgets('selecting a layout highlights it and returns it', (tester) async {
+  testWidgets('starts with the current design and loads large plans singly', (
+    tester,
+  ) async {
+    final largeIntent = NetworkIntent(
+      projectName: 'large',
+      nodes: [
+        for (var i = 0; i < 201; i++) NetNode(name: 'PC${i + 1}', type: 'pc'),
+      ],
+    );
+    await tester.pumpWidget(
+      host(LayoutGalleryScreen(intent: largeIntent, currentStyle: 'compact')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TopologyThumbnail), findsOneWidget);
+    expect(
+      tester
+          .widget<TopologyThumbnail>(find.byType(TopologyThumbnail))
+          .snapshot
+          .style,
+      'compact',
+    );
+    expect(find.text('1 of 14 designs shown'), findsOneWidget);
+
+    await tester.tap(find.text('Show more designs'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TopologyThumbnail), findsNWidgets(2));
+    expect(find.text('2 of 14 designs shown'), findsOneWidget);
+  });
+
+  testWidgets('selecting a layout highlights it and returns it', (
+    tester,
+  ) async {
     String? result;
-    await tester.pumpWidget(MaterialApp(
-      home: Builder(
-        builder: (context) => Scaffold(
-          body: Center(
-            child: ElevatedButton(
-              onPressed: () async {
-                result = await LayoutGalleryScreen.show(
-                  context,
-                  intent: intent,
-                  currentStyle: 'tree',
-                );
-              },
-              child: const Text('open'),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () async {
+                  result = await LayoutGalleryScreen.show(
+                    context,
+                    intent: intent,
+                    currentStyle: 'tree',
+                  );
+                },
+                child: const Text('open'),
+              ),
             ),
           ),
         ),
       ),
-    ));
+    );
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
     // Tap the "Straight rows" card, then confirm.
+    await tester.tap(find.text('Show more designs'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text(layoutStyleLabel('rows')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Use this layout'));
@@ -71,29 +128,32 @@ void main() {
 
   testWidgets('the current style is marked', (tester) async {
     await tester.pumpWidget(host(const SizedBox.shrink()));
-    await tester.pumpWidget(host(
-      LayoutGalleryScreen(intent: intent, currentStyle: 'compact'),
-    ));
+    await tester.pumpWidget(
+      host(LayoutGalleryScreen(intent: intent, currentStyle: 'compact')),
+    );
     await tester.pumpAndSettle();
     expect(find.text('current'), findsOneWidget);
   });
 
-  testWidgets('a thumbnail paints without overflowing a small card',
-      (tester) async {
-    await tester.pumpWidget(host(
-      Scaffold(
-        body: Center(
-          child: SizedBox(
-            width: 180,
-            height: 120,
-            child: TopologyThumbnail(
-              intent: intent,
-              snapshot: computeLayoutSnapshot(intent, style: 'tree'),
+  testWidgets('a thumbnail paints without overflowing a small card', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(
+        Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 180,
+              height: 120,
+              child: TopologyThumbnail(
+                intent: intent,
+                snapshot: computeLayoutSnapshot(intent, style: 'tree'),
+              ),
             ),
           ),
         ),
       ),
-    ));
+    );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
@@ -113,6 +173,7 @@ void main() {
     await tester.pumpWidget(host(LayoutGalleryScreen(intent: empty)));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.byType(TopologyThumbnail), findsNWidgets(kLayoutStyles.length));
+    expect(find.byType(TopologyThumbnail), findsNWidgets(3));
+    expect(find.text('3 of 14 designs shown'), findsOneWidget);
   });
 }

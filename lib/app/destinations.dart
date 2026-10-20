@@ -2,69 +2,70 @@ import 'package:flutter/material.dart';
 
 /// Every screen the shell can show, named.
 ///
-/// The shell used to switch on bare integers (`case 3:`), and only three of
-/// the eight values were ever set: the history, the build form, the memory,
-/// the settings screen and the .pkt file screen existed in the code but had
-/// no way in. Naming them makes "is this reachable?" a question the code can
-/// answer, and the capability registry answers it for every one of them.
+/// Named destinations make the app's navigation explicit. New designs start
+/// in chat; the workspace is available when there is a plan to edit or verify.
 enum AppDestination {
   chat,
   history,
-  newBuild,
   analyze,
   execution,
   memory,
   files,
   importPkts,
+  labs,
   settings;
 
   String get title => switch (this) {
     AppDestination.chat => 'Chat',
     AppDestination.history => 'Saved networks',
-    AppDestination.newBuild => 'New build',
+    AppDestination.execution => 'Plan workspace',
     AppDestination.analyze => 'Analyze and fix',
-    AppDestination.execution => 'Build workspace',
     AppDestination.memory => 'Memory and learning',
     AppDestination.files => 'Packet Tracer files',
     AppDestination.importPkts => 'Open & inspect .pkt',
+    AppDestination.labs => 'Practice labs',
     AppDestination.settings => 'Settings',
   };
 
   String get description => switch (this) {
-    AppDestination.chat => 'Talk to the assistant, attach evidence, approve changes',
-    AppDestination.history => 'Every network this app has built, with its outcome',
-    AppDestination.newBuild => 'Describe a network in a sentence and plan it',
+    AppDestination.chat =>
+      'Talk to the assistant, attach evidence, approve changes',
+    AppDestination.history =>
+      'Every network this app has built, with its outcome',
+    AppDestination.execution => 'Edit, rebuild, and verify the open network',
     AppDestination.analyze => 'Audit a live lab and apply approved fixes',
-    AppDestination.execution => 'Run the plan and prove it on screen',
-    AppDestination.memory => 'Corrections, learned rules and the failure journal',
+    AppDestination.memory =>
+      'Corrections, learned rules and the failure journal',
     AppDestination.files => 'Open, verify, back up and report on .pkt saves',
     AppDestination.importPkts =>
-        'Audit, diff and grade any saved .pkt - no Packet Tracer',
-    AppDestination.settings => 'Keys, provider, engine address, folders',
+      'Audit, diff and grade any saved .pkt - no Packet Tracer',
+    AppDestination.labs =>
+      'Practice routing, services, VLANs, and security with scored goals',
+    AppDestination.settings =>
+      'Provider, build engine, privacy, automation and appearance',
   };
 
   IconData get icon => switch (this) {
     AppDestination.chat => Icons.forum_outlined,
     AppDestination.history => Icons.history,
-    AppDestination.newBuild => Icons.add_circle_outline,
     AppDestination.analyze => Icons.troubleshoot,
-    AppDestination.execution => Icons.play_circle_outline,
+    AppDestination.execution => Icons.account_tree_outlined,
     AppDestination.memory => Icons.psychology_outlined,
     AppDestination.files => Icons.folder_open_outlined,
     AppDestination.importPkts => Icons.manage_search,
+    AppDestination.labs => Icons.school_outlined,
     AppDestination.settings => Icons.tune,
   };
 
-  /// The destinations a person can go to at any time. The execution
-  /// workspace needs a build to open, so it is listed separately.
+  /// Screens available from the main navigation. Settings has one app-bar
+  /// entry; the plan workspace appears only when a plan is open.
   static const alwaysAvailable = [
     AppDestination.chat,
-    AppDestination.newBuild,
     AppDestination.analyze,
     AppDestination.files,
     AppDestination.importPkts,
+    AppDestination.labs,
     AppDestination.history,
     AppDestination.memory,
-    AppDestination.settings,
   ];
 }

@@ -12,6 +12,7 @@ import '../services/adapters/packet_tracer_adapter.dart';
 import '../services/autopilot_service.dart';
 import '../services/build_artifact_service.dart';
 import '../services/gemini_service.dart';
+import '../services/engine_configuration_sync.dart';
 import '../services/memory_service.dart';
 import '../services/privacy_search_service.dart';
 import '../services/settings_service.dart';
@@ -33,6 +34,7 @@ class BuilderDetailScreen extends StatefulWidget {
   /// (older records).
   final String brief;
   final String target;
+  final ValueChanged<Map<String, dynamic>>? onReviewFailure;
   const BuilderDetailScreen({
     super.key,
     required this.record,
@@ -41,6 +43,7 @@ class BuilderDetailScreen extends StatefulWidget {
     this.monitorSidecar = true,
     this.brief = '',
     this.target = 'packet-tracer',
+    this.onReviewFailure,
   });
 
   @override
@@ -131,7 +134,8 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(
-        () => _log = 'Teach run refused: '
+        () => _log =
+            'Teach run refused: '
             '${e.toString().replaceFirst('Exception: ', '')}',
       );
     }
@@ -321,7 +325,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
         _aiSuggesting = true;
         _log =
             'AI is proposing and evaluating fixes for recurring '
-            'failures (two Gemini passes)...';
+            'failures (two model passes)...';
       });
       for (var i = 0; i < 60; i++) {
         await Future.delayed(const Duration(seconds: 2));
@@ -1812,18 +1816,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
     final engine = AutopilotService.of(context);
     try {
       final s = context.read<SettingsService>();
-      final key = await s.getApiKey() ?? '';
-      await engine.pushLlmConfig(
-        apiKey: key,
-        model: s.model,
-        enabled: key.isNotEmpty && !s.privateMode && s.llmFix,
-        // Auto-learning rides along with the key: with it on, a failing run
-        // proposes and (when a PT window is present) verifies a correction
-        // with no button press.  The fail-closed gate is unchanged.
-        autoLearn: s.autoLearn,
-        autoSuggest: s.autoLearn && s.autoSuggest,
-        autoTeach: s.autoLearn && s.autoTeach,
-      );
+      await EngineConfigurationSync.push(s, engine);
     } catch (_) {
       // optional helper - never fail the run over it
     }
@@ -1875,8 +1868,8 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
   }
 
   /// Post-build verification: run the plan's derived test list in the live
-  /// Packet Tracer window (gateway + service pings from every endpoint) and
-  /// show pass/fail evidence per test. Read-only: it types pings, nothing else.
+  /// Packet Tracer window (gateway/service reachability plus DNS lookups) and
+  /// show evidence per test. DHCP, HTTP, and security behavior remain manual.
   Future<void> _verifyBuild() async {
     setState(() {
       _verifying = true;
@@ -1891,7 +1884,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       }
       final plan = PacketTracerAdapter.autopilotPlan(widget.intent);
       await svc.verifyRun(plan);
-      // poll until the runner finishes (bounded: 25 tests * ~12s)
+      // Poll until the bounded runner finishes; larger runs can take several minutes.
       for (var i = 0; i < 150; i++) {
         await Future.delayed(const Duration(seconds: 4));
         if (!mounted) return;
@@ -2151,7 +2144,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
                 ElevatedButton.icon(
                   onPressed: (_busy || _verifying) ? null : _verifyBuild,
                   icon: const Icon(Icons.network_ping, size: 18),
-                  label: const Text('Verify (ping tests)'),
+                  label: const Text('Verify network and services'),
                 ),
               ],
             ),
@@ -2435,6 +2428,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
           report: _verifyReport,
           busy: _verifying,
           onRerun: _verifyBuild,
+          onReviewFailure: widget.onReviewFailure,
         ),
         // The run log is the only place a long build reports its own state,
         // so a screen reader is told when it changes.
@@ -2579,7 +2573,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
         // become `proposed` corrections - teach runs still verify them.
         AppPanel(
           icon: Icons.auto_awesome_outlined,
-          title: 'AI fix suggestions (Gemini)',
+          title: 'AI fix suggestions (selected model)',
           subtitle:
               'Proposes fixes for steps that keep failing, then judges each '
               'proposal with a second AI pass. Accepted label/skip fixes are '

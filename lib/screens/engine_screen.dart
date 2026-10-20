@@ -35,10 +35,12 @@ class _EngineScreenState extends State<EngineScreen> {
     super.initState();
     _address.text = widget.settings?.engineBase ?? _engine.base;
     _engine.addListener(_onEngine);
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _engine.probe(force: true);
-      await _loadLog();
-    });
+    if (!SettingsService.isMobile) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await _engine.probe(force: true);
+        await _loadLog();
+      });
+    }
   }
 
   @override
@@ -78,31 +80,78 @@ class _EngineScreenState extends State<EngineScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final phone = SettingsService.isMobile;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Local engine'),
+        title: Text(phone ? 'On this phone' : 'Local engine'),
         actions: [
-          IconButton(
-            tooltip: 'Check now',
-            icon: const Icon(Icons.refresh),
-            onPressed: _busy
-                ? null
-                : () => _run(() => _engine.probe(force: true)),
-          ),
+          if (!phone)
+            IconButton(
+              tooltip: 'Check now',
+              icon: const Icon(Icons.refresh),
+              onPressed: _busy
+                  ? null
+                  : () => _run(() => _engine.probe(force: true)),
+            ),
         ],
       ),
       body: AppPage(
         maxWidth: 1000,
-        children: [
-          _statusHero(),
-          _actionsPanel(),
-          _addressPanel(),
-          _capabilityPanel(),
-          _logPanel(),
-        ],
+        children: phone
+            ? _phoneSections()
+            : [
+                _statusHero(),
+                _actionsPanel(),
+                _addressPanel(),
+                _capabilityPanel(),
+                _logPanel(),
+              ],
       ),
     );
   }
+
+  List<Widget> _phoneSections() => [
+    AppPanel(
+      icon: Icons.phone_android_outlined,
+      tone: AppTone.success,
+      title: 'Ready on this phone',
+      subtitle:
+          'The everyday network tools and Packet Tracer file builder run here.',
+      children: const [
+        _Tier(
+          icon: Icons.hub_outlined,
+          tone: AppTone.success,
+          title: 'Plan and preview',
+          body:
+              'Create a network, review the device and cable choices, and '
+              'arrange the topology before building.',
+        ),
+        _Tier(
+          icon: Icons.save_outlined,
+          tone: AppTone.success,
+          title: 'Build and save .pkt files',
+          body:
+              'The phone uses its bundled Packet Tracer library and Android’s '
+              'save screen. A PC engine is not needed for this path.',
+        ),
+        _Tier(
+          icon: Icons.calculate_outlined,
+          tone: AppTone.success,
+          title: 'Use local network tools',
+          body:
+              'Subnet math, plan checks, configuration exports, and the '
+              'offline assistant are available here.',
+        ),
+      ],
+    ),
+    AppPanel(
+      icon: Icons.desktop_windows_outlined,
+      title: 'Live Packet Tracer control',
+      subtitle:
+          'Typing into a Packet Tracer window, reading its CLI, and controlling '
+          'a live run require Packet Tracer on a computer.',
+    ),
+  ];
 
   // -------------------------------------------------------------------------
   // Status

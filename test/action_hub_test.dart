@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:net_builder/app/destinations.dart';
 import 'package:net_builder/models/network_intent.dart';
 import 'package:net_builder/services/capability_registry.dart';
+import 'package:net_builder/services/layout_intent.dart';
 import 'package:net_builder/widgets/action_hub.dart';
 
 /// The hub is a function of its host, so the test supplies a host that records
@@ -25,7 +26,6 @@ class _Host {
             push: (screen) => calls.add('push:${screen.runtimeType}'),
             openChat: ({required project, prefill = ''}) =>
                 calls.add('chat:$project:$prefill'),
-            openDrawer: () => calls.add('drawer'),
           ),
         ),
       ),
@@ -51,7 +51,10 @@ void main() {
     expect(find.text('PLAN A NETWORK'), findsOneWidget);
     expect(find.text('NETWORK TOOLS'), findsOneWidget);
     expect(find.text('Open the network toolkit'), findsOneWidget);
-    expect(find.text('Live diagnostics: DNS, ports, HTTP, ping'), findsOneWidget);
+    expect(
+      find.text('Live diagnostics: DNS, ports, HTTP, ping'),
+      findsOneWidget,
+    );
 
     // The list is long by design, so the later groups are reached by search
     // - which is how the hub is meant to be used anyway.
@@ -74,31 +77,33 @@ void main() {
     expect(find.textContaining('feature(s) match'), findsOneWidget);
   });
 
-  testWidgets('a plan-dependent action is visible but disabled without a plan',
-      (tester) async {
-    final host = _Host();
-    await tester.pumpWidget(host.harness());
-    await tester.pumpAndSettle();
+  testWidgets(
+    'a plan-dependent action is visible but disabled without a plan',
+    (tester) async {
+      final host = _Host();
+      await tester.pumpWidget(host.harness());
+      await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField).first, 'Check the plan');
-    await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'Check the plan');
+      await tester.pumpAndSettle();
 
-    expect(find.text('Check the plan for errors'), findsOneWidget);
-    expect(find.text('Open a plan first'), findsOneWidget);
+      expect(find.text('Check the plan for errors'), findsOneWidget);
+      expect(find.text('Open a plan first'), findsOneWidget);
 
-    await tester.tap(
-      find.descendant(
-        of: find.byType(ListView),
-        matching: find.text('Check the plan for errors'),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(
-      host.calls,
-      isEmpty,
-      reason: 'a disabled capability must not run anything',
-    );
-  });
+      await tester.tap(
+        find.descendant(
+          of: find.byType(ListView),
+          matching: find.text('Check the plan for errors'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        host.calls,
+        isEmpty,
+        reason: 'a disabled capability must not run anything',
+      );
+    },
+  );
 
   testWidgets('tapping a navigation action moves the shell', (tester) async {
     final host = _Host();
@@ -136,7 +141,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(host.calls.single, startsWith('chat:default:Explain the current plan'));
+    expect(
+      host.calls.single,
+      startsWith('chat:default:Explain the current plan'),
+    );
   });
 
   testWidgets('with a plan open, the same action becomes available', (
@@ -154,5 +162,33 @@ void main() {
     expect(find.text('Find duplicate addresses in the plan'), findsOneWidget);
     expect(find.text('Open a plan first'), findsNothing);
     expect(find.text('Plan open'), findsOneWidget);
+  });
+
+  testWidgets('a layout is required before a Packet Tracer file action', (
+    tester,
+  ) async {
+    final host = _Host(
+      intent: NetworkIntent.parseSimple('office', '2 routers 1 switch'),
+    );
+    await tester.pumpWidget(host.harness());
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, 'network design');
+    await tester.pumpAndSettle();
+    expect(find.text('Choose network design'), findsOneWidget);
+    expect(find.text('Build a .pkt from the plan'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    final chosenHost = _Host(
+      intent: NetworkIntent.parseSimple(
+        'office',
+        '2 routers 1 switch',
+      ).copyWith(notes: [LayoutRequest.noteFor('backbone')]),
+    );
+    await tester.pumpWidget(chosenHost.harness());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, 'pkt generate');
+    await tester.pumpAndSettle();
+    expect(find.text('Build a .pkt from the plan'), findsOneWidget);
   });
 }

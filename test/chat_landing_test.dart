@@ -1,22 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:net_builder/main.dart';
-import 'package:net_builder/services/memory_service.dart';
-import 'package:net_builder/services/settings_service.dart';
-import 'package:provider/provider.dart';
-
-/// main() is what installs the providers and a widget test does not call it.
-Widget _app() => MultiProvider(
-  providers: [
-    ChangeNotifierProvider<SettingsService>(create: (_) => SettingsService()),
-    ChangeNotifierProvider<MemoryService>(create: (_) => MemoryService()),
-  ],
-  child: const NetBuilderApp(),
-);
 
 void main() {
-  testWidgets('the app opens straight into the chat: no tabs, no floats',
-      (tester) async {
+  testWidgets('the app opens straight into the chat: no tabs, no floats', (
+    tester,
+  ) async {
     await tester.pumpWidget(const NetBuilderApp());
     await tester.pumpAndSettle();
 
@@ -37,12 +26,15 @@ void main() {
 
     // The chat screen is chat plus a media picker and one tools control.
     expect(find.byTooltip('Attach'), findsOneWidget);
-    expect(find.byTooltip('Tools: run, capture, and integrations'),
-        findsOneWidget);
+    expect(
+      find.byTooltip('Tools: run, capture, and integrations'),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('the on-device .pkt builder is reachable from the chat',
-      (tester) async {
+  testWidgets('the on-device .pkt builder is reachable from the chat', (
+    tester,
+  ) async {
     // A builder nobody can reach is not a feature. On Android the sidecar is
     // not there at all, so these two actions are the ONLY route to a .pkt -
     // they have to be findable from the tools sheet.
@@ -56,8 +48,9 @@ void main() {
     expect(find.text('Build a .pkt on this device'), findsOneWidget);
   });
 
-  testWidgets('the token report is one tap away, not always on screen',
-      (tester) async {
+  testWidgets('the token report is one tap away, not always on screen', (
+    tester,
+  ) async {
     await tester.pumpWidget(const NetBuilderApp());
     await tester.pumpAndSettle();
 
@@ -83,14 +76,13 @@ void main() {
     expect(find.text('Run:'), findsNothing);
   });
 
-  testWidgets('the chat sheet keeps only what is used while chatting',
-      (tester) async {
+  testWidgets('the chat sheet keeps only what is used while chatting', (
+    tester,
+  ) async {
     await tester.pumpWidget(const NetBuilderApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.byTooltip('Tools: run, capture, and integrations'),
-    );
+    await tester.tap(find.byTooltip('Tools: run, capture, and integrations'));
     await tester.pumpAndSettle();
 
     expect(find.text('Build a .pkt from the current plan'), findsOneWidget);
@@ -101,26 +93,6 @@ void main() {
     expect(find.text('Live context'), findsNothing);
     expect(find.text('Project context'), findsNothing);
     expect(find.text('Push the plan to GNS3'), findsNothing);
-  });
-
-  testWidgets('nothing was lost: the run, the ledger and the rest are in '
-      'Settings', (tester) async {
-    await tester.pumpWidget(_app());
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byIcon(Icons.menu).first);
-    await tester.pumpAndSettle();
-
-    // Moved out of the chat, present here.
-    expect(find.text('Packet Tracer run'), findsOneWidget);
-    expect(find.text('Pause / resume'), findsOneWidget);
-    expect(find.text('Stop'), findsOneWidget);
-    expect(find.text('Ledger'), findsOneWidget);
-    expect(find.text('Live context'), findsOneWidget);
-    expect(find.text('Project context'), findsOneWidget);
-
-    // The settings that were always here are further down the same list; they
-    // are asserted in settings_drawer_test.dart, which scrolls to them.
   });
 
   testWidgets('the composer is focused on open', (tester) async {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,25 +12,30 @@ import 'screens/build_workspace_screen.dart';
 import 'screens/analyze_screen.dart';
 import 'screens/chat_screen.dart';
 import 'widgets/action_hub.dart';
-import 'widgets/settings_drawer.dart';
 import 'screens/import_screen.dart';
 import 'screens/pkt_files_screen.dart';
 import 'services/capability_registry.dart';
 import 'services/autopilot_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/memory_screen.dart';
-import 'screens/new_build_screen.dart';
+import 'screens/labs_screen.dart';
 import 'screens/network_toolkit_screen.dart';
 import 'screens/settings_screen.dart';
 import 'services/build_artifact_service.dart';
 import 'services/memory_service.dart';
+import 'services/network_check_diagnostics.dart';
+import 'services/plan_version_service.dart';
 import 'services/engine_status.dart';
+import 'services/engine_configuration_sync.dart';
 import 'services/layout_engine.dart';
 import 'services/layout_intent.dart';
+import 'services/pkt/pkt_export_service.dart';
+import 'services/pkt_build_job_service.dart';
 import 'services/settings_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/app_sidebar.dart';
 import 'widgets/whats_new.dart';
+import 'widgets/pkt_build_job_banner.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,9 +44,17 @@ void main() async {
   try {
     await settings.load();
   } catch (_) {}
+  // A store that cannot be opened is not a reason to stop the app cold - but
+  // it IS reported, because running with no memory at all looks exactly like
+  // a fresh install, and a user who has been building labs for weeks deserves
+  // to be told their history is not being written.
+  String? storeError;
   try {
     await memory.init();
-  } catch (_) {}
+  } catch (e) {
+    storeError = 'Memory store unavailable: $e';
+  }
+  await PktBuildJobService.instance.loadHistory();
   // ONE engine client for the whole app, reading the address the user set.
   // The address is resolved per request, so changing it in Settings takes
   // effect everywhere at once - and no screen can quietly talk to loopback
@@ -53,25 +67,48 @@ void main() async {
   final engine = EngineStatus.instance;
   engine.setBase(settings.engineBase);
   settings.addListener(() => engine.setBase(settings.engineBase));
+  final engineConfig = EngineConfigurationSync(settings, autopilot, engine);
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: settings),
         ChangeNotifierProvider.value(value: memory),
+        ChangeNotifierProvider.value(value: engineConfig),
         Provider<AutopilotService>.value(value: autopilot),
       ],
-      child: const NetBuilderApp(),
+      child: NetBuilderApp(storeError: storeError),
     ),
   );
-  unawaited(engine.ensure());
+  // Android builds Packet Tracer files locally. Probing the desktop sidecar
+  // at the emulator alias on every launch only produced a permanent false
+  // alarm, so a phone checks a remote PC only when the user asks it to.
+  if (!SettingsService.isMobile) unawaited(engine.ensure());
 }
 
 class NetBuilderApp extends StatefulWidget {
   final bool monitorDetailSidecar;
 
-  const NetBuilderApp({super.key, this.monitorDetailSidecar = true});
+  /// The memory store could not be opened, so nothing is being written. The
+  /// app still runs - planning, the offline assistant and .pkt compilation
+  /// are all in-memory - but the user is told rather than left wondering why
+  /// their conversations vanish.
+  final String? storeError;
+
+  const NetBuilderApp({
+    super.key,
+    this.monitorDetailSidecar = true,
+    this.storeError,
+  });
   @override
   State<NetBuilderApp> createState() => _NetBuilderAppState();
+}
+
+String _layoutStyleOf(NetworkIntent? intent) {
+  for (final note in intent?.notes ?? const <String>[]) {
+    final style = LayoutRequest.styleFromNote(note);
+    if (style.isNotEmpty) return style;
+  }
+  return '';
 }
 
 class _NetBuilderAppState extends State<NetBuilderApp> {
@@ -84,19 +121,95 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
   NetworkIntent? _openIntent;
   String _openConfig = '';
   String _activeProject = 'default';
+
   /// Text the chat composer should open with, when a hub action sends the
   /// user there to ask something specific.
   String _chatDraft = '';
+
   /// Bumped when a new conversation is started, so the chat screen is rebuilt
   /// with an empty transcript instead of reusing the old one's state.
   int _chatEpoch = 0;
   final _messengerKey = GlobalKey<ScaffoldMessengerState>();
-  final _scaffoldKey = GlobalKey<ScaffoldState>();
   // Dialogs, sheets and pushed routes need a context *below* MaterialApp,
   // where the Localizations and the Navigator live. This state's own context
   // is above it, which is exactly why opening the hub from here used to throw
   // "No MaterialLocalizations found".
   final _navKey = GlobalKey<NavigatorState>();
+
+  bool _storeErrorShown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeShowTour();
+      _maybeShowStoreError();
+    });
+  }
+
+  /// The memory store could not be opened, so nothing is being written. The
+  /// app still runs - planning, the offline assistant and .pkt compilation
+  /// are all in-memory - but the user is told rather than left wondering why
+  /// their conversations vanish.
+  void _maybeShowStoreError() {
+    final error = widget.storeError;
+    if (error == null || _storeErrorShown) return;
+    _storeErrorShown = true;
+    if (!mounted) return;
+    _messengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Text(error),
+        duration: const Duration(seconds: 12),
+        action: SnackBarAction(
+          label: 'Details',
+          onPressed: () => _showStoreError(error),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _savePhoneBuildJob() async {
+    final jobs = PktBuildJobService.instance;
+    final result = jobs.result;
+    if (result == null) return;
+    final exported = await PktExportService.saveToChosenFolder(
+      result.file,
+      suggestedName: result.file.uri.pathSegments.last,
+    );
+    if (!mounted) return;
+    if (!exported.cancelled && exported.path.isNotEmpty) {
+      jobs.markSaved(exported.path);
+    }
+    _messengerKey.currentState?.showSnackBar(
+      SnackBar(content: Text(exported.message)),
+    );
+  }
+
+  void _showStoreError(String message) {
+    final context = _shellContext;
+    if (context == null) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Memory not being saved'),
+        content: Text(
+          '$message\n\n'
+          'The app still plans, answers and compiles .pkt files in this '
+          'session, but nothing is written to disk - so conversations, '
+          'saved networks and learned rules will not be here next time.\n\n'
+          'Your previous store was kept next to the new one, named '
+          'memory.db.unreadable-<timestamp>. Send it along with a bug report '
+          'and it can be recovered.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
 
   BuildContext? get _shellContext => _navKey.currentContext;
 
@@ -109,12 +222,6 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
     } catch (_) {
       return null;
     }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowTour());
   }
 
   /// The first-run tour, offered once. It waits for settings to be loaded from
@@ -130,10 +237,7 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
     if (ctx == null || !ctx.mounted) return;
     // Finishing the tour opens the hub: the tour claims everything is a
     // button, so it should end by showing the buttons.
-    await FirstRunTour(
-      settings: settings,
-      onFinish: _showHub,
-    ).show(ctx);
+    await FirstRunTour(settings: settings, onFinish: _showHub).show(ctx);
   }
 
   void _go(AppDestination destination) {
@@ -142,9 +246,7 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
   }
 
   void _push(Widget screen) {
-    _navKey.currentState?.push(
-      MaterialPageRoute<void>(builder: (_) => screen),
-    );
+    _navKey.currentState?.push(MaterialPageRoute<void>(builder: (_) => screen));
   }
 
   void _openChat({required String project, String prefill = ''}) {
@@ -172,8 +274,8 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
     push: _push,
     openChat: ({required project, prefill = ''}) =>
         _openChat(project: project, prefill: prefill),
-    openDrawer: () => _scaffoldKey.currentState?.openDrawer(),
     applyLayout: _applyLayout,
+    savePlanEdit: _savePlanEdit,
   );
 
   /// Remember the drawing the user picked for the open plan, as a note, so the
@@ -194,19 +296,21 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
     final parked = style == 'grouped'
         ? resolveSideNames(current, kinds: LayoutRequest.defaultSideKinds)
         : const <String>[];
-    setState(() {
-      _openIntent = current.copyWith(notes: [
-        ...cleaned,
-        LayoutRequest.noteFor(
-          style,
-          sideKinds: parked.isEmpty
-              ? const <String>[]
-              : LayoutRequest.defaultSideKinds,
-          sideNames: parked,
-          sideEdge: 'left',
-        ),
-      ]);
-    });
+    _onOpenIntentChanged(
+      current.copyWith(
+        notes: [
+          ...cleaned,
+          LayoutRequest.noteFor(
+            style,
+            sideKinds: parked.isEmpty
+                ? const <String>[]
+                : LayoutRequest.defaultSideKinds,
+            sideNames: parked,
+            sideEdge: 'left',
+          ),
+        ],
+      ),
+    );
     _messengerKey.currentState?.showSnackBar(
       SnackBar(
         content: Text(
@@ -217,6 +321,65 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
         ),
       ),
     );
+  }
+
+  /// Keep layout choices made from the workspace or feature hub with the
+  /// saved plan. Pending plans are updated in place; a verified historical
+  /// build gets a new planned version so its old evidence still describes the
+  /// old file.
+  void _onOpenIntentChanged(NetworkIntent intent) {
+    final previousIntent = _openIntent;
+    final previousRecord = _openRecord;
+    setState(() => _openIntent = intent);
+    if (_layoutStyleOf(previousIntent) == _layoutStyleOf(intent)) return;
+    if (previousRecord == null) return;
+    final memory = context.read<MemoryService>();
+    if (!memory.ready) return;
+    if (previousRecord.id != null && previousRecord.status == 'planned') {
+      unawaited(_persistPendingDesign(memory, previousRecord, intent));
+    } else {
+      unawaited(_saveDesignVersion(previousRecord, intent));
+    }
+  }
+
+  Future<void> _persistPendingDesign(
+    MemoryService memory,
+    BuildRecord previous,
+    NetworkIntent intent,
+  ) async {
+    try {
+      final updated = await memory.updatePlannedBuildIntent(
+        id: previous.id!,
+        intent: intent,
+      );
+      if (!updated && mounted && _openRecord?.id == previous.id) {
+        await _saveDesignVersion(previous, intent);
+      }
+    } catch (error) {
+      if (!mounted || _openRecord?.id != previous.id) return;
+      _messengerKey.currentState?.showSnackBar(
+        SnackBar(content: Text('Could not save the design choice: $error')),
+      );
+    }
+  }
+
+  Future<void> _saveDesignVersion(
+    BuildRecord previous,
+    NetworkIntent intent,
+  ) async {
+    if (!mounted ||
+        _openRecord?.id != previous.id ||
+        _openIntent?.revision != intent.revision) {
+      return;
+    }
+    try {
+      await _savePlanEdit(intent);
+    } catch (error) {
+      if (!mounted) return;
+      _messengerKey.currentState?.showSnackBar(
+        SnackBar(content: Text('Could not save the design choice: $error')),
+      );
+    }
   }
 
   Future<void> _showHub() async {
@@ -233,6 +396,58 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
       _activeProject = r.projectName;
       _destination = AppDestination.execution;
     });
+  }
+
+  void _reviewVerificationFailure(Map<String, dynamic> test) {
+    final intent = _openIntent;
+    if (intent == null) return;
+    final kind = '${test['kind'] ?? 'network'}';
+    final target = kind == 'dns'
+        ? 'DNS query ${test['query'] ?? '?'} from ${test['src'] ?? '?'} '
+              '(expected ${test['expectedIp'] ?? 'an address'})'
+        : '${test['src'] ?? 'source'} to ${test['dst'] ?? 'destination'}';
+    final evidence =
+        '${test['evidence'] ?? test['detail'] ?? 'No evidence was recorded.'}';
+    _openChat(
+      project: intent.projectName,
+      prefill:
+          'Review this failed live network check and suggest the smallest '
+          'safe plan change. Start with these evidence-based checks; treat '
+          'them as hypotheses, not conclusions:\n'
+          '${NetworkCheckDiagnostics.promptContext(test)}\n\n'
+          'Explain the likely cause and the exact change '
+          'before asking me to apply it. Do not change the live Packet Tracer '
+          'network or start another run automatically.\n\n'
+          'Check: $kind, $target\n'
+          'Observed: $evidence\n\n'
+          'Current plan (credentials omitted): '
+          '${jsonEncode(intent.toPlannerJson())}',
+    );
+  }
+
+  Future<void> _savePlanEdit(NetworkIntent intent) async {
+    final previous = _openRecord;
+    final memory = context.read<MemoryService>();
+    final saved = await PlanVersionService.saveEditedPlan(
+      memory: memory,
+      intent: intent,
+      previous: previous,
+    );
+    if (!mounted) return;
+    setState(() {
+      _openIntent = intent;
+      _openRecord = saved;
+      _openConfig = BuildArtifactService.renderLocal(intent, saved.target);
+      _activeProject = intent.projectName;
+      _destination = AppDestination.execution;
+    });
+    _messengerKey.currentState?.showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Plan saved as a new version. Review it before building.',
+        ),
+      ),
+    );
   }
 
   Future<void> _openSavedBuild(BuildRecord record) async {
@@ -284,10 +499,16 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
       case AppDestination.history:
         return HomeScreen(
           onOpen: _openSavedBuild,
-          onNewBuild: () => _go(AppDestination.newBuild),
+          onNewBuild: () => _openChat(
+            project: _activeProject,
+            prefill: 'Describe the network you want to design and build.',
+          ),
         );
-      case AppDestination.newBuild:
-        return NewBuildScreen(onBuilt: _onBuilt);
+      case AppDestination.labs:
+        return LabsScreen(
+          onUseBrief: (brief, project) =>
+              _openChat(project: project, prefill: brief),
+        );
       case AppDestination.analyze:
         return AnalyzeScreen(
           initialProject: _activeProject,
@@ -300,6 +521,7 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
           key: ValueKey('chat-$_activeProject-$_chatEpoch'),
           initialProject: _activeProject,
           initialDraft: _chatDraft,
+          onOpenSettings: () => _go(AppDestination.settings),
           onOpenProject: (project) => setState(() {
             _activeProject = project.trim().isEmpty
                 ? 'default'
@@ -324,8 +546,8 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
         );
       case AppDestination.importPkts:
         return ImportScreen(
-          planLoader: () async => _openIntent
-              ?.toJson(includeSecrets: false),
+          planLoader: () async => _openIntent?.toJson(includeSecrets: false),
+          onOpenImportedPlan: _onBuilt,
         );
       case AppDestination.execution:
         if (_openRecord != null && _openIntent != null) {
@@ -334,16 +556,22 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
             intent: _openIntent!,
             configText: _openConfig,
             monitorSidecar: widget.monitorDetailSidecar,
+            onIntentChanged: _onOpenIntentChanged,
+            onReviewFailure: _reviewVerificationFailure,
           );
         }
         return AppEmptyState(
           icon: AppDestination.execution.icon,
-          title: 'No build is open yet',
-          body: 'Plan a network, or open one from your saved networks, and '
+          title: 'No plan is open yet',
+          body:
+              'Plan a network, or open one from your saved networks, and '
               'this is where it runs and gets proven.',
           actions: [
             FilledButton.icon(
-              onPressed: () => _go(AppDestination.newBuild),
+              onPressed: () => _openChat(
+                project: _activeProject,
+                prefill: 'Describe the network you want to design and build.',
+              ),
               icon: const Icon(Icons.add_circle_outline),
               label: const Text('Plan a network'),
             ),
@@ -357,12 +585,12 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
     }
   }
 
-  ThemeMode _themeMode(SettingsService? settings) => switch (settings
-      ?.themeMode) {
-    'light' => ThemeMode.light,
-    'dark' => ThemeMode.dark,
-    _ => ThemeMode.system,
-  };
+  ThemeMode _themeMode(SettingsService? settings) =>
+      switch (settings?.themeMode) {
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        _ => ThemeMode.system,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -394,16 +622,6 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
         child: Focus(
           autofocus: true,
           child: Scaffold(
-            key: _scaffoldKey,
-            // The sidebar lists the chats and switches between them, so
-            // it needs to be able to change the active project.
-            drawer: SettingsDrawer(
-              onSwitchChat: (conversation) => _openChat(project: conversation),
-              onOpenHub: _showHub,
-              onOpenToolkit: () => _push(
-                NetworkToolkitScreen(intent: _openIntent),
-              ),
-            ),
             // ONE header for every screen: the destination's name and what
             // it is for, the engine's live state, and the feature index. The
             // toolkit's calculator used to sit here AND on the rail AND in
@@ -412,73 +630,106 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
             appBar: AppBar(
               title: _DestinationHeader(destination: _destination),
               actions: [
-                const Padding(
-                  padding: EdgeInsets.only(right: AppTheme.s8),
-                  child: _AiPill(),
-                ),
-                const Padding(
-                  padding: EdgeInsets.only(right: AppTheme.s8),
-                  child: _EnginePill(),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(right: AppTheme.s4),
-                  child: IconButton(
-                    tooltip: 'All features (Ctrl+K)',
-                    icon: const Icon(Icons.grid_view_rounded),
-                    onPressed: _showHub,
-                  ),
+                Builder(
+                  builder: (context) {
+                    // On a narrow Windows window, the two status pills and
+                    // the navigation/settings buttons used to compete for
+                    // the same 360 pixels and overflow the app bar. The
+                    // status stays available in the feature hub; the two
+                    // primary controls remain visible at every width.
+                    final compact = MediaQuery.sizeOf(context).width < 520;
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!compact)
+                          const Padding(
+                            padding: EdgeInsets.only(right: AppTheme.s8),
+                            child: _AiPill(),
+                          ),
+                        if (!compact && !SettingsService.isMobile)
+                          const Padding(
+                            padding: EdgeInsets.only(right: AppTheme.s8),
+                            child: _EnginePill(),
+                          ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: AppTheme.s4),
+                          child: IconButton(
+                            tooltip: 'All features (Ctrl+K)',
+                            icon: const Icon(Icons.grid_view_rounded),
+                            onPressed: _showHub,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: AppTheme.s8),
+                          child: IconButton(
+                            tooltip: 'Settings',
+                            icon: const Icon(Icons.settings_outlined),
+                            onPressed: () => _go(AppDestination.settings),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
-            body: LayoutBuilder(
-              builder: (context, constraints) {
-                // The sidebar on a desktop, a compact rail on a laptop, the
-                // drawer and the hub on a phone. This is how "every screen is
-                // reachable" is visible rather than merely true.
-                final width = constraints.maxWidth;
-                if (width < 1000) return _shellBody();
-                final expanded = width >= 1240;
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (expanded)
-                      AppSidebar(
-                        current: _destination,
-                        onSelect: _go,
-                        onHub: _showHub,
-                        onToolkit: () => _push(
-                          NetworkToolkitScreen(intent: _openIntent),
-                        ),
-                        planProject:
-                            _openIntent == null ? '' : _activeProject,
-                        planSummary: _openIntent == null
-                            ? ''
-                            : '${_openIntent!.nodes.length} device(s), '
-                                  '${_openIntent!.links.length} link(s)',
-                        planTarget: _openIntent == null
-                            ? ''
-                            : _openRecord?.target ?? '',
-                        onOpenWorkspace: _openIntent == null
-                            ? null
-                            : () => _go(AppDestination.execution),
-                      )
-                    else
-                      AppRail(
-                        current: _destination,
-                        onSelect: _go,
-                        onHub: _showHub,
-                        onToolkit: () => _push(
-                          NetworkToolkitScreen(intent: _openIntent),
-                        ),
-                        hasPlan: _openIntent != null,
-                      ),
-                    // The sidebar and the rail carry their own edge; the
-                    // content starts with a clean line instead of a second
-                    // divider a pixel away from the first.
-                    Expanded(child: _shellBody()),
-                  ],
-                );
-              },
+            body: Column(
+              children: [
+                PktBuildJobBanner(onSave: _savePhoneBuildJob),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // The sidebar on a desktop, a compact rail on a laptop, the
+                      // drawer and the hub on a phone. This is how "every screen is
+                      // reachable" is visible rather than merely true.
+                      final width = constraints.maxWidth;
+                      if (width < 1000) return _shellBody();
+                      final expanded = width >= 1240;
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (expanded)
+                            AppSidebar(
+                              current: _destination,
+                              onSelect: _go,
+                              onHub: _showHub,
+                              onToolkit: () => _push(
+                                NetworkToolkitScreen(intent: _openIntent),
+                              ),
+                              planProject: _openIntent == null
+                                  ? ''
+                                  : _activeProject,
+                              planSummary: _openIntent == null
+                                  ? ''
+                                  : '${_openIntent!.nodes.length} device(s), '
+                                        '${_openIntent!.links.length} link(s)',
+                              planTarget: _openIntent == null
+                                  ? ''
+                                  : _openRecord?.target ?? '',
+                              onOpenWorkspace: _openIntent == null
+                                  ? null
+                                  : () => _go(AppDestination.execution),
+                            )
+                          else
+                            AppRail(
+                              current: _destination,
+                              onSelect: _go,
+                              onHub: _showHub,
+                              onToolkit: () => _push(
+                                NetworkToolkitScreen(intent: _openIntent),
+                              ),
+                              hasPlan: _openIntent != null,
+                            ),
+                          // The sidebar and the rail carry their own edge; the
+                          // content starts with a clean line instead of a second
+                          // divider a pixel away from the first.
+                          Expanded(child: _shellBody()),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
             // Run controls are FLOATING buttons, so they are shown only
             // on tabs with no bottom composer, and the chat composer's send
@@ -551,26 +802,32 @@ class _AiPill extends StatelessWidget {
     } catch (_) {
       return const SizedBox.shrink();
     }
-    final (detail, ok, warn) = switch ((
-      settings.privateMode,
-      settings.aiKeyPresent,
-    )) {
-      // Engine-pill brevity: 'AI on / off / private' must hold at a 360px
-      // phone width beside the engine pill; the provider lives in the
-      // tooltip.
-      (true, _) => ('private', false, true),
-      (false, true) => ('on', true, false),
-      (false, false) => ('off', false, true),
-    };
+    final mobile = SettingsService.isMobile;
+    final (detail, ok, warn) = mobile
+        ? switch ((settings.privateMode, settings.aiKeyPresent)) {
+            (true, _) => ('local', true, false),
+            (false, true) => ('online', true, false),
+            (false, false) => ('local', true, false),
+          }
+        : switch ((settings.privateMode, settings.aiKeyPresent)) {
+            (true, _) => ('private', false, true),
+            (false, true) => ('on', true, false),
+            (false, false) => ('off', false, true),
+          };
     return Tooltip(
-      message: switch ((settings.privateMode, settings.aiKeyPresent)) {
-        (true, _) => 'Private mode is on - the model is never called',
-        (false, true) =>
-          'AI on - API key active (${settings.providerName == 'openai' ? 'OpenAI-compatible' : 'Google Gemini'})'
-              '; questions are answered by the model and learned for offline replay',
-        _ => 'AI off - no API key set; the built-in planner answers '
-            'everything offline',
-      },
+      message: mobile
+          ? settings.aiKeyPresent && !settings.privateMode
+                ? 'Online assistant ready (${settings.providerName == 'openai' ? 'OpenAI-compatible' : 'Google Gemini'}).'
+                : 'Local assistant and offline planner are ready. Add a key for online model answers.'
+          : switch ((settings.privateMode, settings.aiKeyPresent)) {
+              (true, _) => 'Private mode is on - the model is never called',
+              (false, true) =>
+                'AI on - API key active (${settings.providerName == 'openai' ? 'OpenAI-compatible' : 'Google Gemini'})'
+                    '; questions are answered by the model and learned for offline replay',
+              _ =>
+                'AI off - no API key set; the built-in planner answers '
+                    'everything offline',
+            },
       child: AppStatusPill(label: 'AI', detail: detail, ok: ok, warn: warn),
     );
   }

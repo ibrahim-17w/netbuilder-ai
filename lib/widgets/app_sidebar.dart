@@ -40,18 +40,15 @@ class AppSidebar extends StatelessWidget {
     this.onOpenWorkspace,
   });
 
-  /// Which screens sit under which heading. The groups are the workflow:
-  /// conversation, the plan, the files, the record - then the app itself.
+  /// Which screens sit under each heading. Settings has one home in the app bar.
   static const groups = <(String, List<AppDestination>)>[
     ('Assistant', [AppDestination.chat]),
-    ('Plan and build', [
-      AppDestination.newBuild,
-      AppDestination.analyze,
-      AppDestination.execution,
-    ]),
+    (
+      'Plan and verify',
+      [AppDestination.labs, AppDestination.analyze, AppDestination.execution],
+    ),
     ('Files', [AppDestination.files, AppDestination.importPkts]),
     ('Record', [AppDestination.history, AppDestination.memory]),
-    ('App', [AppDestination.settings]),
   ];
 
   @override
@@ -110,7 +107,8 @@ class AppSidebar extends StatelessWidget {
                         selected: destination == current,
                         // The workspace needs a build to open, and says so
                         // instead of pretending to be available.
-                        enabled: destination != AppDestination.execution ||
+                        enabled:
+                            destination != AppDestination.execution ||
                             onOpenWorkspace != null,
                         onTap: () => onSelect(destination),
                       ),
@@ -141,8 +139,10 @@ class AppSidebar extends StatelessWidget {
                           onTap: onToolkit,
                         ),
                       ),
-                      const SizedBox(width: AppTheme.s6),
-                      const _EngineDot(),
+                      if (!SettingsService.isMobile) ...[
+                        const SizedBox(width: AppTheme.s6),
+                        const _EngineDot(),
+                      ],
                     ],
                   ),
                 ],
@@ -258,8 +258,7 @@ class _SidebarTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: color,
-                      fontWeight:
-                          selected ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                     ),
                   ),
                 ),
@@ -339,9 +338,10 @@ class _PlanCard extends StatelessWidget {
           const SizedBox(height: AppTheme.s4),
           Text(
             hasPlan
-                ? [summary, if (target.trim().isNotEmpty) target]
-                      .where((s) => s.trim().isNotEmpty)
-                      .join(' - ')
+                ? [
+                    summary,
+                    if (target.trim().isNotEmpty) target,
+                  ].where((s) => s.trim().isNotEmpty).join(' - ')
                 : 'Describe a network in the chat and it appears here.',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -359,9 +359,7 @@ class _PlanCard extends StatelessWidget {
                 label: const Text('Open workspace'),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(0, 34),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppTheme.s10,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: AppTheme.s10),
                   textStyle: theme.textTheme.labelMedium,
                 ),
               ),
@@ -447,15 +445,21 @@ class _EngineDot extends StatelessWidget {
         final engineOptional = SettingsService.isMobile;
         final (color, label) = switch (phase) {
           EngineState.up => (AppPalette.success(scheme), 'Engine up'),
-          EngineState.down => engineOptional
-              ? (
-                  AppPalette.warning(scheme),
-                  'Engine down - .pkt builds run on this device',
-                )
-              : (scheme.error, 'Engine down'),
-          EngineState.checking ||
-          EngineState.starting => (AppPalette.warning(scheme), 'Engine starting'),
-          EngineState.unknown => (scheme.onSurfaceVariant, 'Engine not checked'),
+          EngineState.down =>
+            engineOptional
+                ? (
+                    AppPalette.warning(scheme),
+                    'Engine down - .pkt builds run on this device',
+                  )
+                : (scheme.error, 'Engine down'),
+          EngineState.checking || EngineState.starting => (
+            AppPalette.warning(scheme),
+            'Engine starting',
+          ),
+          EngineState.unknown => (
+            scheme.onSurfaceVariant,
+            'Engine not checked',
+          ),
         };
         return Tooltip(
           message: label,
@@ -468,7 +472,10 @@ class _EngineDot extends StatelessWidget {
                 color: color,
                 shape: BoxShape.circle,
                 boxShadow: [
-                  BoxShadow(color: color.withValues(alpha: 0.45), blurRadius: 5),
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.45),
+                    blurRadius: 5,
+                  ),
                 ],
               ),
             ),

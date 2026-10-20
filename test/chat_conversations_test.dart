@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:net_builder/models/chat_message.dart';
 import 'package:net_builder/services/memory_service.dart';
 import 'package:net_builder/services/settings_service.dart';
-import 'package:net_builder/widgets/settings_drawer.dart';
+import 'package:net_builder/screens/settings_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -43,18 +43,26 @@ void main() {
 
   test('each conversation keeps its own transcript', () async {
     final memory = await fresh();
-    await memory.logChat(_turn('user', 'first chat question'),
-        conversation: 'alpha');
-    await memory.logChat(_turn('model', 'first chat answer'),
-        conversation: 'alpha');
-    await memory.logChat(_turn('user', 'second chat question'),
-        conversation: 'beta');
+    await memory.logChat(
+      _turn('user', 'first chat question'),
+      conversation: 'alpha',
+    );
+    await memory.logChat(
+      _turn('model', 'first chat answer'),
+      conversation: 'alpha',
+    );
+    await memory.logChat(
+      _turn('user', 'second chat question'),
+      conversation: 'beta',
+    );
 
     final alpha = await memory.recentChat(conversation: 'alpha');
     final beta = await memory.recentChat(conversation: 'beta');
 
-    expect(alpha.map((m) => m.text).toList(),
-        ['first chat question', 'first chat answer']);
+    expect(alpha.map((m) => m.text).toList(), [
+      'first chat question',
+      'first chat answer',
+    ]);
     expect(beta.map((m) => m.text).toList(), ['second chat question']);
   });
 
@@ -64,10 +72,16 @@ void main() {
     await memory.logChat(_turn('user', 'newer chat'), conversation: 'beta');
 
     final chats = await memory.conversations();
-    expect(chats.map((c) => c['id']).toList(), ['beta', 'alpha'],
-        reason: 'the most recently used chat comes first');
-    expect(chats.first['title'], 'newer chat',
-        reason: 'a chat is recognised by what the user first said');
+    expect(
+      chats.map((c) => c['id']).toList(),
+      ['beta', 'alpha'],
+      reason: 'the most recently used chat comes first',
+    );
+    expect(
+      chats.first['title'],
+      'newer chat',
+      reason: 'a chat is recognised by what the user first said',
+    );
     expect(chats.first['messages'], 1);
   });
 
@@ -88,24 +102,28 @@ void main() {
     expect(await memory.recentChat(conversation: 'default'), hasLength(1));
   });
 
-  test('the whole log is still readable when no conversation is named',
-      () async {
-    final memory = await fresh();
-    await memory.logChat(_turn('user', 'a'), conversation: 'alpha');
-    await memory.logChat(_turn('user', 'b'), conversation: 'beta');
-    expect(await memory.recentChat(), hasLength(2));
-  });
+  test(
+    'the whole log is still readable when no conversation is named',
+    () async {
+      final memory = await fresh();
+      await memory.logChat(_turn('user', 'a'), conversation: 'alpha');
+      await memory.logChat(_turn('user', 'b'), conversation: 'beta');
+      expect(await memory.recentChat(), hasLength(2));
+    },
+  );
 
   test('an empty store lists no chats rather than inventing one', () async {
     final memory = await fresh();
     expect(await memory.conversations(), isEmpty);
   });
 
-  // The sidebar is the whole settings surface, so it has to open on the
-  // smallest phone the app still supports. A drawer wider than its own
-  // buttons paints yellow-and-black overflow bars across them.
-  testWidgets('the drawer opens on a 320dp phone without overflowing',
-      (tester) async {
+  // Settings are a single page reached from the shell gear, including on a
+  // narrow phone; this guards the compact layout without a second drawer UI.
+  testWidgets('the settings page fits a 320dp phone without overflowing', (
+    tester,
+  ) async {
+    SettingsService.mobileOverrideForTests = true;
+    addTearDown(() => SettingsService.mobileOverrideForTests = null);
     final settings = SettingsService();
     // The provider buttons only exist for the OpenAI-compatible provider,
     // which is not the default one.
@@ -121,30 +139,30 @@ void main() {
           ChangeNotifierProvider<SettingsService>.value(value: settings),
           ChangeNotifierProvider<MemoryService>(create: (_) => MemoryService()),
         ],
-        child: const MaterialApp(
-          home: Scaffold(drawer: SettingsDrawer(), body: SizedBox()),
-        ),
+        child: const MaterialApp(home: SettingsScreen()),
       ),
     );
     await tester.pumpAndSettle();
 
-    tester.state<ScaffoldState>(find.byType(Scaffold)).openDrawer();
     await tester.pumpAndSettle();
 
     // Only a row that is actually laid out can overflow, and a ListView
     // lays its children out in order - so the surface has to be tall enough
     // to build the last one, or the rows below the fold would go unchecked.
-    expect(find.textContaining('/budget <tokens>'), findsOneWidget,
-        reason: 'the test surface holds the entire drawer');
-
-    expect(find.widgetWithText(FilledButton, 'Save provider'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, 'Test connection'),
-        findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, 'Choose folder'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Save folder'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('PRIVACY AND AUTOMATION'), findsOneWidget);
+    expect(find.text('Generated .pkt files'), findsOneWidget);
+    expect(
+      find.text('Choose folder'),
+      findsNothing,
+      reason: 'Android uses the system save flow for each generated file',
+    );
 
     // An overflow reaches the test as an exception, not as a wrong number.
-    expect(tester.takeException(), isNull,
-        reason: 'a drawer row is wider than the drawer itself');
+    expect(
+      tester.takeException(),
+      isNull,
+      reason: 'a settings row is wider than the phone',
+    );
   });
 }

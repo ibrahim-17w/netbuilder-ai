@@ -32,14 +32,18 @@ import '../services/layout_engine.dart';
 import '../services/layout_intent.dart';
 import '../screens/layout_gallery_screen.dart';
 import '../screens/pkt_viewer_screen.dart';
+import '../screens/settings_screen.dart';
 import '../services/packet_tracer_locator.dart';
+import '../services/packet_tracer/model_compatibility.dart';
 import '../services/provider_chat_service.dart';
 import '../services/context_budget.dart';
 import '../services/context_report.dart';
 import '../services/conversation_titles.dart';
 import '../services/design_library.dart';
 import '../services/pkt/on_device_pkt_builder.dart';
+import '../services/pkt_build_job_service.dart';
 import '../services/pkt/pkt_export_service.dart';
+import '../services/pkt_analysis_chat.dart';
 import '../services/pkt/template_library.dart' show PktBuildFailure;
 import '../services/design_memory.dart';
 import '../services/design_review.dart';
@@ -60,6 +64,7 @@ import '../services/planner_memory_service.dart';
 import '../services/planner_suggestions_service.dart';
 import '../services/rule_packs_service.dart';
 import '../services/settings_service.dart';
+import '../services/secret_vault.dart';
 import '../services/validator_service.dart';
 import '../services/gemini_model_catalog.dart';
 import '../services/tool_runtime.dart';
@@ -96,12 +101,14 @@ class ChatScreen extends StatefulWidget {
   /// "what is wrong?" - so a button in the hub ends in a sent message
   /// instead of an empty box.
   final String initialDraft;
+  final VoidCallback? onOpenSettings;
 
   const ChatScreen({
     super.key,
     this.initialProject = 'default',
     this.onOpenProject,
     this.initialDraft = '',
+    this.onOpenSettings,
   });
 
   /// HH:mm in the device's local time, or '' when [createdAt] does not parse.
@@ -172,6 +179,19 @@ const int kRevealChunk = 48;
 const Duration kRevealTick = Duration(milliseconds: 30);
 
 class _ChatScreenState extends State<ChatScreen> {
+  void _openSettings() {
+    final open = widget.onOpenSettings;
+    if (open != null) {
+      open();
+    } else {
+      // Standalone/embedded chat still opens the same settings page as the
+      // app shell; there is no second drawer-based settings surface.
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen()));
+    }
+  }
+
   final _input = TextEditingController();
   final _project = TextEditingController();
   final _scroll = ScrollController();
@@ -247,6 +267,8 @@ class _ChatScreenState extends State<ChatScreen> {
   List<ChatMessage> _messages = [];
   List<ChatImage> _pending = [];
   bool _busy = false;
+  int? _editingMessageIndex;
+  ChatMessage? _editingMessage;
 
   /// The structured plan from the user's own words. It is what the
   /// `.pkt` builder compiles, so generation does not depend on the model.
@@ -255,11 +277,8 @@ class _ChatScreenState extends State<ChatScreen> {
   /// Set when the user's latest message named one of the catalog designs and
   /// it was applied to the standing plan. Reported as a system line so the
   /// change to their design is visible rather than silent.
-  ({
-    NetworkDesign design,
-    List<String> added,
-    List<String> skipped,
-  })? _appliedDesign;
+  ({NetworkDesign design, List<String> added, List<String> skipped})?
+  _appliedDesign;
 
   /// Whether [_lastIntent] was parsed from the LATEST user turn (rather
   /// than left over from an older one or a failed parse). The "Understood"
@@ -454,6 +473,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _revealPersist = null;
     _messages = [];
     _pending = [];
+    _editingMessage = null;
+    _editingMessageIndex = null;
     _lastIntent = null;
     _previousIntent = null;
     _appliedDesign = null;
@@ -501,6 +522,7 @@ class _ChatScreenState extends State<ChatScreen> {
   /// Keep the banner honest while the engine is coming up (or has just
   /// died). Busy states are ignored: "still trying" is not "unreachable".
   void _onEngineStatus() {
+    if (SettingsService.isMobile) return;
     final status = EngineStatus.instance;
     if (status.phase == EngineState.checking ||
         status.phase == EngineState.starting ||
@@ -675,6 +697,8 @@ class _ChatScreenState extends State<ChatScreen> {
             _state.observe(message);
           }
           _state.withChanges(changes);
+          _capturePath = _state.capturePath;
+          if (_chat != null) _chat = _withTools(_chat!);
           // The file this conversation produced, and the plan it came from:
           // without these, "edit it" after a restart has nothing to point at
           // and quietly builds a second file instead.
@@ -687,10 +711,8 @@ class _ChatScreenState extends State<ChatScreen> {
               final decoded = jsonDecode(saved);
               if (decoded is Map) {
                 // The saved plan is redacted, so an account it names comes
-                // back without its password. The transcript still holds the
-                // brief the user typed, so the withheld value is recovered
-                // from there instead of being reported as a credential they
-                // never gave - which left the build withheld for good.
+                // back without its password. Credentials come from the OS
+                // keychain; transcripts on disk remain redacted.
                 _lastIntent = NetworkIntent.recoverRedactedSecrets(
                   NetworkIntent.fromJson(Map<String, dynamic>.from(decoded)),
                   history
@@ -721,6 +743,27 @@ class _ChatScreenState extends State<ChatScreen> {
             }
           }
         });
+        // Restore the file and conversation immediately. A slow/unavailable
+        // keychain must not leave "edit it" pointing at an empty session.
+        final loadedIntent = _lastIntent;
+        if (loadedIntent != null) {
+          final credentials = await SecretVault.load(conversation);
+          if (!mounted ||
+              epoch != _loadEpoch ||
+              !identical(_lastIntent, loadedIntent)) {
+            return;
+          }
+          if (credentials.isNotEmpty) {
+            setState(() {
+              _lastIntent = NetworkIntent.recoverRedactedSecrets(
+                NetworkIntent.fromJson(
+                  SecretVault.inject(loadedIntent.toJson(), credentials),
+                ),
+                credentials['brief'] ?? '',
+              );
+            });
+          }
+        }
       } catch (_) {}
     } catch (_) {}
   }
@@ -1543,7 +1586,10 @@ class _ChatScreenState extends State<ChatScreen> {
   /// up for itself: read tools answer from the engine, and any change it
   /// proposes still goes through the Approve/Reject gate (spec §8).
   ProviderChatService _withTools(ProviderChatService chat) {
-    if (_capturePath.trim().isEmpty) return chat;
+    if (_capturePath.trim().isEmpty) {
+      chat.toolRuntime = null;
+      return chat;
+    }
     chat.toolRuntime = ToolRuntime(
       config: chat.config,
       sidecarBase: _settings?.engineBase ?? 'http://127.0.0.1:5005',
@@ -1693,6 +1739,9 @@ class _ChatScreenState extends State<ChatScreen> {
           'device(s), ${plan.links.length} link(s)). Ask me to build the '
           'current plan instead of clicking this card.';
     }
+    if (!_hasChosenNetworkDesign(plan)) {
+      return 'Choose a network design before continuing.';
+    }
     final blocking = _blockingFindings(plan);
     if (blocking.isNotEmpty) {
       return 'Not built: the plan still has ${blocking.length} finding(s) '
@@ -1700,6 +1749,19 @@ class _ChatScreenState extends State<ChatScreen> {
           'the card), then ask me to build it.';
     }
     return null;
+  }
+
+  bool _hasChosenNetworkDesign(NetworkIntent? plan) =>
+      plan != null &&
+      plan.notes.any((note) => LayoutRequest.styleFromNote(note).isNotEmpty);
+
+  String _chosenNetworkDesign(NetworkIntent? plan) {
+    if (plan == null) return '';
+    for (final note in plan.notes) {
+      final style = LayoutRequest.styleFromNote(note);
+      if (style.isNotEmpty) return style;
+    }
+    return '';
   }
 
   /// Would a repair run actually change the standing plan?
@@ -1871,6 +1933,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _status = 'Redrawing $name (${request.style})...';
     });
     _jumpToEnd();
+    _rememberLayout(request, parked);
     final edited = _lastIntent;
     final result = await _compilePkt(
       inPlacePath: target,
@@ -2001,6 +2064,7 @@ class _ChatScreenState extends State<ChatScreen> {
         if (!n.toLowerCase().startsWith('layout:')) n,
     ];
     _lastIntent = intent.copyWith(
+      layout: const <String, Offset?>{},
       notes: <String>[
         ...cleaned,
         if (parked.isEmpty)
@@ -2014,6 +2078,9 @@ class _ChatScreenState extends State<ChatScreen> {
             ],
           ),
       ],
+    );
+    _state.withIntentJson(
+      jsonEncode(_lastIntent!.toJson(includeSecrets: false)),
     );
   }
 
@@ -2040,7 +2107,89 @@ class _ChatScreenState extends State<ChatScreen> {
     caseSensitive: false,
   );
 
-  bool get _isPreviewRequest => _wantsPreview.hasMatch(_input.text.trim());
+  /// Opens only the design picker. Build requests use this path so selecting
+  /// a drawing never creates or rewrites a file as a side effect.
+  Future<bool> _chooseNetworkDesignOnly() async {
+    final intent = _lastIntent;
+    if (intent == null || intent.nodes.isEmpty) return false;
+    if (PacketTracerModelCompatibility.unsupportedExactModels(
+      intent,
+    ).isNotEmpty) {
+      final group = PacketTracerModelCompatibility.unsupportedExactModels(
+        intent,
+      ).first;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text(PacketTracerModelCompatibility.question(group))),
+      );
+      return false;
+    }
+    final chosen = _chosenNetworkDesign(intent);
+    final current = chosen.isEmpty ? '${_layout['style'] ?? 'tree'}' : chosen;
+    final effective = PacketTracerAdapter.resolveLayoutForEngine(
+      intent,
+      _layout.isEmpty
+          ? PacketTracerAdapter.intentLayoutFromNotes(intent)
+          : _layout,
+    );
+    final zones = <LayoutZone>[
+      for (final zone in (effective['zones'] as List? ?? const []))
+        if (zone is Map)
+          LayoutZone(
+            (zone['side'] as List? ?? const []).map((e) => '$e').toList(),
+            edge: '${zone['edge'] ?? zone['sideEdge'] ?? 'left'}',
+          ),
+    ];
+    final side = (effective['side'] as List? ?? const <dynamic>[])
+        .map((e) => '$e')
+        .toList();
+    if (zones.isEmpty && side.isNotEmpty) {
+      zones.add(LayoutZone(side, edge: '${effective['sideEdge'] ?? 'left'}'));
+    }
+    final picked = await LayoutGalleryScreen.show(
+      context,
+      intent: intent,
+      currentStyle: LayoutRequest.allStyles.contains(current)
+          ? current
+          : 'tree',
+      side: side.isEmpty ? const <String>['server'] : side,
+      zones: zones,
+    );
+    if (!mounted || picked == null) return false;
+    final parked = picked == 'grouped'
+        ? zones.isEmpty
+              ? <LayoutZone>[
+                  const LayoutZone(['server'], edge: 'left'),
+                ]
+              : zones
+        : <LayoutZone>[];
+    setState(() {
+      _rememberLayout(
+        LayoutRequest(style: picked, explicitStyle: true),
+        parked
+            .map(
+              (zone) => LayoutZone(
+                resolveSideNames(intent, kinds: zone.side, names: zone.side),
+                edge: zone.edge,
+              ),
+            )
+            .toList(),
+      );
+    });
+    final mem = _memory;
+    if (mem != null && mem.ready) {
+      try {
+        await mem.setSessionState(_conversation, _state.encode());
+      } catch (_) {}
+    }
+    if (!mounted) return false;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text('Design selected: $picked.'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    return true;
+  }
 
   /// Opens the gallery on the drawing the plan would be built with, seeded
   /// with the style this conversation is on. Returns false when there is no
@@ -2052,30 +2201,70 @@ class _ChatScreenState extends State<ChatScreen> {
         .map((e) => '$e')
         .where((e) => e.trim().isNotEmpty)
         .toList();
-    final current = style.isEmpty ? '${_layout['style'] ?? 'tree'}' : style;
+    final current = style.isEmpty
+        ? '${_layout['style'] ?? PacketTracerAdapter.intentLayoutFromNotes(intent)['style'] ?? 'tree'}'
+        : style;
+    final effective = PacketTracerAdapter.resolveLayoutForEngine(
+      intent,
+      _layout.isEmpty
+          ? PacketTracerAdapter.intentLayoutFromNotes(intent)
+          : _layout,
+    );
+    final zones = <LayoutZone>[
+      for (final zone in (effective['zones'] as List? ?? const []))
+        if (zone is Map)
+          LayoutZone(
+            (zone['side'] as List? ?? const []).map((e) => '$e').toList(),
+            edge: '${zone['edge'] ?? zone['sideEdge'] ?? 'left'}',
+          ),
+    ];
+    final side = (effective['side'] as List? ?? parked)
+        .map((e) => '$e')
+        .toList();
+    if (zones.isEmpty && side.isNotEmpty) {
+      zones.add(LayoutZone(side, edge: '${effective['sideEdge'] ?? 'left'}'));
+    }
     final picked = await LayoutGalleryScreen.show(
       context,
       intent: intent,
       currentStyle: LayoutRequest.allStyles.contains(current)
           ? current
           : 'tree',
-      side: parked.isEmpty ? const <String>['server'] : parked,
+      side: side.isEmpty ? const <String>['server'] : side,
+      zones: zones,
     );
+    if (!mounted) return true;
     // The pick is the choice: whatever style came back from the gallery is
     // what the next build draws. Dropping the return value here used to
     // mean a preview pick silently changed nothing - the user picked a
     // design and the build ignored them.
-    if (picked == null || picked == current) return true;
+    if (picked == null) return true;
     final parkedForPick = picked == 'grouped'
-        ? (parked.isEmpty ? const <String>['server'] : parked)
-        : <String>[];
+        ? (zones.isEmpty
+              ? <LayoutZone>[
+                  const LayoutZone(['server'], edge: 'left'),
+                ]
+              : zones)
+        : <LayoutZone>[];
     setState(() {
-      _layout = {
-        'style': picked,
-        if (parkedForPick.isNotEmpty) 'side': parkedForPick,
-      };
+      _rememberLayout(
+        LayoutRequest(style: picked, explicitStyle: true),
+        parkedForPick
+            .map(
+              (zone) => LayoutZone(
+                resolveSideNames(intent, kinds: zone.side, names: zone.side),
+                edge: zone.edge,
+              ),
+            )
+            .toList(),
+      );
     });
-    _persistLayoutNoteOnIntent();
+    final mem = _memory;
+    if (mem != null && mem.ready) {
+      try {
+        await mem.setSessionState(_conversation, _state.encode());
+      } catch (_) {}
+    }
     if (!mounted) return true;
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
       SnackBar(
@@ -2170,6 +2359,33 @@ class _ChatScreenState extends State<ChatScreen> {
         '- for example "2 routers, 3 switches, 12 PCs and OSPF" - and then '
         'build it. No API key is needed for this.',
       );
+      return;
+    }
+    if (!_hasChosenNetworkDesign(plan)) {
+      await _chooseNetworkDesignOnly();
+      if (!mounted) return;
+      final chosen = _lastIntent;
+      final style = _chosenNetworkDesign(chosen);
+      if (chosen != null && style.isNotEmpty) {
+        setState(() {
+          _messages = [
+            ..._messages,
+            ChatMessage(
+              role: 'model',
+              text:
+                  'Design selected. The build action is ready for **$style**.',
+              createdAt: DateTime.now().toIso8601String(),
+              actions: <ChatAction>[_buildCardFor(chosen)],
+              source: AiStatus.plannerSource,
+            ),
+          ];
+        });
+      } else {
+        _appendSystem(
+          'Choose a network design to continue. Nothing was built.',
+        );
+      }
+      _jumpToEnd();
       return;
     }
     await _buildPktFromPlan(_buildCardFor(plan));
@@ -2308,9 +2524,6 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     }
     final svc = _engine();
-    // One health answer per compile: probing twice would make a phone with
-    // no engine wait twice for a timeout that answers the same way.
-    final engineHealthy = await svc.healthy;
     // A phone builds with the bundled template library by default (see
     // SettingsService.preferOnDevicePkt); a desktop keeps the engine first,
     // because its builds also drive the Packet Tracer window. When the
@@ -2319,6 +2532,11 @@ class _ChatScreenState extends State<ChatScreen> {
     // in below.
     final preferOnDevice =
         _settings?.preferOnDevicePkt ?? SettingsService.isMobile;
+    // A normal phone build needs no PC request at all. Avoid waiting for a
+    // sidecar timeout before doing work the phone can finish locally.
+    final engineHealthy = SettingsService.isMobile && preferOnDevice
+        ? false
+        : await svc.healthy;
     if (preferOnDevice || !engineHealthy) {
       final onDevice = await _compilePktOnDevice(
         intent: intent,
@@ -2366,6 +2584,14 @@ class _ChatScreenState extends State<ChatScreen> {
           actions: const <ChatAction>[],
         );
       }
+      PktBuildJobService.instance.recordGeneratedFile(
+        project: intent.projectName,
+        filePath: path,
+        deviceCount: (res['deviceCount'] as num?)?.toInt() ?? 0,
+        linkCount: (res['linkCount'] as num?)?.toInt() ?? 0,
+        planRevision: intent.revision,
+        planJson: jsonEncode(intent.toPlannerJson()),
+      );
       // The tool layer may now read this capture, and the model may be asked
       // about it.
       _capturePath = path;
@@ -2400,7 +2626,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ..writeln('- File: `$path`')
           ..writeln(
             '- Devices: ${res['deviceCount'] ?? '?'}, '
-            'links: ${res['linkCount'] ?? '?'}',
+            'Cables: ${res['linkCount'] ?? '?'}',
           );
         body.writeln(
           backup.isEmpty
@@ -2420,7 +2646,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ..writeln('- File: `$path`')
           ..writeln(
             '- Devices: ${res['deviceCount'] ?? '?'}, '
-            'links: ${res['linkCount'] ?? '?'}',
+            'Cables: ${res['linkCount'] ?? '?'}',
           );
         _writeVerification(body, check);
       }
@@ -2486,7 +2712,10 @@ class _ChatScreenState extends State<ChatScreen> {
               summary: _ptInstalled == false
                   ? 'View the network (no Packet Tracer found)'
                   : 'Open in Packet Tracer',
-              payload: {'path': path, 'name': path.split(RegExp(r'[\\/]')).last},
+              payload: {
+                'path': path,
+                'name': path.split(RegExp(r'[\\/]')).last,
+              },
             ),
           ChatAction(
             kind: 'pkt_scan',
@@ -2528,10 +2757,7 @@ class _ChatScreenState extends State<ChatScreen> {
     var filename = BuildArtifactService.networkFileName(
       plan: intent,
       brief: _lastBrief,
-      taken: {
-        ..._builtNames,
-        for (final a in _state.knownArtifacts) a.name,
-      },
+      taken: {..._builtNames, for (final a in _state.knownArtifacts) a.name},
     );
     // WHERE THE FILE GOES. The folder chosen in Settings is the destination
     // when it is one the app can really write to; otherwise the lab is built
@@ -2548,7 +2774,13 @@ class _ChatScreenState extends State<ChatScreen> {
       why: 'no folder has been set yet',
     );
     try {
-      folder = await PktExportService.resolveFolder(_settings?.outputDir ?? '');
+      // Android's SAF directory result is not a writable dart:io path. Keep
+      // the generated file private until the user exports it through the
+      // system save dialog, which writes via the content resolver.
+      final outputDir = SettingsService.isMobile
+          ? ''
+          : (_settings?.outputDir ?? '');
+      folder = await PktExportService.resolveFolder(outputDir);
       // The folder is real: names already ON DISK count as taken too.
       if (folder.dir != null) {
         final onDisk = folder.dir!
@@ -2563,18 +2795,29 @@ class _ChatScreenState extends State<ChatScreen> {
           n += 1;
         }
       }
-      final built = await OnDevicePktBuilder.buildFromPlan(
-        plan: plan,
-        appDir: getApplicationDocumentsDirectory,
-        filename: filename,
-        project: _project.text.trim(),
-        outDir: folder.dir == null ? null : () async => folder.dir!,
+      final jobs = PktBuildJobService.instance;
+      final projectName = _project.text.trim();
+      final built = await jobs.start(
+        project: intent.projectName,
+        planRevision: intent.revision,
+        planJson: jsonEncode(intent.toPlannerJson()),
+        build: (reportProgress) => OnDevicePktBuilder.buildFromPlan(
+          plan: plan,
+          appDir: getApplicationDocumentsDirectory,
+          filename: filename,
+          project: projectName,
+          outDir: folder.dir == null ? null : () async => folder.dir!,
+          onProgress: reportProgress,
+          isCancelled: () => jobs.cancelRequested,
+        ),
       );
       if (built == null) {
         return (
-          text:
-              'That plan has no devices in it, so there is nothing to '
-              'build.',
+          text: jobs.status == PktBuildJobStatus.cancelled
+              ? 'The phone build was cancelled. You can retry it from the build notice.'
+              : jobs.error.isNotEmpty
+              ? 'The phone build could not finish: ${jobs.error}'
+              : 'That plan has no devices in it, so there is nothing to build.',
           actions: const <ChatAction>[],
         );
       }
@@ -2614,7 +2857,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ..writeln('- File: `$path`')
         ..writeln(
           '- Devices: ${report['deviceCount'] ?? '?'}, '
-          'links: ${report['linkCount'] ?? '?'}',
+          'Cables: ${report['linkCount'] ?? '?'}',
         )
         ..writeln(
           '- Compiled on this device: no Packet Tracer, no PC, nothing '
@@ -2651,10 +2894,10 @@ class _ChatScreenState extends State<ChatScreen> {
         ..writeln(
           folder.dir == null
               ? 'This device has no folder set for .pkt files '
-                  '(${folder.why}), so the lab was written into the app\'s own '
-                  'storage. Tap "Save it to a folder" below to put a copy '
-                  'somewhere you can browse, or set a folder in Settings - '
-                  'Tools - Settings.'
+                    '(${folder.why}), so the lab was written into the app\'s own '
+                    'storage. Tap "Save it to a folder" below to put a copy '
+                    'somewhere you can browse, or set a folder in Settings - '
+                    'Tools - Settings.'
               : 'It is in the folder you chose, next to your other labs.',
         )
         ..writeln();
@@ -2740,23 +2983,49 @@ class _ChatScreenState extends State<ChatScreen> {
         _appendSystem('${ident['message'] ?? 'That file is not a .pkt save.'}');
         return;
       }
-      // From here on the model may investigate this capture with the
-      // engine's read-only tools (spec §2/§3).
+      // Keep a bounded snapshot of what the offline scan actually read so
+      // follow-up questions can use the same evidence after a restart.
       _capturePath = path;
+      if (_chat != null) _chat = _withTools(_chat!);
       final report = await svc.pktAudit(path, project: _project.text.trim());
+      final analysis = PktAnalysisChat.snapshot(report, path: path, name: name);
+      final analysisJson = jsonEncode(analysis);
       final turn = ChatMessage(
         role: 'model',
         text: _auditText(report, name, path),
-        actions: _fixActions(report, path, name),
         createdAt: DateTime.now().toIso8601String(),
       );
       if (!mounted) return;
+      _state
+          .withCaptureAnalysis(
+            path: path,
+            name: name,
+            analysisJson: analysisJson,
+          )
+          .observe(ask)
+          .observe(turn);
       setState(() {
         _busy = false;
         _status = '';
         _messages = [..._messages, turn];
+        _quickReplies = [
+          'Why does shutdown matter here?',
+          'What should I fix first?',
+        ];
       });
       _jumpToEnd();
+      final mem = _memory;
+      if (mem != null && mem.ready) {
+        try {
+          await mem.ensureConversation(
+            _conversation,
+            project: _project.text.trim(),
+          );
+          await mem.logChat(ask, conversation: _conversation);
+          await mem.logChat(turn, conversation: _conversation);
+          await mem.setSessionState(_conversation, _state.encode());
+        } catch (_) {}
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -2769,107 +3038,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   String _auditText(Map<String, dynamic> report, String name, String path) {
-    final devices = (report['devices'] as List?) ?? const [];
-    final findings = <Map<String, dynamic>>[];
-    for (final d in devices) {
-      for (final f in (((d as Map)['findings'] as List?) ?? const [])) {
-        findings.add(Map<String, dynamic>.from(f as Map));
-      }
-    }
-    final high = findings
-        .where((f) => '${f['severity']}'.toLowerCase() == 'high')
-        .length;
-    final b = StringBuffer()
-      ..writeln(
-        '**Capture decrypted and audited offline.** Packet Tracer '
-        'was not opened.',
-      )
-      ..writeln()
-      ..writeln('- File: `$name`')
-      ..writeln('- Path: `$path`')
-      ..writeln(
-        '- Devices: ${devices.length}, links: ${_linkCount(report)}, '
-        'findings: ${findings.length} ($high high)',
-      )
-      ..writeln(
-        '- Key: the save container was decrypted with the built-in '
-        'Packet Tracer codec; no credential of yours is involved or shown.',
-      );
-    if (findings.isEmpty) {
-      b
-        ..writeln()
-        ..writeln(
-          'Nothing to fix: the saved configuration matches the '
-          'topology. Ask me anything about it.',
-        );
-    } else {
-      b
-        ..writeln()
-        ..writeln(
-          '**Prioritised findings** - approve a fix below and I edit '
-          'the save and encrypt it back:',
-        );
-      for (final f in findings.take(12)) {
-        b.writeln(
-          '- [${f['severity'] ?? 'info'}] ${f['device'] ?? ''} - '
-          '${f['text'] ?? ''}',
-        );
-      }
-    }
-    return b.toString();
-  }
-
-  /// How many cables the audit found, however the engine reported them.
-  ///
-  /// The deep audit answers with `summary.links` and a top-level `links`
-  /// array; the summary-only reply has `linkCount`. Reading just the last one
-  /// printed "links: ?" on a file whose cables had all been counted, which
-  /// reads as a failed decode of a file that decoded perfectly.
-  static String _linkCount(Map<String, dynamic> report) {
-    final summary = report['summary'];
-    if (summary is Map) {
-      final n = summary['links'];
-      if (n is num) return '${n.toInt()}';
-    }
-    final direct = report['linkCount'];
-    if (direct is num) return '${direct.toInt()}';
-    final rows = report['links'];
-    if (rows is List) return '${rows.length}';
-    return '?';
-  }
-
-  List<ChatAction> _fixActions(
-    Map<String, dynamic> report,
-    String path,
-    String name,
-  ) {
-    final out = <ChatAction>[];
-    for (final d in ((report['devices'] as List?) ?? const [])) {
-      final dev = (((d as Map)['name'] ?? '')).toString();
-      for (final f in (((d['findings'] as List?) ?? const []))) {
-        final m = Map<String, dynamic>.from(f as Map);
-        final cli = ((m['fix_cli'] as List?) ?? const [])
-            .map((e) => e.toString())
-            .toList();
-        if (cli.isEmpty) continue;
-        out.add(
-          ChatAction(
-            kind: 'pkt_fix',
-            summary: '${m['text'] ?? 'fix'}   ->   ${cli.join(' ; ')}',
-            payload: {
-              'path': path,
-              'name': name,
-              'device': dev,
-              'id': '${m['id'] ?? ''}',
-              'severity': '${m['severity'] ?? ''}',
-              'text': '${m['text'] ?? ''}',
-              'fix_cli': cli,
-            },
-          ),
-        );
-      }
-    }
-    return out;
+    return PktAnalysisChat.reportText(
+      PktAnalysisChat.snapshot(report, path: path, name: name),
+    );
   }
 
   /// Write the plan-vs-file verification block from the collected audit.
@@ -2884,11 +3055,7 @@ class _ChatScreenState extends State<ChatScreen> {
   /// 88/100 is evidence, and it is the same review the build path uses, so
   /// the two numbers are always comparable.
   void _reportAppliedDesign(
-    ({
-      NetworkDesign design,
-      List<String> added,
-      List<String> skipped,
-    }) applied,
+    ({NetworkDesign design, List<String> added, List<String> skipped}) applied,
   ) {
     final before = DesignReviewer.review(_previousIntent ?? _lastIntent!);
     final after = DesignReviewer.review(_lastIntent!);
@@ -2954,9 +3121,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (review.findings.isEmpty) {
       body
         ..writeln()
-        ..writeln(
-          'Nothing to fix. ${review.strengths.join('. ')}.',
-        );
+        ..writeln('Nothing to fix. ${review.strengths.join('. ')}.');
       return;
     }
     body
@@ -3006,16 +3171,24 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<String> _applyPktFix(ChatAction action) async {
     final payload = action.payload;
-    final fix = <String, dynamic>{
-      'id': payload['id'],
-      'device': payload['device'],
-      'severity': payload['severity'],
-      'text': payload['text'],
-      'fix_cli': payload['fix_cli'],
-    };
+    final fixes =
+        (payload['fixes'] as List?)
+            ?.whereType<Map>()
+            .map((row) => Map<String, dynamic>.from(row))
+            .toList() ??
+        [
+          <String, dynamic>{
+            'id': payload['id'],
+            'device': payload['device'],
+            'severity': payload['severity'],
+            'text': payload['text'],
+            'fix_cli': payload['fix_cli'],
+          },
+        ];
+    if (fixes.isEmpty) return 'There are no approved changes in this card.';
     final res = await _engine().pktApplyFixes({
       'path': payload['path'],
-      'fixes': [fix],
+      'fixes': fixes,
       'outName': payload['name'],
       'project': _project.text.trim(),
     });
@@ -3024,11 +3197,20 @@ class _ChatScreenState extends State<ChatScreen> {
     final verdict = await _verifyRepair(
       beforePath: '${payload['path'] ?? ''}',
       afterPath: '${res['path'] ?? ''}',
-      findingId: '${fix['id'] ?? ''}',
+      findingIds:
+          (payload['findingIds'] as List?)
+              ?.map((id) => id.toString())
+              .where((id) => id.isNotEmpty)
+              .toList() ??
+          fixes
+              .map((fix) => '${fix['id'] ?? ''}')
+              .where((id) => id.isNotEmpty)
+              .toSet()
+              .toList(),
     );
     final turn = ChatMessage(
       role: 'model',
-      text: '${_appliedText(res, fix)}$verdict',
+      text: '${_appliedText(res, fixes)}$verdict',
       actions: [
         ChatAction(
           kind: 'pkt_undo',
@@ -3050,12 +3232,21 @@ class _ChatScreenState extends State<ChatScreen> {
     return 'Applied and re-encrypted. The original save was not modified.';
   }
 
-  String _appliedText(Map<String, dynamic> res, Map<String, dynamic> fix) {
+  String _appliedText(
+    Map<String, dynamic> res,
+    List<Map<String, dynamic>> fixes,
+  ) {
     final sha = '${res['sha256'] ?? ''}';
+    final devices = fixes
+        .map((fix) => '${fix['device'] ?? ''}')
+        .where((name) => name.isNotEmpty)
+        .toSet()
+        .toList();
     final b = StringBuffer()
       ..writeln('**Approved fix applied, and the save was encrypted back.**')
       ..writeln()
-      ..writeln('- Device: ${fix['device']}')
+      ..writeln('- Devices: ${devices.join(', ')}')
+      ..writeln('- Changes approved: ${fixes.length}')
       ..writeln('- Result: `${res['name'] ?? ''}`')
       ..writeln('- Path: `${res['path'] ?? ''}`')
       ..writeln(
@@ -3116,7 +3307,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<String> _verifyRepair({
     required String beforePath,
     required String afterPath,
-    required String findingId,
+    required List<String> findingIds,
   }) async {
     if (beforePath.trim().isEmpty || afterPath.trim().isEmpty) return '';
     try {
@@ -3127,9 +3318,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final result = await engine.verifyRepair(
         before: before,
         after: after,
-        fixes: [
-          {'id': findingId},
-        ],
+        fixes: findingIds.map((id) => {'id': id}).toList(),
       );
       final summary = '${result['summary'] ?? ''}'.trim();
       if (summary.isEmpty) return '';
@@ -3433,8 +3622,67 @@ class _ChatScreenState extends State<ChatScreen> {
     await _send();
   }
 
+  /// A greeting is a local conversation turn, not a planning or model job.
+  /// Keep the whole answer on screen immediately; persistence can finish in
+  /// the background without making a simple "hello" wait on SQLite.
+  void _answerSmallTalkImmediately(String text) {
+    final reply = OfflineAssistantService.reply(
+      rawText: text,
+      normalized: CasualEnglish.normalize(text),
+      target: _target,
+      plan: null,
+      previousPlan: null,
+      history: _messages.where((m) => !m.isError).toList(),
+      privateMode: _settings?.privateMode ?? false,
+    );
+    final at = DateTime.now().toIso8601String();
+    final ask = ChatMessage(role: 'user', text: text, createdAt: at);
+    final answer = ChatMessage(
+      role: 'model',
+      text: reply.text,
+      createdAt: at,
+      source: AiStatus.plannerSource,
+      actions: const [],
+    );
+    _state.observe(ask);
+    _state.observe(answer);
+    _input.clear();
+    _understoodOk = false;
+    _appliedDesign = null;
+    _slotFixNote = null;
+    setState(() {
+      _messages = [..._messages, ask, answer];
+      _activity = const [];
+      _activityOpen = false;
+      _busy = false;
+      _status = '';
+      _quickReplies = reply.quickReplies;
+      _skillMenu = const [];
+    });
+    _jumpToEnd();
+
+    final store = _memory;
+    if (store == null || !store.ready) return;
+    unawaited(() async {
+      try {
+        await store.ensureConversation(
+          _conversation,
+          project: _project.text.trim(),
+        );
+        await store.logChat(ask, conversation: _conversation);
+        await store.logChat(answer, conversation: _conversation);
+        await store.setSessionState(_conversation, _state.encode());
+        if (mounted) await _refreshConversations();
+      } catch (_) {
+        // The greeting has already been answered. A storage problem must not
+        // turn it back into a spinner or make the user send it again.
+      }
+    }());
+  }
+
   Future<void> _send() async {
     var text = _input.text.trim();
+    final editingMessage = _editingMessage;
     // ENTER WHILE THE "/" MENU IS OPEN completes the command. The menu only
     // shows for a bare "/token" (a space closes it), so this expands a
     // partial command and can never swallow a real message with arguments.
@@ -3448,6 +3696,16 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     }
     if ((text.isEmpty && _pending.isEmpty) || _busy) return;
+    // A plain greeting, even in a conversation that already has a lab, has no
+    // reason to enter planner parsing, memory lookups, context assembly, or a
+    // provider. Keep the existing plan as context; do not re-parse it.
+    if (editingMessage == null &&
+        _pending.isEmpty &&
+        ScopeGate.isSmallTalk(text)) {
+      _revealFinish?.call();
+      _answerSmallTalkImmediately(text);
+      return;
+    }
     // A typed message replaces the suggestions; they were an answer to the
     // turn before this one. It also ends any reveal still in flight - the
     // previous answer appears at once rather than growing under the new turn.
@@ -3460,14 +3718,28 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     // Slash commands answer in the chat itself - there is no settings
     // screen to go to any more.
-    if (await _handleCommand(text)) {
+    if (editingMessage == null && await _handleCommand(text)) {
       _input.clear();
       return;
     }
     // "Undo that" is answered from the exact change log, before a model is
     // consulted. Asking a model which value it typed earlier is how undo
     // becomes a guess.
-    if (await _handleUndo(text)) {
+    if (editingMessage == null && await _handleUndo(text)) {
+      _input.clear();
+      return;
+    }
+    // An analyzed .pkt is a conversation topic. Answer from the saved scan
+    // before the network planner sees the question, so "why is no shutdown
+    // important?" cannot become a new build or a repair request by accident.
+    if (editingMessage == null && await _handlePktAnalysisFollowup(text)) {
+      _input.clear();
+      return;
+    }
+    // An unsupported exact model is a real blocking choice, not an automatic
+    // repair. Accept a supported model only when the user names it, then
+    // continue to the design-selection gate with the same device inventory.
+    if (editingMessage == null && await _handlePacketTracerModelChoice(text)) {
       _input.clear();
       return;
     }
@@ -3475,7 +3747,7 @@ class _ChatScreenState extends State<ChatScreen> {
     // the findings are this app's own and the repair for them is deterministic
     // and offline. Whether a key is set must not decide whether the user can
     // act on the findings the app just reported.
-    if (await _handlePlanRepair(text)) {
+    if (editingMessage == null && await _handlePlanRepair(text)) {
       _input.clear();
       return;
     }
@@ -3520,12 +3792,16 @@ class _ChatScreenState extends State<ChatScreen> {
     // (or the phrasing teacher or the design catalog) and the standing lab
     // stays exactly as it is - a wrong mutation is the most expensive
     // misunderstanding this app can make.
-    final exploring = !smallTalk &&
+    final exploring =
+        !smallTalk &&
         !ScopeGate.isOffTopic(text) &&
         TentativeLanguageService.analyze(
           CasualEnglish.normalize(text).trim(),
         ).tentative;
-    if (!ScopeGate.isOffTopic(text) && !smallTalk && !exploring) {
+    if (!ScopeGate.isOffTopic(text) &&
+        !smallTalk &&
+        !exploring &&
+        !_wantsPreview.hasMatch(text)) {
       try {
         final normalized = CasualEnglish.normalize(text);
         final brief = normalized.trim().isEmpty ? text : normalized;
@@ -3537,9 +3813,14 @@ class _ChatScreenState extends State<ChatScreen> {
           previous: _previousIntent,
           previousBrief: _lastBrief,
           brief: brief,
-          parsed: NetworkIntent.parseSimple('chat', brief),
+          // Keep the user's original punctuation and line breaks for the
+          // topology reader. The normalized brief is still used to classify
+          // the turn, but flattening it here destroys inventory lists such as
+          // "3 routers: R1, R2, R3" and can add duplicate generated devices.
+          parsed: await NetworkIntent.parseSimpleAsync('chat', text),
           project: 'chat',
         );
+        if (!mounted || !_generation.isCurrent(token)) return;
         // LEARNING, without a model: when this turn turned an
         // underspecified earlier phrasing into a resolved brief (the user
         // clarified, or a change landed), the pair is remembered so the same
@@ -3577,9 +3858,12 @@ class _ChatScreenState extends State<ChatScreen> {
           if (named != null) {
             final hosts = _lastIntent!.nodes
                 .where(
-                  (n) => const {'pc', 'laptop', 'tablet', 'phone'}.contains(
-                    n.type,
-                  ),
+                  (n) => const {
+                    'pc',
+                    'laptop',
+                    'tablet',
+                    'phone',
+                  }.contains(n.type),
                 )
                 .length;
             _appendSystem(
@@ -3608,7 +3892,9 @@ class _ChatScreenState extends State<ChatScreen> {
     // The history the provider is given must END BEFORE this turn: both
     // providers append the pending text themselves, so sending the appended
     // list as well made every message appear twice in model context.
-    final historyBeforeCurrent = List<ChatMessage>.from(_messages);
+    final historyBeforeCurrent = _messages
+        .where((message) => !identical(message, editingMessage))
+        .toList();
 
     // "EDIT IT" IS A QUESTION ABOUT A FILE THAT EXISTS.
     //
@@ -3624,25 +3910,15 @@ class _ChatScreenState extends State<ChatScreen> {
     // [LayoutRequest.read], which would read "drawing" as a vague redraw and
     // cycle the style - the user asking to look at the picture and getting a
     // different picture instead.
-    if (_isPreviewRequest) {
-      final ask = ChatMessage(
-        role: 'user',
-        text: text,
-        images: attachments,
-        createdAt: DateTime.now().toIso8601String(),
-      );
+    if (_wantsPreview.hasMatch(text)) {
+      final ask = _makeUserTurn(text, attachments);
       _state.observe(ask).withIntent(_lastIntent);
-      setState(() {
-        _messages = [..._messages, ask];
-        _activity = const [];
-        _busy = false;
-        _status = '';
-      });
-      _jumpToEnd();
-      if (mem != null && mem.ready) {
-        try {
-          await mem.logChat(ask, conversation: _conversation);
-        } catch (_) {}
+      await _commitUserTurn(ask);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _status = '';
+        });
       }
       final opened = await _previewLayout('');
       if (!opened) {
@@ -3680,23 +3956,9 @@ class _ChatScreenState extends State<ChatScreen> {
       final hasSomethingToRedraw =
           _state.knownArtifacts.isNotEmpty || _artifactPath.trim().isNotEmpty;
       if (hasSomethingToRedraw) {
-        final ask = ChatMessage(
-          role: 'user',
-          text: text,
-          images: attachments,
-          createdAt: DateTime.now().toIso8601String(),
-        );
+        final ask = _makeUserTurn(text, attachments);
         _state.observe(ask).withIntent(_lastIntent);
-        setState(() {
-          _messages = [..._messages, ask];
-          _activity = const [];
-        });
-        _jumpToEnd();
-        if (mem != null && mem.ready) {
-          try {
-            await mem.logChat(ask, conversation: _conversation);
-          } catch (_) {}
-        }
+        await _commitUserTurn(ask);
         await _redrawPkt(drawingRequest);
         return;
       }
@@ -3743,17 +4005,13 @@ class _ChatScreenState extends State<ChatScreen> {
         (fileIntent == FileEditIntent.editExisting ||
             fileIntent == FileEditIntent.ambiguous);
     if (fileIntent == FileEditIntent.ambiguous || needsFileChoice) {
-      final ask = ChatMessage(
-        role: 'user',
-        text: text,
-        images: attachments,
-        createdAt: DateTime.now().toIso8601String(),
-      );
+      final ask = _makeUserTurn(text, attachments);
       final choice = files.length > 1
           ? _fileMultiChoiceTurn(files)
           : _fileChoiceTurn(text);
+      await _commitUserTurn(ask);
       setState(() {
-        _messages = [..._messages, ask, choice];
+        _messages = [..._messages, choice];
         _status = '';
         _quickReplies = files.length > 1
             ? [
@@ -3765,7 +4023,6 @@ class _ChatScreenState extends State<ChatScreen> {
       _jumpToEnd();
       if (mem != null && mem.ready) {
         try {
-          await mem.logChat(ask, conversation: _conversation);
           await mem.logChat(choice, conversation: _conversation);
         } catch (_) {}
       }
@@ -3773,12 +4030,7 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
     final editInPlace = fileIntent == FileEditIntent.editExisting;
-    final userTurn = ChatMessage(
-      role: 'user',
-      text: text,
-      images: attachments,
-      createdAt: DateTime.now().toIso8601String(),
-    );
+    final userTurn = _makeUserTurn(text, attachments);
     // LAYER 2: fold the new turn into the structured state before anything is
     // sent, so "what about its gateway?" is answerable from data rather than
     // from the model's recollection.
@@ -3790,15 +4042,9 @@ class _ChatScreenState extends State<ChatScreen> {
     if (standing != null) {
       _state.withIntentJson(jsonEncode(standing.toJson(includeSecrets: false)));
     }
-    setState(() {
-      _messages = [..._messages, userTurn];
-      _activity = const [];
-      _activityOpen = true;
-    });
-    _jumpToEnd();
+    await _commitUserTurn(userTurn, openActivity: true);
     if (mem != null && mem.ready) {
       try {
-        await mem.logChat(userTurn, conversation: _conversation);
         await mem.ensureConversation(
           _conversation,
           project: _project.text.trim(),
@@ -4012,12 +4258,22 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
       final reply = ChatService.parseReply(live.toString());
+      final unsupportedModel =
+          PacketTracerModelCompatibility.unsupportedExactModels(
+            _lastIntent,
+          ).firstOrNull;
+      final visibleText = unsupportedModel == null
+          ? reply.text
+          : PacketTracerModelCompatibility.question(unsupportedModel);
+      final visibleActions = unsupportedModel == null
+          ? reply.actions
+          : const <ChatAction>[];
       final turn = ChatMessage(
         role: 'model',
-        text: reply.text.isEmpty && reply.actions.isEmpty
+        text: visibleText.isEmpty && visibleActions.isEmpty
             ? '(the model returned nothing usable)'
-            : reply.text,
-        actions: reply.actions,
+            : visibleText,
+        actions: visibleActions,
         createdAt: DateTime.now().toIso8601String(),
         // This turn really did come from the API model, so it is stamped
         // with where it came from. (A failure would have taken the offline
@@ -4033,9 +4289,21 @@ class _ChatScreenState extends State<ChatScreen> {
         } else {
           _messages = [..._messages, turn];
         }
-        _status = reply.questions.isEmpty
+        _status = unsupportedModel != null
+            ? ''
+            : reply.questions.isEmpty
             ? ''
             : 'The assistant asks: ${reply.questions.join('  |  ')}';
+        if (unsupportedModel != null) {
+          _quickReplies =
+              PacketTracerModelCompatibility.compatibleModels(unsupportedModel)
+                  .map(
+                    (model) =>
+                        'Use $model for all ${unsupportedModel.count} ${unsupportedModel.type}s',
+                  )
+                  .toList();
+          _state.pendingQuestionIds = const [];
+        }
       });
       _jumpToEnd();
       // The question is answered: fold the answer into the structured state,
@@ -4180,10 +4448,11 @@ class _ChatScreenState extends State<ChatScreen> {
       try {
         final rules = await _learnedRules();
         final prefs = await _learnedPrefs();
-        final parsed = NetworkIntent.parseSimple(
-          'offline-chat',
-          normalized.isEmpty ? text : normalized,
-        );
+        // Hardware and connection parsing needs the original formatting:
+        // CasualEnglish.normalize collapses inventory lines and separators.
+        // Use normalized text for turn intent below, but parse the user's
+        // unmodified message so named devices and ranges survive.
+        final parsed = NetworkIntent.parseSimple('offline-chat', text);
         final withMemory = PlannerMemoryService.apply(
           parsed,
           rules: rules,
@@ -4275,12 +4544,22 @@ class _ChatScreenState extends State<ChatScreen> {
     // in which case the safe defaults are visible on the brief card.
     List<ClarificationQuestion> clarifying = const [];
     if (plan != null && plan.nodes.isNotEmpty) {
-      if (_brief.ready || _isForcedBuild(normalized.isEmpty ? text : normalized)) {
+      if (_brief.ready ||
+          _isForcedBuild(normalized.isEmpty ? text : normalized)) {
         _state.pendingQuestionIds = const [];
       } else {
         clarifying = await _clarificationsFor(plan, envProfile);
         _state.pendingQuestionIds = [for (final q in clarifying) q.id];
       }
+    }
+    var unsupportedGroup =
+        PacketTracerModelCompatibility.unsupportedExactModels(plan).firstOrNull;
+    // Exact model support is checked before any design or build action. This
+    // question takes priority over generic brief clarifications because the
+    // user explicitly asked not to accept a silent hardware substitution.
+    if (unsupportedGroup != null) {
+      clarifying = const [];
+      _state.pendingQuestionIds = const [];
     }
     final reply = OfflineAssistantService.reply(
       rawText: text,
@@ -4328,6 +4607,9 @@ class _ChatScreenState extends State<ChatScreen> {
     if (repaired != null && repaired.nodes.isNotEmpty) {
       _lastIntent = repaired;
       plan = repaired;
+      unsupportedGroup = PacketTracerModelCompatibility.unsupportedExactModels(
+        plan,
+      ).firstOrNull;
       _state.withIntentJson(jsonEncode(repaired.toJson(includeSecrets: false)));
       // Park what the repair would teach. Nothing reads it until a build of
       // this exact plan comes back verified - see MemoryService.
@@ -4361,20 +4643,35 @@ class _ChatScreenState extends State<ChatScreen> {
       // asks instead. The brief card rides when the brief moved, except on
       // the asking turn itself - see the action list below.
       actions: [
-        if (plan != null && plan.nodes.isNotEmpty && clarifying.isEmpty)
+        if (unsupportedGroup == null &&
+            plan != null &&
+            plan.nodes.isNotEmpty &&
+            clarifying.isEmpty)
           _buildCardFor(plan),
         // The brief card rides when the brief moved - EXCEPT on the turn
         // that is asking: there the questions ARE the open list, and a card
         // repeating "still open" beside them says the same thing twice.
-        if (briefChanged && clarifying.isEmpty) _briefCardFor(_brief),
-        if (reply.advice != null) _adviceCardFor(reply.advice!),
+        if (unsupportedGroup == null && briefChanged && clarifying.isEmpty)
+          _briefCardFor(_brief),
+        if (unsupportedGroup == null && reply.advice != null)
+          _adviceCardFor(reply.advice!),
       ],
     );
+    final answerText = unsupportedGroup == null
+        ? reply.text
+        : PacketTracerModelCompatibility.question(unsupportedGroup);
     if (!mounted) return;
     setState(() {
       _messages = [..._messages, turn];
       _status = '';
-      _quickReplies = reply.quickReplies;
+      _quickReplies = unsupportedGroup == null
+          ? reply.quickReplies
+          : PacketTracerModelCompatibility.compatibleModels(unsupportedGroup)
+                .map(
+                  (model) =>
+                      'Use $model for all ${unsupportedGroup!.count} ${unsupportedGroup.type}s',
+                )
+                .toList();
       // A plan that contradicts itself asks above the box; a plan that does
       // not clears the question.
       _planPrompt = _nextPlanPrompt(plan);
@@ -4386,7 +4683,7 @@ class _ChatScreenState extends State<ChatScreen> {
     // the whole thing lands in well under a second.
     final answer = ChatMessage(
       role: 'model',
-      text: reply.text,
+      text: answerText,
       createdAt: turn.createdAt,
       actions: turn.actions,
     );
@@ -4405,7 +4702,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     _revealAnswer(
       turn,
-      reply.text,
+      answerText,
       // OFFLINE TURNS ARE REMEMBERED TOO, once the answer is whole. They used
       // to be appended to the screen and nowhere else, so reopening a keyless
       // conversation showed the user's questions with none of the answers -
@@ -4508,16 +4805,20 @@ class _ChatScreenState extends State<ChatScreen> {
         await store.setSessionState(_conversation, _state.encode());
       } catch (_) {}
     }
-    _revealAnswer(turn, body, onDone: () async {
-      final store = _memory;
-      if (store == null || !store.ready) return;
-      try {
-        await store.logChat(answer, conversation: _conversation);
-        await store.setSessionState(_conversation, _state.encode());
-        await _autoTitleFirstTurn(store);
-      } catch (_) {}
-      await _refreshConversations();
-    });
+    _revealAnswer(
+      turn,
+      body,
+      onDone: () async {
+        final store = _memory;
+        if (store == null || !store.ready) return;
+        try {
+          await store.logChat(answer, conversation: _conversation);
+          await store.setSessionState(_conversation, _state.encode());
+          await _autoTitleFirstTurn(store);
+        } catch (_) {}
+        await _refreshConversations();
+      },
+    );
   }
 
   /// Reveal a computed answer at a reading pace.
@@ -4575,7 +4876,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
     void step() {
       if (done) return;
-      end = end + kRevealChunk >= full.length ? full.length : end + kRevealChunk;
+      end = end + kRevealChunk >= full.length
+          ? full.length
+          : end + kRevealChunk;
       write(full.substring(0, end));
       if (end < full.length) {
         _reveal = Timer(kRevealTick, step);
@@ -5141,6 +5444,70 @@ class _ChatScreenState extends State<ChatScreen> {
   /// transaction (device, interface, field, old value) and offers the reverse
   /// as a normal approvable action. The model is not asked which value it
   /// typed earlier, because it cannot know.
+  Future<bool> _handlePktAnalysisFollowup(String text) async {
+    if (_pending.isNotEmpty) return false;
+    final analysis = PktAnalysisChat.decode(_state.captureAnalysisJson);
+    if (analysis == null) return false;
+    final reply = PktAnalysisChat.answer(text, analysis);
+    if (reply == null) return false;
+
+    final user = ChatMessage(
+      role: 'user',
+      text: text,
+      createdAt: DateTime.now().toIso8601String(),
+    );
+    final actions = <ChatAction>[];
+    if (reply.fixes.isNotEmpty && reply.path.trim().isNotEmpty) {
+      actions.add(
+        ChatAction(
+          kind: 'pkt_fix',
+          summary: reply.actionSummary,
+          payload: {
+            'path': reply.path,
+            'name': reply.name,
+            'fixes': reply.fixes,
+            'findingIds': reply.fixes
+                .map((fix) => '${fix['id'] ?? ''}')
+                .where((id) => id.isNotEmpty)
+                .toSet()
+                .toList(),
+          },
+        ),
+      );
+    }
+    final turn = ChatMessage(
+      role: 'model',
+      text: reply.text,
+      actions: actions,
+      createdAt: DateTime.now().toIso8601String(),
+    );
+    _state.observe(user).observe(turn);
+    if (!mounted) return true;
+    setState(() {
+      _messages = [..._messages, user, turn];
+      _activity = const [];
+      _busy = false;
+      _status = '';
+      _quickReplies = actions.isEmpty
+          ? const ['What should I fix first?', 'What can this scan prove?']
+          : const [];
+    });
+    _jumpToEnd();
+    final mem = _memory;
+    if (mem != null && mem.ready) {
+      try {
+        await mem.ensureConversation(
+          _conversation,
+          project: _project.text.trim(),
+        );
+        await mem.logChat(user, conversation: _conversation);
+        await mem.logChat(turn, conversation: _conversation);
+        await mem.setSessionState(_conversation, _state.encode());
+      } catch (_) {}
+    }
+    return true;
+  }
+
   Future<bool> _handleUndo(String text) async {
     if (!RegExp(r'\bundo\b', caseSensitive: false).hasMatch(text)) {
       return false;
@@ -5225,43 +5592,139 @@ class _ChatScreenState extends State<ChatScreen> {
     final mem = _memory;
     if (mem == null || !mem.ready || fixes.isEmpty) return;
     try {
-      await mem.noteRepairedPlan(
-        plan: plan,
-        fixes: fixes,
-        target: _target,
-      );
+      await mem.noteRepairedPlan(plan: plan, fixes: fixes, target: _target);
     } catch (_) {}
   }
 
-  /// "fix the plan", "fix these findings", "can you fix it" - run the
-  /// deterministic repair pass over the standing plan and answer with what
-  /// changed and a fresh build card.
+  Future<bool> _handlePacketTracerModelChoice(String text) async {
+    final plan = _lastIntent;
+    if (plan == null || plan.nodes.isEmpty) return false;
+    final groups = PacketTracerModelCompatibility.unsupportedExactModels(plan);
+    if (groups.isEmpty) return false;
+
+    UnsupportedPacketTracerModel? selectedGroup;
+    String? selectedModel;
+    for (final group in groups) {
+      final model = PacketTracerModelCompatibility.selectedCompatibleModel(
+        text,
+        group,
+      );
+      if (model != null) {
+        selectedGroup = group;
+        selectedModel = model;
+        break;
+      }
+    }
+    if (selectedGroup == null || selectedModel == null) return false;
+
+    final updated = PacketTracerModelCompatibility.applyChoice(
+      plan,
+      selectedGroup,
+      selectedModel,
+    );
+    final remaining = PacketTracerModelCompatibility.unsupportedExactModels(
+      updated,
+    );
+    final stamp = DateTime.now().toIso8601String();
+    final ask = ChatMessage(role: 'user', text: text, createdAt: stamp);
+    final answerText = remaining.isNotEmpty
+        ? PacketTracerModelCompatibility.question(remaining.first)
+        : 'Updated the model for ${selectedGroup.count} ${selectedGroup.type} '
+              'device(s) to $selectedModel. All device names, links, and the '
+              '${updated.nodes.length}-device inventory are unchanged. Choose a '
+              'network design to continue.';
+    final actions = remaining.isEmpty
+        ? [_buildCardFor(updated)]
+        : <ChatAction>[];
+    final turn = ChatMessage(
+      role: 'model',
+      text: '',
+      createdAt: stamp,
+      source: _aiStatus.source,
+      actions: actions,
+    );
+    final answer = ChatMessage(
+      role: 'model',
+      text: answerText,
+      createdAt: stamp,
+      source: _aiStatus.source,
+      actions: actions,
+    );
+
+    _lastIntent = updated;
+    _state.withIntentJson(jsonEncode(updated.toJson(includeSecrets: false)));
+    _state.pendingQuestionIds = const [];
+    _state.observe(answer);
+    if (!mounted) return true;
+    setState(() {
+      _messages = [..._messages, ask, turn];
+      _status = '';
+      _quickReplies = remaining.isEmpty
+          ? const []
+          : PacketTracerModelCompatibility.compatibleModels(remaining.first)
+                .map(
+                  (model) =>
+                      'Use $model for all ${remaining.first.count} ${remaining.first.type}s',
+                )
+                .toList();
+      _planPrompt = _nextPlanPrompt(updated);
+    });
+    _jumpToEnd();
+
+    final store = _memory;
+    if (store != null && store.ready) {
+      try {
+        await store.logChat(ask, conversation: _conversation);
+        await store.logChat(answer, conversation: _conversation);
+        await store.setSessionState(_conversation, _state.encode());
+      } catch (_) {}
+    }
+    _revealAnswer(turn, answerText);
+    return true;
+  }
+
+  /// Repair the standing plan when asked, or explain its blockers when the
+  /// user asks what needs to change. The advice path is read-only.
   ///
   /// This is the missing half of the build card's refusal: the card names the
   /// findings that would be baked into the .pkt, and until this existed there
   /// was no way to act on them from the chat at all - saying "fix the plan"
   /// got the same plan described back, and the disabled button stayed
-  /// disabled. Returns false (so the normal turn continues) when there is no
-  /// plan to repair yet or the message is not a repair request.
+  /// disabled. Returns false when there is no plan or the message is neither
+  /// a repair request nor a question about the build blockers.
   Future<bool> _handlePlanRepair(String text) async {
-    if (!OfflineAssistantService.looksLikeRepairRequest(text)) return false;
+    final asksHow = OfflineAssistantService.asksHowToFixPlan(text);
+    if (!asksHow && !OfflineAssistantService.looksLikeRepairRequest(text)) {
+      return false;
+    }
     final plan = _lastIntent;
     if (plan == null || plan.nodes.isEmpty) return false;
+    final unsupportedModel =
+        PacketTracerModelCompatibility.unsupportedExactModels(plan).firstOrNull;
+    if (unsupportedModel != null) {
+      await _askPacketTracerModelChoice(text, unsupportedModel);
+      return true;
+    }
     _revealFinish?.call();
     // Keep the pre-repair plan: the answer says what changed, and the next
     // turn still needs to know which lab the user was looking at.
-    _previousIntent = plan;
+    if (!asksHow) _previousIntent = plan;
     // "fix every finding you got then build" is ONE request: the repair runs,
     // and when it clears the plan the build follows without a second click.
     // The reply's wording is told about the build half, so it never asks for
     // the click the user already gave.
     final wantsBuild = OfflineAssistantService.asksToBuildAfterRepair(text);
-    final reply = OfflineAssistantService.fixPlan(
-      plan: plan,
-      target: _target,
-      suggestions: PlannerSuggestionsService.forIntent(plan, target: _target),
-      andBuild: wantsBuild,
-    );
+    final reply = asksHow
+        ? OfflineAssistantService.explainPlanRepair(plan: plan, target: _target)
+        : OfflineAssistantService.fixPlan(
+            plan: plan,
+            target: _target,
+            suggestions: PlannerSuggestionsService.forIntent(
+              plan,
+              target: _target,
+            ),
+            andBuild: wantsBuild,
+          );
     final repaired = reply.repairedPlan;
     if (repaired != null) {
       _lastIntent = repaired;
@@ -5309,6 +5772,48 @@ class _ChatScreenState extends State<ChatScreen> {
       await _buildPktFromPlan(_buildCardFor(repaired));
     }
     return true;
+  }
+
+  Future<void> _askPacketTracerModelChoice(
+    String userText,
+    UnsupportedPacketTracerModel group,
+  ) async {
+    _revealFinish?.call();
+    final stamp = DateTime.now().toIso8601String();
+    final ask = ChatMessage(role: 'user', text: userText, createdAt: stamp);
+    final answerText = PacketTracerModelCompatibility.question(group);
+    final turn = ChatMessage(
+      role: 'model',
+      text: '',
+      createdAt: stamp,
+      source: _aiStatus.source,
+    );
+    final answer = ChatMessage(
+      role: 'model',
+      text: answerText,
+      createdAt: stamp,
+      source: _aiStatus.source,
+    );
+    _state.observe(answer);
+    if (!mounted) return;
+    setState(() {
+      _messages = [..._messages, ask, turn];
+      _status = '';
+      _quickReplies = PacketTracerModelCompatibility.compatibleModels(group)
+          .map((model) => 'Use $model for all ${group.count} ${group.type}s')
+          .toList();
+      _state.pendingQuestionIds = const [];
+    });
+    _jumpToEnd();
+    final store = _memory;
+    if (store != null && store.ready) {
+      try {
+        await store.logChat(ask, conversation: _conversation);
+        await store.logChat(answer, conversation: _conversation);
+        await store.setSessionState(_conversation, _state.encode());
+      } catch (_) {}
+    }
+    _revealAnswer(turn, answerText);
   }
 
   /// The reverse of one recorded field change, as a normal approvable action.
@@ -5494,7 +5999,6 @@ class _ChatScreenState extends State<ChatScreen> {
             _conversationQuery = query;
             _refreshConversations();
           },
-          onSettings: () => Scaffold.maybeOf(context)?.openDrawer(),
           onCollapse: () {
             _sidebarTouched = true;
             setState(() => _sidebarOpen = false);
@@ -5511,7 +6015,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   setState(() => _sidebarOpen = true);
                 },
                 onNewChat: _startNewChat,
-                onSettings: () => Scaffold.maybeOf(context)?.openDrawer(),
               ),
             Expanded(child: chat),
             if (roomForInspector && _inspectorOpen)
@@ -5589,7 +6092,8 @@ class _ChatScreenState extends State<ChatScreen> {
     return Column(
       children: [
         _conversationHeader(roomForSidebar),
-        if (_engineReachable == false) _engineBanner(),
+        if (!SettingsService.isMobile && _engineReachable == false)
+          _engineBanner(),
         Expanded(
           child: empty
               ? _openingScreen()
@@ -5686,34 +6190,30 @@ class _ChatScreenState extends State<ChatScreen> {
   /// themselves when the window is too short for them - so on a landscape
   /// phone or with large system text the box never leaves the window.
   Widget _openingScreen() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppTheme.s16,
-        AppTheme.s16,
-        AppTheme.s16,
-        AppTheme.s8,
-      ),
-      child: Column(
-        // Stretch, not centre: the composer holds an Expanded text field and
-        // needs a BOUNDED width. Handed loose constraints it collapses to its
-        // minimum and overflows the row by 35px on a 360px phone.
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // One flexible gap ABOVE the group only: the composer sits at the
-          // bottom edge (where a chat input belongs), the greeting floats
-          // between the top and it, and on a short window the spacer
-          // collapses and the greeting scrolls instead of pushing the box
-          // off screen.
-          const Spacer(),
-          Flexible(
-            child: SingleChildScrollView(
-              child: _welcomeHead,
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxHeight < 260;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppTheme.s16,
+            compact ? AppTheme.s8 : AppTheme.s16,
+            AppTheme.s16,
+            compact ? AppTheme.s4 : AppTheme.s8,
           ),
-          const SizedBox(height: AppTheme.s16),
-          _composer(),
-        ],
-      ),
+          child: Column(
+            // Stretch, not centre: the composer holds an Expanded text field
+            // and needs bounded width. In a short landscape window, reclaim
+            // vertical space from decoration before squeezing the composer.
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Spacer(),
+              Flexible(child: SingleChildScrollView(child: _welcomeHead)),
+              SizedBox(height: compact ? AppTheme.s4 : AppTheme.s16),
+              _composer(),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -5721,7 +6221,8 @@ class _ChatScreenState extends State<ChatScreen> {
     embedded: true,
     // A raw storage id ("chat 0:1228") is not a project name: the welcome
     // line only names REAL projects, otherwise it reads machine-speak.
-    hasProject: _project.text.trim().isNotEmpty &&
+    hasProject:
+        _project.text.trim().isNotEmpty &&
         _project.text.trim() != 'default' &&
         !ConversationTitles.isRawId(_project.text.trim()),
     project: ConversationTitles.display(_project.text.trim()),
@@ -5982,7 +6483,6 @@ class _ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => reveal());
   }
 
-
   /// Says plainly that the `.pkt` engine cannot be reached, and offers the
   /// one thing that fixes it.
   ///
@@ -6046,7 +6546,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: const Text('Start engine'),
                 ),
               TextButton(
-                onPressed: () => Scaffold.maybeOf(context)?.openDrawer(),
+                onPressed: _openSettings,
                 child: const Text('Set address'),
               ),
               TextButton.icon(
@@ -6065,6 +6565,9 @@ class _ChatScreenState extends State<ChatScreen> {
   /// answered from [EngineStatus]'s cache, so a missing engine cannot make
   /// the chat feel slow.
   Future<void> _checkEngine() async {
+    // Desktop engine status is not a phone capability. Do not turn the
+    // default PC address into an alarm above the local chat.
+    if (SettingsService.isMobile) return;
     final ok = await EngineStatus.instance.probe();
     if (!mounted) return;
     setState(() => _engineReachable = ok);
@@ -6223,18 +6726,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 onTap: () {
                   Navigator.of(sheetContext).pop();
                   _clearChat();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.settings_outlined),
-                title: const Text('Settings'),
-                subtitle: const Text(
-                  'Run controls, ledger, GNS3, live '
-                  'context, project, API key, folders',
-                ),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  Scaffold.maybeOf(context)?.openDrawer();
                 },
               ),
               const SizedBox(height: 8),
@@ -6446,19 +6937,21 @@ class _ChatScreenState extends State<ChatScreen> {
     void addCountChip(String type) {
       final n = counts[type];
       if (n == null || n <= 0 || !shown.add(type)) return;
-      chips.add(_slotChip(
-        '$n ${unit(type, n)}',
-        // TAP TO FIX. A count is the slot the parser most often gets wrong
-        // and the one a user most wants to change, and the correction is
-        // the clearest learning signal there is: their words, what it
-        // became, no re-typed English in between.
-        onTap: () => _fixSlot(
-          messageIndex: index,
-          slot: 'count:$type',
-          label: unit(type, n),
-          value: '$n',
+      chips.add(
+        _slotChip(
+          '$n ${unit(type, n)}',
+          // TAP TO FIX. A count is the slot the parser most often gets wrong
+          // and the one a user most wants to change, and the correction is
+          // the clearest learning signal there is: their words, what it
+          // became, no re-typed English in between.
+          onTap: () => _fixSlot(
+            messageIndex: index,
+            slot: 'count:$type',
+            label: unit(type, n),
+            value: '$n',
+          ),
         ),
-      ));
+      );
     }
 
     for (final t in order) {
@@ -6468,30 +6961,34 @@ class _ChatScreenState extends State<ChatScreen> {
       addCountChip(t);
     }
     for (final v in intent.vlans) {
-      chips.add(_slotChip(
-        'VLAN $v',
-        accent: true,
-        onTap: () => _fixSlot(
-          messageIndex: index,
-          slot: 'vlan:$v',
-          label: 'VLAN $v',
-          value: '$v',
+      chips.add(
+        _slotChip(
+          'VLAN $v',
+          accent: true,
+          onTap: () => _fixSlot(
+            messageIndex: index,
+            slot: 'vlan:$v',
+            label: 'VLAN $v',
+            value: '$v',
+          ),
         ),
-      ));
+      );
     }
     // Always shown, unlike before: a slot the card does not display is a
     // slot the user cannot correct, and a default routing choice is exactly
     // the kind of thing people want to argue with.
-    chips.add(_slotChip(
-      intent.routing.toUpperCase(),
-      accent: intent.routing != 'static',
-      onTap: () => _fixSlot(
-        messageIndex: index,
-        slot: 'routing',
-        label: 'routing protocol',
-        value: intent.routing,
+    chips.add(
+      _slotChip(
+        intent.routing.toUpperCase(),
+        accent: intent.routing != 'static',
+        onTap: () => _fixSlot(
+          messageIndex: index,
+          slot: 'routing',
+          label: 'routing protocol',
+          value: intent.routing,
+        ),
       ),
-    ));
+    );
 
     final questions = intent.questions.take(3).toList();
     final pct = (intent.confidence * 100).round();
@@ -6882,12 +7379,9 @@ class _ChatScreenState extends State<ChatScreen> {
                                   message.actions[i],
                                   message.executed.contains(i.toString()),
                                 )
-                              else if (message.actions[i].kind ==
-                                  'brief_card')
+                              else if (message.actions[i].kind == 'brief_card')
                                 BriefCardWidget(
-                                  key: ValueKey(
-                                    'brief-card-$index-$i',
-                                  ),
+                                  key: ValueKey('brief-card-$index-$i'),
                                   brief: _briefFromPayload(
                                     message.actions[i].payload,
                                   ),
@@ -6930,8 +7424,7 @@ class _ChatScreenState extends State<ChatScreen> {
   /// desktops yes, phones no (there is no Packet Tracer on a phone to open
   /// it with, and no file association to route it).
   bool get _canOpenFiles =>
-      !kIsWeb &&
-      (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+      !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
 
   /// Hands [path] to the operating system: the file association decides
   /// what opens it - a .pkt lands in Packet Tracer on a machine that has
@@ -6986,7 +7479,10 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     }
     if (!mounted) {
-      return (handled: false, message: 'The screen closed before the viewer could open.');
+      return (
+        handled: false,
+        message: 'The screen closed before the viewer could open.',
+      );
     }
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -6999,7 +7495,8 @@ class _ChatScreenState extends State<ChatScreen> {
     );
     return (
       handled: true,
-      message: 'Packet Tracer was not found on this device, so the built-in '
+      message:
+          'Packet Tracer was not found on this device, so the built-in '
           'viewer is showing $name.',
     );
   }
@@ -7117,11 +7614,6 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _messageActions(int index, ChatMessage message, bool isUser) {
     final theme = Theme.of(context);
     final muted = AppPalette.mutedText(theme.colorScheme);
-    // A 44x44 TOUCH TARGET, the same one the corrections list uses
-    // (lib/widgets/correction_badges.dart:248-252): the row works on a
-    // finger, not only on a mouse. shrinkWrap keeps the visible icon at its
-    // 14px - the target grows, the button does not - so the row still fits a
-    // 320dp phone.
     final style = TextButton.styleFrom(
       foregroundColor: muted,
       padding: const EdgeInsets.symmetric(horizontal: AppTheme.s4),
@@ -7133,35 +7625,47 @@ class _ChatScreenState extends State<ChatScreen> {
       padding: const EdgeInsets.only(top: AppTheme.s4),
       child: Row(
         children: [
-          TextButton.icon(
-            style: style,
+          IconButton(
+            tooltip: 'Copy message',
+            visualDensity: VisualDensity.compact,
             onPressed: () => _copyMessage(message.text),
-            icon: const Icon(Icons.copy_all_outlined, size: 14),
-            label: const Text('Copy'),
+            icon: Icon(Icons.copy_all_outlined, size: 16, color: muted),
           ),
           if (isUser)
             TextButton.icon(
               style: style,
-              onPressed: _busy
-                  ? null
-                  : () => _editAndResend(index, message),
+              onPressed: _busy ? null : () => _editAndResend(index, message),
               icon: const Icon(Icons.edit_outlined, size: 14),
-              label: const Text('Edit and resend'),
+              label: const Text('Edit'),
             )
-          else ...[
-            TextButton.icon(
-              style: style,
-              onPressed: _busy ? null : _regenerate,
-              icon: const Icon(Icons.refresh, size: 14),
-              label: const Text('Answer again'),
+          else
+            PopupMenuButton<String>(
+              tooltip: 'More message actions',
+              enabled: !_busy,
+              icon: Icon(Icons.more_horiz, size: 18, color: muted),
+              onSelected: (value) {
+                if (value == 'again') _regenerate();
+                if (value == 'remember') _rememberFromMessage(message);
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'again',
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.refresh),
+                    title: Text('Answer again'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'remember',
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.bookmark_add_outlined),
+                    title: Text('Remember as a rule'),
+                  ),
+                ),
+              ],
             ),
-            TextButton.icon(
-              style: style,
-              onPressed: _busy ? null : () => _rememberFromMessage(message),
-              icon: const Icon(Icons.bookmark_add_outlined, size: 14),
-              label: const Text('Remember as a rule'),
-            ),
-          ],
         ],
       ),
     );
@@ -7245,6 +7749,95 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  ChatMessage _makeUserTurn(String text, List<ChatImage> attachments) {
+    final previous = _editingMessage;
+    if (previous == null) {
+      return ChatMessage(
+        role: 'user',
+        text: text,
+        images: attachments,
+        createdAt: DateTime.now().toIso8601String(),
+      );
+    }
+    return previous.copyWith(
+      text: text,
+      images: attachments.isEmpty
+          ? previous.images
+          : [...previous.images, ...attachments],
+    );
+  }
+
+  /// A normal send appends one user turn. An edit replaces its existing row,
+  /// preserving its place and id so the transcript never gains a duplicate.
+  Future<ChatMessage> _commitUserTurn(
+    ChatMessage turn, {
+    bool openActivity = false,
+  }) async {
+    final previous = _editingMessage;
+    final editingIndex = _editingMessageIndex;
+    final replacing =
+        previous != null &&
+        editingIndex != null &&
+        editingIndex >= 0 &&
+        editingIndex < _messages.length &&
+        identical(_messages[editingIndex], previous);
+    setState(() {
+      final next = List<ChatMessage>.of(_messages);
+      if (replacing) {
+        next[editingIndex] = turn;
+      } else {
+        next.add(turn);
+      }
+      _messages = next;
+      _activity = const [];
+      if (openActivity) _activityOpen = true;
+      _editingMessage = null;
+      _editingMessageIndex = null;
+    });
+    _jumpToEnd();
+
+    final mem = _memory;
+    if (mem == null || !mem.ready) return turn;
+    try {
+      final int? id = replacing
+          ? await mem.replaceChatMessage(
+              conversation: _conversation,
+              previous: previous,
+              replacement: turn,
+            )
+          : await mem.logChat(turn, conversation: _conversation);
+      if (id == null) {
+        if (replacing && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'This edited turn could not be saved in the conversation.',
+              ),
+            ),
+          );
+        }
+        return turn;
+      }
+      final stored = turn.copyWith(id: id);
+      if (mounted) {
+        setState(() {
+          final index = _messages.indexWhere(
+            (message) => identical(message, turn),
+          );
+          if (index >= 0) _messages[index] = stored;
+        });
+      }
+      return stored;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not save this message: $e')),
+        );
+      }
+      return turn;
+    }
+  }
+
   /// "Edit and resend" supersedes the branch it edits: the turn and
   /// everything after it are gone, the original words go back into the
   /// composer, and sending them starts a fresh turn. Leaving the transcript
@@ -7255,15 +7848,27 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _editAndResend(int index, ChatMessage message) async {
     if (_busy || !message.isUser) return;
     if (index < 0 || index >= _messages.length) return;
-    await _truncateFrom(index, message);
-    if (!mounted) return;
+    final conversation = _conversation;
+    if (index + 1 < _messages.length) {
+      await _truncateFrom(index + 1, _messages[index + 1]);
+    }
+    if (!mounted || _conversation != conversation) return;
     setState(() {
+      _editingMessageIndex = index;
+      _editingMessage = message;
       _input.text = message.text;
-      _input.selection = TextSelection.collapsed(
-        offset: _input.text.length,
-      );
+      _input.selection = TextSelection.collapsed(offset: _input.text.length);
     });
     _composerFocus.requestFocus();
+  }
+
+  void _cancelMessageEdit() {
+    setState(() {
+      _editingMessage = null;
+      _editingMessageIndex = null;
+      _input.clear();
+    });
+    _composerFocus.unfocus();
   }
 
   /// Stop an in-flight progressive reveal WITHOUT writing its answer down.
@@ -7442,7 +8047,7 @@ class _ChatScreenState extends State<ChatScreen> {
   /// Try to resolve the pending clarifications against this message. First
   /// one that resolves wins; null when the message answers none of them.
   Future<({ClarificationQuestion question, BriefFact fact, String raw})?>
-      _resolvePendingClarification(String text) async {
+  _resolvePendingClarification(String text) async {
     for (final id in _state.pendingQuestionIds) {
       final q = ClarificationService.questionById(id);
       if (q == null) continue;
@@ -7512,9 +8117,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (clarifying.isNotEmpty) {
       b
         ..writeln()
-        ..writeln(
-          'Still open: ${clarifying.map((q) => q.question).join(' ')}',
-        );
+        ..writeln('Still open: ${clarifying.map((q) => q.question).join(' ')}');
     } else {
       // Ready, or the gaps that remain have no question (the planner's safe
       // defaults cover them, and the brief card shows which).
@@ -7604,7 +8207,11 @@ class _ChatScreenState extends State<ChatScreen> {
       'recommendation': advice.recommendation,
       'options': [
         for (final o in advice.options)
-          {'label': o.label, 'chooseWhen': o.chooseWhen, 'tradeOff': o.tradeOff},
+          {
+            'label': o.label,
+            'chooseWhen': o.chooseWhen,
+            'tradeOff': o.tradeOff,
+          },
       ],
       'reasons': advice.reasons,
       'nextStep': advice.nextStep,
@@ -7616,7 +8223,8 @@ class _ChatScreenState extends State<ChatScreen> {
   /// Store the answer as a rule the planner reads. The value of a correction
   /// is that it changes the next plan, not just this conversation - which is
   /// what the memory already does, so this writes there.
-  Future<void> _rememberFromMessage(ChatMessage message) async {    final mem = _memory;
+  Future<void> _rememberFromMessage(ChatMessage message) async {
+    final mem = _memory;
     if (mem == null || !mem.ready) {
       _appendSystem(
         'Memory is not available in this session, so the rule was not saved.',
@@ -7699,10 +8307,9 @@ class _ChatScreenState extends State<ChatScreen> {
   /// "Plan this" runs by sending a turn, not by executing a payload.
   void _markActionExecuted(int messageIndex, int actionIndex) {
     final message = _messages[messageIndex];
-    final updated = message.copyWith(executed: [
-      ...message.executed,
-      actionIndex.toString(),
-    ]);
+    final updated = message.copyWith(
+      executed: [...message.executed, actionIndex.toString()],
+    );
     setState(() {
       _messages = [..._messages];
       _messages[messageIndex] = updated;
@@ -7728,6 +8335,11 @@ class _ChatScreenState extends State<ChatScreen> {
     // version is no longer the standing one - is withheld here, next to the
     // reason, instead of failing only after the click.
     final blockReason = _buildBlockReason(action);
+    final chooseDesignFirst =
+        action.kind == 'pkt_generate' &&
+        _lastIntent != null &&
+        _lastIntent!.nodes.isNotEmpty &&
+        !_hasChosenNetworkDesign(_lastIntent);
     return Container(
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -7758,13 +8370,30 @@ class _ChatScreenState extends State<ChatScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  action.label,
+                  chooseDesignFirst ? 'Choose network design' : action.label,
                   style: const TextStyle(fontSize: 13, height: 1.35),
                 ),
               ),
             ],
           ),
-          if (action.touchesPacketTracer)
+          if (chooseDesignFirst)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, left: 26),
+              child: Text(
+                'Preview the drawings and choose one for this network.',
+                style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+              ),
+            )
+          else if (action.kind == 'pkt_fix')
+            Padding(
+              padding: const EdgeInsets.only(top: 4, left: 26),
+              child: Text(
+                'Creates a separate encrypted .pkt copy offline. Your original '
+                'file is unchanged, and Packet Tracer is not opened.',
+                style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+              ),
+            )
+          else if (action.touchesPacketTracer)
             Padding(
               padding: const EdgeInsets.only(top: 4, left: 26),
               child: Text(
@@ -7776,8 +8405,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
             ),
-          _actionPayload(action),
-          if (blockReason != null)
+          if (!chooseDesignFirst) _actionPayload(action),
+          if (blockReason != null && !chooseDesignFirst)
             Padding(
               padding: const EdgeInsets.only(top: 6, left: 26),
               child: Text(
@@ -7854,7 +8483,20 @@ class _ChatScreenState extends State<ChatScreen> {
                     // nothing and the same button came back - and the choice
                     // it suggested had no wording in the parser to make it.
                     // A repair that repairs nothing is a lie of a button.
-                    if (action.kind == 'pkt_generate' &&
+                    if (chooseDesignFirst)
+                      FilledButton.icon(
+                        onPressed: _busy
+                            ? null
+                            : () async {
+                                await _chooseNetworkDesignOnly();
+                              },
+                        icon: const Icon(
+                          Icons.dashboard_customize_outlined,
+                          size: 18,
+                        ),
+                        label: const Text('Choose network design'),
+                      )
+                    else if (action.kind == 'pkt_generate' &&
                         blockReason != null &&
                         _repairWouldHelp())
                       FilledButton.tonal(
@@ -7871,9 +8513,11 @@ class _ChatScreenState extends State<ChatScreen> {
                       FilledButton.tonal(
                         onPressed: _busy
                             ? null
-                            : () => _sendQuickReply('what do I need to change '
-                                  'to fix the plan?'),
-                        child: const Text('What should I change?'),
+                            : () => _sendQuickReply(
+                                'what do I need to change '
+                                'to fix the plan?',
+                              ),
+                        child: const Text('Show what blocks it'),
                       )
                     else
                       FilledButton(
@@ -7883,6 +8527,8 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: Text(
                           action.kind == 'pkt_generate'
                               ? 'Build .pkt'
+                              : action.kind == 'pkt_fix'
+                              ? 'Create fixed copy'
                               : 'Approve',
                         ),
                       ),
@@ -7971,20 +8617,26 @@ class _ChatScreenState extends State<ChatScreen> {
         lines.add((action.payload['project'] ?? '').toString());
         break;
       case 'pkt_fix':
-        final path = (action.payload['path'] ?? '').toString().trim();
-        if (path.isNotEmpty) lines.add('file: $path');
-        final device = (action.payload['device'] ?? '').toString().trim();
-        if (device.isNotEmpty) lines.add('device: $device');
-        final finding = (action.payload['finding'] ?? '').toString().trim();
-        if (finding.isNotEmpty) lines.add('finding: $finding');
-        final cli = action.payload['fix_cli'];
-        if (cli is List) {
-          for (final command in cli) {
+        final fixes = (action.payload['fixes'] as List?)
+            ?.whereType<Map>()
+            .toList();
+        if (fixes != null && fixes.isNotEmpty) {
+          for (final raw in fixes) {
+            final fix = Map<String, dynamic>.from(raw);
+            lines.add('${fix['device'] ?? 'Device'}:');
+            for (final command in (fix['fix_cli'] as List?) ?? const []) {
+              final c = command.toString().trim();
+              if (c.isNotEmpty) lines.add('  $c');
+            }
+          }
+        } else {
+          final device = (action.payload['device'] ?? '').toString().trim();
+          if (device.isNotEmpty) lines.add('$device:');
+          for (final command
+              in (action.payload['fix_cli'] as List?) ?? const []) {
             final c = command.toString().trim();
             if (c.isNotEmpty) lines.add('  $c');
           }
-        } else if (cli != null && cli.toString().trim().isNotEmpty) {
-          lines.add('  ${cli.toString().trim()}');
         }
         break;
       case 'pkt_undo':
@@ -8168,7 +8820,8 @@ class _ChatScreenState extends State<ChatScreen> {
       final library = OnDevicePktBuilder.installSeed(File(path), dir);
       if (!mounted) return;
       setState(() {
-        _seedHint = '${library.devices.length} device template(s): '
+        _seedHint =
+            '${library.devices.length} device template(s): '
             '${(library.kinds.toList()..sort()).join(', ')}';
       });
       final audit = OnDevicePktBuilder.audit(File(path).readAsBytesSync());
@@ -8277,10 +8930,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
     try {
       await SharePlus.instance.share(
-        ShareParams(
-          text: text,
-          title: 'NetBuilder chat - $_conversation',
-        ),
+        ShareParams(text: text, title: 'NetBuilder chat - $_conversation'),
       );
     } catch (e) {
       _appendSystem('Could not open the share sheet: $e');
@@ -8331,7 +8981,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     '${_thousands(plan.tokensUsed)} of '
                     '${_thousands(plan.windowTokens)} tokens used'
                     '${plan.summarized ? ' · ${plan.turnsSummarized} earlier '
-                        'turn(s) summarized' : ''}.',
+                              'turn(s) summarized' : ''}.',
                     style: theme.textTheme.bodySmall,
                   ),
                 ),
@@ -8407,6 +9057,40 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (_editingMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppTheme.s6),
+                child: Material(
+                  color: scheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(AppTheme.rMd),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.edit_outlined,
+                          size: 16,
+                          color: scheme.onSecondaryContainer,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Editing your message. Sending replaces this turn.',
+                            style: TextStyle(
+                              color: scheme.onSecondaryContainer,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _cancelMessageEdit,
+                          child: const Text('Cancel'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             // The "/" menu: what the app can do, while a command is being
             // typed. It sits closest to the box because it is about the very
             // next keystroke.
@@ -8513,165 +9197,169 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // One media picker, the way a chat app has one: every way
-                  // of attaching something lives behind it, and the chat keeps
-                  // its space.
-                  PopupMenuButton<String>(
-                    tooltip: 'Attach',
-                    icon: const Icon(Icons.add_circle_outline),
-                    onSelected: (value) {
-                      if (value == 'image') {
-                        _pickImageFiles();
-                      } else if (value == 'screenshot') {
-                        _attachScreenshot();
-                      } else if (value == 'pkt') {
-                        _pickPkt();
-                      } else if (value == 'paste') {
-                        _pasteText();
-                      }
-                    },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: 'image',
-                        child: ListTile(
-                          dense: true,
-                          leading: Icon(Icons.add_photo_alternate_outlined),
-                          title: Text('Photo or image file'),
+                    children: [
+                      // One media picker, the way a chat app has one: every way
+                      // of attaching something lives behind it, and the chat keeps
+                      // its space.
+                      PopupMenuButton<String>(
+                        tooltip: 'Attach',
+                        icon: const Icon(Icons.add_circle_outline),
+                        onSelected: (value) {
+                          if (value == 'image') {
+                            _pickImageFiles();
+                          } else if (value == 'screenshot') {
+                            _attachScreenshot();
+                          } else if (value == 'pkt') {
+                            _pickPkt();
+                          } else if (value == 'paste') {
+                            _pasteText();
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(
+                            value: 'image',
+                            child: ListTile(
+                              dense: true,
+                              leading: Icon(Icons.add_photo_alternate_outlined),
+                              title: Text('Photo or image file'),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'screenshot',
+                            child: ListTile(
+                              dense: true,
+                              leading: Icon(Icons.photo_library_outlined),
+                              title: Text('Screenshot from the run'),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'pkt',
+                            child: ListTile(
+                              dense: true,
+                              leading: Icon(Icons.router_outlined),
+                              title: Text('Packet Tracer save (.pkt)'),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'paste',
+                            child: ListTile(
+                              dense: true,
+                              leading: Icon(Icons.content_paste),
+                              title: Text('Paste clipboard text'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Expanded(
+                        // ENTER SENDS, SHIFT+ENTER ADDS A LINE.  A
+                        // CallbackShortcuts sits closer to the field than the
+                        // app-wide text-editing shortcuts, so it wins for a
+                        // bare Enter while Shift+Enter falls through to the
+                        // default newline.  TextInputAction.send also makes an
+                        // on-screen Android keyboard show a Send key.
+                        child: CallbackShortcuts(
+                          bindings: <ShortcutActivator, VoidCallback>{
+                            const SingleActivator(LogicalKeyboardKey.enter):
+                                _send,
+                            const SingleActivator(
+                              LogicalKeyboardKey.numpadEnter,
+                            ): _send,
+                          },
+                          child: TextField(
+                            controller: _input,
+                            focusNode: _composerFocus,
+                            // NEVER DISABLED WHILE THE ASSISTANT ANSWERS. The box
+                            // used to lock the moment a turn started, so a thought
+                            // that arrived mid-answer had to be remembered by the
+                            // user instead of written down. A disabled field also
+                            // swallows the caret and the Android keyboard, which
+                            // reads as "the app is broken" rather than "busy".
+                            autofocus: true,
+                            minLines: 1,
+                            maxLines: 6,
+                            textInputAction: TextInputAction.send,
+                            decoration: InputDecoration(
+                              // labelText gives the field a real accessible
+                              // name; the hint teaches the shortcuts.
+                              labelText: 'Message',
+                              hintText:
+                                  'Ask a question, or describe what to do '
+                                  '(Enter sends - Shift+Enter = new line)',
+                              // The capsule IS the field's surface: the fill and
+                              // outline are removed so the input melts into it.
+                              filled: false,
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                            ),
+                            onSubmitted: (_) => _send(),
+                          ),
                         ),
                       ),
-                      PopupMenuItem(
-                        value: 'screenshot',
-                        child: ListTile(
-                          dense: true,
-                          leading: Icon(Icons.photo_library_outlined),
-                          title: Text('Screenshot from the run'),
-                        ),
+                      // Everything else the app can do, labelled, in one sheet.
+                      IconButton(
+                        tooltip: 'Tools: run, capture, and integrations',
+                        icon: const Icon(Icons.tune),
+                        onPressed: _busy ? null : _openTools,
                       ),
-                      PopupMenuItem(
-                        value: 'pkt',
-                        child: ListTile(
-                          dense: true,
-                          leading: Icon(Icons.router_outlined),
-                          title: Text('Packet Tracer save (.pkt)'),
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'paste',
-                        child: ListTile(
-                          dense: true,
-                          leading: Icon(Icons.content_paste),
-                          title: Text('Paste clipboard text'),
-                        ),
+                      const SizedBox(width: 2),
+                      // The send button answers the composer: an empty box gets
+                      // a quiet button, a written message gets the filled,
+                      // glowing one. Driven by the controller, so only the
+                      // button rebuilds on each keystroke - never the
+                      // transcript.
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _input,
+                        builder: (context, value, _) {
+                          final hasText = value.text.trim().isNotEmpty;
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            curve: Curves.easeOut,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _busy || hasText
+                                  ? scheme.primary
+                                  : scheme.surfaceContainerHighest,
+                              boxShadow: _busy || hasText
+                                  ? [
+                                      BoxShadow(
+                                        color: scheme.primary.withValues(
+                                          alpha: 0.30,
+                                        ),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: IconButton.filled(
+                              tooltip: _busy
+                                  ? 'Stop generating'
+                                  : _editingMessage == null
+                                  ? 'Send'
+                                  : 'Update message',
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                foregroundColor: _busy || hasText
+                                    ? scheme.onPrimary
+                                    : scheme.onSurfaceVariant,
+                                elevation: 0,
+                              ),
+                              icon: _busy
+                                  ? const Icon(Icons.stop)
+                                  : const Icon(Icons.send),
+                              onPressed: _busy
+                                  ? _cancelGeneration
+                                  : (_input.text.trim().isEmpty ? null : _send),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
-                  Expanded(
-                    // ENTER SENDS, SHIFT+ENTER ADDS A LINE.  A
-                    // CallbackShortcuts sits closer to the field than the
-                    // app-wide text-editing shortcuts, so it wins for a
-                    // bare Enter while Shift+Enter falls through to the
-                    // default newline.  TextInputAction.send also makes an
-                    // on-screen Android keyboard show a Send key.
-                    child: CallbackShortcuts(
-                      bindings: <ShortcutActivator, VoidCallback>{
-                        const SingleActivator(LogicalKeyboardKey.enter): _send,
-                        const SingleActivator(LogicalKeyboardKey.numpadEnter):
-                            _send,
-                      },
-                      child: TextField(
-                        controller: _input,
-                        focusNode: _composerFocus,
-                        // NEVER DISABLED WHILE THE ASSISTANT ANSWERS. The box
-                        // used to lock the moment a turn started, so a thought
-                        // that arrived mid-answer had to be remembered by the
-                        // user instead of written down. A disabled field also
-                        // swallows the caret and the Android keyboard, which
-                        // reads as "the app is broken" rather than "busy".
-                        autofocus: true,
-                        minLines: 1,
-                        maxLines: 6,
-                        textInputAction: TextInputAction.send,
-                        decoration: InputDecoration(
-                          // labelText gives the field a real accessible
-                          // name; the hint teaches the shortcuts.
-                          labelText: 'Message',
-                          hintText:
-                              'Ask a question, or describe what to do '
-                              '(Enter sends - Shift+Enter = new line)',
-                          // The capsule IS the field's surface: the fill and
-                          // outline are removed so the input melts into it.
-                          filled: false,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                        ),
-                        onSubmitted: (_) => _send(),
-                      ),
-                    ),
-                  ),
-                  // Everything else the app can do, labelled, in one sheet.
-                  IconButton(
-                    tooltip: 'Tools: run, capture, and integrations',
-                    icon: const Icon(Icons.tune),
-                    onPressed: _busy ? null : _openTools,
-                  ),
-                  const SizedBox(width: 2),
-                  // The send button answers the composer: an empty box gets
-                  // a quiet button, a written message gets the filled,
-                  // glowing one. Driven by the controller, so only the
-                  // button rebuilds on each keystroke - never the
-                  // transcript.
-                  ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: _input,
-                    builder: (context, value, _) {
-                      final hasText = value.text.trim().isNotEmpty;
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 160),
-                        curve: Curves.easeOut,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _busy || hasText
-                              ? scheme.primary
-                              : scheme.surfaceContainerHighest,
-                          boxShadow: _busy || hasText
-                              ? [
-                                  BoxShadow(
-                                    color: scheme.primary.withValues(
-                                      alpha: 0.30,
-                                    ),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: IconButton.filled(
-                          tooltip: _busy ? 'Stop generating' : 'Send',
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            foregroundColor: _busy || hasText
-                                ? scheme.onPrimary
-                                : scheme.onSurfaceVariant,
-                            elevation: 0,
-                          ),
-                          icon: _busy
-                              ? const Icon(Icons.stop)
-                              : const Icon(Icons.send),
-                          onPressed: _busy
-                              ? _cancelGeneration
-                              : (_input.text.trim().isEmpty
-                                    ? null
-                                    : _send),
-                        ),
-                      );
-                    },
-                  ),
-                  ],
-                ),
-              );
-            },
-          ),
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -8957,10 +9645,7 @@ class _ConversationSearchState extends State<_ConversationSearch> {
 
   /// The turns whose text contains the query, oldest first. An empty query
   /// matches nothing: an empty hit list is the honest answer to an empty box.
-  static List<ChatMessage> matches(
-    List<ChatMessage> messages,
-    String query,
-  ) {
+  static List<ChatMessage> matches(List<ChatMessage> messages, String query) {
     final needle = query.trim().toLowerCase();
     if (needle.isEmpty) return const [];
     return [
@@ -9106,7 +9791,6 @@ class _PendingChange {
     required this.newValue,
   });
 }
-
 
 /// The prompt behind a tap-to-fix chip: one field carrying the value that is
 /// wrong, and the two ways out.

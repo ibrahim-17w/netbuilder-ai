@@ -29,7 +29,6 @@ class ConversationSidebar extends StatefulWidget {
   final ValueChanged<String> onSearch;
   final String query;
 
-  final VoidCallback onSettings;
   final VoidCallback onCollapse;
 
   const ConversationSidebar({
@@ -41,7 +40,6 @@ class ConversationSidebar extends StatefulWidget {
     required this.onDelete,
     required this.onRename,
     required this.onSearch,
-    required this.onSettings,
     required this.onCollapse,
     this.query = '',
     this.busy = false,
@@ -84,83 +82,39 @@ class _ConversationSidebarState extends State<ConversationSidebar> {
           ),
         ),
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppTheme.s10,
-              AppTheme.s10,
-              AppTheme.s6,
-              AppTheme.s6,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: widget.busy ? null : widget.onNewChat,
-                    icon: const Icon(Icons.add_comment_outlined, size: 18),
-                    label: const Text('New chat'),
-                    style: FilledButton.styleFrom(
-                      alignment: Alignment.centerLeft,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppTheme.s12,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppTheme.s10,
+                AppTheme.s10,
+                AppTheme.s6,
+                AppTheme.s6,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      onPressed: widget.busy ? null : widget.onNewChat,
+                      icon: const Icon(Icons.add_comment_outlined, size: 18),
+                      label: const Text('New chat'),
+                      style: FilledButton.styleFrom(
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppTheme.s12,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                IconButton(
-                  tooltip: 'Hide the conversation list',
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.chevron_left, size: 18),
-                  onPressed: widget.onCollapse,
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppTheme.s12,
-              0,
-              AppTheme.s12,
-              AppTheme.s8,
-            ),
-            child: _searching
-                ? TextField(
-                    controller: _search,
-                    autofocus: true,
-                    onChanged: widget.onSearch,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      hintText: 'Search conversations',
-                      prefixIcon: const Icon(Icons.search, size: 18),
-                      suffixIcon: IconButton(
-                        tooltip: 'Close search',
-                        icon: const Icon(Icons.close, size: 16),
-                        onPressed: () {
-                          _search.clear();
-                          widget.onSearch('');
-                          setState(() => _searching = false);
-                        },
-                      ),
-                      border: const OutlineInputBorder(),
-                    ),
-                  )
-                : OutlinedButton.icon(
-                    onPressed: () => setState(() => _searching = true),
-                    icon: const Icon(Icons.search, size: 18),
-                    label: const Text('Search'),
-                    style: OutlinedButton.styleFrom(
-                      alignment: Alignment.centerLeft,
-                      minimumSize: const Size.fromHeight(38),
-                    ),
+                  IconButton(
+                    tooltip: 'Hide the conversation list',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.chevron_left, size: 18),
+                    onPressed: widget.onCollapse,
                   ),
-          ),
-          // The current network chip only names REAL projects: a raw
-          // storage id ("chat 15:2653") is not a network anyone knows, and
-          // the pane header already says "New conversation".
-          if (widget.project.trim().isNotEmpty &&
-              widget.project.trim() != 'default' &&
-              !ConversationTitles.isRawId(widget.project))
+                ],
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppTheme.s12,
@@ -168,53 +122,80 @@ class _ConversationSidebarState extends State<ConversationSidebar> {
                 AppTheme.s12,
                 AppTheme.s8,
               ),
-              child: _NetworkChip(project: widget.project),
-            ),
-          const Divider(height: 1),
-          Expanded(
-            child: groups.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppTheme.s16),
-                      child: Text(
-                        widget.query.trim().isEmpty
-                            ? 'No conversations yet.\nAsk something to start one.'
-                            : 'Nothing matched "${widget.query.trim()}".',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
+              child: _searching
+                  ? TextField(
+                      controller: _search,
+                      autofocus: true,
+                      onChanged: widget.onSearch,
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: 'Search conversations',
+                        prefixIcon: const Icon(Icons.search, size: 18),
+                        suffixIcon: IconButton(
+                          tooltip: 'Close search',
+                          icon: const Icon(Icons.close, size: 16),
+                          onPressed: () {
+                            _search.clear();
+                            widget.onSearch('');
+                            setState(() => _searching = false);
+                          },
                         ),
+                        border: const OutlineInputBorder(),
+                      ),
+                    )
+                  : OutlinedButton.icon(
+                      onPressed: () => setState(() => _searching = true),
+                      icon: const Icon(Icons.search, size: 18),
+                      label: const Text('Search'),
+                      style: OutlinedButton.styleFrom(
+                        alignment: Alignment.centerLeft,
+                        minimumSize: const Size.fromHeight(38),
                       ),
                     ),
-                  )
-                : ListView(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: AppTheme.s6,
+            ),
+            // The current network chip only names REAL projects: a raw
+            // storage id ("chat 15:2653") is not a network anyone knows, and
+            // the pane header already says "New conversation".
+            if (widget.project.trim().isNotEmpty &&
+                widget.project.trim() != 'default' &&
+                !ConversationTitles.isRawId(widget.project))
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.s12,
+                  0,
+                  AppTheme.s12,
+                  AppTheme.s8,
+                ),
+                child: _NetworkChip(project: widget.project),
+              ),
+            const Divider(height: 1),
+            Expanded(
+              child: groups.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppTheme.s16),
+                        child: Text(
+                          widget.query.trim().isEmpty
+                              ? 'No conversations yet.\nAsk something to start one.'
+                              : 'Nothing matched "${widget.query.trim()}".',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    )
+                  : ListView(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppTheme.s6,
+                      ),
+                      children: [
+                        for (final group in groups)
+                          ..._groupTiles(group, theme),
+                      ],
                     ),
-                    children: [
-                      for (final group in groups) ..._groupTiles(group, theme),
-                    ],
-                  ),
-          ),
-          const Divider(height: 1),
-          // Settings: the ONE app-level entry point. Theme and the rest live
-          // inside the drawer - a second row of app chrome here read as a
-          // second settings tab.
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppTheme.s8,
-              AppTheme.s4,
-              AppTheme.s8,
-              AppTheme.s10,
             ),
-            child: ListTile(
-              dense: true,
-              visualDensity: VisualDensity.compact,
-              leading: const Icon(Icons.settings_outlined, size: 18),
-              title: const Text('Settings'),
-              onTap: widget.onSettings,
-            ),
-          ),
+            const Divider(height: 1),
           ],
         ),
       ),
@@ -301,9 +282,7 @@ class _ConversationSidebarState extends State<ConversationSidebar> {
     };
     for (final chat in chats) {
       final ms = (chat['at'] as num?)?.toInt() ?? 0;
-      final at = ms == 0
-          ? null
-          : DateTime.fromMillisecondsSinceEpoch(ms);
+      final at = ms == 0 ? null : DateTime.fromMillisecondsSinceEpoch(ms);
       final day = at == null ? null : DateTime(at.year, at.month, at.day);
       final label = day == null
           ? 'Older'
@@ -320,8 +299,7 @@ class _ConversationSidebarState extends State<ConversationSidebar> {
     }
     return [
       for (final entry in buckets.entries)
-        if (entry.value.isNotEmpty)
-          _ConversationGroup(entry.key, entry.value),
+        if (entry.value.isNotEmpty) _ConversationGroup(entry.key, entry.value),
     ];
   }
 }
@@ -394,7 +372,9 @@ class _ConversationTile extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
                         ),
                       ),
                       Text(
@@ -431,18 +411,16 @@ class _ConversationTile extends StatelessWidget {
   }
 }
 
-/// The collapsed sidebar: New chat, search and settings stay one click away
+/// The collapsed sidebar: New chat and search stay one click away
 /// while the conversation gets the width.
 class CollapsedConversationRail extends StatelessWidget {
   final VoidCallback onExpand;
   final VoidCallback onNewChat;
-  final VoidCallback onSettings;
 
   const CollapsedConversationRail({
     super.key,
     required this.onExpand,
     required this.onNewChat,
-    required this.onSettings,
   });
 
   @override
@@ -453,7 +431,9 @@ class CollapsedConversationRail extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLowest,
         border: Border(
-          right: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.6)),
+          right: BorderSide(
+            color: scheme.outlineVariant.withValues(alpha: 0.6),
+          ),
         ),
       ),
       child: Column(
@@ -470,11 +450,6 @@ class CollapsedConversationRail extends StatelessWidget {
             onPressed: onNewChat,
           ),
           const Spacer(),
-          IconButton(
-            tooltip: 'Settings',
-            icon: const Icon(Icons.settings_outlined, size: 18),
-            onPressed: onSettings,
-          ),
           const SizedBox(height: AppTheme.s8),
         ],
       ),
@@ -550,10 +525,26 @@ class ChatWelcome extends StatelessWidget {
 
   static const suggestions = <(IconData, String, String)>[
     (Icons.search, 'Analyze a network', 'Audit a .pkt for real problems'),
-    (Icons.wifi_tethering_error, 'Troubleshoot connectivity', 'Why can\'t PC1 reach Server0?'),
-    (Icons.folder_open_outlined, 'Open a .pkt project', 'Work on a saved network'),
-    (Icons.fact_check_outlined, 'Check a configuration', 'Review the CLI for mistakes'),
-    (Icons.add_road_outlined, 'Create a network', 'Describe a lab and build it'),
+    (
+      Icons.wifi_tethering_error,
+      'Troubleshoot connectivity',
+      'Why can\'t PC1 reach Server0?',
+    ),
+    (
+      Icons.folder_open_outlined,
+      'Open a .pkt project',
+      'Work on a saved network',
+    ),
+    (
+      Icons.fact_check_outlined,
+      'Check a configuration',
+      'Review the CLI for mistakes',
+    ),
+    (
+      Icons.add_road_outlined,
+      'Create a network',
+      'Describe a lab and build it',
+    ),
   ];
 
   @override

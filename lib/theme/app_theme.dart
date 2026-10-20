@@ -90,7 +90,9 @@ class AppTheme {
     final text = base.textTheme
         .apply(
           bodyColor: dark ? const Color(0xFFDDE3EC) : const Color(0xFF1A1D26),
-          displayColor: dark ? const Color(0xFFF3F6FA) : const Color(0xFF0F1219),
+          displayColor: dark
+              ? const Color(0xFFF3F6FA)
+              : const Color(0xFF0F1219),
         )
         .copyWith(
           // Fewer sizes, further apart: an eyebrow, a section, a panel title
@@ -145,6 +147,12 @@ class AppTheme {
             fontWeight: FontWeight.w700,
             letterSpacing: 0.7,
           ),
+        )
+        .apply(
+          bodyColor: dark ? const Color(0xFFDDE3EC) : const Color(0xFF1A1D26),
+          displayColor: dark
+              ? const Color(0xFFF3F6FA)
+              : const Color(0xFF0F1219),
         );
 
     final hairline = scheme.outlineVariant.withValues(alpha: dark ? 0.8 : 0.7);
@@ -280,9 +288,7 @@ class AppTheme {
         backgroundColor: dark
             ? scheme.surfaceContainerHighest.withValues(alpha: 0.28)
             : scheme.surfaceContainerLow,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(999),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         labelStyle: text.labelMedium,
         padding: const EdgeInsets.symmetric(horizontal: s8, vertical: s4),
       ),
@@ -291,9 +297,7 @@ class AppTheme {
           horizontal: s16,
           vertical: s2,
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(rMd),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMd)),
         minVerticalPadding: s10,
         titleTextStyle: text.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
         subtitleTextStyle: text.bodySmall?.copyWith(
@@ -329,9 +333,7 @@ class AppTheme {
           color: scheme.onInverseSurface,
         ),
         insetPadding: const EdgeInsets.all(s16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(rLg),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLg)),
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: SegmentedButton.styleFrom(
@@ -364,9 +366,7 @@ class AppTheme {
         ),
       ),
       checkboxTheme: CheckboxThemeData(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(5),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
         side: BorderSide(color: scheme.outlineVariant),
       ),
       sliderTheme: base.sliderTheme.copyWith(
@@ -382,9 +382,7 @@ class AppTheme {
         indicatorSize: TabBarIndicatorSize.label,
         indicator: UnderlineTabIndicator(
           borderSide: BorderSide(color: scheme.primary, width: 2),
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(2),
-          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(2)),
         ),
       ),
       navigationRailTheme: base.navigationRailTheme.copyWith(
@@ -436,9 +434,7 @@ class AppTheme {
         ),
       ),
       expansionTileTheme: base.expansionTileTheme.copyWith(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(rMd),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMd)),
         collapsedShape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(rMd),
         ),
@@ -465,10 +461,7 @@ class AppTheme {
   /// that a card on a card looked like one card; these steps are visible.
   static ColorScheme _scheme(Brightness brightness) {
     final dark = brightness == Brightness.dark;
-    final base = ColorScheme.fromSeed(
-      seedColor: seed,
-      brightness: brightness,
-    );
+    final base = ColorScheme.fromSeed(seedColor: seed, brightness: brightness);
     if (!dark) {
       return base.copyWith(
         surface: const Color(0xFFF5F7FB),
@@ -651,9 +644,9 @@ class AppStatusPill extends StatelessWidget {
               child: Text(
                 detail,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
               ),
             ),
           ],

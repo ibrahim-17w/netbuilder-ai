@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -7,11 +8,16 @@ import '../services/autopilot_service.dart';
 import '../services/context_budget.dart';
 import '../services/gemini_model_catalog.dart';
 import '../services/gemini_service.dart';
+import '../services/engine_configuration_sync.dart';
+import '../services/provider_chat_service.dart';
+import '../services/pkt/pkt_export_service.dart';
+import '../services/packet_tracer/catalog.dart';
 import '../services/settings_service.dart';
 import '../theme/app_kit.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gemini_model_picker.dart';
+import '../widgets/local_model_section.dart';
 import '../widgets/whats_new.dart';
 
 /// Everything that configures the app, in one place, grouped by the question
@@ -38,8 +44,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _gns3 = TextEditingController();
   final _gns3User = TextEditingController();
   final _gns3Pass = TextEditingController();
+  final _openAiBase = TextEditingController();
+  final _openAiModel = TextEditingController();
+  final _openAiKey = TextEditingController();
+  final _openAiHeaders = TextEditingController();
+  final _openAiOrganization = TextEditingController();
+  final _engine = TextEditingController();
+  final _outputDir = TextEditingController();
+  final _pktVersion = TextEditingController();
   bool _obscure = true;
   bool _obscureGns3 = true;
+  bool _obscureOpenAi = true;
+  bool _testingEngine = false;
+  String? _engineTest;
   String _status = '';
 
   /// What the last status line was: an error is red, a success green and a
@@ -47,15 +64,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// saved one.
   AppTone _statusTone = AppTone.info;
   bool _busy = false;
+
   /// True while what is on screen differs from what is stored. Cleared by a
   /// successful save: the warning is a claim about the stored value, and a
   /// warning that survives a successful save is a lie the user has to learn to
   /// ignore.
   bool _dirty = false;
+
   /// Models detected for the stored/typed key, or null until detection has
   /// run. Null is distinct from empty: null = not checked yet.
   List<String>? _detected;
   String? _detectedNote;
+
   /// Re-run detection silently when the key field settles.
   Timer? _detectDebounce;
 
@@ -66,6 +86,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _gns3.dispose();
     _gns3User.dispose();
     _gns3Pass.dispose();
+    _openAiBase.dispose();
+    _openAiModel.dispose();
+    _openAiKey.dispose();
+    _openAiHeaders.dispose();
+    _openAiOrganization.dispose();
+    _engine.dispose();
+    _outputDir.dispose();
+    _pktVersion.dispose();
     super.dispose();
   }
 
@@ -172,10 +200,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _init() async {
     final s = context.read<SettingsService>();
     final k = await s.getApiKey();
+    final openAiKey = await s.getOpenAiKey();
     _key.text = k ?? '';
     _gns3.text = s.gns3Endpoint;
     _gns3User.text = s.gns3User;
     _gns3Pass.text = s.gns3Pass;
+    _openAiBase.text = s.openAiBaseUrl;
+    _openAiModel.text = s.openAiModel;
+    _openAiKey.text = openAiKey ?? '';
+    _openAiHeaders.text = s.openAiHeaders;
+    _openAiOrganization.text = s.openAiOrganization;
+    _engine.text = s.engineBase;
+    _outputDir.text = s.outputDir;
+    _pktVersion.text = s.packetTracerVersion;
     if (mounted) setState(() {});
   }
 
@@ -201,49 +238,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
       await s.setGns3Endpoint(_gns3.text);
       await s.setGns3Credentials(_gns3User.text, _gns3Pass.text);
-      final key = _key.text.trim();
-      if (key.isEmpty) {
-        _dirty = false;
-        // Clearing the key means the chat answers offline. It does NOT turn
-        // Private Mode on, and saying so was a promise the app did not keep.
+      await s.setOpenAiBaseUrl(_openAiBase.text);
+      await s.setOpenAiModel(_openAiModel.text);
+      await s.setOpenAiOrganization(_openAiOrganization.text);
+      final headersSaved = await s.setOpenAiHeaders(_openAiHeaders.text);
+      final openAiSaved = await s.setOpenAiKey(_openAiKey.text);
+      if (!headersSaved || !openAiSaved) {
         _say(
-          'Key cleared. The chat answers from the offline assistant.',
-          tone: AppTone.info,
+          'Provider credentials could not be read back from secure storage. Check the device keychain and try again.',
+          tone: AppTone.danger,
         );
         return;
       }
-      // Detect first: the saved model may be one this key cannot use, and
-      // the recommendation is only trustworthy once the list is real.
-      await _detect(announce: false);
-      final detected = _detected;
-      if (detected != null && !detected.contains(s.model)) {
-        final best = GeminiModelCatalog.recommend([
-          for (final n in detected) GeminiModelInfo(name: n),
-        ]);
-        if (best != null) {
-          await s.setModel(best.name);
+      final key = _key.text.trim();
+      String? err;
+      String? providerResult;
+      if (s.usesOpenAi) {
+        final result = await ProviderChatService(
+          config: s.providerConfig,
+          geminiKey: await s.getApiKey() ?? '',
+          openaiKey: await s.getOpenAiKey() ?? '',
+          contextTokens: s.contextBudget,
+        ).testConnection();
+        providerResult = '${result['message'] ?? 'No response from provider.'}';
+        if (result['ok'] != true) err = providerResult;
+      } else if (key.isNotEmpty) {
+        // Detect first: the saved model may be one this key cannot use, and
+        // the recommendation is only trustworthy once the list is real.
+        await _detect(announce: false);
+        final detected = _detected;
+        if (detected != null && !detected.contains(s.model)) {
+          final best = GeminiModelCatalog.recommend([
+            for (final n in detected) GeminiModelInfo(name: n),
+          ]);
+          if (best != null) await s.setModel(best.name);
         }
+        err = await GeminiService().testKey(apiKey: key, model: s.model);
       }
-      final err = await GeminiService().testKey(apiKey: key, model: s.model);
       if (!mounted) return;
       // Push the credential AND the auto-learning switches now, so a toggle
       // takes effect without waiting for the next build to re-push it.
       try {
-        await AutopilotService.of(context).pushLlmConfig(
-          apiKey: key,
-          model: s.model,
-          enabled: key.isNotEmpty && !s.privateMode && s.llmFix,
-          autoLearn: s.autoLearn,
-          autoSuggest: s.autoLearn && s.autoSuggest,
-          autoTeach: s.autoLearn && s.autoTeach,
-        );
+        if (!SettingsService.isMobile) {
+          await EngineConfigurationSync.push(s, AutopilotService.of(context));
+        }
       } catch (_) {
         // The sidecar may be offline; the setting is saved regardless and
         // will ride along on the next build's push.
       }
       _dirty = false;
       _say(
-        err == null
+        s.usesOpenAi
+            ? err == null
+                  ? 'Provider settings saved and the connection answered.'
+                  : 'Provider test failed: $err'
+            : key.isEmpty
+            ? 'Settings saved. The chat answers from the offline assistant.'
+            : err == null
             ? 'Key valid for ${s.model}. ${_detectedNote ?? ''}'.trim()
             : 'Key test failed: $err',
         tone: err == null ? AppTone.success : AppTone.danger,
@@ -263,11 +314,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ? (await s.getApiKey() ?? '')
         : _key.text.trim();
     if (!mounted) return;
-    await showGeminiModelPicker(
-      context,
-      apiKey: key,
-      currentModel: s.model,
-    );
+    await showGeminiModelPicker(context, apiKey: key, currentModel: s.model);
   }
 
   Future<void> _showChangelog() async {
@@ -296,7 +343,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('•  ', style: Theme.of(context).textTheme.bodySmall),
+                          Text(
+                            '•  ',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
                           Expanded(
                             child: Text(
                               change,
@@ -344,9 +394,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         eyebrow: 'Configure',
         title: 'Settings',
         description:
-            'The app works with no key at all. A Gemini key only adds '
-            'model-written answers on top of the offline planner and '
-            'assistant.',
+            'One place for provider, privacy, Packet Tracer, file, and appearance settings.',
         actions: [
           FilledButton.icon(
             onPressed: _busy ? null : _saveAndTest,
@@ -357,7 +405,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.save_outlined),
-            label: Text(_busy ? 'Testing...' : 'Save + Test Key'),
+            label: Text(_busy ? 'Testing...' : 'Save + test provider'),
           ),
         ],
       ),
@@ -372,7 +420,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           AppBanner(
             tone: AppTone.warning,
             message:
-                'Unsaved changes - press Save + Test Key to store them.',
+                'Unsaved changes - press Save + test provider to store them.',
           ),
         _modelPanel(s),
         _targetsPanel(s),
@@ -392,9 +440,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
       subtitle: 'Optional. Keys are stored in the OS keychain, never logged.',
       children: [
         AppPanel(
+          icon: Icons.smart_toy_outlined,
+          title: 'Active assistant',
+          subtitle:
+              'Choose the service used for model-written answers. Planning and local .pkt tools still work without a key.',
+          children: [
+            DropdownButtonFormField<String>(
+              initialValue: s.providerName,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'AI provider'),
+              items: const [
+                DropdownMenuItem(value: 'gemini', child: Text('Google Gemini')),
+                DropdownMenuItem(
+                  value: 'openai',
+                  child: Text('OpenAI-compatible provider'),
+                ),
+              ],
+              onChanged: (value) {
+                if (value != null) s.setProviderName(value);
+              },
+            ),
+          ],
+        ),
+        AppPanel(
           icon: Icons.key_outlined,
           title: 'API key',
-          subtitle: 'Free keys: aistudio.google.com',
+          subtitle: 'Gemini key · Free keys: aistudio.google.com',
           trailing: AppTag(
             label: _key.text.trim().isEmpty ? 'offline' : 'key set',
             tone: _key.text.trim().isEmpty ? AppTone.neutral : AppTone.success,
@@ -432,47 +503,118 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
         AppPanel(
+          icon: Icons.cloud_outlined,
+          title: 'OpenAI-compatible provider',
+          subtitle:
+              'Optional. Supports hosted gateways and local runtimes such as Ollama.',
+          children: [
+            TextField(
+              controller: _openAiBase,
+              decoration: const InputDecoration(
+                labelText: 'Base URL',
+                hintText: 'https://api.groq.com/openai/v1',
+              ),
+              onChanged: (_) => setState(() => _dirty = true),
+            ),
+            const SizedBox(height: AppTheme.s8),
+            TextField(
+              controller: _openAiModel,
+              decoration: const InputDecoration(labelText: 'Model id'),
+              onChanged: (_) => setState(() => _dirty = true),
+            ),
+            const SizedBox(height: AppTheme.s8),
+            TextField(
+              controller: _openAiOrganization,
+              decoration: const InputDecoration(
+                labelText: 'Organization (optional)',
+              ),
+              onChanged: (_) => setState(() => _dirty = true),
+            ),
+            const SizedBox(height: AppTheme.s8),
+            TextField(
+              controller: _openAiKey,
+              obscureText: _obscureOpenAi,
+              decoration: InputDecoration(
+                labelText: 'Provider API key',
+                helperText: 'Leave empty to clear the saved key.',
+                suffixIcon: IconButton(
+                  tooltip: _obscureOpenAi ? 'Show key' : 'Hide key',
+                  onPressed: () =>
+                      setState(() => _obscureOpenAi = !_obscureOpenAi),
+                  icon: Icon(
+                    _obscureOpenAi ? Icons.visibility : Icons.visibility_off,
+                  ),
+                ),
+              ),
+              onChanged: (_) => setState(() => _dirty = true),
+            ),
+            const SizedBox(height: AppTheme.s8),
+            TextField(
+              controller: _openAiHeaders,
+              minLines: 1,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Extra headers (optional)',
+                helperText: 'One Header: value pair per line.',
+              ),
+              onChanged: (_) => setState(() => _dirty = true),
+            ),
+            const SizedBox(height: AppTheme.s8),
+            LocalModelSection(
+              settings: s,
+              baseUrl: _openAiBase,
+              modelId: _openAiModel,
+              onNote: (message) => _say(message, tone: AppTone.info),
+            ),
+          ],
+        ),
+        AppPanel(
           icon: Icons.auto_awesome_outlined,
           title: 'Model and context',
-          subtitle: _detectedNote ??
+          subtitle:
+              _detectedNote ??
               'Press Save + Test Key to detect the models this key can use.',
           children: [
-            AppField(
-              label: 'Model',
-              help: 'The dropdown lists what this key can actually use once '
-                  'detection has run.',
-              child: Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      key: ValueKey(
-                        'model-${(_detected ?? const <String>[]).length}-${s.model}',
+            if (!s.usesOpenAi)
+              AppField(
+                label: 'Model',
+                help:
+                    'The dropdown lists what this key can actually use once '
+                    'detection has run.',
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        key: ValueKey(
+                          'model-${(_detected ?? const <String>[]).length}-${s.model}',
+                        ),
+                        initialValue: s.model,
+                        items: modelChoices(s.model)
+                            .map(
+                              (m) => DropdownMenuItem(value: m, child: Text(m)),
+                            )
+                            .toList(),
+                        onChanged: (v) => v == null ? null : s.setModel(v),
+                        decoration: const InputDecoration(isDense: true),
                       ),
-                      initialValue: s.model,
-                      items: modelChoices(s.model)
-                          .map(
-                            (m) => DropdownMenuItem(value: m, child: Text(m)),
-                          )
-                          .toList(),
-                      onChanged: (v) => v == null ? null : s.setModel(v),
-                      decoration: const InputDecoration(isDense: true),
                     ),
-                  ),
-                  const SizedBox(width: AppTheme.s8),
-                  IconButton.filledTonal(
-                    tooltip: 'Detect models for this key and choose one',
-                    onPressed: _busy ? null : _pickModel,
-                    icon: const Icon(Icons.auto_awesome_outlined, size: 18),
-                  ),
-                ],
+                    const SizedBox(width: AppTheme.s8),
+                    IconButton.filledTonal(
+                      tooltip: 'Detect models for this key and choose one',
+                      onPressed: _busy ? null : _pickModel,
+                      icon: const Icon(Icons.auto_awesome_outlined, size: 18),
+                    ),
+                  ],
+                ),
               ),
-            ),
             AppField(
               label: 'Chat context budget',
-              help: 'How much conversation the chat holds before older turns '
+              help:
+                  'How much conversation the chat holds before older turns '
                   'are summarized into memory. Default 256k.',
               child: DropdownButtonFormField<int>(
                 initialValue: s.contextBudget,
+                isExpanded: true,
                 items:
                     (<int>{
                           32768,
@@ -480,8 +622,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ContextBudget.defaultContextTokens,
                           1048576,
                           s.contextBudget,
-                        }.toList()
-                        ..sort())
+                        }.toList()..sort())
                         .map(
                           (b) => DropdownMenuItem<int>(
                             value: b,
@@ -496,25 +637,77 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 decoration: const InputDecoration(isDense: true),
               ),
             ),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _busy ? null : _listModels,
-                    icon: const Icon(Icons.list_alt_outlined, size: 18),
-                    label: const Text('Browse available models'),
-                  ),
+            if (!SettingsService.isMobile)
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Include live run context in chat'),
+                subtitle: const Text(
+                  'Adds the current Packet Tracer run summary to relevant prompts.',
                 ),
-              ],
+                value: s.liveContext,
+                onChanged: s.setLiveContext,
+              ),
+            AppField(
+              label: 'Runtime context window',
+              help:
+                  'Detect automatically unless you need to set the model runtime window yourself.',
+              child: DropdownButtonFormField<int>(
+                initialValue: s.runtimeWindow,
+                isExpanded: true,
+                items:
+                    (<int>{
+                          0,
+                          2048,
+                          4096,
+                          8192,
+                          16384,
+                          32768,
+                          131072,
+                          s.runtimeWindow,
+                        }.toList()..sort())
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(
+                              value == 0
+                                  ? 'Detect automatically'
+                                  : '${value ~/ 1024}k tokens',
+                            ),
+                          ),
+                        )
+                        .toList(),
+                onChanged: (value) => s.setRuntimeWindow(value ?? 0),
+                decoration: const InputDecoration(isDense: true),
+              ),
             ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'Show context diagnostics in the debug console',
+              ),
+              value: s.contextDebug,
+              onChanged: s.setContextDebug,
+            ),
+            if (!s.usesOpenAi)
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _busy ? null : _listModels,
+                      icon: const Icon(Icons.list_alt_outlined, size: 18),
+                      label: const Text('Browse available models'),
+                    ),
+                  ),
+                ],
+              ),
             const SizedBox(height: AppTheme.s6),
             Text(
               'With no key the chat answers from the offline assistant and '
               'the planner stays deterministic - the app never needs a key '
               'to work.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -527,8 +720,148 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _targetsPanel(SettingsService s) {
     return AppSection(
       title: 'Where builds go',
-      subtitle: 'The default target a new plan is compiled for.',
+      subtitle: 'Choose the builder and compatibility reference used by plans.',
       children: [
+        AppPanel(
+          icon: Icons.memory_outlined,
+          title: 'Packet Tracer compatibility',
+          subtitle:
+              'The bundled device templates are sourced from Packet Tracer ${PacketTracerCatalog.instance.version}. Set the version installed on your PC to see compatibility warnings in the catalog.',
+          children: [
+            TextField(
+              controller: _pktVersion,
+              decoration: const InputDecoration(
+                labelText: 'Installed Packet Tracer version',
+                hintText: 'For example, 9.0.0.0810',
+                helperText: 'Leave blank when unknown.',
+              ),
+              onSubmitted: (value) => s.setPacketTracerVersion(value),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () async {
+                  await s.setPacketTracerVersion(_pktVersion.text);
+                  if (mounted) {
+                    _say('Packet Tracer version saved.', tone: AppTone.success);
+                  }
+                },
+                icon: const Icon(Icons.save_outlined, size: 17),
+                label: const Text('Save version'),
+              ),
+            ),
+          ],
+        ),
+        AppPanel(
+          icon: Icons.device_hub_outlined,
+          title: 'Packet Tracer build engine',
+          subtitle: SettingsService.engineHint(_engine.text),
+          children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                SettingsService.isMobile
+                    ? 'Build .pkt files on this device'
+                    : 'Prefer on-device .pkt building',
+              ),
+              subtitle: Text(
+                SettingsService.isMobile
+                    ? 'Uses the bundled templates. Turn this off to use the PC engine below.'
+                    : 'Uses bundled templates first; the PC engine is still available for live Packet Tracer runs.',
+              ),
+              value: s.preferOnDevicePkt,
+              onChanged: s.setPreferOnDevicePkt,
+            ),
+            TextField(
+              controller: _engine,
+              decoration: InputDecoration(
+                labelText: SettingsService.isMobile
+                    ? 'PC engine address (optional)'
+                    : 'Engine address',
+                helperText: SettingsService.engineHint(_engine.text),
+                helperMaxLines: 4,
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: AppTheme.s8),
+            Wrap(
+              spacing: AppTheme.s8,
+              runSpacing: AppTheme.s8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await s.setEngineBase(_engine.text);
+                    if (!mounted) return;
+                    if (s.engineBaseError.isNotEmpty) {
+                      _say(s.engineBaseError, tone: AppTone.danger);
+                    } else {
+                      _engine.text = s.engineBase;
+                      _say('Engine address saved.', tone: AppTone.success);
+                    }
+                  },
+                  icon: const Icon(Icons.save_outlined, size: 17),
+                  label: const Text('Save address'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _testingEngine ? null : _testEngine,
+                  icon: _testingEngine
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.wifi_tethering_outlined, size: 17),
+                  label: const Text('Test connection'),
+                ),
+              ],
+            ),
+            if (_engineTest != null)
+              Padding(
+                padding: const EdgeInsets.only(top: AppTheme.s8),
+                child: Text(_engineTest!),
+              ),
+          ],
+        ),
+        AppPanel(
+          icon: Icons.folder_outlined,
+          title: 'Generated .pkt files',
+          subtitle: SettingsService.isMobile
+              ? 'Android asks where each generated file should be saved.'
+              : 'Choose the default folder for generated and repaired files.',
+          children: [
+            if (!SettingsService.isMobile) ...[
+              TextField(
+                controller: _outputDir,
+                decoration: const InputDecoration(
+                  labelText: 'Output folder',
+                  helperText: 'Leave empty to use the engine default folder.',
+                ),
+              ),
+              Wrap(
+                spacing: AppTheme.s8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _chooseOutputFolder(s),
+                    icon: const Icon(Icons.folder_open_outlined, size: 17),
+                    label: const Text('Choose folder'),
+                  ),
+                  FilledButton.tonal(
+                    onPressed: () async {
+                      await s.setOutputDir(_outputDir.text);
+                      if (mounted) {
+                        _say('Output folder saved.', tone: AppTone.success);
+                      }
+                    },
+                    child: const Text('Save folder'),
+                  ),
+                ],
+              ),
+            ] else
+              const Text(
+                'After a file is ready, use Save to choose a destination through Android.',
+              ),
+          ],
+        ),
         AppPanel(
           icon: Icons.device_hub_outlined,
           title: 'Default target',
@@ -548,62 +881,107 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
-        AppPanel(
-          icon: Icons.hub_outlined,
-          title: 'GNS3 server',
-          subtitle: 'GNS3 2.2+ requires HTTP auth by default (user admin). '
-              'Credentials are sent as Basic auth on every call.',
-          children: [
-            AppField(
-              label: 'Endpoint',
-              child: TextField(
-                controller: _gns3,
-                decoration: const InputDecoration(
-                  hintText: 'http://127.0.0.1:3080',
-                ),
-              ),
-            ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: AppField(
-                    label: 'User',
-                    child: TextField(
-                      controller: _gns3User,
-                      decoration: const InputDecoration(hintText: 'admin'),
-                    ),
+        if (!SettingsService.isMobile)
+          AppPanel(
+            icon: Icons.hub_outlined,
+            title: 'GNS3 server',
+            subtitle:
+                'GNS3 2.2+ requires HTTP auth by default (user admin). '
+                'Credentials are sent as Basic auth on every call.',
+            children: [
+              AppField(
+                label: 'Endpoint',
+                child: TextField(
+                  controller: _gns3,
+                  decoration: const InputDecoration(
+                    hintText: 'http://127.0.0.1:3080',
                   ),
                 ),
-                const SizedBox(width: AppTheme.s10),
-                Expanded(
-                  child: AppField(
-                    label: 'Password',
-                    child: TextField(
-                      controller: _gns3Pass,
-                      obscureText: _obscureGns3,
-                      decoration: InputDecoration(
-                        suffixIcon: IconButton(
-                          tooltip: 'show/hide',
-                          icon: Icon(
-                            _obscureGns3
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                          ),
-                          onPressed: () => setState(
-                            () => _obscureGns3 = !_obscureGns3,
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: AppField(
+                      label: 'User',
+                      child: TextField(
+                        controller: _gns3User,
+                        decoration: const InputDecoration(hintText: 'admin'),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppTheme.s10),
+                  Expanded(
+                    child: AppField(
+                      label: 'Password',
+                      child: TextField(
+                        controller: _gns3Pass,
+                        obscureText: _obscureGns3,
+                        decoration: InputDecoration(
+                          suffixIcon: IconButton(
+                            tooltip: 'show/hide',
+                            icon: Icon(
+                              _obscureGns3
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                            ),
+                            onPressed: () =>
+                                setState(() => _obscureGns3 = !_obscureGns3),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
-        ),
+                ],
+              ),
+            ],
+          ),
       ],
     );
+  }
+
+  Future<void> _testEngine() async {
+    final address = _engine.text.trim();
+    setState(() {
+      _testingEngine = true;
+      _engineTest = 'Checking $address…';
+    });
+    String result;
+    try {
+      final healthy = await AutopilotService(base: address).healthy;
+      result = healthy
+          ? 'Connected to $address.'
+          : 'No response from $address. Check that the PC sidecar is running and both devices can reach it.';
+    } catch (error) {
+      result =
+          'Could not reach $address: ${error.toString().replaceFirst('Exception: ', '')}';
+    }
+    if (!mounted) return;
+    setState(() {
+      _testingEngine = false;
+      _engineTest = result;
+    });
+  }
+
+  Future<void> _chooseOutputFolder(SettingsService settings) async {
+    String? selected;
+    try {
+      selected = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'Choose a folder for Packet Tracer files',
+      );
+    } catch (error) {
+      _say('Could not open the folder picker: $error', tone: AppTone.warning);
+      return;
+    }
+    if (selected == null || selected.trim().isEmpty) return;
+    final resolved = await PktExportService.resolveFolder(selected);
+    if (resolved.dir == null) {
+      _say('That folder cannot be used: ${resolved.why}', tone: AppTone.danger);
+      return;
+    }
+    _outputDir.text = resolved.dir!.path;
+    await settings.setOutputDir(resolved.dir!.path);
+    if (mounted) _say('Output folder saved.', tone: AppTone.success);
   }
 
   static IconData _targetIcon(String target) => switch (target) {
@@ -623,59 +1001,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
         AppPanel(
           icon: Icons.lock_outline,
           title: 'Private / Offline Mode',
-          subtitle: 'Kill-switch: disables Gemini + web search. Local only.',
+          subtitle:
+              'Disables model requests and web search. Local planning only.',
           trailing: Switch(
             value: s.privateMode,
             onChanged: (v) => s.setPrivateMode(v),
           ),
-          children: const [],
-        ),
-        AppPanel(
-          icon: Icons.psychology_outlined,
-          title: 'Learning',
-          subtitle: 'Improvements are only ever trusted after they verify.',
           children: [
-            _SwitchRow(
-              title: 'Let the sidecar ask Gemini when stuck',
-              subtitle:
-                  'On a rejected command the sidecar asks Gemini for a '
-                  'replacement, tries it, and remembers it only if the '
-                  'terminal proves it worked. Off in Private Mode.',
-              value: s.llmFix,
-              onChanged: (v) => s.setLlmFix(v),
-            ),
-            const AppDivider(),
-            _SwitchRow(
-              title: 'Learn automatically',
-              subtitle:
-                  'After a run that keeps failing the same way, the engine '
-                  'looks for a fix on its own - no button press. A fix is '
-                  'still only trusted after it verifies on screen.',
-              value: s.autoLearn,
-              onChanged: (v) => s.setAutoLearn(v),
-            ),
-            _SwitchRow(
-              indent: true,
-              title: 'Propose fixes after a failing run',
-              subtitle:
-                  'When a run ends with recurring failures, ask the model '
-                  'for a hypothesis without waiting for you to press '
-                  'Suggest.',
-              value: s.autoSuggest,
-              onChanged: s.autoLearn ? (v) => s.setAutoSuggest(v) : null,
-            ),
-            _SwitchRow(
-              indent: true,
-              title: 'Verify fixes on screen automatically',
-              subtitle:
-                  'Run one bounded teach pass to prove a proposed fix on '
-                  'the real Packet Tracer window, and promote it only if the '
-                  'screen agrees.',
-              value: s.autoTeach,
-              onChanged: s.autoLearn ? (v) => s.setAutoTeach(v) : null,
-            ),
+            if (context.watch<EngineConfigurationSync?>()?.error.isNotEmpty ??
+                false)
+              Text(context.watch<EngineConfigurationSync?>()!.error),
           ],
         ),
+        if (!SettingsService.isMobile)
+          AppPanel(
+            icon: Icons.psychology_outlined,
+            title: 'Learning',
+            subtitle: 'Improvements are only ever trusted after they verify.',
+            children: [
+              _SwitchRow(
+                title: 'Let the engine ask the selected model when stuck',
+                subtitle:
+                    'On a rejected command the engine asks your selected model for a '
+                    'replacement, tries it, and remembers it only if the '
+                    'terminal proves it worked. Off in Private Mode.',
+                value: s.llmFix,
+                onChanged: (v) => s.setLlmFix(v),
+              ),
+              const AppDivider(),
+              _SwitchRow(
+                title: 'Learn automatically',
+                subtitle:
+                    'After a run that keeps failing the same way, the engine '
+                    'looks for a fix on its own - no button press. A fix is '
+                    'still only trusted after it verifies on screen.',
+                value: s.autoLearn,
+                onChanged: (v) => s.setAutoLearn(v),
+              ),
+              _SwitchRow(
+                indent: true,
+                title: 'Propose fixes after a failing run',
+                subtitle:
+                    'When a run ends with recurring failures, ask the model '
+                    'for a hypothesis without waiting for you to press '
+                    'Suggest.',
+                value: s.autoSuggest,
+                onChanged: s.autoLearn ? (v) => s.setAutoSuggest(v) : null,
+              ),
+              _SwitchRow(
+                indent: true,
+                title: 'Verify fixes on screen automatically',
+                subtitle:
+                    'Run one bounded teach pass to prove a proposed fix on '
+                    'the real Packet Tracer window, and promote it only if the '
+                    'screen agrees.',
+                value: s.autoTeach,
+                onChanged: s.autoLearn ? (v) => s.setAutoTeach(v) : null,
+              ),
+            ],
+          ),
       ],
     );
   }
@@ -715,8 +1099,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ? s.themeMode
                     : 'system',
               },
-              onSelectionChanged: (values) =>
-                  s.setThemeMode(values.first),
+              onSelectionChanged: (values) => s.setThemeMode(values.first),
             ),
           ],
         ),
@@ -728,6 +1111,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _aboutPanel(SettingsService s) {
     final scheme = Theme.of(context).colorScheme;
+    if (SettingsService.isMobile) {
+      return AppSection(
+        title: 'About and requirements',
+        subtitle: 'Tools that run here, and what needs a computer.',
+        children: [
+          AppPanel(
+            icon: Icons.phone_android_outlined,
+            tone: AppTone.success,
+            title: 'Available on this phone',
+            children: const [
+              _Requirement(
+                icon: Icons.hub_outlined,
+                text: 'Plan and preview network designs.',
+              ),
+              _Requirement(
+                icon: Icons.category_outlined,
+                text: 'Browse Packet Tracer device and cable models.',
+              ),
+              _Requirement(
+                icon: Icons.save_outlined,
+                text: 'Build .pkt files locally and save them through Android.',
+              ),
+              _Requirement(
+                icon: Icons.calculate_outlined,
+                text: 'Use network calculations and plan checks offline.',
+              ),
+            ],
+          ),
+          AppPanel(
+            icon: Icons.desktop_windows_outlined,
+            title: 'Needs a computer',
+            children: const [
+              _Requirement(
+                icon: Icons.mouse_outlined,
+                text:
+                    'Controlling a live Packet Tracer window and reading its CLI.',
+              ),
+              _Requirement(
+                icon: Icons.pause_circle_outline,
+                text: 'Starting, pausing, or stopping a live desktop run.',
+              ),
+            ],
+          ),
+          AppPanel(
+            icon: Icons.folder_outlined,
+            title: 'Saving files',
+            children: const [
+              _Requirement(
+                icon: Icons.save_alt_outlined,
+                text:
+                    'Android asks where each finished .pkt file should be saved.',
+              ),
+            ],
+          ),
+        ],
+      );
+    }
     return AppSection(
       title: 'About and requirements',
       subtitle: 'Packet Tracer automation needs a specific setup.',
@@ -754,14 +1194,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               text: 'Sidecar: python sidecar/pt_autopilot.py',
             ),
             const SizedBox(height: AppTheme.s8),
-            Row(
+            Wrap(
+              spacing: AppTheme.s8,
+              runSpacing: AppTheme.s8,
               children: [
                 OutlinedButton.icon(
                   onPressed: _showChangelog,
                   icon: const Icon(Icons.new_releases_outlined, size: 18),
                   label: const Text("What's new"),
                 ),
-                const SizedBox(width: AppTheme.s8),
                 OutlinedButton.icon(
                   onPressed: () => FirstRunTour(settings: s).show(context),
                   icon: const Icon(Icons.tour_outlined, size: 18),
@@ -792,9 +1233,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Text(
               'Nothing leaves this machine unless a model call is made, and '
               'Private Mode stops those entirely.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -878,9 +1319,7 @@ class _Requirement extends StatelessWidget {
         children: [
           Icon(icon, size: 15, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: AppTheme.s8),
-          Expanded(
-            child: Text(text, style: theme.textTheme.bodySmall),
-          ),
+          Expanded(child: Text(text, style: theme.textTheme.bodySmall)),
         ],
       ),
     );
