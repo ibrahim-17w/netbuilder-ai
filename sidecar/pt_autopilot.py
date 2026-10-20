@@ -81,6 +81,11 @@ except ImportError:  # pragma: no cover - package import fallback
                                   normalize_signature, parse_promotion,
                                   promotion_ref, taxonomy_snapshot)
 try:
+    from redaction import redact_credentials
+except ImportError:  # pragma: no cover - package import fallback
+    from .redaction import redact_credentials
+
+try:
     import pkt_builder
     import pkt_template_build
 except ImportError:  # pragma: no cover - package import fallback
@@ -1258,31 +1263,6 @@ LLM_ASKED: set = set()          # (device, command key) already asked this run
 LLM_PER_DEVICE: dict = {}       # device -> calls used this run
 # `key <secret>` / `password <secret>` / `secret <secret>` / `md5 <secret>`
 LLM_SECRET_RE = re.compile(r"(?i)\b(key|password|secret|md5)\s+\S+")
-
-# Credential shapes that must not survive into a log line or a diagnostics
-# archive.  Kept deliberately broader than the Cisco CLI patterns above:
-# provider SDKs use `sk-...`, HTTP uses `Bearer ...`, and several tools print
-# an `api_key=`/`apiKey:` field in errors and request dumps.
-_CREDENTIAL_RES = (
-    (re.compile(r"\bsk-[A-Za-z0-9_-]{8,}", re.I), "sk-<redacted>"),
-    (re.compile(r"\bBearer\s+[A-Za-z0-9._~+/=-]+", re.I),
-     "Bearer <redacted>"),
-    (re.compile(r"\bAIza[0-9A-Za-z_-]{20,}"), "AIza<redacted>"),
-    (re.compile(
-        r"(?i)\b(api[_ -]?key|apiKey|x-goog-api-key|authorization|password|"
-        r"passwd|secret|token|community)[\"']?(\s*[:=]\s*|\s+)"
-        r"[^\s,;}]+"),
-     r"\1=<redacted>"),
-)
-
-
-def redact_credentials(text: str) -> str:
-    """Replace credential-shaped values with a stable marker. Idempotent."""
-    out = str(text or "")
-    for pattern, replacement in _CREDENTIAL_RES:
-        out = pattern.sub(replacement, out)
-    return out
-
 
 def llm_reset_run():
     """Clear the per-run LLM budget. The credential itself is left alone."""
