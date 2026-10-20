@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -52,6 +53,8 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Why the list could not be read, verbatim. Null means the read worked -
   /// which is the only way to tell "no networks yet" from "I could not look".
   String? _loadError;
+  MemoryService? _memoryRef;
+  bool _memoryReadyHandled = false;
   String _query = '';
   String _statusFilter = 'all';
   _HistorySort _sort = _HistorySort.newest;
@@ -60,13 +63,32 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    try {
+      _memoryRef = context.read<MemoryService>();
+      _memoryReadyHandled = _memoryRef!.ready;
+      _memoryRef!.addListener(_onMemoryChanged);
+    } catch (_) {
+      // A shell test may mount the list without providers.
+    }
     _refresh();
   }
 
   @override
   void dispose() {
+    _memoryRef?.removeListener(_onMemoryChanged);
     _search.dispose();
     super.dispose();
+  }
+
+  /// Startup opens memory after the shell paints. If this list mounted first,
+  /// read it again once the store is available instead of leaving the
+  /// "memory is not open" state on screen forever.
+  void _onMemoryChanged() {
+    if (_memoryReadyHandled) return;
+    final memory = _memoryRef;
+    if (memory == null || !memory.ready || !mounted) return;
+    _memoryReadyHandled = true;
+    unawaited(_refresh());
   }
 
   Future<void> _refresh() async {

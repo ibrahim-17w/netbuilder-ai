@@ -71,3 +71,23 @@ def test_diagnostics_export_redacts_credential_shapes(tmp_path, monkeypatch):
     # The JSON-shaped archive stays parseable after redaction.
     payload = json.loads(text)
     assert payload["schema"] == 1
+
+
+def test_diagnostics_export_includes_redacted_app_log(tmp_path, monkeypatch):
+    secret = "sk-live-applog12345678"
+    monkeypatch.setattr(pt, "DIAGNOSTICS_DIR", str(tmp_path))
+    monkeypatch.setattr(pt, "_journal_rows", lambda limit: [])
+    monkeypatch.setattr(pt, "_experience_rows", lambda limit: [])
+
+    result = pt.diagnostics_export(
+        include_screenshots=False,
+        app_log=f"[error] request failed api_key={secret}\nstack...",
+    )
+
+    with zipfile.ZipFile(result["path"]) as archive:
+        assert "app.log" in archive.namelist()
+        text = archive.read("app.log").decode("utf-8")
+
+    assert secret not in text
+    assert "<redacted>" in text
+

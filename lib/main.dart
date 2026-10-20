@@ -14,6 +14,7 @@ import 'screens/chat_screen.dart';
 import 'widgets/action_hub.dart';
 import 'screens/import_screen.dart';
 import 'screens/pkt_files_screen.dart';
+import 'services/app_diagnostics.dart';
 import 'services/capability_registry.dart';
 import 'services/app_version.dart';
 import 'services/autopilot_service.dart';
@@ -33,32 +34,24 @@ import 'services/layout_intent.dart';
 import 'services/pkt/pkt_export_service.dart';
 import 'services/pkt_build_job_service.dart';
 import 'services/settings_service.dart';
+import 'services/startup_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/app_sidebar.dart';
+import 'widgets/startup_banner.dart';
 import 'widgets/whats_new.dart';
 import 'widgets/pkt_build_job_banner.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // One runtime source for the version shown in About and compared with the
-  // engine. The build stamps it from pubspec.yaml; nothing else hard-codes it.
-  await AppVersion.load();
+  // Install before any startup work so a failure in a loader is still logged,
+  // and let the shell paint while the redacted file fills in the background.
+  AppDiagnostics.instance.install();
   final settings = SettingsService();
   final memory = MemoryService();
-  try {
-    await settings.load();
-  } catch (_) {}
-  // A store that cannot be opened is not a reason to stop the app cold - but
-  // it IS reported, because running with no memory at all looks exactly like
-  // a fresh install, and a user who has been building labs for weeks deserves
-  // to be told their history is not being written.
-  String? storeError;
-  try {
-    await memory.init();
-  } catch (e) {
-    storeError = 'Memory store unavailable: $e';
-  }
-  await PktBuildJobService.instance.loadHistory();
+  // The shell paints before any of these finish. Each loader is timeboxed and
+  // reports its own readiness; a slow keychain or a locked database becomes a
+  // visible degraded state rather than a frozen first frame.
+  final startup = StartupCoordinator();
   // ONE engine client for the whole app, reading the address the user set.
   // The address is resolved per request, so changing it in Settings takes
   // effect everywhere at once - and no screen can quietly talk to loopback
@@ -79,8 +72,17 @@ void main() async {
         ChangeNotifierProvider.value(value: memory),
         ChangeNotifierProvider.value(value: engineConfig),
         Provider<AutopilotService>.value(value: autopilot),
+        ChangeNotifierProvider.value(value: startup),
       ],
-      child: NetBuilderApp(storeError: storeError),
+      child: NetBuilderApp(startup: startup),
+    ),
+  );
+  unawaited(
+    startup.start(
+      settings: settings.load,
+      memory: memory.init,
+      history: PktBuildJobService.instance.loadHistory,
+      version: AppVersion.load,
     ),
   );
   // Android builds Packet Tracer files locally. It has no supported remote
@@ -95,12 +97,20 @@ class NetBuilderApp extends StatefulWidget {
   /// app still runs - planning, the offline assistant and .pkt compilation
   /// are all in-memory - but the user is told rather than left wondering why
   /// their conversations vanish.
+  ///
+  /// Directly-mounted widget tests can still pass this. A real launch passes
+  /// [startup] instead, so the failure arrives after the shell has painted.
   final String? storeError;
+
+  /// Live readiness for the parallel startup loaders. Null in widget tests
+  /// that mount the shell without the app's startup pipeline.
+  final StartupCoordinator? startup;
 
   const NetBuilderApp({
     super.key,
     this.monitorDetailSidecar = true,
     this.storeError,
+    this.startup,
   });
   @override
   State<NetBuilderApp> createState() => _NetBuilderAppState();
@@ -140,14 +150,43 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
   final _navKey = GlobalKey<NavigatorState>();
 
   bool _storeErrorShown = false;
+  bool _tourStarted = false;
+  String? _storeError;
 
   @override
   void initState() {
     super.initState();
+    _storeError = widget.storeError;
+    widget.startup?.addListener(_onStartupChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _maybeShowTour();
       _maybeShowStoreError();
     });
+  }
+
+  @override
+  void dispose() {
+    widget.startup?.removeListener(_onStartupChanged);
+    super.dispose();
+  }
+
+  void _onStartupChanged() {
+    final startup = widget.startup;
+    if (startup == null) return;
+    final memory = startup.value.statusOf('memory');
+    if (memory != null && memory.isFailed && _storeError == null) {
+      _storeError = 'Memory store unavailable: ${memory.detail}';
+      _storeErrorShown = false;
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _maybeShowStoreError(),
+      );
+    }
+    // The first-run tour waits for loaded settings. Startup now finishes after
+    // the first frame, so this is the signal that it is safe to offer it.
+    if (startup.value.statusOf('settings')?.isReady == true) {
+      unawaited(_maybeShowTour());
+    }
+    if (mounted) setState(() {});
   }
 
   /// The memory store could not be opened, so nothing is being written. The
@@ -155,7 +194,7 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
   /// are all in-memory - but the user is told rather than left wondering why
   /// their conversations vanish.
   void _maybeShowStoreError() {
-    final error = widget.storeError;
+    final error = _storeError;
     if (error == null || _storeErrorShown) return;
     _storeErrorShown = true;
     if (!mounted) return;
@@ -231,8 +270,10 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
   /// prefs (so a widget test booting the shell without `load()` never gets an
   /// unexpected dialog) and for the shell context the Navigator lives under.
   Future<void> _maybeShowTour() async {
+    if (_tourStarted) return;
     final settings = _settings;
     if (settings == null || !settings.loaded || settings.tourDone) return;
+    _tourStarted = true;
     // Let the chat paint first: the tour is an introduction, not a splash.
     await Future<void>.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
@@ -678,6 +719,13 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
             ),
             body: Column(
               children: [
+                if (widget.startup != null)
+                  StartupBanner(
+                    startup: widget.startup!,
+                    onDetails: _storeError == null
+                        ? null
+                        : () => _showStoreError(_storeError!),
+                  ),
                 PktBuildJobBanner(onSave: _savePhoneBuildJob),
                 Expanded(
                   child: LayoutBuilder(

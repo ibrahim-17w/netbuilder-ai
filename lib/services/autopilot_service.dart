@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
+import 'app_diagnostics.dart';
 import 'credential_redaction.dart';
 import 'settings_service.dart';
 import 'sidecar_supervisor.dart';
@@ -349,12 +350,21 @@ class AutopilotService {
   Future<Map<String, dynamic>> exportDiagnostics({
     bool includeScreenshots = false,
   }) async {
+    // The app error log is local and redacted; it rides along so one archive
+    // explains both sides of a failure. A missing log is not an export error.
+    var appLog = '';
+    try {
+      appLog = await AppDiagnostics.instance.exportText();
+    } catch (_) {}
     try {
       final r = await _client
           .post(
             Uri.parse('$base/diagnostics/export'),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'includeScreenshots': includeScreenshots}),
+            body: jsonEncode({
+              'includeScreenshots': includeScreenshots,
+              'appLog': appLog,
+            }),
           )
           .timeout(const Duration(seconds: 30));
       if (r.statusCode != 200) {

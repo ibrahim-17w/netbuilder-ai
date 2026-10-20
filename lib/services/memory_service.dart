@@ -84,23 +84,47 @@ class MemoryService extends ChangeNotifier {
   /// why. Losing every lab and every chat to a schema hiccup is not an
   /// acceptable failure mode when the file is still sitting right there.
   static Future<Database> _openStore(String path) async {
-    try {
-      return await _openAt(path);
-    } catch (_) {
-      // The store is unopenable, not empty. Move it aside - never over it -
-      // so its bytes survive for recovery, then open a fresh one.
-      final stamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-      final kept = '$path.unreadable-$stamp';
+    Object? failure;
+    for (var attempt = 0; attempt < 4; attempt++) {
       try {
-        await File(path).rename(kept);
-      } catch (_) {
-        // Could not move it: opening over it would destroy the evidence and
-        // the history, so fail loudly instead.
-        rethrow;
+        return await _openAt(path);
+      } catch (error) {
+        failure = error;
+        // A second instance (or a file scanner) can hold the store for a
+        // moment. Retry those errors; moving a live database aside would
+        // split one history across two files.
+        if (!_isTransientOpenError(error) || attempt == 3) break;
+        await Future<void>.delayed(Duration(milliseconds: 120 << attempt));
       }
-      final db = await _openAt(path);
-      return db;
     }
+    if (failure != null && _isTransientOpenError(failure)) {
+      throw StateError(
+        'The memory database is still in use. Close other NetBuilder '
+        'windows, then retry. ($failure)',
+      );
+    }
+    // The store is unopenable, not empty. Move it aside - never over it -
+    // so its bytes survive for recovery, then open a fresh one.
+    final stamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+    final kept = '$path.unreadable-$stamp';
+    try {
+      await File(path).rename(kept);
+    } catch (_) {
+      // Could not move it: opening over it would destroy the evidence and
+      // the history, so fail loudly instead.
+      rethrow;
+    }
+    return _openAt(path);
+  }
+
+  static bool _isTransientOpenError(Object error) {
+    final text = error.toString().toLowerCase();
+    return text.contains('database is locked') ||
+        text.contains('database is busy') ||
+        text.contains('database table is locked') ||
+        text.contains('access is denied') ||
+        text.contains('being used by another process') ||
+        text.contains('used by another process');
   }
 
   static Future<Database> _openAt(String path) async {

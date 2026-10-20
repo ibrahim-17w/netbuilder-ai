@@ -412,6 +412,14 @@ class _ChatScreenState extends State<ChatScreen> {
   /// configuration the user has already changed again.
   int _settingsEpoch = 0;
 
+  /// The app now paints before startup finishes. These remember the one
+  /// transition from "not ready" to "ready" so the open conversation reloads
+  /// its transcript and model settings as soon as they exist, instead of
+  /// staying empty for the rest of the session.
+  MemoryService? _memoryRef;
+  bool _memoryReadyHandled = false;
+  bool _settingsReadyHandled = false;
+
   /// The request report this conversation's last turn produced. The global log
   /// is not used for this: switching chats used to leave the previous
   /// conversation's context breakdown under the new one's composer.
@@ -437,7 +445,15 @@ class _ChatScreenState extends State<ChatScreen> {
     EngineStatus.instance.addListener(_onEngineStatus);
     // Settings is a ChangeNotifier: provider, model, key, target, context
     // budget and private mode all change it, and the open chat has to follow.
-    _settings?.addListener(_onSettingsChanged);
+    final settings = _settings;
+    settings?.addListener(_onSettingsChanged);
+    _settingsReadyHandled = settings?.loaded ?? false;
+    // Memory opens in the background after the shell paints. A conversation
+    // that mounted before the store was ready must reload when it opens.
+    final memory = _memory;
+    _memoryRef = memory;
+    _memoryReadyHandled = memory?.ready ?? false;
+    memory?.addListener(_onMemoryChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkEngine());
     _detectPacketTracer();
   }
@@ -546,6 +562,7 @@ class _ChatScreenState extends State<ChatScreen> {
     // Nothing this screen started may keep running after it is gone.
     _generation.cancel();
     _settings?.removeListener(_onSettingsChanged);
+    _memoryRef?.removeListener(_onMemoryChanged);
     EngineStatus.instance.removeListener(_onEngineStatus);
     _scroll.removeListener(_onScroll);
     _input.removeListener(_onComposerChanged);
@@ -628,6 +645,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final epoch = ++_loadEpoch;
     final settings = _settings;
     final mem = _memory;
+    if (settings != null && settings.loaded) _settingsReadyHandled = true;
+    if (mem != null && mem.ready) _memoryReadyHandled = true;
     if (settings != null) {
       _geminiKey = await settings.getApiKey() ?? '';
       _openAiKey = await settings.getOpenAiKey() ?? '';
@@ -840,6 +859,16 @@ class _ChatScreenState extends State<ChatScreen> {
     ),
   );
 
+  /// The memory store opened after this screen mounted. Reload once so the
+  /// stored transcript and conversation state appear without a manual switch.
+  void _onMemoryChanged() {
+    if (_memoryReadyHandled) return;
+    final memory = _memoryRef;
+    if (memory == null || !memory.ready || !mounted) return;
+    _memoryReadyHandled = true;
+    unawaited(_load());
+  }
+
   /// Settings changed while this chat was open: the provider, model, key,
   /// target, context budget or private mode may all be different now.
   ///
@@ -849,6 +878,14 @@ class _ChatScreenState extends State<ChatScreen> {
   void _onSettingsChanged() {
     final settings = _settings;
     if (settings == null || !mounted) return;
+    // The first notification is settings.load() finishing. Until then the
+    // facade used the defaults; reload once so the saved provider, key,
+    // target and window are applied to the conversation.
+    if (settings.loaded && !_settingsReadyHandled) {
+      _settingsReadyHandled = true;
+      unawaited(_load());
+      return;
+    }
     final epoch = ++_settingsEpoch;
     // Private mode is a promise that nothing leaves the device: an answer that
     // is already streaming has to stop now rather than finish.

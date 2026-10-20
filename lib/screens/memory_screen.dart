@@ -103,10 +103,19 @@ class _MemoryScreenState extends State<MemoryScreen> {
   bool _restoreGuardAvailable = false;
   String? _diagnosticsPath;
   _MemoryTab _tab = _MemoryTab.rules;
+  MemoryService? _memoryRef;
+  bool _memoryReadyHandled = false;
 
   @override
   void initState() {
     super.initState();
+    try {
+      _memoryRef = context.read<MemoryService>();
+      _memoryReadyHandled = _memoryRef!.ready;
+      _memoryRef!.addListener(_onMemoryChanged);
+    } catch (_) {
+      // A shell test may mount this screen without providers.
+    }
     _refresh();
     _refreshLearning();
     _refreshCorrections();
@@ -257,8 +266,19 @@ class _MemoryScreenState extends State<MemoryScreen> {
     await _refreshCorrections();
   }
 
+  /// The store opens in the background after the shell paints; reload the
+  /// memory panes once it is available so they do not stay blank.
+  void _onMemoryChanged() {
+    if (_memoryReadyHandled) return;
+    final memory = _memoryRef;
+    if (memory == null || !memory.ready || !mounted) return;
+    _memoryReadyHandled = true;
+    unawaited(_refresh());
+  }
+
   @override
   void dispose() {
+    _memoryRef?.removeListener(_onMemoryChanged);
     _ruleCtl.dispose();
     _kCtl.dispose();
     _vCtl.dispose();

@@ -3709,7 +3709,8 @@ def _diagnostics_experience(row: dict) -> dict:
     }
 
 
-def diagnostics_export(include_screenshots: bool = False) -> dict:
+def diagnostics_export(include_screenshots: bool = False,
+                       app_log: str = "") -> dict:
     """Create an opt-in, redacted tester bundle without raw configs."""
     os.makedirs(DIAGNOSTICS_DIR, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
@@ -3746,6 +3747,14 @@ def diagnostics_export(include_screenshots: bool = False) -> dict:
             "diagnostics.json",
             redact_credentials(json.dumps(payload, indent=2)),
         )
+        # The app already redacts its log before sending it. Run it through
+        # the same choke point again in case a future caller sends raw text.
+        if app_log:
+            archive.writestr(
+                "app.log",
+                redact_credentials(str(app_log)[:300 * 1024]),
+            )
+            files.append("app.log")
         if include_screenshots and os.path.isdir(SHOTS):
             shot_paths = sorted(
                 (os.path.join(SHOTS, name) for name in os.listdir(SHOTS)),
@@ -17386,8 +17395,12 @@ class H(BaseHTTPRequestHandler):
                 self._json({"ok": False, "error": f"bad json: {e}"}, 400)
                 return
             try:
+                app_log = req.get("appLog") or ""
+                if not isinstance(app_log, str):
+                    app_log = str(app_log)
                 result = diagnostics_export(
-                    include_screenshots=bool(req.get("includeScreenshots")))
+                    include_screenshots=bool(req.get("includeScreenshots")),
+                    app_log=app_log)
                 self._json({"ok": True, **result})
             except Exception as e:
                 log(f"diagnostics export ERROR: {e}")
