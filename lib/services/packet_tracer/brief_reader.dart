@@ -97,7 +97,14 @@ class PtBriefRequest {
   );
   static final _singlePortReverseConnection = RegExp(
     '($_label)\\s+($_port)\\s*(?:connects?\\s+to|connected\\s+to|to|->|→)\\s*'
-    '($_label)(?!\\s*$_port)',
+    // Do not let the label backtrack into the middle of a name: "Router0"
+    // must not become "Router" just so the port lookahead can pass. Without
+    // the boundary, "PC0 RS232 to Router0 Console" produced a second console
+    // link to a phantom device called "Router".
+    // Group the whole port alternation inside the lookahead: `_port` is a
+    // top-level `|` chain, so `\s*$_port` would only attach the whitespace to
+    // its first alternative and miss " Console".
+    '($_label)(?![A-Za-z0-9_.-])(?!\\s*($_port))',
     caseSensitive: false,
   );
   static final _routerPeerPort = RegExp(

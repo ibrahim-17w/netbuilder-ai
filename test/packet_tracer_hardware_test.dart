@@ -76,6 +76,35 @@ void main() {
       final serial = plan.links.singleWhere((l) => l.cable == 'serial-dte');
       expect(serial.dceEnd, 'b');
       expect(serial.exactPorts, isTrue);
+      expect(plan.nodes.map((n) => n.name).toSet(), {
+        'PC0',
+        'Router0',
+        'Router1',
+        'Switch0',
+      });
+    },
+  );
+  test(
+    'console link is not duplicated when the console end is written first',
+    () {
+      final plan = NetworkIntent.parseSimple(
+        'test',
+        'Connect Router0 Console to PC0 RS232 using console; '
+            'Router0 Gi0/0 to Switch0 Gi0/1 using copper straight-through; '
+            'Router0 Serial0/0/0 to Router1 Serial0/0/0 using serial DTE.',
+      );
+      expect(plan.links.where((l) => l.cable == 'console'), hasLength(1));
+      expect(plan.nodes.map((n) => n.name).toSet(), {
+        'PC0',
+        'Router0',
+        'Router1',
+        'Switch0',
+      });
+      final console = plan.links.singleWhere((l) => l.cable == 'console');
+      expect(
+        {console.a.toLowerCase(), console.b.toLowerCase()},
+        {'pc0', 'router0'},
+      );
     },
   );
   test(
