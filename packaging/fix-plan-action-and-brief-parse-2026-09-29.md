@@ -121,7 +121,7 @@ All edits are uncommitted. To back out:
 ## Re-verify by hand
 
 ```
-cd C:\ai\app
+cd C:\netbuilder
 flutter analyze
 flutter test test/chat_plan_repair_test.dart test/ai_retry_test.dart
 flutter test

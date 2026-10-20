@@ -35,8 +35,8 @@ Build date: 2026-09-21  ·  App version: 1.0.0+1  ·  Sidecar version: 2026-09-2
 
 | Artifact | Path | Size | SHA-256 |
 |---|---|---|---|
-| Windows installer | `C:\ai\app\dist\NetBuilderAI-Tester-Setup.exe` | 100.7 MB | `20F22A9647A965C37901A365F69C0E4428B4C400A2A652DDFC79F78D99BEF7E8` |
-| Android APK | `C:\ai\app\dist\NetBuilderAI-Tester.apk` | 58.3 MB | `0EB6F8D9004501FB7B656ABAFA3D2AEE22ECE8E948B270811CF73A5F5A223995` |
+| Windows installer | `C:\netbuilder\dist\NetBuilderAI-Tester-Setup.exe` | 100.7 MB | `20F22A9647A965C37901A365F69C0E4428B4C400A2A652DDFC79F78D99BEF7E8` |
+| Android APK | `C:\netbuilder\dist\NetBuilderAI-Tester.apk` | 58.3 MB | `0EB6F8D9004501FB7B656ABAFA3D2AEE22ECE8E948B270811CF73A5F5A223995` |
 
 Build identifiers:
 * App `1.0.0+1` (`versionCode 1`, `versionName 1.0.0`), applicationId `com.netbuilder.net_builder`
@@ -76,7 +76,7 @@ and the Android licences accepted (`flutter doctor --android-licenses`).
 
 ### Windows installer
 ```powershell
-cd C:\ai\app
+cd C:\netbuilder
 python -m pip install -r sidecar\requirements.txt   # RPA deps for the bundle
 python -m pip install pyinstaller
 powershell -ExecutionPolicy Bypass -File packaging\build_installer.ps1
@@ -86,7 +86,7 @@ powershell -ExecutionPolicy Bypass -File packaging\build_installer.ps1
 
 ### Android APK
 ```powershell
-cd C:\ai\app
+cd C:\netbuilder
 flutter build apk --release
 # -> build\app\outputs\flutter-apk\app-release.apk
 Copy-Item build\app\outputs\flutter-apk\app-release.apk dist\NetBuilderAI-Tester.apk -Force

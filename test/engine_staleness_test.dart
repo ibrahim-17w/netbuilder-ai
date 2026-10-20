@@ -8,7 +8,7 @@ import 'package:net_builder/services/sidecar_supervisor.dart';
 /// notice, and the parsing that finds the stray process.
 void main() {
   group('the engine answering is compared with the one this app ships', () {
-    const bundled = r'C:\ai\app\build\windows\x64\runner\Release\sidecar\pt_autopilot.exe';
+    const bundled = r'C:\netbuilder\build\windows\x64\runner\Release\sidecar\pt_autopilot.exe';
     const newer = 1790800000000;
     const older = 1780000000000;
 
@@ -91,8 +91,8 @@ void main() {
       );
       expect(
         EngineStatus.sameFile(
-          r'C:\ai\app\one.exe',
-          r'C:\ai\app\two.exe',
+          r'C:\netbuilder\one.exe',
+          r'C:\netbuilder\two.exe',
         ),
         isFalse,
       );

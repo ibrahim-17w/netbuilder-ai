@@ -1,7 +1,7 @@
 // ignore_for_file: avoid_print
 // Guidance rubric demo - run it with:
 //
-//   cd C:\ai\app
+//   cd C:\netbuilder
 //   dart run tool/guidance_demo.dart
 //
 // It walks ten representative prompts (vague, multi-part, follow-up, how-to,

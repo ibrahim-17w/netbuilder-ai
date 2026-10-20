@@ -12,10 +12,10 @@ and **encrypt a valid .pkt back**.
 
 | Platform | How |
 |---|---|
-| Windows | `C:\ai\app\dist\NetBuilderAI-Tester-Setup.exe` (installs to `%LOCALAPPDATA%\NetBuilderAI`) |
-| Android | `C:\ai\app\dist\NetBuilderAI-Tester.apk` (`adb install -r …`, or copy to the phone) |
-| From source | `cd C:\ai\app && flutter run -d windows` |
-| The engine | `cd C:\ai\app\sidecar && python pt_autopilot.py` (port 5005) |
+| Windows | `C:\netbuilder\dist\NetBuilderAI-Tester-Setup.exe` (installs to `%LOCALAPPDATA%\NetBuilderAI`) |
+| Android | `C:\netbuilder\dist\NetBuilderAI-Tester.apk` (`adb install -r …`, or copy to the phone) |
+| From source | `cd C:\netbuilder && flutter run -d windows` |
+| The engine | `cd C:\netbuilder\sidecar && python pt_autopilot.py` (port 5005) |
 
 In the app: the **sidebar** (hamburger) holds every setting — API key, model,
 context budget, engine address, .pkt output folder, private mode. The chat

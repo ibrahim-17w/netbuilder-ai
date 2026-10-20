@@ -60,10 +60,10 @@ A secret command is stored in the ledger as `••••••••`.
 ## Run it
 
 ```powershell
-cd C:\ai\app\sidecar
+cd C:\netbuilder\sidecar
 python -m pip install -r requirements.txt      # once
 python pt_autopilot.py                          # leave running on :5005
-cd C:\ai\app
+cd C:\netbuilder
 flutter run -d windows                          # or: flutter build windows --release
 ```
 
@@ -71,11 +71,11 @@ flutter run -d windows                          # or: flutter build windows --re
 
 ```powershell
 # engine (real .pkt files, real decrypt/encrypt)
-cd C:\ai\app\sidecar
+cd C:\netbuilder\sidecar
 py -3.14 -m pytest -q test_pkt_fix.py
 
 # the app
-cd C:\ai\app
+cd C:\netbuilder
 flutter analyze
 flutter test
 ```

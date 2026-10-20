@@ -1,7 +1,7 @@
 # Android failure + chat screen redesign
 
 Date: 2026-09-22
-Workspace: `C:\ai`, app at `C:\ai\app`
+Workspace: `C:\ai`, app at `C:\netbuilder`
 
 Three reports:
 

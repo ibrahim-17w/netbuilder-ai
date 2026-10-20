@@ -2,7 +2,7 @@
 //
 // HARD-NETWORK TEST - the same code the Windows app's chat uses.
 //
-//   cd C:\ai\app
+//   cd C:\netbuilder
 //   dart run tool/hard_network_test.dart
 //
 // Section A  what the chat answers for a brutal brief

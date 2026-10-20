@@ -1,7 +1,7 @@
 # Bugfix: key persistence and `.pkt` generation from chat
 
 Date: 2026-09-22
-Workspace: `C:\ai`, app at `C:\ai\app`
+Workspace: `C:\ai`, app at `C:\netbuilder`
 
 Two reports from the tester:
 

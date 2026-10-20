@@ -1,7 +1,7 @@
 // ignore_for_file: avoid_print
 // Long-conversation recall demo - run it with:
 //
-//   cd C:\ai\app
+//   cd C:\netbuilder
 //   dart run tool/context_demo.dart
 //
 // It builds a conversation well past 100k tokens and shows what the context

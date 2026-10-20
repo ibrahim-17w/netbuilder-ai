@@ -29,7 +29,7 @@ network:
    router, 1 switch, 1 server, OSPF."** The user pressed Build the .pkt.
 
 What got built (the artifact the user reacted to):
-`C:\ai\app\build\windows\x64\runner\Release\sidecar\_internal\pkt_output\netbuilder-202609281236.pkt`
+`C:\netbuilder\build\windows\x64\runner\Release\sidecar\_internal\pkt_output\netbuilder-202609281236.pkt`
 - 66,213 bytes, built 2026-09-28 12:36:41
 - manifest (`...pkt.netbuilder.json`): planned deviceCount **3**, linkCount **2**
 
@@ -122,7 +122,7 @@ All edits are uncommitted. To back out:
 ## Re-verify by hand
 
 ```
-cd C:\ai\app
+cd C:\netbuilder
 flutter test test/chat_plan_continuity_test.dart
 flutter test test/nlu_golden_set_test.dart
 flutter test

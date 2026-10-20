@@ -103,7 +103,7 @@ Every message below is produced by the app and is asserted in
 ## Verification commands
 
 ```powershell
-cd C:\ai\app
+cd C:\netbuilder
 flutter analyze                       # No issues found
 flutter test                          # 147 passed
 flutter test test\openai_provider_test.dart   # the provider + failure matrix

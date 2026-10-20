@@ -1,7 +1,7 @@
 # `.pkt` build failed on an installed machine
 
 Date: 2026-09-22
-Workspace: `C:\ai`, app at `C:\ai\app`
+Workspace: `C:\ai`, app at `C:\netbuilder`
 
 ## The report
 
@@ -19,7 +19,7 @@ here:
 ```
 POST /pkt/generate -> HTTP 400
 {"ok": false, "error": "no template library in
-  C:\ai\app\build\windows\x64\runner\Release\sidecar\_internal\pkt_templates.
+  C:\netbuilder\build\windows\x64\runner\Release\sidecar\_internal\pkt_templates.
   Build it from your own .pkt files first (POST /pkt/templates/build)."}
 ```
 
@@ -73,7 +73,7 @@ own audit can read back.
 ### A correct plan, on the normal path
 
 ```
-path     : C:\ai\app\sidecar\pkt_output\e2e-links.pkt
+path     : C:\netbuilder\sidecar\pkt_output\e2e-links.pkt
 devices  : 3   links: 2   bytes: 48330
 warnings : []
 audit    : ['R1', 'SW1', 'PC1']

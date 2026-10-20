@@ -37,7 +37,7 @@ unknown name is passed through untouched.
 ## Verified scenarios (exact commands)
 
 ```powershell
-cd C:\ai\app
+cd C:\netbuilder
 flutter analyze                                -> No issues found
 flutter test                                   -> 147 passed
 flutter test test\openai_provider_test.dart    -> 12 passed
