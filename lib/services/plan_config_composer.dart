@@ -940,8 +940,9 @@ class PlanConfigComposer {
       // given; guessing a /24 onto a bare address would invent a fact.
       if (branch.contains('/')) {
         final branchNet = _netOf(branch);
-        if (branchNet != null)
+        if (branchNet != null) {
           remoteLans['${branchNet.network}/${branchNet.prefix}'] = branchNet;
+        }
       }
       for (final r in routers) {
         if (r.name == owner) continue;

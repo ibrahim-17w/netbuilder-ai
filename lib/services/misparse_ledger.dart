@@ -255,8 +255,9 @@ class MisparseLedger {
     }
     if (slot == 'routing') {
       final proto = v.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
-      if (!const ['static', 'ospf', 'eigrp', 'bgp'].contains(proto))
+      if (!const ['static', 'ospf', 'eigrp', 'bgp'].contains(proto)) {
         return null;
+      }
       final hit = RegExp(
         r'\b(?:ospf|eigrp|bgp|static)\b',
         caseSensitive: false,

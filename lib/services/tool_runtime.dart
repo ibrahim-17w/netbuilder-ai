@@ -259,8 +259,9 @@ class ToolRuntime {
     if (decoded is Map && decoded['ok'] == false) {
       throw Exception(decoded['error']?.toString() ?? 'tool failed');
     }
-    if (decoded is Map && decoded.containsKey('result'))
+    if (decoded is Map && decoded.containsKey('result')) {
       return decoded['result'];
+    }
     return decoded;
   }
 

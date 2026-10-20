@@ -958,8 +958,9 @@ class _TopologyCanvasState extends State<TopologyCanvas> {
                                                     for (final name in moving) {
                                                       final current =
                                                           _positions[name];
-                                                      if (current == null)
+                                                      if (current == null) {
                                                         continue;
+                                                      }
                                                       final point =
                                                           current + delta;
                                                       _positions[name] = Offset(

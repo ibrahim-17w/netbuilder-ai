@@ -2437,13 +2437,15 @@ class _AdvisorContext {
   /// silent about the one fact the advisor was just using.
   String? get planBrief {
     if (!lab) return null;
-    if (hasPlan)
+    if (hasPlan) {
       return null; // the lab already exists; advice must not re-plan it
+    }
     final v = venue;
     final n = scale;
     if (v == _Venue.home) {
-      if (n == null)
+      if (n == null) {
         return 'Build a home network with 1 wireless router and 4 PCs';
+      }
       return 'Build a home network with 1 wireless router and $n PCs';
     }
     if (n == null) {
