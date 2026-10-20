@@ -80,6 +80,7 @@ import '../widgets/conversation_sidebar.dart';
 import '../widgets/chat_presence.dart';
 import '../widgets/gemini_model_picker.dart';
 import '../widgets/rule_dialog.dart';
+import '../widgets/slot_fix_dialog.dart';
 
 /// A real conversation with the model, with screenshots attached.
 ///
@@ -6835,7 +6836,7 @@ class _ChatScreenState extends State<ChatScreen> {
     // controller here broke the very widget that was going away.
     final fixed = await showDialog<String>(
       context: context,
-      builder: (_) => _SlotFixDialog(label: label, value: value),
+      builder: (_) => SlotFixDialog(label: label, value: value),
     );
     if (fixed == null || !mounted) return;
     final answer = fixed.trim();
@@ -9271,63 +9272,4 @@ class _PendingChange {
     required this.field,
     required this.newValue,
   });
-}
-
-/// The prompt behind a tap-to-fix chip: one field carrying the value that is
-/// wrong, and the two ways out.
-///
-/// It owns its own controller rather than borrowing one from the caller:
-/// the dialog route keeps animating - and keeps listening to its field -
-/// after [showDialog] hands the result back, so a controller disposed by the
-/// caller is a controller used after dispose. The widget test caught that.
-class _SlotFixDialog extends StatefulWidget {
-  const _SlotFixDialog({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  State<_SlotFixDialog> createState() => _SlotFixDialogState();
-}
-
-class _SlotFixDialogState extends State<_SlotFixDialog> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.value);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('Fix the ${widget.label}'),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        decoration: InputDecoration(
-          labelText: widget.label,
-          hintText: widget.value,
-        ),
-        onSubmitted: (v) => Navigator.of(context).pop(v),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_controller.text),
-          child: const Text('Fix it'),
-        ),
-      ],
-    );
-  }
 }
