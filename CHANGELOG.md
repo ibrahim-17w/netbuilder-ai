@@ -19,13 +19,21 @@
 - Windows Flutter tests, Windows sidecar pytest, a PR debug APK build, pinned
   Flutter/tool version logging, explicit formatting/analyzer gates, and a
   tagged signed-release APK workflow.
-- Architecture, troubleshooting, supported-configuration, contributing and
-  security documentation.
+- A packaged Windows release smoke test and a named Linux golden-corpus gate
+  in CI.
+- Architecture, troubleshooting, supported-configuration, contributing,
+  dependency and security documentation.
 
 ### Changed
 
 - Extracted the chat composer, typing bubble and jump-to-latest pill into
   reusable widgets. Behavior and widget keys are unchanged.
+- Context budgeting runs on a background isolate for real launches, keeping
+  the 400-turn planning walk off the frame that sends a model request.
+- Extracted sidecar credential redaction and the Packet Tracer device catalog
+  into leaf modules; all existing names and call sites are preserved.
+- Upgraded `cupertino_icons` to 2.x and staged `flutter_secure_storage` 10.3.1
+  so its first run migrates keys before the v11 move.
 - Applied `dart format` across the Dart tree and fixed the analyzer infos it
   exposed.
 

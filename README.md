@@ -59,6 +59,8 @@ the offline assistant and says so.
   autopilot failures, plus where the local logs are.
 - [Supported configurations](docs/supported-configurations.md) - platforms,
   providers and what is deliberately unsupported.
+- [Dependency notes](docs/dependencies.md) - upgrade status, the staged
+  secure-storage migration and the coupled `win32` 6 stack.
 - [Contributing](CONTRIBUTING.md) - setup, test commands and PR rules.
 - [Security](SECURITY.md) - reporting and privacy guarantees.
 - [Changelog](CHANGELOG.md) - what changed.
