@@ -1895,6 +1895,74 @@ def _spare_ethernet_port(used: dict, device: str, ports: list) -> str:
     return ""
 
 
+def _variant_port(variants: dict | None, device: str, name: str):
+    for port in (variants or {}).get(device, {}).get("ports", []):
+        if str(port.get("name") or "") == name:
+            return port
+    return None
+
+
+def _interface_medium(name: str) -> str:
+    """The medium an unresolved interface name can only mean, else ""."""
+    text = re.sub(r"[\s_-]+", "", str(name or "").lower())
+    if re.match(r"^(?:s|se|serial)\d", text):
+        return "serial"
+    if text.startswith("console"):
+        return "console"
+    if text.startswith("rs232"):
+        return "rs232"
+    if text.startswith("aux"):
+        return "console"
+    return ""
+
+
+def _link_mediums(link: dict, name_a: str, name_b: str, port_names: dict,
+                  variants: dict | None) -> tuple[str, str]:
+    mediums = []
+    for side, device in (("a", name_a), ("b", name_b)):
+        raw = str(link.get(side + "If") or "")
+        actual = port_names.get((device, raw))
+        port = _variant_port(variants, device, actual) if actual else None
+        mediums.append(hardware.port_medium(port) if port
+                       else _interface_medium(raw))
+    return mediums[0], mediums[1]
+
+
+def _infer_cable(link: dict, name_a: str, name_b: str, port_names: dict,
+                 variants: dict | None) -> str:
+    """The cable the endpoints imply when the plan did not name one.
+
+    Older plans and the offline-learning fixture omit `cable` on a serial WAN.
+    Treating that as copper makes the hardware gate reject a connection the
+    ports describe unambiguously. Only the medium is inferred here; serial
+    clocking still comes from the plan's `clock rate` via `dce_ports`.
+    """
+    explicit = str(link.get("cable") or "").strip()
+    if explicit:
+        return explicit
+    medium_a, medium_b = _link_mediums(link, name_a, name_b, port_names,
+                                      variants)
+    pair = {medium_a, medium_b}
+    if medium_a == medium_b == "serial":
+        return "serial"
+    if pair == {"console", "rs232"}:
+        return "console"
+    if pair == {"async", "console"}:
+        return "octal"
+    if medium_a == medium_b == "fiber":
+        modules_a = (variants or {}).get(name_a, {}).get("modules", [])
+        modules_b = (variants or {}).get(name_b, {}).get("modules", [])
+        return ("fiber-single"
+                if hardware.single_mode(modules_a)
+                and hardware.single_mode(modules_b)
+                else "fiber-multi")
+    for medium, cable in (("coaxial", "coaxial"), ("usb", "usb"),
+                          ("io", "ioe"), ("modem", "phone")):
+        if medium_a == medium_b == medium:
+            return cable
+    return ""
+
+
 def _build_link(library: dict, link: dict, refs: dict, port_names: dict,
                 warnings: list, dce_ports: dict | None = None,
                 used_ports: dict | None = None,
@@ -1904,11 +1972,14 @@ def _build_link(library: dict, link: dict, refs: dict, port_names: dict,
     if name_a not in refs or name_b not in refs:
         warnings.append(f"link {name_a}-{name_b}: endpoint was skipped")
         return None
-    requested_cable = str(link.get("cable") or "copper")
+    requested_cable = _infer_cable(link, name_a, name_b, port_names,
+                                   variants) or "copper"
     if hardware.cable_for(requested_cable) and hardware.cable_for(requested_cable)['id']=='fiber':
         modules=(variants or {}).get(name_a,{}).get('modules',[])
         requested_cable='fiber-single' if hardware.single_mode(modules) else 'fiber-multi'
-        link={**link,'cable':requested_cable}
+    # The report is written from this dict, so record the cable that was
+    # actually built - inferred media included, not the plan's empty field.
+    link['cable'] = requested_cable
     template, note = _pick_link_template(library, requested_cable)
     if template is None:
         if link.get('exactPorts'):
@@ -1969,7 +2040,11 @@ def _build_link(library: dict, link: dict, refs: dict, port_names: dict,
     actual_b=next((p for p in variant_b.get('ports',[]) if p.get('name')==port_b),None)
     if actual_a and actual_b:
         error=hardware.mismatch(hardware.cable_for(requested_cable),actual_a,actual_b,variant_a.get('modules',[]),variant_b.get('modules',[]))
-        if error:raise BuildError(f'link {name_a}-{name_b}: {error}')
+        if error:
+            raise BuildError(
+                f'link {name_a}-{name_b}: {error} '
+                f'({name_a} {link.get("aIf") or "?"}, '
+                f'{name_b} {link.get("bIf") or "?"})')
     out = _replace_first(out, rb"<FROM>[^<]*</FROM>",
                          b"<FROM>save-ref-id:" + str(refs[name_a]).encode()
                          + b"</FROM>")

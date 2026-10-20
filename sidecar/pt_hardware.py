@@ -38,10 +38,28 @@ def single_mode(modules):
     return any(m.upper() in ('GLC-LH-SMD','GLC-LX-SM-RGD') for m in modules)
 
 
+def suggest_cable(a,b,modules_a=(),modules_b=()):
+    """The cable these two ports can actually use, or "" if none can."""
+    ma,mb=port_medium(a),port_medium(b)
+    pair={ma,mb}
+    if ma==mb=='serial':return 'serial'
+    if pair=={'console','rs232'}:return 'console'
+    if pair=={'async','console'}:return 'octal'
+    if ma==mb=='fiber':
+        return ('fiber-single' if single_mode(modules_a) and single_mode(modules_b)
+                else 'fiber-multi')
+    if ma==mb:
+        return {'coaxial':'coaxial','usb':'usb','io':'ioe',
+                'modem':'phone'}.get(ma,'')
+    return ''
+
+
 def mismatch(cable,a,b,modules_a=(),modules_b=()):
     if not cable:return 'Unknown cable; no substitute was made.'
     if port_medium(a) not in cable['families'] or port_medium(b) not in cable['families']:
-        return f"{cable['label']} is incompatible with these connector types."
+        hint=suggest_cable(a,b,modules_a,modules_b)
+        suffix=f' Use "{hint}" instead.' if hint and hint!=cable['id'] else ''
+        return f"{cable['label']} is incompatible with these connector types.{suffix}"
     if cable['id']=='console' and port_medium(a)==port_medium(b):
         return 'Console requires one RS232 end and one Console end.'
     if cable['id']=='octal' and port_medium(a)==port_medium(b):

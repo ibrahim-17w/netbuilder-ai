@@ -1554,6 +1554,18 @@ class TestBuild:
         assert any("neither end a clock rate" in w
                    for w in built["warnings"])
 
+    def test_serial_link_infers_its_cable_when_the_plan_omits_one(self, library):
+        # The offline-learning fixture names only s0/2/0 on both ends.  A
+        # missing `cable` used to default to copper and trip the hardware gate.
+        plan = copy.deepcopy(PLAN)
+        plan["steps"][1]["links"][0].pop("cable")
+        built = pkt_builder.build_pkt(plan, library)
+        serial = next(link for link in built["links"]
+                      if link["a"] == "R1" and link["b"] == "R2")
+        assert serial["cable"] == "serial"
+        assert not any("incompatible with these connector types" in warning
+                       for warning in built["warnings"])
+
     def test_serial_link_does_not_fall_back_to_ethernet(self, library):
         # A serial cable with a nonexistent serial slot must be reported as
         # unresolved, never emitted with FastEthernet endpoint names.
