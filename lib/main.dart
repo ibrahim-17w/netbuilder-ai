@@ -15,6 +15,7 @@ import 'widgets/action_hub.dart';
 import 'screens/import_screen.dart';
 import 'screens/pkt_files_screen.dart';
 import 'services/capability_registry.dart';
+import 'services/app_version.dart';
 import 'services/autopilot_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/memory_screen.dart';
@@ -39,6 +40,9 @@ import 'widgets/pkt_build_job_banner.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // One runtime source for the version shown in About and compared with the
+  // engine. The build stamps it from pubspec.yaml; nothing else hard-codes it.
+  await AppVersion.load();
   final settings = SettingsService();
   final memory = MemoryService();
   try {
@@ -79,9 +83,8 @@ void main() async {
       child: NetBuilderApp(storeError: storeError),
     ),
   );
-  // Android builds Packet Tracer files locally. Probing the desktop sidecar
-  // at the emulator alias on every launch only produced a permanent false
-  // alarm, so a phone checks a remote PC only when the user asks it to.
+  // Android builds Packet Tracer files locally. It has no supported remote
+  // engine path, so it does not probe one at launch either.
   if (!SettingsService.isMobile) unawaited(engine.ensure());
 }
 

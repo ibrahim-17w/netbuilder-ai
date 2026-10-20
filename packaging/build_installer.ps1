@@ -15,6 +15,23 @@ $ReleaseRoot = Join-Path $AppRoot 'build\windows\x64\runner\Release'
 $InstallerPath = Join-Path $OutputRoot 'NetBuilderAI-Tester-Setup.exe'
 $PyInstaller = (Get-Command python -ErrorAction Stop).Source
 
+# Flutter stamps the Windows resource and the Android manifest from pubspec.
+# The installer is just a wrapper around that release, so a disagreement here
+# would ship a binary labelled with a version nobody can reproduce. Refuse it
+# before spending time on PyInstaller and IExpress.
+$PubspecText = Get-Content (Join-Path $AppRoot 'pubspec.yaml') -Raw
+if ($PubspecText -notmatch '(?m)^version:\s*(\d+\.\d+\.\d+)(?:\+\d+)?\s*$') {
+    throw 'pubspec.yaml is missing a semantic version line (x.y.z+build).'
+}
+$AppVersion = $Matches[1]
+$ChangelogText = Get-Content (Join-Path $AppRoot 'lib\widgets\whats_new.dart') -Raw
+$ChangelogMatch = [regex]::Match(
+    $ChangelogText, "version:\s*'([^']+)'")
+if (-not $ChangelogMatch.Success -or
+    $ChangelogMatch.Groups[1].Value -ne $AppVersion) {
+    throw "Changelog version does not match pubspec $AppVersion."
+}
+
 function Assert-WorkspacePath([string]$Path) {
     $resolved = [IO.Path]::GetFullPath($Path)
     $root = [IO.Path]::GetFullPath($AppRoot).TrimEnd('\') + '\'
@@ -59,6 +76,14 @@ if (-not $SkipFlutterBuild) {
 if (-not (Test-Path -LiteralPath (Join-Path $ReleaseRoot 'net_builder.exe'))) {
     throw "Flutter release output not found: $ReleaseRoot"
 }
+
+$BuiltExe = Get-Item -LiteralPath (Join-Path $ReleaseRoot 'net_builder.exe')
+$BuiltVersion = $BuiltExe.VersionInfo.ProductVersion
+if ([string]::IsNullOrWhiteSpace($BuiltVersion) -or
+    -not $BuiltVersion.StartsWith($AppVersion, [StringComparison]::Ordinal)) {
+    throw "Built executable version '$BuiltVersion' does not match pubspec $AppVersion."
+}
+Write-Host "App version: $AppVersion (installer payload $BuiltVersion)"
 
 Write-Host 'Building the bundled sidecar executable...'
 Push-Location $AppRoot

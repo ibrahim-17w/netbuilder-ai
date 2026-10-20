@@ -36,13 +36,13 @@ void main() {
     });
 
     test(
-      'it never tries to start a sidecar, and says where the engine is',
+      'it never tries to start a sidecar, and says it builds on-device',
       () async {
         final result = await SidecarSupervisor.ensureStarted(force: true);
         expect(result.ok, isFalse);
         expect(result.method, 'phone');
-        expect(result.message, contains('PC'));
-        expect(result.message, contains('5005'));
+        expect(result.message, contains('on-device'));
+        expect(result.message, isNot(contains('5005')));
         expect(
           SidecarSupervisor.searchRoots(),
           isEmpty,
@@ -69,12 +69,12 @@ void main() {
         0,
         reason: 'a phone must not spawn a process that cannot exist',
       );
-      expect(status.detail, contains('PC'));
-      expect(status.summary, contains('PC'));
+      expect(status.detail, contains('on-device'));
+      expect(status.summary, contains('on-device'));
     });
 
-    test('a .pkt job on a phone says where the engine is', () {
-      expect(AutopilotService.startHint, contains('PC'));
+    test('a .pkt job on a phone says it builds on-device', () {
+      expect(AutopilotService.startHint, contains('on-device'));
       expect(
         AutopilotService.startHint,
         isNot(contains('python.org')),
@@ -88,18 +88,24 @@ void main() {
       );
     });
 
-    test('the default engine address is the host, not the phone', () {
-      expect(SettingsService.defaultEngineBase(), 'http://10.0.2.2:5005');
+    test('the default engine address does not point at a PC', () {
+      expect(SettingsService.defaultEngineBase(), 'http://127.0.0.1:5005');
       expect(SettingsService.defaultGns3Endpoint(), 'http://10.0.2.2:3080');
       expect(
         SettingsService.engineHint('http://127.0.0.1:5005'),
-        contains('PC'),
-        reason: 'loopback on a phone is the phone itself',
+        contains('on-device'),
+        reason: 'the phone never uses a remote engine',
       );
       expect(
         SettingsService.engineHint('http://10.0.2.2:5005'),
         contains('emulator'),
       );
+    });
+
+    test('a phone cannot turn off on-device building', () async {
+      final settings = SettingsService();
+      await settings.setPreferOnDevicePkt(false);
+      expect(settings.preferOnDevicePkt, isTrue);
     });
 
     test('the diagnostics report says the engine is elsewhere', () async {

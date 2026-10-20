@@ -3,7 +3,9 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'app_version.dart';
 import 'autopilot_service.dart';
+import 'credential_redaction.dart';
 import 'settings_service.dart';
 import 'sidecar_supervisor.dart';
 
@@ -41,19 +43,19 @@ enum EngineState {
 class EngineStatus extends ChangeNotifier {
   EngineStatus({
     Future<Map<String, dynamic>> Function(String base, Duration timeout)?
-        healthProbe,
+    healthProbe,
     Future<SidecarLaunchResult> Function()? launcher,
     this.cacheWindow = const Duration(seconds: 4),
     this.probeTimeout = const Duration(milliseconds: 1800),
     this.startWait = const Duration(seconds: 25),
-  })  : _healthProbe = healthProbe ?? _defaultProbe,
-        _launcher = launcher ?? SidecarSupervisor.ensureStarted;
+  }) : _healthProbe = healthProbe ?? _defaultProbe,
+       _launcher = launcher ?? SidecarSupervisor.ensureStarted;
 
   /// The app-wide instance. Tests build their own with fakes.
   static final EngineStatus instance = EngineStatus();
 
   final Future<Map<String, dynamic>> Function(String base, Duration timeout)
-      _healthProbe;
+  _healthProbe;
   final Future<SidecarLaunchResult> Function() _launcher;
 
   /// How long a probe result is trusted before it is asked again.
@@ -70,6 +72,11 @@ class EngineStatus extends ChangeNotifier {
   String _base = SettingsService.defaultEngineBase();
   String _detail = '';
   String _version = '';
+  String _appVersion = '';
+  String _apiSchema = '';
+  List<String> _capabilities = const [];
+  String _compatWarning = '';
+  bool _incompatible = false;
   bool _rpa = false;
   bool _ocr = false;
   String? _logPath;
@@ -92,6 +99,22 @@ class EngineStatus extends ChangeNotifier {
   String get detail => _detail;
   String get version => _version;
 
+  /// The app version the engine says launched it (empty for a hand-started
+  /// engine or a sidecar older than the field).
+  String get appVersion => _appVersion;
+
+  /// The `/health` schema generation and the capabilities this engine reports.
+  String get apiSchema => _apiSchema;
+  List<String> get capabilities => _capabilities;
+
+  /// A non-fatal version warning for the status card. Fatal schema mismatches
+  /// put the engine in [EngineState.down] and appear in [detail] instead.
+  String get compatibilityWarning => _compatWarning;
+
+  /// True when the engine is reachable but speaks an API schema this app does
+  /// not understand. Such an engine is blocked, not restarted.
+  bool get incompatible => _incompatible;
+
   /// Whether the engine can drive the Packet Tracer window. Offline .pkt
   /// generation and auditing work even when this is false.
   bool get hasRpa => _rpa;
@@ -107,9 +130,9 @@ class EngineStatus extends ChangeNotifier {
   /// Shown instead of a start attempt when the configured engine is on
   /// another machine. Says the one thing that can be done about it.
   String get remoteEngineMessage =>
-      'The engine is configured at $_base, which is not this machine. This app '
-      'does not start a second engine here - start the sidecar on that host, '
-      'or set the address back to ${SettingsService.defaultEngineBase()}.';
+      'The engine is configured at $_base, which is not this machine. Remote '
+      'engines are unsupported and provider keys are never sent there. Run '
+      'the engine on this PC instead.';
 
   /// Whether the configured engine is a process on THIS machine. A remote
   /// host is somebody else's sidecar: the app can talk to it, but it must
@@ -128,7 +151,9 @@ class EngineStatus extends ChangeNotifier {
           if (_rpa) 'GUI automation' else 'offline only',
           if (_ocr) 'OCR',
         ];
-        return 'Local engine is running${bits.isEmpty ? '' : ' (${bits.join(', ')})'}.';
+        final warning = _compatWarning.isEmpty ? '' : ' - $_compatWarning';
+        return 'Local engine is running'
+            '${bits.isEmpty ? '' : ' (${bits.join(', ')})'}.$warning';
       case EngineState.checking:
         return 'Checking the local engine...';
       case EngineState.starting:
@@ -151,13 +176,15 @@ class EngineStatus extends ChangeNotifier {
     _base = next;
     _phase = EngineState.unknown;
     _lastChecked = null;
+    _incompatible = false;
     _detail = '';
     notifyListeners();
   }
 
   /// Fast, cached liveness. Pass `force: true` for a user-initiated recheck.
   Future<bool> probe({bool force = false}) {
-    final cachedFresh = _lastChecked != null &&
+    final cachedFresh =
+        _lastChecked != null &&
         DateTime.now().difference(_lastChecked!) < cacheWindow;
     if (!force && cachedFresh && _phase != EngineState.unknown) {
       return Future.value(_lastAnswer);
@@ -170,21 +197,56 @@ class EngineStatus extends ChangeNotifier {
     notifyListeners();
     try {
       final health = await _healthProbe(_base, probeTimeout);
-      _lastAnswer = health['ok'] == true;
+      final reportedOk = health['ok'] == true;
       _version = (health['version'] ?? '').toString();
+      _appVersion = (health['appVersion'] ?? '').toString();
+      _apiSchema = (health['apiSchemaVersion'] ?? '').toString();
+      _capabilities = [
+        for (final value in (health['capabilities'] as List? ?? const []))
+          if ('$value'.trim().isNotEmpty) '$value',
+      ];
       _rpa = health['rpa'] == true;
       _ocr = health['ocr'] == true;
-      _engine = (health['engine'] as Map?)?.cast<String, dynamic>() ??
+      _engine =
+          (health['engine'] as Map?)?.cast<String, dynamic>() ??
           const <String, dynamic>{};
+
+      _compatWarning = '';
+      _incompatible = false;
+      var schemaOk = true;
+      if (_apiSchema.isNotEmpty) {
+        schemaOk =
+            int.tryParse(_apiSchema) == AutopilotService.apiSchemaVersion;
+        if (!schemaOk) {
+          _incompatible = true;
+          _compatWarning =
+              'The engine reports API schema $_apiSchema, but this app speaks '
+              'schema ${AutopilotService.apiSchemaVersion}. Update both '
+              'together.';
+        }
+      }
+      if (_appVersion.isNotEmpty) {
+        final mismatch = AppVersion.majorMismatch(_appVersion);
+        if (mismatch != null && _compatWarning.isEmpty) {
+          _compatWarning = mismatch;
+        }
+      }
+
+      _lastAnswer = reportedOk && schemaOk;
       _phase = _lastAnswer ? EngineState.up : EngineState.down;
-      if (!_lastAnswer) {
+      if (!reportedOk) {
         _detail = 'The local engine answered, but reported a problem.';
+      } else if (!schemaOk) {
+        _detail = _compatWarning;
       } else {
-        _detail = '';
+        // A major app/engine mismatch is a warning, not a dead engine: the
+        // shell is compatible enough to keep working while the user updates.
+        _detail = _compatWarning;
       }
     } catch (e) {
       _lastAnswer = false;
       _phase = EngineState.down;
+      _incompatible = false;
       _detail = 'Nothing is answering at $_base.';
       _lastError = '$e';
     }
@@ -207,6 +269,10 @@ class EngineStatus extends ChangeNotifier {
   /// through [phase] instead.
   Future<bool> ensure({bool force = false}) async {
     if (await probe(force: force)) return _replaceStaleEngineIfAny();
+    // A reachable engine that speaks a different API schema is not a missing
+    // engine. Starting another process would hide the real problem and could
+    // leave two engines fighting for the port.
+    if (_incompatible) return false;
     // On a phone the engine is a PC program. Trying to start one here is not a
     // long shot, it is impossible - and the message has to say what to do
     // instead, not what is missing.
@@ -263,7 +329,8 @@ class EngineStatus extends ChangeNotifier {
       }
     }
     _phase = EngineState.down;
-    _detail = 'The engine was started but never answered at $_base. '
+    _detail =
+        'The engine was started but never answered at $_base. '
         '${launch.message}';
     _lastChecked = DateTime.now();
     notifyListeners();
@@ -279,12 +346,12 @@ class EngineStatus extends ChangeNotifier {
   /// Whether the engine that is answering is an OLDER build than the one this
   /// app ships.
   bool get engineIsStale => EngineStatus.isStaleEngine(
-        identity: _engine,
-        bundledFile: SidecarSupervisor.bundledEngineFile(),
-        bundledBuiltAt: SidecarSupervisor.fileBuiltAt(
-          SidecarSupervisor.bundledEngineFile(),
-        ),
-      );
+    identity: _engine,
+    bundledFile: SidecarSupervisor.bundledEngineFile(),
+    bundledBuiltAt: SidecarSupervisor.fileBuiltAt(
+      SidecarSupervisor.bundledEngineFile(),
+    ),
+  );
 
   /// Is the engine answering an older copy than the one this build ships?
   ///
@@ -339,7 +406,8 @@ class EngineStatus extends ChangeNotifier {
   Future<bool> _replaceStaleEngineIfAny() async {
     if (_staleSwapDone || !isLocalEngine || !engineIsStale) return true;
     _staleSwapDone = true;
-    final pid = (_engine['pid'] as num?)?.toInt() ??
+    final pid =
+        (_engine['pid'] as num?)?.toInt() ??
         await SidecarSupervisor.pidListeningOnPort(enginePort);
     if (pid == null || pid <= 0) {
       _detail =
@@ -417,8 +485,12 @@ class EngineStatus extends ChangeNotifier {
     try {
       final text = await File(path).readAsString();
       final all = text.split(RegExp(r'\r?\n'));
-      if (all.length <= lines) return text;
-      return all.sublist(all.length - lines).join('\n');
+      final result = all.length <= lines
+          ? text
+          : all.sublist(all.length - lines).join('\n');
+      // The engine redacts at write time; this also covers a log left by an
+      // older build that copied a response body verbatim.
+      return CredentialRedaction.redact(result);
     } catch (e) {
       return 'Could not read $path: $e';
     }
@@ -434,26 +506,47 @@ class EngineStatus extends ChangeNotifier {
       ..writeln('engine is on this machine: $isLocalEngine')
       ..writeln('phase: ${_phase.name}')
       ..writeln('detail: $detail')
-      ..writeln('version: ${_version.isEmpty ? "(unknown)" : _version}')
+      ..writeln('app version: ${AppVersion.full}')
+      ..writeln(
+        'engine app version: ${_appVersion.isEmpty ? "(not reported)" : _appVersion}',
+      )
+      ..writeln('engine version: ${_version.isEmpty ? "(unknown)" : _version}')
+      ..writeln(
+        'api schema: ${_apiSchema.isEmpty ? "(not reported)" : _apiSchema}',
+      )
+      ..writeln(
+        'api schema compatible: ${_apiSchema.isEmpty ? "(not reported)" : !_incompatible}',
+      )
+      ..writeln(
+        'compatibility warning: ${_compatWarning.isEmpty ? "(none)" : _compatWarning}',
+      )
+      ..writeln(
+        'capabilities: ${_capabilities.isEmpty ? "(not reported)" : _capabilities.join(", ")}',
+      )
       ..writeln('gui automation available: $hasRpa')
       ..writeln('ocr available: $hasOcr')
       ..writeln('started by the app: ${SidecarSupervisor.weStartedIt}')
       ..writeln('engine file: ${_engine['file'] ?? "(not reported)"}')
-      ..writeln('engine built: ${engineBuiltAt == 0 ? "(not reported)" : engineBuiltAt}')
-      ..writeln('layout revision: ${_engine['layoutRevision'] ?? "(not reported)"}')
+      ..writeln(
+        'engine built: ${engineBuiltAt == 0 ? "(not reported)" : engineBuiltAt}',
+      )
+      ..writeln(
+        'layout revision: ${_engine['layoutRevision'] ?? "(not reported)"}',
+      )
       ..writeln('older than the shipped engine: $engineIsStale')
       ..writeln('last start: ${SidecarSupervisor.lastResult?.method ?? "-"}')
       ..writeln('log: ${logPath ?? "(none)"}')
-      ..writeln('last transport error: ${_lastError.isEmpty ? "-" : _lastError}')
+      ..writeln(
+        'last transport error: ${_lastError.isEmpty ? "-" : _lastError}',
+      )
       ..writeln()
       ..writeln('--- log tail ---')
       ..writeln(await readLogTail(lines: 40));
-    return buffer.toString();
+    return CredentialRedaction.redact(buffer.toString());
   }
 
   static Future<Map<String, dynamic>> _defaultProbe(
     String base,
     Duration timeout,
-  ) =>
-      AutopilotService(base: base).healthDetails(timeout: timeout);
+  ) => AutopilotService(base: base).healthDetails(timeout: timeout);
 }

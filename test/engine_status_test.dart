@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:net_builder/screens/engine_screen.dart';
+import 'package:net_builder/services/app_version.dart';
 import 'package:net_builder/services/engine_status.dart';
 import 'package:net_builder/services/sidecar_supervisor.dart';
 import 'package:path/path.dart' as p;
@@ -56,6 +57,71 @@ void main() {
       expect(status.hasRpa, isTrue);
       expect(status.hasOcr, isFalse);
       expect(status.summary, contains('v9.9'));
+    });
+
+    test('an incompatible API schema blocks the engine', () async {
+      final status = EngineStatus(
+        healthProbe: (base, timeout) async => {
+          'ok': true,
+          'version': '9.9',
+          'apiSchemaVersion': 2,
+          'appVersion': '1.0.0',
+          'capabilities': ['health'],
+        },
+      );
+
+      expect(await status.probe(), isFalse);
+      expect(status.phase, EngineState.down);
+      expect(status.detail, contains('schema 2'));
+      expect(status.compatibilityWarning, contains('schema 2'));
+      final report = await status.diagnose();
+      expect(report, contains('api schema: 2'));
+      expect(report, contains('capabilities: health'));
+    });
+
+    test('a major app mismatch warns but keeps a compatible engine up',
+        () async {
+      AppVersion.overrideForTests(version: '1.0.0', buildNumber: '1');
+      addTearDown(AppVersion.resetForTests);
+      final status = EngineStatus(
+        healthProbe: (base, timeout) async => {
+          'ok': true,
+          'version': '9.9',
+          'apiSchemaVersion': 1,
+          'appVersion': '2.0.0',
+          'capabilities': ['health', 'pkt_build'],
+        },
+      );
+
+      expect(await status.probe(), isTrue);
+      expect(status.phase, EngineState.up);
+      expect(status.appVersion, '2.0.0');
+      expect(status.compatibilityWarning, contains('major'));
+      expect(status.summary, contains('major'));
+      expect(status.capabilities, contains('pkt_build'));
+    });
+
+    test('an incompatible engine is not restarted or duplicated', () async {
+      var launched = 0;
+      final status = EngineStatus(
+        healthProbe: (base, timeout) async => {
+          'ok': true,
+          'version': '9.9',
+          'apiSchemaVersion': 2,
+        },
+        launcher: () async {
+          launched++;
+          return const SidecarLaunchResult(ok: true, message: 'started');
+        },
+      );
+
+      expect(await status.ensure(force: true), isFalse);
+      expect(status.incompatible, isTrue);
+      expect(
+        launched,
+        0,
+        reason: 'a schema mismatch must not start a second engine',
+      );
     });
 
     test('ensure starts the engine and waits until it answers', () async {

@@ -131,7 +131,9 @@ offline assistant and says so.
 
 - Memories, chat history, rules: `%USERPROFILE%\Documents\netbuilder\memory.db`
 - API keys: OS secure storage (Windows Credential Manager via
-  `flutter_secure_storage`).
+  `flutter_secure_storage`). The local engine receives provider settings only
+  over loopback and keeps the key in memory; a remote engine is refused so a
+  key can never be shipped to another host.
 - Built `.pkt` files: the engine's `pkt_output` folder, each with a
   `.netbuilder.json` manifest recording what the plan asked for. In-place
   edits keep a timestamped backup of the previous file.
@@ -140,8 +142,10 @@ offline assistant and says so.
 ## Troubleshooting
 
 - **"Engine not running"** - the sidecar needs Python 3 with the packages
-  above. The app shows the engine log; on phones the engine must run on a
-  machine on your network (Settings > engine address).
+  above and runs on the same PC as the app. The app shows the engine log.
+  Phones build `.pkt` files on-device with the bundled templates; remote
+  engine control is unsupported and provider keys are never sent to another
+  host.
 - **A step is reported instead of completed** - that is the autopilot's
   fail-closed rule: it could not prove the screen matched, so it stopped
   instead of guessing. Read the report; nothing was assumed.

@@ -31,6 +31,9 @@ jobs:
       - name: Static analysis
         run: flutter analyze --fatal-infos
 
+      - name: Version contract
+        run: flutter test test/version_contract_test.dart
+
       - name: Test suite
         run: flutter test
 

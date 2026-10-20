@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
+import 'credential_redaction.dart';
 import 'settings_service.dart';
 import 'sidecar_supervisor.dart';
 
@@ -23,6 +24,20 @@ class AutopilotService {
   /// last-resort default for a bare client, never a decision this class makes
   /// for the app: main.dart provides one instance bound to the settings.
   static const loopbackBase = 'http://127.0.0.1:5005';
+
+  /// The /health contract this app can speak. A sidecar from a different
+  /// schema generation is refused rather than allowed to answer half the
+  /// routes with different shapes.
+  static const apiSchemaVersion = 1;
+
+  /// Older sidecars did not report a schema. Missing means "unknown", not
+  /// "incompatible": a hand-started engine from an older checkout still gets
+  /// the benefit of a health check. A present value must match exactly.
+  static bool healthSchemaCompatible(Map<String, dynamic> health) {
+    final raw = health['apiSchemaVersion'];
+    if (raw == null || '$raw'.trim().isEmpty) return true;
+    return int.tryParse('$raw') == apiSchemaVersion;
+  }
 
   final String? _baseOverride;
   final String Function()? baseProvider;
@@ -73,9 +88,9 @@ class AutopilotService {
     // steps would send the user to install something on the wrong machine.
     if (!SettingsService.isLoopbackEngineBase(base)) {
       return 'The engine at $base is not answering. That address is not this '
-          'machine, so this app does not start an engine for it - start the '
-          'sidecar on that host, or set the engine address in Settings back '
-          'to ${SettingsService.defaultEngineBase()}.';
+          'machine; remote engines are unsupported and provider keys are '
+          'never sent there. Start the engine on this PC, or set the address '
+          'back to ${SettingsService.defaultEngineBase()}.';
     }
     return SidecarSupervisor.canRunLocally
         ? desktopStartHintFor(base)
@@ -101,7 +116,7 @@ class AutopilotService {
   Future<bool> get healthy async {
     try {
       final j = await healthDetails();
-      return j['ok'] == true;
+      return j['ok'] == true && healthSchemaCompatible(j);
     } catch (_) {
       return false;
     }
@@ -545,6 +560,16 @@ class AutopilotService {
     Map<String, String> extraHeaders = const {},
     int? configRevision,
   }) async {
+    // The engine owns its credentials locally. Sending a provider key to a
+    // host the app does not own turns every remote engine into a credential
+    // collector, and the current API has no TLS or authentication to protect
+    // it. Loopback is the only supported destination.
+    if (!SettingsService.isLoopbackEngineBase(base)) {
+      throw StateError(
+        'Refusing to send provider credentials to $base. Remote engines are '
+        'unsupported; run the engine on this PC.',
+      );
+    }
     try {
       final r = await _client
           .post(
@@ -1345,7 +1370,7 @@ class AutopilotService {
   }
 
   String _friendly(Object e) {
-    final s = e.toString();
+    final s = CredentialRedaction.redact(e.toString());
     if (s.contains('SocketException') ||
         s.contains('Connection refused') ||
         s.contains('refused the network connection') ||

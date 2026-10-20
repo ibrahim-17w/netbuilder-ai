@@ -5,6 +5,19 @@ import 'autopilot_service.dart';
 import 'settings_service.dart';
 import 'engine_status.dart';
 
+/// Thrown when a caller tries to push provider settings to a non-loopback
+/// engine. The message is deliberately explicit: this is a security refusal,
+/// not a temporary connection failure.
+class RemoteEngineUnsupported implements Exception {
+  final String base;
+  const RemoteEngineUnsupported(this.base);
+
+  @override
+  String toString() =>
+      'Remote engines are unsupported ($base). Provider keys stay on this '
+      'device; run the engine on this PC.';
+}
+
 /// One settings path for startup, live changes, and execution entry points.
 class EngineConfigurationSync extends ChangeNotifier {
   EngineConfigurationSync(this.settings, this.engine, this.status) {
@@ -31,6 +44,17 @@ class EngineConfigurationSync extends ChangeNotifier {
       }
       return;
     }
+    // Never read the keychain for an address that is not this machine. A
+    // remote engine is unsupported precisely because the API is plaintext and
+    // unauthenticated; refusing here means the credential is never decrypted,
+    // let alone sent.
+    if (!SettingsService.isLoopbackEngineBase(settings.engineBase)) {
+      error =
+          'Remote engines are unsupported. Provider keys stay on this device; '
+          'run the engine on this PC.';
+      notifyListeners();
+      return;
+    }
     unawaited(
       push(settings, engine)
           .then<void>((_) {
@@ -38,11 +62,13 @@ class EngineConfigurationSync extends ChangeNotifier {
             error = '';
             notifyListeners();
           })
-          .catchError((Object _) {
+          .catchError((Object e) {
             if (request != _request) return;
-            error =
-                'The engine has not received your latest privacy and model settings. '
-                'Reconnect it before running a build.';
+            error = e is RemoteEngineUnsupported
+                ? 'Remote engines are unsupported. Provider keys stay on this '
+                      'device; run the engine on this PC.'
+                : 'The engine has not received your latest privacy and model '
+                      'settings. Reconnect it before running a build.';
             notifyListeners();
           }),
     );
@@ -68,6 +94,9 @@ class EngineConfigurationSync extends ChangeNotifier {
     SettingsService settings,
     AutopilotService engine,
   ) async {
+    if (!SettingsService.isLoopbackEngineBase(settings.engineBase)) {
+      throw RemoteEngineUnsupported(settings.engineBase);
+    }
     final revision = ++_revision;
     final config = settings.providerConfig;
     final disabled = settings.privateMode || !settings.llmFix;

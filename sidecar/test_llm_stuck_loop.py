@@ -138,6 +138,35 @@ def test_secrets_are_redacted_before_sending():
     assert pt.llm_redact("interface g0/0") == "interface g0/0"
 
 
+def test_provider_credential_shapes_are_redacted():
+    cases = (
+        "Authorization: Bearer sk-live-abcdefgh12345678",
+        "api_key=sk-proj-abcdefgh12345678",
+        '{"apiKey": "sk-ant-abcdefgh12345678"}',
+        '{"password": "Sup3rSecret!"}',
+        "x-goog-api-key: AIzaabcdefghijklmnopqrstuvwxyz123456",
+        "password=Sup3rSecret!",
+    )
+    for text in cases:
+        red = pt.llm_redact(text)
+        assert "<redacted>" in red, text
+        for secret in (
+            "sk-live-abcdefgh12345678",
+            "sk-proj-abcdefgh12345678",
+            "sk-ant-abcdefgh12345678",
+            "AIzaabcdefghijklmnopqrstuvwxyz123456",
+            "Sup3rSecret!",
+        ):
+            assert secret not in red, (text, red)
+
+
+def test_log_choke_point_redacts_a_key():
+    secret = "sk-log-abcdefgh12345678"
+    pt.log(f"request failed apiKey={secret}")
+    assert secret not in pt.JOB.log[-1]
+    assert "<redacted>" in pt.JOB.log[-1]
+
+
 def test_status_never_exposes_the_key():
     pt.llm_configure(api_key="super-secret", model="m", enabled=True)
     state = pt.llm_status()

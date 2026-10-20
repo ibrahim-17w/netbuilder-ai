@@ -1166,9 +1166,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // --- sending -----------------------------------------------------------
 
-  /// The offline engine for THIS build: the local sidecar on a
-  /// desktop, or the PC running that sidecar when the app is on a
-  /// phone (set it with /pc - the device has no Python of its own).
+  /// The offline engine for THIS build: the local sidecar on a desktop. A
+  /// phone builds with its bundled templates and does not connect to a PC
+  /// engine. Remote addresses remain visible for diagnostics but are
+  /// unsupported and never receive provider credentials.
   AutopilotService _engine() =>
       AutopilotService(base: _settings?.engineBase ?? 'http://127.0.0.1:5005');
 
@@ -1233,15 +1234,22 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     if (lower.startsWith('/pc')) {
       final settings = _settings;
-      final arg = text.trim().length > 3 ? text.trim().substring(3).trim() : '';
       if (settings == null) return true;
+      if (SettingsService.isMobile) {
+        _appendSystem(
+          'Remote engine control is not supported on this phone. .pkt files '
+          'are built on-device with the bundled templates; live Packet '
+          'Tracer control needs the desktop app.',
+        );
+        return true;
+      }
+      final arg = text.trim().length > 3 ? text.trim().substring(3).trim() : '';
       if (arg.isEmpty || arg.toLowerCase() == 'status') {
         _appendSystem(
-          'Offline engine: `${settings.engineBase}`.\n'
-          'On a phone the .pkt work runs on a PC: start the sidecar '
-          'there (`python pt_autopilot.py`) and point the app at it, '
-          'e.g. `/pc 192.168.1.20:5005`. On an Android emulator the '
-          'host is `/pc 10.0.2.2:5005`.',
+          'Engine: `${settings.engineBase}`.\n'
+          'Remote engine addresses are experimental and unsupported. The app '
+          'never sends provider keys to another host; run the engine on this '
+          'PC for credential handoff and full control.',
         );
         return true;
       }
@@ -1250,11 +1258,12 @@ class _ChatScreenState extends State<ChatScreen> {
       final up = await svc.healthy;
       _appendSystem(
         up
-            ? 'Engine set to `${settings.engineBase}` and it answered. '
-                  'Attach a .pkt or `/scan <path>`.'
-            : 'Engine set to `${settings.engineBase}`, but nothing '
-                  'answered there yet. Start the sidecar on that '
-                  'machine and try again.',
+            ? 'Engine set to `${settings.engineBase}` and it answered. Remote '
+                  'control is unsupported and this engine owns its own LLM '
+                  'credentials. Attach a .pkt or `/scan <path>`.'
+            : 'Engine set to `${settings.engineBase}`, but nothing answered '
+                  'there. Remote engines are unsupported; run the engine on '
+                  'this PC instead.',
       );
       return true;
     }
@@ -2938,7 +2947,7 @@ class _ChatScreenState extends State<ChatScreen> {
         text:
             '${e.message}\n\nThe engine is not answering either, so this '
             'build needs one of the two: import a seed .pkt in Tools, or '
-            'start the engine on your PC and set its address.',
+            'start the local engine on a desktop.',
         actions: const <ChatAction>[],
       );
     } on PktBuildFailure catch (e) {
@@ -6483,27 +6492,16 @@ class _ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => reveal());
   }
 
-  /// Says plainly that the `.pkt` engine cannot be reached, and offers the
-  /// one thing that fixes it.
+  /// Says plainly that the local `.pkt` engine cannot be reached, and offers
+  /// the one thing that fixes it.
   ///
-  /// Before this, that fact only appeared inside a chat bubble, after the user
-  /// had already tried something - which is what made the Android build feel
-  /// broken. On a phone the reason is specific and worth naming: the address
-  /// has to be the PC, never the phone itself.
+  /// Desktop-only: [SettingsService.isMobile] builds `.pkt` files on-device,
+  /// so the chat column does not show an engine alarm there at all. The strip
+  /// is compact and capped with its own scroll: on a short window with large
+  /// text it must not take rows away from the transcript.
   Widget _engineBanner() {
     final address = _settings?.engineBase ?? '';
-    final mobile = SettingsService.isMobile;
     final status = EngineStatus.instance;
-    // On a phone the engine is optional, not missing: the bundled template
-    // library builds the .pkt on this device. That changes the strip from an
-    // alarm into a status - and pretending otherwise is what made the
-    // Android build feel broken.
-    final onDevice = mobile && (_settings?.preferOnDevicePkt ?? true);
-    // One compact line: this strip sits between the header and the
-    // transcript, and every extra row it takes is a row the transcript does
-    // not get on a short window with large text. It is also given a hard
-    // height cap with its own scroll: on a 320px phone at 1.5x text this
-    // banner alone was tall enough to overflow the whole chat column.
     return ConstrainedBox(
       constraints: const BoxConstraints(maxHeight: 132),
       child: SingleChildScrollView(
@@ -6516,21 +6514,10 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           child: AppBanner(
             dense: true,
-            tone: onDevice ? AppTone.info : AppTone.danger,
-            icon: onDevice
-                ? Icons.phone_android_outlined
-                : Icons.cloud_off_outlined,
-            message: onDevice
-                ? 'No .pkt engine at $address. Builds run on this device - '
-                      'planning and .pkt files work without a PC.'
-                : mobile
-                ? 'No .pkt engine at $address. On a phone the engine runs on '
-                      'your PC, so this must be that PC\'s address - not '
-                      '127.0.0.1.'
-                : 'No .pkt engine at $address. Planning, tools and .pkt files '
-                      'all work without it.',
-            // The actions wrap: at a phone width this banner must not be the
-            // thing that overflows the chat.
+            tone: AppTone.danger,
+            icon: Icons.cloud_off_outlined,
+            message: 'No .pkt engine at $address. Planning, tools and .pkt '
+                'files all work without it.',
             actions: [
               if (_engineStarting)
                 const SizedBox(
@@ -6539,8 +6526,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               else if (status.canStartLocally)
-                // Nothing to start on a phone, where the engine is a PC
-                // program: the button would be a lie with a spinner.
                 TextButton(
                   onPressed: _startEngine,
                   child: const Text('Start engine'),
@@ -6578,12 +6563,9 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _startEngine() async {
     if (!EngineStatus.instance.canStartLocally) {
       _appendSystem(
-        'This device cannot run the .pkt engine - it is a PC program.\n'
-        '1. Start the app (or `python sidecar/pt_autopilot.py`) on the PC.\n'
-        '2. Find that PC\'s address on your network.\n'
-        '3. Set it here: Settings -> Engine address, e.g. '
-        'http://192.168.1.20:5005, then press Test.\n'
-        'On the Android emulator the host PC answers on 10.0.2.2.',
+        'This phone builds .pkt files on-device with its bundled templates. '
+        'Live Packet Tracer control needs the desktop app; connecting to a PC '
+        'engine is not supported.',
       );
       return;
     }

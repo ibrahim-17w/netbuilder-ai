@@ -71,9 +71,9 @@ class SettingsService extends ChangeNotifier {
   bool _liveContext = true;
 
   /// Build .pkt files on this device (bundled template library) instead of
-  /// waiting for the PC engine. A phone has no engine and usually no
-  /// reachable PC, so this is ON by default there; a desktop keeps the
-  /// engine first, because its builds also drive the Packet Tracer window.
+  /// waiting for the local desktop engine. A phone has no engine at all, so
+  /// this is ON by default there; a desktop keeps the engine first, because
+  /// its builds also drive the Packet Tracer window.
   bool _preferOnDevicePkt = SettingsService.isMobile;
 
   /// 'system' | 'light' | 'dark'. A preference rather than a constant: the
@@ -103,8 +103,8 @@ class SettingsService extends ChangeNotifier {
   bool _tourDone = false;
   String _seenChangelog = '';
   // Where the offline .pkt engine lives. On a desktop that is the local
-  // sidecar; on a phone it is the PC running that sidecar (the device has
-  // no Python), so this is a real setting rather than a constant.
+  // sidecar. A phone never connects to one: it builds with the bundled
+  // templates and keeps this at loopback so no probe leaves the device.
   String _engineBase = defaultEngineBase();
   // Where generated and fixed .pkt files are written. Empty = the engine's
   // own default (sidecar/pkt_output), so nothing breaks when unset.
@@ -189,20 +189,12 @@ class SettingsService extends ChangeNotifier {
 
   /// Where the offline `.pkt` engine listens, by default.
   ///
-  /// On a desktop the sidecar runs beside the app, so loopback is right. On a
-  /// phone, `127.0.0.1` is the *phone* - the sidecar lives on a PC - so
-  /// defaulting to loopback guaranteed a "Sidecar not running" message no
-  /// matter what the user did with the app. That was the whole of the
-  /// "does not work on Android" report.
-  ///
-  /// A phone cannot discover the PC's address on its own, so this is a
-  /// starting point the user corrects, not a guess pretending to be a
-  /// solution: an Android emulator reaches its host at 10.0.2.2, and a real
-  /// phone needs the PC's LAN address entered in Settings.
-  static String defaultEngineBase() {
-    if (isAndroid) return 'http://10.0.2.2:5005';
-    return 'http://127.0.0.1:5005';
-  }
+  /// The engine is a desktop process and its API has no authentication. The
+  /// phone therefore does not talk to one at all: it builds `.pkt` files with
+  /// the bundled template library. Loopback is the only honest default on both
+  /// platforms - on a phone it names the phone itself, which is exactly why
+  /// nothing probes it there.
+  static String defaultEngineBase() => 'http://127.0.0.1:5005';
 
   /// The port the engine listens on when the address does not name one.
   static const defaultEnginePort = 5005;
@@ -298,24 +290,24 @@ class SettingsService extends ChangeNotifier {
     return 'http://127.0.0.1:3080';
   }
 
-  /// A one-line explanation of what the current default means, shown next to
-  /// the field so the emulator alias cannot be mistaken for the phone's own
-  /// address.
+  /// A one-line explanation of what the current address means.
+  ///
+  /// The old phone advice named the PC's LAN address and the emulator alias.
+  /// Neither is supported: the sidecar is unauthenticated, so the app keeps
+  /// it on loopback and the phone builds locally.
   static String engineHint(String current) {
     final t = current.trim();
     if (t.contains('10.0.2.2')) {
-      return '10.0.2.2 is the Android emulator\'s name for the PC that is '
-          'running it. On a real phone, replace it with that PC\'s LAN '
-          'address, e.g. http://192.168.1.20:5005.';
+      return 'The Android emulator host alias is no longer supported. This '
+          'phone builds .pkt files on-device.';
     }
     if (t.contains('127.0.0.1') || t.contains('localhost')) {
       return isMobile
-          ? '127.0.0.1 means this phone itself, which runs no sidecar. Use '
-                'the PC\'s LAN address instead, e.g. http://192.168.1.20:5005.'
+          ? 'This phone builds .pkt files on-device; no PC engine is used.'
           : 'Loopback is right when the sidecar runs on this same machine.';
     }
-    return 'The app calls this address for every .pkt job. Tap Test to check '
-        'it answers.';
+    return 'Remote engine addresses are unsupported. Provider keys are never '
+        'sent off this machine; run the engine here instead.';
   }
 
   /// Read the installer's record, if this machine has one.
@@ -365,8 +357,12 @@ class SettingsService extends ChangeNotifier {
 
   bool get preferOnDevicePkt => _preferOnDevicePkt;
   Future<void> setPreferOnDevicePkt(bool value) async {
-    _preferOnDevicePkt = value;
-    await _prefs?.setBool(_kPreferOnDevicePkt, value);
+    // The phone has no supported engine path, so this is not a preference
+    // there: a value persisted by an older build must not send it looking for
+    // a PC engine it can no longer use.
+    final next = SettingsService.isMobile ? true : value;
+    _preferOnDevicePkt = next;
+    await _prefs?.setBool(_kPreferOnDevicePkt, next);
     notifyListeners();
   }
 
@@ -489,8 +485,9 @@ class SettingsService extends ChangeNotifier {
     _autoSuggest = _prefs!.getBool(_kAutoSuggest) ?? true;
     _autoTeach = _prefs!.getBool(_kAutoTeach) ?? true;
     _liveContext = _prefs!.getBool(_kLiveContext) ?? true;
-    _preferOnDevicePkt =
-        _prefs!.getBool(_kPreferOnDevicePkt) ?? SettingsService.isMobile;
+    _preferOnDevicePkt = SettingsService.isMobile
+        ? true
+        : (_prefs!.getBool(_kPreferOnDevicePkt) ?? false);
     _themeMode = _prefs!.getString(_kThemeMode) ?? _themeMode;
     _gns3Endpoint = _prefs!.getString(_kGns3) ?? _gns3Endpoint;
     // Migrate older plaintext GNS3 credentials into secure storage.
@@ -761,7 +758,7 @@ class SettingsService extends ChangeNotifier {
     final v = normalizeEngineBase(value);
     if (v == null) {
       _engineBaseError = value.trim().isEmpty
-          ? 'Enter an engine address, for example 192.168.1.20:5005.'
+          ? 'Enter the local engine address, for example 127.0.0.1:5005.'
           : '"${value.trim()}" is not an address the app can call. Use a host '
                 'or host:port, optionally with http:// or https://.';
       notifyListeners();

@@ -189,9 +189,10 @@ class _LocalModelSectionState extends State<LocalModelSection> {
           'The app talks to a model server you run yourself; none is '
           'bundled or started by the app. With no server at all, the '
           'rule-based assistant still answers.'
-          '${SettingsService.isMobile ? ' On a phone, 127.0.0.1 is the '
-                'phone itself - use the PC\'s LAN address, or 10.0.2.2 in '
-                'the Android emulator.' : ''}',
+          '${SettingsService.isMobile ? ' On a phone, run the server on the '
+                    'phone or use an HTTPS provider; the app does not discover a '
+                    'PC on the LAN, and a provider key must never be sent over '
+                    'plaintext HTTP.' : ''}',
           style: TextStyle(
             fontSize: 12,
             color: AppPalette.mutedText(theme.colorScheme),

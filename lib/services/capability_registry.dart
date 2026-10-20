@@ -1909,8 +1909,9 @@ class CapabilityRegistry {
       phoneAvailable: false,
       keywords: ['sidecar', 'engine', 'start', 'python', 'service'],
       run: (context) async {
-        // On a phone there is nothing here to start; the engine is on the PC.
-        // Trying anyway is what produced "install Python 3" on Android.
+        // On a phone there is nothing here to start. The phone builds .pkt
+        // files locally; trying a PC engine is what produced "install
+        // Python 3" on Android.
         if (!EngineStatus.instance.canStartLocally) {
           context.toast(SidecarSupervisor.phoneEngineMessage);
           return;

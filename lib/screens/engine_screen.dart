@@ -149,7 +149,8 @@ class _EngineScreenState extends State<EngineScreen> {
       title: 'Live Packet Tracer control',
       subtitle:
           'Typing into a Packet Tracer window, reading its CLI, and controlling '
-          'a live run require Packet Tracer on a computer.',
+          'a live run require the desktop app. This phone does not connect to '
+          'a PC engine.',
     ),
   ];
 
@@ -317,18 +318,15 @@ class _EngineScreenState extends State<EngineScreen> {
       title: 'Controls',
       subtitle: local
           ? 'Start, restart or stop the helper that drives Packet Tracer.'
-          : 'The engine runs on a PC, not on this device.',
+          : 'This phone builds .pkt files on-device; no PC engine is used.',
       children: [
         if (!local)
           const AppBanner(
             tone: AppTone.info,
             message:
-                'On the PC, start the app (or run python '
-                'sidecar/pt_autopilot.py in the project folder), find that '
-                'PC\'s address with ipconfig on Windows or `ifconfig` / '
-                '`ip addr` on Linux and macOS, then enter it below as '
-                'http://<pc-address>:5005 and press Test. On the Android '
-                'emulator the host PC is 10.0.2.2.',
+                'This device builds .pkt files on-device with its bundled '
+                'templates. Live Packet Tracer control needs the desktop app; '
+                'a phone cannot connect to a PC engine.',
           )
         else
           Padding(
@@ -405,9 +403,9 @@ class _EngineScreenState extends State<EngineScreen> {
         AppField(
           label: 'Engine base URL',
           help:
-              'On this PC that is 127.0.0.1. On a phone the engine runs on '
-              'your PC, so this must be that PC\'s address (for the Android '
-              'emulator, 10.0.2.2).',
+              'On this PC that is 127.0.0.1. Remote engine addresses are '
+              'unsupported: the engine API is unauthenticated, so provider '
+              'keys are never sent off this machine.',
           child: LayoutBuilder(
             builder: (context, constraints) {
               final field = TextField(

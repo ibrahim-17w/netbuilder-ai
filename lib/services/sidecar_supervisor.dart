@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart' as p;
 
+import 'app_version.dart';
+import 'credential_redaction.dart';
 import 'settings_service.dart';
 
 /// The outcome of trying to bring the local engine up.
@@ -79,9 +81,10 @@ class SidecarSupervisor {
   /// Whether this platform can run the engine at all.
   ///
   /// The engine is Python that drives a Packet Tracer window. A phone has no
-  /// Python process to start and no Packet Tracer to drive, so looking for one
-  /// there produced the worst possible answer - "install Python 3" - instead
-  /// of the true one: the engine lives on the PC, point the app at it.
+  /// Python process to start and no Packet Tracer to drive. It also has no
+  /// supported way to reach the PC engine: that API is unauthenticated, so
+  /// the app keeps it loopback-only and the phone builds with the bundled
+  /// template library instead.
   ///
   /// One source of truth for that fact ([SettingsService.canHostEngine]), so a
   /// phone cannot be a phone in one place and a desktop in another.
@@ -90,10 +93,9 @@ class SidecarSupervisor {
   /// The one sentence a phone user needs, used by every caller so the wording
   /// cannot drift.
   static const String phoneEngineMessage =
-      'This device runs no engine of its own. The .pkt engine is a PC '
-      'program: start it on the PC (python pt_autopilot.py) and set this app\'s '
-      'engine address to that PC - for example http://192.168.1.20:5005. On the '
-      'Android emulator the host is 10.0.2.2.';
+      'This phone builds .pkt files on-device with its bundled templates. '
+      'Live Packet Tracer control needs the desktop app; connecting to a PC '
+      'engine is not supported.';
 
   /// The bundled/derived interpreter candidates, most specific first.
   /// Pure and side-effect free so it can be tested without a process.
@@ -497,6 +499,9 @@ class SidecarSupervisor {
         // Unbuffered so the log is useful the moment something goes wrong.
         'PYTHONUNBUFFERED': '1',
         'PYTHONIOENCODING': 'utf-8',
+        // Let /health report which app launched this engine, so a mixed
+        // install can be detected instead of silently using old code.
+        'NETBUILDER_APP_VERSION': AppVersion.full,
       };
       if (target.tesseract != null) {
         environment['TESSERACT_CMD'] = target.tesseract!;
@@ -603,6 +608,9 @@ class SidecarSupervisor {
 
   static void _appendLog(String? path, String text) {
     if (path == null) return;
+    // The sidecar redacts its own log lines; this catches a traceback or a
+    // launcher message that still carries a credential-shaped value.
+    text = CredentialRedaction.redact(text);
     _logPath = path;
     try {
       final file = File(path);

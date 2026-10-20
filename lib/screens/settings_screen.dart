@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../services/app_version.dart';
 import '../services/autopilot_service.dart';
 import '../services/context_budget.dart';
 import '../services/gemini_model_catalog.dart';
@@ -358,6 +359,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   const SizedBox(height: AppTheme.s12),
                 ],
+                Text(
+                  'App version: ${AppVersion.full}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
                 Text(
                   'Seen version: ${s.seenChangelog.isEmpty ? 'none' : s.seenChangelog}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -755,71 +762,87 @@ class _SettingsScreenState extends State<SettingsScreen> {
         AppPanel(
           icon: Icons.device_hub_outlined,
           title: 'Packet Tracer build engine',
-          subtitle: SettingsService.engineHint(_engine.text),
+          subtitle: SettingsService.isMobile
+              ? 'On-device .pkt building; no PC engine is used.'
+              : SettingsService.engineHint(_engine.text),
           children: [
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                SettingsService.isMobile
-                    ? 'Build .pkt files on this device'
-                    : 'Prefer on-device .pkt building',
+            if (SettingsService.isMobile) ...[
+              const AppBanner(
+                tone: AppTone.info,
+                message:
+                    'This phone builds .pkt files on-device with its bundled '
+                    'templates. Live Packet Tracer control needs the desktop '
+                    'app. Connecting to a PC engine is not supported.',
               ),
-              subtitle: Text(
-                SettingsService.isMobile
-                    ? 'Uses the bundled templates. Turn this off to use the PC engine below.'
-                    : 'Uses bundled templates first; the PC engine is still available for live Packet Tracer runs.',
-              ),
-              value: s.preferOnDevicePkt,
-              onChanged: s.setPreferOnDevicePkt,
-            ),
-            TextField(
-              controller: _engine,
-              decoration: InputDecoration(
-                labelText: SettingsService.isMobile
-                    ? 'PC engine address (optional)'
-                    : 'Engine address',
-                helperText: SettingsService.engineHint(_engine.text),
-                helperMaxLines: 4,
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: AppTheme.s8),
-            Wrap(
-              spacing: AppTheme.s8,
-              runSpacing: AppTheme.s8,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    await s.setEngineBase(_engine.text);
-                    if (!mounted) return;
-                    if (s.engineBaseError.isNotEmpty) {
-                      _say(s.engineBaseError, tone: AppTone.danger);
-                    } else {
-                      _engine.text = s.engineBase;
-                      _say('Engine address saved.', tone: AppTone.success);
-                    }
-                  },
-                  icon: const Icon(Icons.save_outlined, size: 17),
-                  label: const Text('Save address'),
+            ] else ...[
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Prefer on-device .pkt building'),
+                subtitle: const Text(
+                  'Uses bundled templates first; the local PC engine is still '
+                  'available for live Packet Tracer runs.',
                 ),
-                OutlinedButton.icon(
-                  onPressed: _testingEngine ? null : _testEngine,
-                  icon: _testingEngine
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.wifi_tethering_outlined, size: 17),
-                  label: const Text('Test connection'),
-                ),
-              ],
-            ),
-            if (_engineTest != null)
-              Padding(
-                padding: const EdgeInsets.only(top: AppTheme.s8),
-                child: Text(_engineTest!),
+                value: s.preferOnDevicePkt,
+                onChanged: s.setPreferOnDevicePkt,
               ),
+              TextField(
+                controller: _engine,
+                decoration: InputDecoration(
+                  labelText: 'Engine address (local only)',
+                  helperText: SettingsService.engineHint(_engine.text),
+                  helperMaxLines: 4,
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+              if (!SettingsService.isLoopbackEngineBase(_engine.text))
+                const Padding(
+                  padding: EdgeInsets.only(top: AppTheme.s8),
+                  child: AppBanner(
+                    tone: AppTone.warning,
+                    message:
+                        'Remote engine addresses are unsupported. The app will '
+                        'not send provider keys to another host; run the engine '
+                        'on this PC.',
+                  ),
+                ),
+              const SizedBox(height: AppTheme.s8),
+              Wrap(
+                spacing: AppTheme.s8,
+                runSpacing: AppTheme.s8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      await s.setEngineBase(_engine.text);
+                      if (!mounted) return;
+                      if (s.engineBaseError.isNotEmpty) {
+                        _say(s.engineBaseError, tone: AppTone.danger);
+                      } else {
+                        _engine.text = s.engineBase;
+                        _say('Engine address saved.', tone: AppTone.success);
+                      }
+                    },
+                    icon: const Icon(Icons.save_outlined, size: 17),
+                    label: const Text('Save address'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _testingEngine ? null : _testEngine,
+                    icon: _testingEngine
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.wifi_tethering_outlined, size: 17),
+                    label: const Text('Test connection'),
+                  ),
+                ],
+              ),
+              if (_engineTest != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppTheme.s8),
+                  child: Text(_engineTest!),
+                ),
+            ],
           ],
         ),
         AppPanel(

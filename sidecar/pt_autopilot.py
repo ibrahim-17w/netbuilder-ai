@@ -240,7 +240,22 @@ def _run_hidden(command, **kwargs):
 # Bump on every behaviour change. Served on /health so a stale process
 # (old code, old port-holder, double instance) is detectable remotely
 # instead of producing "nothing changed" mystery runs.
-VERSION = "2026-09-29-tier-tree-layout-threaded-server"
+VERSION = "2026-10-20-app-schema-health-redaction"
+
+# The /health contract. Bump only for an incompatible route/shape change; the
+# app blocks an engine whose schema it does not speak, so a mixed installer
+# fails with an update message instead of silently misreading responses.
+API_SCHEMA_VERSION = 1
+
+
+def _capabilities() -> list:
+    """What this engine can actually do, for the app's handshake."""
+    caps = ["health", "status", "pkt_build", "pkt_audit", "dry_run", "memory"]
+    if HAS_RPA:
+        caps.append("pt_autopilot")
+    if TESSERACT_CMD:
+        caps.append("ocr")
+    return caps
 
 
 def _engine_identity() -> dict:
@@ -1244,6 +1259,30 @@ LLM_PER_DEVICE: dict = {}       # device -> calls used this run
 # `key <secret>` / `password <secret>` / `secret <secret>` / `md5 <secret>`
 LLM_SECRET_RE = re.compile(r"(?i)\b(key|password|secret|md5)\s+\S+")
 
+# Credential shapes that must not survive into a log line or a diagnostics
+# archive.  Kept deliberately broader than the Cisco CLI patterns above:
+# provider SDKs use `sk-...`, HTTP uses `Bearer ...`, and several tools print
+# an `api_key=`/`apiKey:` field in errors and request dumps.
+_CREDENTIAL_RES = (
+    (re.compile(r"\bsk-[A-Za-z0-9_-]{8,}", re.I), "sk-<redacted>"),
+    (re.compile(r"\bBearer\s+[A-Za-z0-9._~+/=-]+", re.I),
+     "Bearer <redacted>"),
+    (re.compile(r"\bAIza[0-9A-Za-z_-]{20,}"), "AIza<redacted>"),
+    (re.compile(
+        r"(?i)\b(api[_ -]?key|apiKey|x-goog-api-key|authorization|password|"
+        r"passwd|secret|token|community)[\"']?(\s*[:=]\s*|\s+)"
+        r"[^\s,;}]+"),
+     r"\1=<redacted>"),
+)
+
+
+def redact_credentials(text: str) -> str:
+    """Replace credential-shaped values with a stable marker. Idempotent."""
+    out = str(text or "")
+    for pattern, replacement in _CREDENTIAL_RES:
+        out = pattern.sub(replacement, out)
+    return out
+
 
 def llm_reset_run():
     """Clear the per-run LLM budget. The credential itself is left alone."""
@@ -1333,8 +1372,9 @@ def llm_status() -> dict:
 
 def llm_redact(text: str) -> str:
     """Hide obvious secrets before anything leaves the machine."""
-    return LLM_SECRET_RE.sub(lambda m: f"{m.group(1)} <redacted>",
-                             str(text or ""))
+    return redact_credentials(
+        LLM_SECRET_RE.sub(lambda m: f"{m.group(1)} <redacted>",
+                          str(text or "")))
 
 
 def llm_available(device: str = "") -> bool:
@@ -2646,6 +2686,9 @@ def end_activity(kind: str):
 
 
 def log(msg: str):
+    # Every line that reaches /status or a copied report passes here. Redact
+    # at the choke point so a future caller cannot accidentally log a key.
+    msg = redact_credentials(msg)
     with LOCK:
         JOB.log.append(f"{time.strftime('%H:%M:%S')} {msg}")
         JOB.log[:] = JOB.log[-300:]
@@ -3642,14 +3685,7 @@ DIAGNOSTICS_DIR = os.path.join(os.path.dirname(__file__), "diagnostics")
 
 def _diagnostics_redact(value) -> str:
     """Remove obvious credentials before a tester export is created."""
-    text = str(value or "")
-    patterns = (
-        r"(?i)(api[_ -]?key|password|passwd|secret|token|community)"
-        r"(\s*[:=]\s*|\s+)[^\s,;]+",
-    )
-    for pattern in patterns:
-        text = re.sub(pattern, r"\1=<redacted>", text)
-    return text[:500]
+    return redact_credentials(value)[:500]
 
 
 def _diagnostics_event(row: dict) -> dict:
@@ -3706,7 +3742,10 @@ def diagnostics_export(include_screenshots: bool = False) -> dict:
     }
     files = ["diagnostics.json"]
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("diagnostics.json", json.dumps(payload, indent=2))
+        archive.writestr(
+            "diagnostics.json",
+            redact_credentials(json.dumps(payload, indent=2)),
+        )
         if include_screenshots and os.path.isdir(SHOTS):
             shot_paths = sorted(
                 (os.path.join(SHOTS, name) for name in os.listdir(SHOTS)),
@@ -16606,6 +16645,11 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/health":
             self._json({"ok": True, "rpa": HAS_RPA,
                         "ocr": bool(TESSERACT_CMD), "version": VERSION,
+                        "sidecarVersion": VERSION,
+                        "apiSchemaVersion": API_SCHEMA_VERSION,
+                        "appVersion": os.environ.get(
+                            "NETBUILDER_APP_VERSION", ""),
+                        "capabilities": _capabilities(),
                         "engine": dict(ENGINE_IDENTITY),
                         "emergencyEsc": dict(HOTKEY_STATE),
                         "activity": activity_snapshot()})

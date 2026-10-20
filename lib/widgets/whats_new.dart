@@ -8,7 +8,7 @@ import '../services/settings_service.dart';
 const List<({String version, String date, List<String> changes})>
 kChangelogEntries = [
   (
-    version: '2.1',
+    version: '1.0.0',
     date: 'September 2026',
     changes: [
       'Verify a finished build with real pings and see pass/fail evidence',

@@ -194,11 +194,17 @@ def test_a_blocking_handler_does_not_stop_other_requests(engine):
     _SlowHandler.BLOCK.set()
 
 
-def test_health_answers_before_any_build_has_run(engine):
+def test_health_answers_before_any_build_has_run(engine, monkeypatch):
+    monkeypatch.setenv("NETBUILDER_APP_VERSION", "1.0.0+1")
     status, body = _get(engine, "/health")
     assert status == 200
     assert body["ok"] is True
     assert "engine" in body and "version" in body
+    assert body["sidecarVersion"] == pt.VERSION
+    assert body["apiSchemaVersion"] == pt.API_SCHEMA_VERSION
+    assert isinstance(body["capabilities"], list)
+    assert "pkt_build" in body["capabilities"]
+    assert body["appVersion"] == "1.0.0+1"
 
 
 def test_status_answers_and_stays_self_consistent(engine):
