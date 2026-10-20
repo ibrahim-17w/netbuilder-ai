@@ -114,17 +114,14 @@ class SettingsService extends ChangeNotifier {
   /// Secure storage, configured so a key written on Android is still there
   /// after the app is closed and reopened.
   ///
-  /// `encryptedSharedPreferences` selects the modern Android implementation
-  /// rather than the legacy keystore path, and `resetOnError` means a value
-  /// that cannot be decrypted (a restored backup that arrived without its
-  /// keystore key, a rotated signing key) is cleared instead of throwing
-  /// into the boot path - which is what made a saved key look like it had
-  /// silently vanished.
+  /// v10 migrates the old EncryptedSharedPreferences values to its custom
+  /// ciphers on first access; asking for the removed backend explicitly would
+  /// only add a deprecation warning. `resetOnError` means a value that cannot
+  /// be decrypted (a restored backup that arrived without its keystore key, a
+  /// rotated signing key) is cleared instead of throwing into the boot path -
+  /// which is what made a saved key look like it had silently vanished.
   static const FlutterSecureStorage _defaultStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions(
-      encryptedSharedPreferences: true,
-      resetOnError: true,
-    ),
+    aOptions: AndroidOptions(resetOnError: true),
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
   );
 

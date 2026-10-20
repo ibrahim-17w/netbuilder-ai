@@ -25,9 +25,7 @@ class SecretVault {
     'brief',
   ];
 
-  static const FlutterSecureStorage _defaultStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-  );
+  static const FlutterSecureStorage _defaultStorage = FlutterSecureStorage();
 
   /// Swapped for an in-memory stand-in in tests; the app uses
   /// [_defaultStorage].
