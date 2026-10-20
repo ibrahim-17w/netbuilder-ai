@@ -1,0 +1,6572 @@
+{
+  "schema": 1,
+  "version": "9.0.0.0810",
+  "provenance": "Bundled PT save manifest and installed PT template names; recognition is separate from build verification.",
+  "devices": [
+    {
+      "model": "1841",
+      "type": "router",
+      "kind": "Router",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "1841",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
+            },
+            {
+              "index": -1,
+              "type": "eConsole",
+              "family": "console",
+              "name": "Console",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eAsync",
+              "family": "async",
+              "name": "Auxiliary",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": true
+        },
+        {
+          "key": "1841+HWIC-2T",
+          "modules": [
+            "HWIC-2T"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eSmartSerial",
+              "family": "serial",
+              "name": "Serial0/0/0"
+            },
+            {
+              "index": 1,
+              "type": "eSmartSerial",
+              "family": "serial",
+              "name": "Serial0/0/1"
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0"
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "1941",
+      "type": "router",
+      "kind": "Router",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "1941",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1"
+            },
+            {
+              "index": -1,
+              "type": "eAsync",
+              "family": "async",
+              "name": "Auxiliary",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "2620XM",
+      "type": "router",
+      "kind": "router",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "2621XM",
+      "type": "router",
+      "kind": "router",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "2811",
+      "type": "router",
+      "kind": "Router",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "2811+WIC-2T",
+          "modules": [
+            "WIC-2T"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eSmartSerial",
+              "family": "serial",
+              "name": "Serial0/2/0"
+            },
+            {
+              "index": 1,
+              "type": "eSmartSerial",
+              "family": "serial",
+              "name": "Serial0/2/1"
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0"
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
+            }
+          ],
+          "hasConfig": true
+        },
+        {
+          "key": "2811",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
+            }
+          ],
+          "hasConfig": true
+        },
+        {
+          "key": "2811+NM-2E2W",
+          "modules": [
+            "NM-2E2W"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
+            },
+            {
+              "index": 2,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": "Ethernet1/0"
+            },
+            {
+              "index": 3,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": "Ethernet1/1"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "2901",
+      "type": "router",
+      "kind": "Router",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "2901",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1"
+            },
+            {
+              "index": -1,
+              "type": "eAsync",
+              "family": "async",
+              "name": "Auxiliary",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "2911",
+      "type": "router",
+      "kind": "Router",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "2911",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/2"
+            },
+            {
+              "index": -1,
+              "type": "eAsync",
+              "family": "async",
+              "name": "Auxiliary",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "2950-24",
+      "type": "switch",
+      "kind": "Switch",
+      "aliases": [
+        "2950"
+      ],
+      "variants": [
+        {
+          "key": "2950-24",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/2"
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/3"
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/4"
+            },
+            {
+              "index": 4,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/5"
+            },
+            {
+              "index": 5,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/6"
+            },
+            {
+              "index": 6,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/7"
+            },
+            {
+              "index": 7,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/8"
+            },
+            {
+              "index": 8,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/9"
+            },
+            {
+              "index": 9,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/10"
+            },
+            {
+              "index": 10,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/11"
+            },
+            {
+              "index": 11,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/12"
+            },
+            {
+              "index": 12,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/13"
+            },
+            {
+              "index": 13,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/14"
+            },
+            {
+              "index": 14,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/15"
+            },
+            {
+              "index": 15,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/16"
+            },
+            {
+              "index": 16,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/17"
+            },
+            {
+              "index": 17,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/18"
+            },
+            {
+              "index": 18,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/19"
+            },
+            {
+              "index": 19,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/20"
+            },
+            {
+              "index": 20,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/21"
+            },
+            {
+              "index": 21,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/22"
+            },
+            {
+              "index": 22,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/23"
+            },
+            {
+              "index": 23,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/24"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "2960-24TT",
+      "type": "switch",
+      "kind": "Switch",
+      "aliases": [
+        "2960",
+        "Catalyst 2960"
+      ],
+      "variants": [
+        {
+          "key": "2960-24TT",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/2"
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/3"
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/4"
+            },
+            {
+              "index": 4,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/5"
+            },
+            {
+              "index": 5,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/6"
+            },
+            {
+              "index": 6,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/7"
+            },
+            {
+              "index": 7,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/8"
+            },
+            {
+              "index": 8,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/9"
+            },
+            {
+              "index": 9,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/10"
+            },
+            {
+              "index": 10,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/11"
+            },
+            {
+              "index": 11,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/12"
+            },
+            {
+              "index": 12,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/13"
+            },
+            {
+              "index": 13,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/14"
+            },
+            {
+              "index": 14,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/15"
+            },
+            {
+              "index": 15,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/16"
+            },
+            {
+              "index": 16,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/17"
+            },
+            {
+              "index": 17,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/18"
+            },
+            {
+              "index": 18,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/19"
+            },
+            {
+              "index": 19,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/20"
+            },
+            {
+              "index": 20,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/21"
+            },
+            {
+              "index": 21,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/22"
+            },
+            {
+              "index": 22,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/23"
+            },
+            {
+              "index": 23,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/24"
+            },
+            {
+              "index": 24,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1"
+            },
+            {
+              "index": 25,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/2"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "3560-24PS",
+      "type": "switch",
+      "kind": "MultiLayerSwitch",
+      "aliases": [
+        "3560",
+        "Catalyst 3560",
+        "layer 3 switch"
+      ],
+      "variants": [
+        {
+          "key": "3560-24PS",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/2"
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/3"
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/4"
+            },
+            {
+              "index": 4,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/5"
+            },
+            {
+              "index": 5,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/6"
+            },
+            {
+              "index": 6,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/7"
+            },
+            {
+              "index": 7,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/8"
+            },
+            {
+              "index": 8,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/9"
+            },
+            {
+              "index": 9,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/10"
+            },
+            {
+              "index": 10,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/11"
+            },
+            {
+              "index": 11,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/12"
+            },
+            {
+              "index": 12,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/13"
+            },
+            {
+              "index": 13,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/14"
+            },
+            {
+              "index": 14,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/15"
+            },
+            {
+              "index": 15,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/16"
+            },
+            {
+              "index": 16,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/17"
+            },
+            {
+              "index": 17,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/18"
+            },
+            {
+              "index": 18,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/19"
+            },
+            {
+              "index": 19,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/20"
+            },
+            {
+              "index": 20,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/21"
+            },
+            {
+              "index": 21,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/22"
+            },
+            {
+              "index": 22,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/23"
+            },
+            {
+              "index": 23,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/24"
+            },
+            {
+              "index": 24,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1"
+            },
+            {
+              "index": 25,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/2"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "7960",
+      "type": "phone",
+      "kind": "IpPhone",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "7960",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "819HG-4G-IOX",
+      "type": "router",
+      "kind": "Router",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "819HG-4G-IOX+PT-HOST-NM-1CE",
+          "modules": [
+            "PT-HOST-NM-1CE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet1"
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet2"
+            },
+            {
+              "index": 4,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet3"
+            },
+            {
+              "index": 5,
+              "type": "eSerial",
+              "family": "serial",
+              "name": "Serial0"
+            },
+            {
+              "index": 6,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": "Ethernet1"
+            },
+            {
+              "index": 7,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 8,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 9,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": ""
+            },
+            {
+              "index": 10,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": ""
+            },
+            {
+              "index": 11,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "819HGW",
+      "type": "router",
+      "kind": "Router",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "819HGW",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet1"
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet2"
+            },
+            {
+              "index": 4,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet3"
+            },
+            {
+              "index": 5,
+              "type": "eSerial",
+              "family": "serial",
+              "name": "Serial0"
+            },
+            {
+              "index": 6,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 7,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 8,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 9,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 10,
+              "type": "eAccessPointWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 11,
+              "type": "eAccessPointWirelessN",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "829",
+      "type": "router",
+      "kind": "Router",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "829+GLC-T+PT-HOST-NM-1CE",
+          "modules": [
+            "GLC-T",
+            "PT-HOST-NM-1CE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet2"
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet3"
+            },
+            {
+              "index": 4,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet4"
+            },
+            {
+              "index": 5,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 6,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 7,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet5"
+            },
+            {
+              "index": 8,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 9,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 10,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": ""
+            },
+            {
+              "index": 11,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": ""
+            },
+            {
+              "index": 12,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 13,
+              "type": "eAccessPointWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 14,
+              "type": "eAccessPointWirelessN",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "AC",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "AccessPoint-PT",
+      "type": "wireless",
+      "kind": "AccessPoint",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "AccessPoint-PT+PT-REPEATER-NM-1CFE",
+          "modules": [
+            "PT-REPEATER-NM-1CFE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eAccessPointWirelessG",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "AccessPoint-PT-A",
+      "type": "wireless",
+      "kind": "AccessPoint",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "AccessPoint-PT-A+PT-REPEATER-NM-1CFE",
+          "modules": [
+            "PT-REPEATER-NM-1CFE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eAccessPointWirelessA",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "AccessPoint-PT-N",
+      "type": "wireless",
+      "kind": "AccessPoint",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "AccessPoint-PT-N+PT-REPEATER-NM-1CFE",
+          "modules": [
+            "PT-REPEATER-NM-1CFE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eAccessPointWirelessN",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Air Conditioner",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Air-Conditioner+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Air Cooler",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Alarm",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Analog-Phone-PT",
+      "type": "analog-phone",
+      "kind": "AnalogPhone",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Analog-Phone-PT",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eModem",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eModem",
+              "family": "modem",
+              "name": "Port 0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Appliance",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Appliance(0)",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Appliance-0-+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "ASA5505",
+      "type": "firewall",
+      "kind": "firewall",
+      "aliases": [
+        "ASA 5505",
+        "5505"
+      ],
+      "variants": []
+    },
+    {
+      "model": "ASA5506",
+      "type": "firewall",
+      "kind": "firewall",
+      "aliases": [
+        "ASA 5506",
+        "5506"
+      ],
+      "variants": []
+    },
+    {
+      "model": "Atm Pressure Monitor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Battery",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Battery+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Beacon",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Beacon+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Blower",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Bluetooth Speaker",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Bluetooth-Speaker+PT-IOT-NM-1CFE+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Bridge-PT",
+      "type": "bridge",
+      "kind": "bridge",
+      "aliases": [
+        "bridge"
+      ],
+      "variants": []
+    },
+    {
+      "model": "Cable Modem-PT",
+      "type": "modem",
+      "kind": "modem",
+      "aliases": [
+        "cable modem"
+      ],
+      "variants": []
+    },
+    {
+      "model": "Carbon Dioxide Detector",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Carbon Monoxide Detector",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Ceiling Fan",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Ceiling Sprinkler",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Cell-Tower",
+      "type": "cell-tower",
+      "kind": "CellTower",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Cell-Tower+PT-CELL-NM-1CX",
+          "modules": [
+            "PT-CELL-NM-1CX"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperCoaxial",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCopperCoaxial",
+              "family": "coaxial",
+              "name": "Coaxial0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Central-Office-Server",
+      "type": "central-office",
+      "kind": "CentralOfficeServer",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Central-Office-Server",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperCoaxial",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "eCopperCoaxial",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "eCopperCoaxial",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "eCopperCoaxial",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 5,
+              "type": "eCopperCoaxial",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 6,
+              "type": "eCopperCoaxial",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 7,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCopperCoaxial",
+              "family": "coaxial",
+              "name": "Coaxial0/0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCopperCoaxial",
+              "family": "coaxial",
+              "name": "Coaxial0/1",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "CGR1240",
+      "type": "router",
+      "kind": "Router",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "CGR1240+GLC-FE-100FX-RGD+ROUTER-ADAPTER",
+          "modules": [
+            "GLC-FE-100FX-RGD",
+            "ROUTER-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1"
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet2/3"
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet2/4"
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet2/5"
+            },
+            {
+              "index": 4,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet2/6"
+            },
+            {
+              "index": 5,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet2/1"
+            },
+            {
+              "index": 6,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet2/2"
+            },
+            {
+              "index": 7,
+              "type": "eAccessPointWirelessN",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "Cloud-PT",
+      "type": "cloud",
+      "kind": "cloud",
+      "aliases": [
+        "cloud",
+        "internet cloud"
+      ],
+      "variants": []
+    },
+    {
+      "model": "CO Detector",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "CO-Detector+PT-IOT-NM-1CFE+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "CyberObserver",
+      "type": "cyber-observer",
+      "kind": "CyberObserver",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "CyberObserver+PT-CONTROLLER-BUILTIN",
+          "modules": [
+            "PT-CONTROLLER-BUILTIN"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "DataHistorianServer",
+      "type": "historian",
+      "kind": "DataHistorian",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "DataHistorianServer+PT-CONTROLLER-BUILTIN",
+          "modules": [
+            "PT-CONTROLLER-BUILTIN"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Dimmable LED",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "DLC100",
+      "type": "iot",
+      "kind": "HomeGateway",
+      "aliases": [
+        "Home Gateway-PT",
+        "home gateway"
+      ],
+      "variants": [
+        {
+          "key": "DLC100",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 5,
+              "type": "eAccessPointWirelessN",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Door",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [
+        "smart lock"
+      ],
+      "variants": [
+        {
+          "key": "Door+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "DSL Modem-PT",
+      "type": "modem",
+      "kind": "modem",
+      "aliases": [
+        "dsl modem"
+      ],
+      "variants": []
+    },
+    {
+      "model": "Fire Monitor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Fire-Monitor+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Fire Sprinkler",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Fire-Sprinkler+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Flex Sensor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Floor Sprinkler",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Furnace",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Furnace+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Garage Door",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Garage-Door+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Generic Environment Sensor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Generic Sensor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Heating Element",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Home Speaker",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Home-Speaker+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Home-VoIP-PT",
+      "type": "voip-adapter",
+      "kind": "HomeVoip",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Home-VoIP-PT",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eModem",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eModem",
+              "family": "modem",
+              "name": "Phone",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "HomeRouter-PT-AC",
+      "type": "wireless-router",
+      "kind": "WirelessRouterNewGeneration",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "HomeRouter-PT-AC",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 5,
+              "type": "eAccessPointWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 6,
+              "type": "eAccessPointWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 7,
+              "type": "eAccessPointWirelessAC",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 8,
+              "type": "eAccessPointWirelessAC",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 9,
+              "type": "eAccessPointWirelessAC",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 10,
+              "type": "eAccessPointWirelessAC",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 11,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Hub-PT",
+      "type": "hub",
+      "kind": "Hub",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Hub-PT+PT-REPEATER-NM-1CFE",
+          "modules": [
+            "PT-REPEATER-NM-1CFE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 5,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Humidifier",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Humidifier+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Humidity Monitor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Humidity-Monitor+PT-IOT-NM-1CFE+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Humidity Sensor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Humiture Monitor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Humiture Sensor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "IE-2000",
+      "type": "switch",
+      "kind": "MultiLayerSwitch",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "IE-2000",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet1/1"
+            },
+            {
+              "index": 5,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet1/2"
+            },
+            {
+              "index": 6,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet1/3"
+            },
+            {
+              "index": 7,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet1/4"
+            },
+            {
+              "index": 8,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/1"
+            },
+            {
+              "index": 9,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/2"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "IE-3400",
+      "type": "switch",
+      "kind": "MultiLayerSwitch",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "IE-3400+IE3400-SFP-BUILTIN",
+          "modules": [
+            "IE3400-SFP-BUILTIN"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/1"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/2"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/3"
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/4"
+            },
+            {
+              "index": 4,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/5"
+            },
+            {
+              "index": 5,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/6"
+            },
+            {
+              "index": 6,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/7"
+            },
+            {
+              "index": 7,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/8"
+            },
+            {
+              "index": 8,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/9"
+            },
+            {
+              "index": 9,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/10"
+            }
+          ],
+          "hasConfig": true
+        },
+        {
+          "key": "IE-3400+IE3400-SFP-BUILTIN+GLC-LX-SM-RGD",
+          "modules": [
+            "IE3400-SFP-BUILTIN",
+            "GLC-LX-SM-RGD"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eFiberGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/1",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 1,
+              "type": "eFiberGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/2",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/3",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/4",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 4,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/5",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 5,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/6",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 6,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/7",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 7,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/8",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 8,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/9",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 9,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/10",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "IE-9320",
+      "type": "switch",
+      "kind": "MultiLayerSwitch",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "IE-9320+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN+GLC-TE+GLC-LX-SM-RGD",
+          "modules": [
+            "9320-AC-POWER-SUPPLY",
+            "C9320-SFP-BUILTIN",
+            "GLC-TE",
+            "GLC-LX-SM-RGD"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/1",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/2",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/3",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/4",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 4,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/5",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 5,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/6",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 6,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/7",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 7,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/8",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 8,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/9",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 9,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/10",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 10,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/11",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 11,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/12",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 12,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/13",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 13,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/14",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 14,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/15",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 15,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/16",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 16,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/17",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 17,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/18",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 18,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/19",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 19,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/20",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 20,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/21",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 21,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/22",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 22,
+              "type": "eFiberGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/23",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 23,
+              "type": "eFiberGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/24",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 24,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/25",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 25,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/26",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 26,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/27",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 27,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/28",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            }
+          ],
+          "hasConfig": true
+        },
+        {
+          "key": "IE-9320+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN+GLC-LX-SM-RGD+GLC-TE",
+          "modules": [
+            "9320-AC-POWER-SUPPLY",
+            "C9320-SFP-BUILTIN",
+            "GLC-LX-SM-RGD",
+            "GLC-TE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eFiberGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/1",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 1,
+              "type": "eFiberGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/2",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/3",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/4",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 4,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/5",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 5,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/6",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 6,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/7",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 7,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/8",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 8,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/9",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 9,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/10",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 10,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/11",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 11,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/12",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 12,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/13",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 13,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/14",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 14,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/15",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 15,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/16",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 16,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/17",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 17,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/18",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 18,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/19",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 19,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/20",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 20,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/21",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 21,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/22",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 22,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/23",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 23,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/24",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 24,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/25",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 25,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/26",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 26,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/27",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 27,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/28",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            }
+          ],
+          "hasConfig": true
+        },
+        {
+          "key": "IE-9320+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN+GLC-TE",
+          "modules": [
+            "9320-AC-POWER-SUPPLY",
+            "C9320-SFP-BUILTIN",
+            "GLC-TE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/1"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/2"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/3"
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/4"
+            },
+            {
+              "index": 4,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/5"
+            },
+            {
+              "index": 5,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/6"
+            },
+            {
+              "index": 6,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/7"
+            },
+            {
+              "index": 7,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/8"
+            },
+            {
+              "index": 8,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/9"
+            },
+            {
+              "index": 9,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/10"
+            },
+            {
+              "index": 10,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/11"
+            },
+            {
+              "index": 11,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/12"
+            },
+            {
+              "index": 12,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/13"
+            },
+            {
+              "index": 13,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/14"
+            },
+            {
+              "index": 14,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/15"
+            },
+            {
+              "index": 15,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/16"
+            },
+            {
+              "index": 16,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/17"
+            },
+            {
+              "index": 17,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/18"
+            },
+            {
+              "index": 18,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/19"
+            },
+            {
+              "index": 19,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/20"
+            },
+            {
+              "index": 20,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/21"
+            },
+            {
+              "index": 21,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/22"
+            },
+            {
+              "index": 22,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/23"
+            },
+            {
+              "index": 23,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/24"
+            },
+            {
+              "index": 24,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/25"
+            },
+            {
+              "index": 25,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/26"
+            },
+            {
+              "index": 26,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/27"
+            },
+            {
+              "index": 27,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/28"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "IE-9320-26S2C",
+      "type": "switch",
+      "kind": "MultiLayerSwitch",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "IE-9320-26S2C+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN+GLC-TE",
+          "modules": [
+            "9320-AC-POWER-SUPPLY",
+            "C9320-SFP-BUILTIN",
+            "GLC-TE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/1"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/2"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/3"
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/4"
+            },
+            {
+              "index": 4,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/5"
+            },
+            {
+              "index": 5,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/6"
+            },
+            {
+              "index": 6,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/7"
+            },
+            {
+              "index": 7,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/8"
+            },
+            {
+              "index": 8,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/9"
+            },
+            {
+              "index": 9,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/10"
+            },
+            {
+              "index": 10,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/11"
+            },
+            {
+              "index": 11,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/12"
+            },
+            {
+              "index": 12,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/13"
+            },
+            {
+              "index": 13,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/14"
+            },
+            {
+              "index": 14,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/15"
+            },
+            {
+              "index": 15,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/16"
+            },
+            {
+              "index": 16,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/17"
+            },
+            {
+              "index": 17,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/18"
+            },
+            {
+              "index": 18,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/19"
+            },
+            {
+              "index": 19,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/20"
+            },
+            {
+              "index": 20,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/21"
+            },
+            {
+              "index": 21,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/22"
+            },
+            {
+              "index": 22,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/23"
+            },
+            {
+              "index": 23,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/24"
+            },
+            {
+              "index": 24,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/25"
+            },
+            {
+              "index": 25,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/26"
+            },
+            {
+              "index": 26,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/27"
+            },
+            {
+              "index": 27,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/28"
+            }
+          ],
+          "hasConfig": true
+        },
+        {
+          "key": "IE-9320-26S2C+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN",
+          "modules": [
+            "9320-AC-POWER-SUPPLY",
+            "C9320-SFP-BUILTIN"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/1"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/2"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/3"
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/4"
+            },
+            {
+              "index": 4,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/5"
+            },
+            {
+              "index": 5,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/6"
+            },
+            {
+              "index": 6,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/7"
+            },
+            {
+              "index": 7,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/8"
+            },
+            {
+              "index": 8,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/9"
+            },
+            {
+              "index": 9,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/10"
+            },
+            {
+              "index": 10,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/11"
+            },
+            {
+              "index": 11,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/12"
+            },
+            {
+              "index": 12,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/13"
+            },
+            {
+              "index": 13,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/14"
+            },
+            {
+              "index": 14,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/15"
+            },
+            {
+              "index": 15,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/16"
+            },
+            {
+              "index": 16,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/17"
+            },
+            {
+              "index": 17,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/18"
+            },
+            {
+              "index": 18,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/19"
+            },
+            {
+              "index": 19,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/20"
+            },
+            {
+              "index": 20,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/21"
+            },
+            {
+              "index": 21,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/22"
+            },
+            {
+              "index": 22,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/23"
+            },
+            {
+              "index": 23,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/24"
+            },
+            {
+              "index": 24,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/25"
+            },
+            {
+              "index": 25,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/26"
+            },
+            {
+              "index": 26,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/27"
+            },
+            {
+              "index": 27,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/28"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "IoT Server-PT",
+      "type": "server",
+      "kind": "server",
+      "aliases": [
+        "iot server"
+      ],
+      "variants": []
+    },
+    {
+      "model": "IR1101",
+      "type": "router",
+      "kind": "Router",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "IR1101+IR1101-BUILTIN+PWR_IE50W_AC_L",
+          "modules": [
+            "IR1101-BUILTIN",
+            "PWR_IE50W_AC_L"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0/0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0/1"
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0/2"
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0/3"
+            },
+            {
+              "index": 4,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0/4"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "IR8340",
+      "type": "router",
+      "kind": "Router",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "IR8340+IR8340-WAN-BUILTIN+IR8340-LAN-BUILTIN+PWR-RGD-AC-DC",
+          "modules": [
+            "IR8340-WAN-BUILTIN",
+            "IR8340-LAN-BUILTIN",
+            "PWR-RGD-AC-DC"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0/0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0/1"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1/0"
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1/1"
+            },
+            {
+              "index": 4,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1/2"
+            },
+            {
+              "index": 5,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1/3"
+            },
+            {
+              "index": 6,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1/4"
+            },
+            {
+              "index": 7,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1/5"
+            },
+            {
+              "index": 8,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1/6"
+            },
+            {
+              "index": 9,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1/7"
+            },
+            {
+              "index": 10,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1/8"
+            },
+            {
+              "index": 11,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1/9"
+            },
+            {
+              "index": 12,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1/10"
+            },
+            {
+              "index": 13,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/1/11"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "ISA-3000",
+      "type": "firewall",
+      "kind": "ASA",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "ISA-3000+ISA-DC-POWER-ADAPTER-A+ISA-DC-POWER-ADAPTER-B+ISA3000-SFP-BUILTIN+GLC-LX-SM-RGD",
+          "modules": [
+            "ISA-DC-POWER-ADAPTER-A",
+            "ISA-DC-POWER-ADAPTER-B",
+            "ISA3000-SFP-BUILTIN",
+            "GLC-LX-SM-RGD"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitManagement",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/1",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/2",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 3,
+              "type": "eFiberGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/3",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 4,
+              "type": "eFiberGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/4",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            }
+          ],
+          "hasConfig": true
+        },
+        {
+          "key": "ISA-3000+ISA-DC-POWER-ADAPTER-A+ISA-DC-POWER-ADAPTER-B+ISA3000-SFP-BUILTIN",
+          "modules": [
+            "ISA-DC-POWER-ADAPTER-A",
+            "ISA-DC-POWER-ADAPTER-B",
+            "ISA3000-SFP-BUILTIN"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitManagement",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/1",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/2",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 3,
+              "type": "eFiberGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/3",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 4,
+              "type": "eFiberGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/4",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "ISR4321",
+      "type": "router",
+      "kind": "Router",
+      "aliases": [
+        "4321",
+        "ISR 4321",
+        "Cisco 4321"
+      ],
+      "variants": [
+        {
+          "key": "ISR4321+ISR4321-BUILTIN",
+          "modules": [
+            "ISR4321-BUILTIN"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0/0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0/1"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "ISR4331",
+      "type": "router",
+      "kind": "Router",
+      "aliases": [
+        "4331",
+        "ISR 4331",
+        "Cisco 4331"
+      ],
+      "variants": [
+        {
+          "key": "ISR4331+ISR4331-BUILTIN",
+          "modules": [
+            "ISR4331-BUILTIN"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0/0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0/1"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0/2"
+            }
+          ],
+          "hasConfig": true
+        },
+        {
+          "key": "ISR4331+ISR4331-BUILTIN+GLC-TE",
+          "modules": [
+            "ISR4331-BUILTIN",
+            "GLC-TE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0/0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0/1"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0/2"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "LAP-PT",
+      "type": "wireless",
+      "kind": "LightWeightAccessPoint",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "LAP-PT+ACCESS_POINT_POWER_ADAPTER",
+          "modules": [
+            "ACCESS_POINT_POWER_ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eAccessPointWirelessN",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "LAP-PT",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eAccessPointWirelessN",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Laptop-PT",
+      "type": "laptop",
+      "kind": "Laptop",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Laptop-PT+PT-LAPTOP-NM-1CFE",
+          "modules": [
+            "PT-LAPTOP-NM-1CFE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "Laptop-PT+PT-LAPTOP-NM-1W",
+          "modules": [
+            "PT-LAPTOP-NM-1W"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessG",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Lawn Sprinkler",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "LCD",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "LCD+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "LED",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "LED+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Light",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [
+        "smart bulb",
+        "bulb"
+      ],
+      "variants": [
+        {
+          "key": "Light+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Linksys-WRT300N",
+      "type": "wireless-router",
+      "kind": "WirelessRouter",
+      "aliases": [
+        "WRT300N",
+        "Wireless Router-PT"
+      ],
+      "variants": [
+        {
+          "key": "Linksys-WRT300N",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 5,
+              "type": "eAccessPointWirelessN",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "MCU-PT",
+      "type": "mcu",
+      "kind": "MCU",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "MCU-PT+PT-IOE-NM-1CGE+PT-IOE-CUSTOM-IO+PT-IOE-POWER-ADAPTER",
+          "modules": [
+            "PT-IOE-NM-1CGE",
+            "PT-IOE-CUSTOM-IO",
+            "PT-IOE-POWER-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "MCU-PT+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-IOT-POWER-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eUsb",
+              "family": "usb",
+              "name": "USB0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "MCU-PT+PT-IOT-NM-1CGE+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CGE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-IOT-POWER-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "MCU-PT+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-IOT-POWER-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Membrane Potentiometer",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Membrane-Potentiometer+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Meraki-MX65W",
+      "type": "firewall",
+      "kind": "SecurityAppliance",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Meraki-MX65W+MERAKI-POWER-ADAPTER",
+          "modules": [
+            "MERAKI-POWER-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 5,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 6,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 7,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 8,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 9,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 10,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 11,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 12,
+              "type": "eAccessPointWirelessAC",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Meraki-Server",
+      "type": "controller",
+      "kind": "MerakiServer",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Meraki-Server+PT-HOST-NM-1CFE",
+          "modules": [
+            "PT-HOST-NM-1CFE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Metal Sensor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Metal-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Motion Detector",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Motion Sensor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Motor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Motor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "NetworkController",
+      "type": "controller",
+      "kind": "NetworkController",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "NetworkController+PT-CONTROLLER-BUILTIN",
+          "modules": [
+            "PT-CONTROLLER-BUILTIN"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Old Car",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Old-Car+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "PC-PT",
+      "type": "pc",
+      "kind": "Pc",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "PC-PT+PT-HOST-NM-1CFE",
+          "modules": [
+            "PT-HOST-NM-1CFE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "PC-PT+Linksys-WMP300N",
+          "modules": [
+            "Linksys-WMP300N"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "PC-PT+PT-HOST-NM-1W-A",
+          "modules": [
+            "PT-HOST-NM-1W-A"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessA",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Photo Sensor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Piezo Speaker",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Piezo-Speaker+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "PLC-PT",
+      "type": "plc",
+      "kind": "PLC",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "PLC-PT+PT-IOT-NM-1CGE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CGE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Portable Music Player",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Potentiometer",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Potentiometer+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Power Distribution Device",
+      "type": "power-distribution",
+      "kind": "Power Distribution Device",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Power-Distribution-Device",
+          "modules": [],
+          "ports": [],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Power Meter",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Power-Meter+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Printer-PT",
+      "type": "printer",
+      "kind": "printer",
+      "aliases": [
+        "printer"
+      ],
+      "variants": []
+    },
+    {
+      "model": "PT8000 Activated",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "PT8200",
+      "type": "router",
+      "kind": "Router",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "PT8200+PT8200-BUILTIN",
+          "modules": [
+            "PT8200-BUILTIN"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0/0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0/1"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0/2"
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0/0/3"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "Push Button",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Push-Button+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Push Button Toggle Switch",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Push-Button-Toggle-Switch+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Repeater-PT",
+      "type": "repeater",
+      "kind": "repeater",
+      "aliases": [
+        "repeater"
+      ],
+      "variants": []
+    },
+    {
+      "model": "RFID Card",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "RFID Reader",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "RGB LED",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "RGB-LED+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Rocker Switch",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Rocker-Switch+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Router-PT",
+      "type": "router",
+      "kind": "Router",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Router-PT+PT-ROUTER-NM-1CFE+PT-ROUTER-NM-1S+PT-ROUTER-NM-1FFE",
+          "modules": [
+            "PT-ROUTER-NM-1CFE",
+            "PT-ROUTER-NM-1S",
+            "PT-ROUTER-NM-1FFE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet1/0",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 2,
+              "type": "eSerial",
+              "family": "serial",
+              "name": "Serial2/0",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 3,
+              "type": "eSerial",
+              "family": "serial",
+              "name": "Serial3/0",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 4,
+              "type": "eFiberFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet4/0",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 5,
+              "type": "eFiberFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet5/0",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": -1,
+              "type": "eAsync",
+              "family": "async",
+              "name": "Auxiliary",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "Router-PT-Empty",
+      "type": "router",
+      "kind": "router",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "SBC-PT",
+      "type": "sbc",
+      "kind": "SBC",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "SBC-PT+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER+PT-IOT-NM-1W-AC",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-IOT-POWER-ADAPTER",
+            "PT-IOT-NM-1W-AC"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessAC",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "SBC-PT+PT-IOE-CUSTOM-IO+PT-IOE-POWER-ADAPTER+PT-IOE-NM-1W-AC",
+          "modules": [
+            "PT-IOE-CUSTOM-IO",
+            "PT-IOE-POWER-ADAPTER",
+            "PT-IOE-NM-1W-AC"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessAC",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "SBC-PT+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-IOT-POWER-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "SBC-PT+PT-IOT-NM-1CE+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-IOT-POWER-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "SBC-PT+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER+PT-IOT-NM-1W-AC",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-IOT-POWER-ADAPTER",
+            "PT-IOT-NM-1W-AC"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eHostWirelessAC",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 5,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Server-PT",
+      "type": "server",
+      "kind": "Server",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Server-PT+PT-HOST-NM-1CFE",
+          "modules": [
+            "PT-HOST-NM-1CFE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            },
+            {
+              "index": 1,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "Server-PT+PT-HOST-NM-1W",
+          "modules": [
+            "PT-HOST-NM-1W"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessG",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "Server-PT+PT-HOST-NM-1CFE+PT-HOST-NM-1CGE",
+          "modules": [
+            "PT-HOST-NM-1CFE",
+            "PT-HOST-NM-1CGE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Servo",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Signal Generator",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Signal-Generator+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Siren",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Smart LED",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Smart-LED+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "SMARTPHONE-PT",
+      "type": "smartphone",
+      "kind": "Pda",
+      "aliases": [
+        "Smartphone-PT",
+        "smartphone"
+      ],
+      "variants": [
+        {
+          "key": "SMARTPHONE-PT+Linksys-WPC300N+PT-PDA-NM-3G-4G",
+          "modules": [
+            "Linksys-WPC300N",
+            "PT-PDA-NM-3G/4G"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 5,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 6,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 7,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 8,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 9,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 10,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Smoke Detector",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Smoke Sensor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Sniffer",
+      "type": "sniffer",
+      "kind": "Sniffer",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Sniffer+PT-REPEATER-NM-1CE",
+          "modules": [
+            "PT-REPEATER-NM-1CE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Solar Panel",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Solar-Panel+PT-IOT-NM-1CGE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CGE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Sound Frequency Detector",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Sound Sensor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Sound-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Speaker",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Street Lamp",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Switch-PT",
+      "type": "switch",
+      "kind": "switch",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Switch-PT-Empty",
+      "type": "switch",
+      "kind": "switch",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "TabletPC-PT",
+      "type": "tablet",
+      "kind": "TabletPC",
+      "aliases": [
+        "Tablet-PT",
+        "tablet"
+      ],
+      "variants": [
+        {
+          "key": "TabletPC-PT+Linksys-WPC300N+PT-TABLETPC-NM-3G",
+          "modules": [
+            "Linksys-WPC300N",
+            "PT-TABLETPC-NM-3G"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 5,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 6,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 7,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 8,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 9,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 10,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Temperature Monitor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Temperature-Monitor+PT-IOT-NM-1CFE+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Temperature Sensor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Temperature-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Thermostat",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Thermostat+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Thing",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Thing+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "Thing+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [],
+          "hasConfig": false
+        },
+        {
+          "key": "Thing+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "Thing+PT-IOT-NM-1CGE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CGE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "Thing+PT-IOT-NM-1CE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Toggle Push Button",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Trip Sensor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Trip Wire",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "TV-PT",
+      "type": "tv",
+      "kind": "tv",
+      "aliases": [
+        "smart tv"
+      ],
+      "variants": []
+    },
+    {
+      "model": "Water Detector",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Water Drain",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Water Level Monitor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Water Sensor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Webcam",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Wind Detector",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Wind Sensor",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": []
+    },
+    {
+      "model": "Wind Turbine",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Wind-Turbine+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Window",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Window+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "WLC-2504",
+      "type": "wlc",
+      "kind": "WirelessLanController",
+      "aliases": [
+        "2504"
+      ],
+      "variants": [
+        {
+          "key": "WLC-2504",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "eVlan",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 5,
+              "type": "eWlcInterface",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 6,
+              "type": "eWlcInterface",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "WLC-3504",
+      "type": "wlc",
+      "kind": "WirelessLanController",
+      "aliases": [
+        "3504"
+      ],
+      "variants": [
+        {
+          "key": "WLC-3504",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 5,
+              "type": "eVlan",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 6,
+              "type": "eWlcInterface",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 7,
+              "type": "eWlcInterface",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 8,
+              "type": "eWlcInterface",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 9,
+              "type": "eWlcInterface",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "WLC-PT",
+      "type": "wlc",
+      "kind": "WirelessLanController",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "WLC-PT",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eVlan",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    }
+  ],
+  "cables": [
+    {
+      "id": "copper",
+      "label": "Copper straight-through",
+      "aliases": [
+        "straight-through",
+        "straight through",
+        "straight",
+        "copper straight-through"
+      ],
+      "medium": "eCopper",
+      "variant": "eStraightThrough",
+      "families": [
+        "copper"
+      ],
+      "templateAvailable": true
+    },
+    {
+      "id": "copper-cross",
+      "label": "Copper crossover",
+      "aliases": [
+        "crossover",
+        "cross-over",
+        "cross over",
+        "cross",
+        "copper crossover"
+      ],
+      "medium": "eCopper",
+      "variant": "eCrossOver",
+      "families": [
+        "copper"
+      ],
+      "templateAvailable": true
+    },
+    {
+      "id": "console",
+      "label": "Console / rollover",
+      "aliases": [
+        "console",
+        "rollover",
+        "roll-over",
+        "console cable"
+      ],
+      "medium": "eConsole",
+      "variant": "",
+      "families": [
+        "console",
+        "rs232"
+      ],
+      "templateAvailable": false
+    },
+    {
+      "id": "serial-dce",
+      "label": "Serial DCE",
+      "aliases": [
+        "serial dce",
+        "serial-dce",
+        "dce"
+      ],
+      "medium": "eSerial",
+      "variant": "",
+      "families": [
+        "serial"
+      ],
+      "templateAvailable": true
+    },
+    {
+      "id": "serial-dte",
+      "label": "Serial DTE",
+      "aliases": [
+        "serial dte",
+        "serial-dte",
+        "dte"
+      ],
+      "medium": "eSerial",
+      "variant": "",
+      "families": [
+        "serial"
+      ],
+      "templateAvailable": true
+    },
+    {
+      "id": "serial",
+      "label": "Serial",
+      "aliases": [
+        "serial",
+        "serial cable"
+      ],
+      "medium": "eSerial",
+      "variant": "",
+      "families": [
+        "serial"
+      ],
+      "templateAvailable": true
+    },
+    {
+      "id": "fiber-single",
+      "label": "Fiber single-mode",
+      "aliases": [
+        "single-mode fiber",
+        "single mode fiber",
+        "single-mode fibre",
+        "single mode fibre",
+        "single mode",
+        "single-mode",
+        "fiber sm",
+        "smf"
+      ],
+      "medium": "eFiber",
+      "variant": "eSingleMode",
+      "families": [
+        "fiber"
+      ],
+      "templateAvailable": true
+    },
+    {
+      "id": "fiber-multi",
+      "label": "Fiber multimode",
+      "aliases": [
+        "multimode fiber",
+        "multi-mode fiber",
+        "multimode fibre",
+        "multi mode fiber",
+        "multimode",
+        "multi-mode",
+        "multi mode",
+        "fiber mm",
+        "mmf"
+      ],
+      "medium": "eFiber",
+      "variant": "eMultiMode",
+      "families": [
+        "fiber"
+      ],
+      "templateAvailable": true
+    },
+    {
+      "id": "fiber",
+      "label": "Fiber (mode unspecified)",
+      "aliases": [
+        "fiber",
+        "fibre",
+        "fiber optic",
+        "fibre optic"
+      ],
+      "medium": "eFiber",
+      "variant": "",
+      "families": [
+        "fiber"
+      ],
+      "templateAvailable": true
+    },
+    {
+      "id": "phone",
+      "label": "Phone line",
+      "aliases": [
+        "phone line",
+        "phone cable",
+        "telephone cable",
+        "rj11",
+        "rj-11",
+        "telephone"
+      ],
+      "medium": "ePhoneLine",
+      "variant": "",
+      "families": [
+        "modem"
+      ],
+      "templateAvailable": true
+    },
+    {
+      "id": "coaxial",
+      "label": "Coaxial",
+      "aliases": [
+        "coaxial",
+        "coax",
+        "coaxial cable"
+      ],
+      "medium": "eCoaxial",
+      "variant": "",
+      "families": [
+        "coaxial"
+      ],
+      "templateAvailable": true
+    },
+    {
+      "id": "octal",
+      "label": "Octal",
+      "aliases": [
+        "octal",
+        "octal cable"
+      ],
+      "medium": "eOctal",
+      "variant": "",
+      "families": [
+        "async",
+        "console"
+      ],
+      "templateAvailable": true
+    },
+    {
+      "id": "ioe",
+      "label": "IoE custom cable",
+      "aliases": [
+        "ioe custom cable",
+        "iot custom cable",
+        "custom io",
+        "custom i/o",
+        "ioe",
+        "gpio cable"
+      ],
+      "medium": "eCustomIOLink",
+      "variant": "",
+      "families": [
+        "io"
+      ],
+      "templateAvailable": true
+    },
+    {
+      "id": "usb",
+      "label": "USB",
+      "aliases": [
+        "usb",
+        "usb cable"
+      ],
+      "medium": "eUsb",
+      "variant": "",
+      "families": [
+        "usb"
+      ],
+      "templateAvailable": true
+    }
+  ]
+}

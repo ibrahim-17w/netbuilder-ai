@@ -254,10 +254,19 @@ def server_services(xml: bytes) -> Dict[str, List[dict]]:
                 clients = len(re.findall(rb"<CLIENT><HOST_IP>", body))
                 detail = f"{users} user(s), {clients} client(s)"
             elif tag == "DHCP_SERVERS":
-                pools = len(re.findall(rb"<DHCP_SERVER><ENABLED>", body))
+                # A DEVICE may have one DHCP_SERVER element per associated
+                # port, so count actual address pools rather than server
+                # containers. The old count called an empty DHCP panel a
+                # configured pool and hid an unusable server.
+                pools = len(re.findall(rb"<POOL(?:\s[^>]*)?>", body))
                 detail = f"{pools} pool(s)"
             elif tag == "DNS_SERVER":
-                records = len(re.findall(rb"<NAME_ALIAS>", body))
+                # Packet Tracer saves appear with both NAME_ALIAS and the
+                # RESOURCE-RECORD/NAME schema emitted by our generator.
+                records = max(
+                    len(re.findall(rb"<NAME_ALIAS>", body)),
+                    len(re.findall(rb"<RESOURCE-RECORD(?:\s[^>]*)?>", body)),
+                )
                 detail = f"{records} record(s)"
             if enabled or detail:
                 rows.append({"service": svc, "enabled": enabled,

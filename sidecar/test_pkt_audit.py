@@ -122,6 +122,26 @@ def test_aaa_state_roundtrip(proof_pkt):
     assert srv2["clients"][0]["type"] == "RADIUS"
 
 
+def test_server_service_inventory_counts_pool_and_resource_record_tags():
+    xml = (
+        b'<PACKETTRACER5><DEVICE><TYPE customModel="" model="Server-PT">'
+        b'Server</TYPE><NAME translate="true">SRV1</NAME>'
+        b'<DHCP_SERVERS><ASSOCIATED_PORTS><ASSOCIATED_PORT><DHCP_SERVER>'
+        b'<ENABLED>1</ENABLED><POOLS><POOL><NAME>LAN</NAME></POOL></POOLS>'
+        b'</DHCP_SERVER></ASSOCIATED_PORT></ASSOCIATED_PORTS></DHCP_SERVERS>'
+        b'<DNS_SERVER><ENABLED>1</ENABLED><NAMESERVER-DATABASE>'
+        b'<RESOURCE-RECORD><NAME>app.example</NAME></RESOURCE-RECORD>'
+        b'</NAMESERVER-DATABASE></DNS_SERVER></DEVICE></PACKETTRACER5>'
+    )
+
+    rows = pkt_audit.server_services(xml)["SRV1"]
+
+    assert {row["service"]: row["detail"] for row in rows} == {
+        "dhcp": "1 pool(s)",
+        "dns": "1 record(s)",
+    }
+
+
 def test_audit_reports_findings(proof_pkt):
     rep = pkt_audit.audit(proof_pkt, "audit-test")
     assert rep["summary"]["devices"] == 6

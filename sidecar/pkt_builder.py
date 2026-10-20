@@ -41,6 +41,7 @@ import uuid
 import xml.etree.ElementTree as ET
 
 import pkt_codec
+import pt_hardware as hardware
 import pkt_template_build as template_build
 
 __all__ = [
@@ -201,18 +202,7 @@ _PORT_FAMILIES = ("fastethernet", "gigabitethernet", "ethernet", "serial",
                   "fiber", "wireless")
 
 # Cable kind -> (link medium, cable type) as Packet Tracer names them.
-LINK_MEDIUMS = {
-    "copper": ("eCopper", "eStraightThrough"),
-    "straight": ("eCopper", "eStraightThrough"),
-    "copper-cross": ("eCopper", "eCrossOver"),
-    "cross": ("eCopper", "eCrossOver"),
-    "crossover": ("eCopper", "eCrossOver"),
-    "serial": ("eSerial", "eSerial"),
-    "serial-dce": ("eSerial", "eSerial"),
-    "serial-dte": ("eSerial", "eSerial"),
-    "fiber": ("eFiber", "eFiber"),
-    "console": ("eConsole", "eConsole"),
-}
+LINK_MEDIUMS = hardware.LINK_MEDIUMS
 
 # Exec-mode lines the app types at the CLI but that must not live inside a
 # saved running config: Packet Tracer replays this text in config mode.
@@ -520,11 +510,21 @@ def select_variant(library: dict, node: dict,
     """Pick the model template that best covers this node and its ports."""
     node_type = str(node.get("type") or "").strip().lower()
     wanted = [str(port) for port in (wanted_ports or []) if str(port).strip()]
+    requested=hardware.MODELS.get(hardware.identity(node.get('model')))
+    required_modules=node.get('modules') or []
+    exact=bool(node.get('exactModel') or required_modules)
+    if exact and (not requested or requested['type']!=node_type):
+        raise BuildError(f"{node.get('name')}: unknown exact model {node.get('model')} for {node_type}")
     candidates = [entry for entry in library.get("devices", [])
                   if _kind_matches(entry.get("kind", ""), node_type)]
     if not candidates:
         candidates = [entry for entry in library.get("devices", [])
                       if _kind_text_matches(entry.get("kind", ""), node_type)]
+    if exact:
+        candidates=[e for e in library.get('devices',[]) if hardware.identity(e.get('model'))==hardware.identity(requested['model'])
+            and all(any(hardware.identity(m)==hardware.identity(x) for x in e.get('modules',[])) for m in required_modules)]
+        if not candidates:
+            raise BuildError(f"{node.get('name')}: requested model/modules cannot be built; choose an available variant. No replacement was made.")
     valid_candidates = []
     rejected = []
     for entry in candidates:
@@ -535,11 +535,26 @@ def select_variant(library: dict, node: dict,
         else:
             valid_candidates.append(entry)
     candidates = valid_candidates
+    media=node.get('portMedia') or {}
+    if media:
+        compatible=[]
+        for entry in candidates:
+            named=_named_variant(entry)
+            good=True
+            for spec,cable_name in media.items():
+                definition=hardware.cable_for(cable_name)
+                port,_=resolve_port(named,spec)
+                if not definition or not port or hardware.port_medium(port) not in definition['families']:
+                    good=False;break
+                if definition['id'] in ('fiber-single','fiber-multi') and (definition['id']=='fiber-single')!=hardware.single_mode(entry.get('modules',[])):
+                    good=False;break
+            if good:compatible.append(entry)
+        if compatible:candidates=compatible
     if not candidates:
         return None, rejected + [
             f"{node.get('name')}: no {node_type or 'device'} model has a "
             "valid template - node skipped"]
-    model_hint = str(node.get("model") or "").strip().lower()
+    model_hint = str((requested or {}).get("model") or node.get("model") or "").strip().lower()
 
     def coverage(entry):
         hits = 0
@@ -572,7 +587,7 @@ def select_variant(library: dict, node: dict,
         hint = 1 if model_hint and (model == model_hint
                                     or model.startswith(model_hint)) else 0
         return (fits(entry), coverage(entry), hint,
-                -len(entry.get("ports") or []))
+                -sum(p.get("index", 0) >= 0 for p in entry.get("ports") or []))
 
     best = max(candidates, key=score)
     # A rejected template is reported even when another model can take its
@@ -1637,27 +1652,9 @@ def _set_tag(block: bytes, tag: str, value: str) -> bytes:
     return re.sub(pattern, replace, block, count=1)
 
 
-def _set_tag_or_insert(block: bytes, tag: str, value: str) -> bytes:
-    """Set a tag inside a PORT, creating the element when it is absent.
-
-    `_set_tag` deliberately leaves a block untouched when the tag is not
-    there: a device block's own tags are PT-authored and must not be
-    invented.  A PORT's `<NAME>` is the opposite - a port the source save
-    never named NEEDS one, or the cable that references it by name points at
-    nothing.
-    """
-    replaced = _set_tag(block, tag, value)
-    if replaced != block:
-        return replaced
-    opener = re.search(rb"<PORT(?:\s[^>]*)?>", block)
-    if opener is None:
-        return block
-    at = opener.end()
-    return (block[:at] + b"<" + tag.encode() + b">" + _esc(value)
-            + b"</" + tag.encode() + b">" + block[at:])
-
-
 def _patch_port(block: bytes, port_index: int, fields: dict) -> bytes:
+    if port_index < 0:
+        return block
     spans = template_build.iter_port_spans(block)
     if port_index < 0 or port_index >= len(spans):
         return block
@@ -1665,24 +1662,6 @@ def _patch_port(block: bytes, port_index: int, fields: dict) -> bytes:
     port = block[start:end]
     for tag, value in fields.items():
         port = _set_tag(port, tag, str(value))
-    return block[:start] + port + block[end:]
-
-
-def _stamp_port_name(block: bytes, port_index: int, port_name: str) -> bytes:
-    """Write the resolved name onto the port, creating <NAME> when absent.
-
-    Every access point is that case: Packet Tracer names the port from the
-    host module and never writes it into the save, so the block has no
-    <NAME> element at all.  A LINK block references its ports by name, so a
-    cable pointing at FastEthernet0 resolves to nothing and the whole link is
-    dropped - which is how a plan that cabled SW1 to an AP came out with the
-    AP floating in the workspace, connected to nothing.
-    """
-    spans = template_build.iter_port_spans(block)
-    if port_index < 0 or port_index >= len(spans):
-        return block
-    start, end = spans[port_index]
-    port = _set_tag_or_insert(block[start:end], "NAME", port_name)
     return block[:start] + port + block[end:]
 
 
@@ -1879,14 +1858,16 @@ def _ref_id(seed: str, used: set) -> int:
 
 def _pick_link_template(library: dict, cable: str) -> tuple[dict | None,
                                                             str]:
-    medium, cable_type = LINK_MEDIUMS.get(
-        str(cable or "copper").strip().lower(), ("eCopper", "eStraightThrough"))
+    definition=hardware.cable_for(cable)
+    if definition is None:
+        raise BuildError(f'Unknown cable "{cable}"; choose a catalog cable. No replacement was made.')
+    medium,cable_type=definition['medium'],definition['variant']
     entries = library.get("links", [])
     for entry in entries:
         if entry.get("type") == medium and entry.get("cable") == cable_type:
             return entry, ""
     for entry in entries:  # the right medium, any cable of it
-        if entry.get("type") == medium:
+        if entry.get("type") == medium and (not cable_type or medium == "eCopper"):
             return entry, ""
     if medium == "eCopper":
         return None, ""  # caller reports "library has no copper link"
@@ -1924,8 +1905,14 @@ def _build_link(library: dict, link: dict, refs: dict, port_names: dict,
         warnings.append(f"link {name_a}-{name_b}: endpoint was skipped")
         return None
     requested_cable = str(link.get("cable") or "copper")
+    if hardware.cable_for(requested_cable) and hardware.cable_for(requested_cable)['id']=='fiber':
+        modules=(variants or {}).get(name_a,{}).get('modules',[])
+        requested_cable='fiber-single' if hardware.single_mode(modules) else 'fiber-multi'
+        link={**link,'cable':requested_cable}
     template, note = _pick_link_template(library, requested_cable)
     if template is None:
+        if link.get('exactPorts'):
+            raise BuildError(f'link {name_a}-{name_b}: {note}; this connection is understood but cannot be generated by the library.')
         warnings.append(
             f"link {name_a}-{name_b}: "
             + (note or "the library has no copper cable template"))
@@ -1944,9 +1931,9 @@ def _build_link(library: dict, link: dict, refs: dict, port_names: dict,
     # endpoint family; remapping one to Ethernet creates a misleading cable
     # record that Packet Tracer cannot use as requested.  First come, first
     # served: each Ethernet claim is recorded so the next link cannot reuse it.
-    medium, _cable_type = LINK_MEDIUMS.get(
-        requested_cable.strip().lower(), ("eCopper", "eStraightThrough"))
-    allow_ethernet_remap = medium == "eCopper"
+    definition = hardware.cable_for(requested_cable)
+    medium = definition['medium']
+    allow_ethernet_remap = medium == "eCopper" and not link.get("exactPorts")
     if allow_ethernet_remap and not port_a and name_a in refs:
         spare = _spare_ethernet_port(used_ports or {}, name_a,
                                      (variants or {}).get(name_a, {}).get(
@@ -1976,6 +1963,13 @@ def _build_link(library: dict, link: dict, refs: dict, port_names: dict,
                         f"usable on {name_b}")
         return None
     out = block
+    variant_a=(variants or {}).get(name_a,{})
+    variant_b=(variants or {}).get(name_b,{})
+    actual_a=next((p for p in variant_a.get('ports',[]) if p.get('name')==port_a),None)
+    actual_b=next((p for p in variant_b.get('ports',[]) if p.get('name')==port_b),None)
+    if actual_a and actual_b:
+        error=hardware.mismatch(hardware.cable_for(requested_cable),actual_a,actual_b,variant_a.get('modules',[]),variant_b.get('modules',[]))
+        if error:raise BuildError(f'link {name_a}-{name_b}: {error}')
     out = _replace_first(out, rb"<FROM>[^<]*</FROM>",
                          b"<FROM>save-ref-id:" + str(refs[name_a]).encode()
                          + b"</FROM>")
@@ -2018,8 +2012,7 @@ def _build_link(library: dict, link: dict, refs: dict, port_names: dict,
             "so the serial link has no DCE side")
     # The template's cable kind may differ from the one the plan asked for
     # (a crossover on the straight-through block is the same structure).
-    _medium, wanted_cable = LINK_MEDIUMS.get(requested_cable.strip().lower(),
-                                             ("eCopper", "eStraightThrough"))
+    wanted_cable = definition['variant']
     if wanted_cable and template.get("cable") \
             and template["cable"] != wanted_cable:
         cable_segment = re.search(rb"<CABLE>.*?</CABLE>", out, re.S)
@@ -2197,7 +2190,9 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
         # it is normalized exactly as select_variant normalizes it.
         node_type = str(node.get("type") or "").strip().lower()
         device_report_services: dict = {}
-        variant, notes = select_variant(library, node, wanted.get(name, []))
+        constraints={str(link.get(side+'If')):link['cable'] for link in sections['links']
+                     if link.get('exactPorts') and link.get('cable') for side in ('a','b') if link.get(side)==name}
+        variant, notes = select_variant(library, {**node,'portMedia':constraints}, wanted.get(name, []))
         warnings.extend(notes)
         if variant is None:
             continue
@@ -2211,6 +2206,12 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
         # exactly as Packet Tracer wrote it; the build is what needs a name to
         # put in a <LINK>.
         variant = _named_variant(variant)
+        for link in sections['links']:
+            if not link.get('exactPorts'):continue
+            for side in ('a','b'):
+                if link.get(side)==name and exact_port(variant,str(link.get(side+'If') or '')) is None:
+                    raise BuildError(f"{name}: exact port {link.get(side+'If')} is unavailable on {variant['key']}. No port remap was made.")
+
         block = library["_blocks"].get(variant["file"])
         if not block:
             warnings.append(f"{name}: template block {variant['file']} is "
@@ -2264,14 +2265,15 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
                 used_ports[(name, port["name"])] = True
                 if note and note not in warnings:
                     warnings.append(f"{name}: {note}")
-        # Stamp the resolved name onto the PORT element itself.  A model
-        # whose port block carries no <NAME> (every access point - the port is
-        # named from the host module and never written into the save) is
-        # addressable by name in the manifest but not in its own XML, so a
-        # LINK that says <PORT>FastEthernet0</PORT> points at a port the
-        # device block never declares.  Writing the name closes that gap.
-        for port in plan_ports.values():
-            block = _stamp_port_name(block, port["index"], port["name"])
+        # NO `<NAME>` STAMP HERE. The resolved name is what a LINK block
+        # references, and Packet Tracer matches it against its own module
+        # layout - it never writes a `<NAME>` element inside `<PORT>` (0 of 46
+        # PORT blocks in a real save carry one). Inventing one produced a file
+        # Packet Tracer rejected outright as "not compatible with this version",
+        # which is exactly what happened the first time this was tried.
+        #
+        # What DOES make an access point cableable is the manifest naming the
+        # port the source save left nameless, so the link resolves at all.
         # Clocking: a serial DCE end needs the flag set on the port itself.
         for spec, port in plan_ports.items():
             clock = _clock_rate_for(config_lines, port["name"])

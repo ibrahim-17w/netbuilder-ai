@@ -451,12 +451,14 @@ def _qt_uncompress(blob: bytes) -> bytes:
     if len(blob) < 6:
         raise PktFormatError("compressed payload is too short")
     declared = struct.unpack(">I", blob[:4])[0]
-    if declared > MAX_XML_BYTES:
+    if declared == 0 or declared > MAX_XML_BYTES:
         raise PktFormatError(
             f"declared size {declared} exceeds the {MAX_XML_BYTES} byte cap")
     decompressor = zlib.decompressobj()
-    data = decompressor.decompress(blob[4:], declared)
-    data += decompressor.flush()
+    # Read one extra byte to detect a lying prefix without an unbounded flush.
+    data = decompressor.decompress(blob[4:], declared + 1)
+    if len(data) != declared or not decompressor.eof or decompressor.unused_data:
+        raise PktFormatError("compressed payload size does not match its declaration")
     if not data.startswith(b"<"):
         raise PktFormatError("payload does not decompress to XML")
     return data[:declared]

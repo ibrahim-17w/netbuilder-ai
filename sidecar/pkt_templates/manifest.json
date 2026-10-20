@@ -909,6 +909,13 @@
           "type": "",
           "family": "",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\iot_home_gateway.pkt",
@@ -994,6 +1001,13 @@
           "type": "",
           "family": "",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eModem",
+          "family": "modem",
+          "name": "Phone",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\01 Networking\\VoIP\\voip_local_all_phone_devices.pkt",
@@ -1015,6 +1029,13 @@
           "type": "eModem",
           "family": "",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eModem",
+          "family": "modem",
+          "name": "Port 0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\01 Networking\\VoIP\\voip_local_all_phone_devices.pkt",
@@ -1124,6 +1145,13 @@
           "type": "",
           "family": "",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCopperCoaxial",
+          "family": "coaxial",
+          "name": "Coaxial0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\01 Networking\\Wireless\\Bluetooth\\bluetooth tethering.pkt",
@@ -1185,6 +1213,20 @@
           "type": "",
           "family": "",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCopperCoaxial",
+          "family": "coaxial",
+          "name": "Coaxial0/0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCopperCoaxial",
+          "family": "coaxial",
+          "name": "Coaxial0/1",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\01 Networking\\Wireless\\Bluetooth\\bluetooth tethering.pkt",
@@ -1218,6 +1260,13 @@
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
           "name": "GigabitEthernet0/2"
+        },
+        {
+          "index": -1,
+          "type": "eAsync",
+          "family": "async",
+          "name": "Auxiliary",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\01 Networking\\Wireless\\Bluetooth\\bluetooth tethering.pkt",
@@ -1360,6 +1409,13 @@
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
           "name": "GigabitEthernet0/1"
+        },
+        {
+          "index": -1,
+          "type": "eAsync",
+          "family": "async",
+          "name": "Auxiliary",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\01 Networking\\8200\\8200.pkt",
@@ -1762,37 +1818,50 @@
           "index": 0,
           "type": "eCopperFastEthernet",
           "family": "fastethernet",
-          "name": "FastEthernet0/0"
+          "name": "FastEthernet0/0",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 1,
           "type": "eCopperFastEthernet",
           "family": "fastethernet",
-          "name": "FastEthernet0/0.10"
+          "name": "FastEthernet1/0",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 2,
           "type": "eSerial",
           "family": "serial",
-          "name": "Serial2/0"
+          "name": "Serial2/0",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 3,
           "type": "eSerial",
           "family": "serial",
-          "name": "Serial3/0"
+          "name": "Serial3/0",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 4,
           "type": "eFiberFastEthernet",
-          "family": "",
-          "name": ""
+          "family": "fastethernet",
+          "name": "FastEthernet4/0",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 5,
           "type": "eFiberFastEthernet",
-          "family": "",
-          "name": ""
+          "family": "fastethernet",
+          "name": "FastEthernet5/0",
+          "namingEvidence": "Bundled PT-authored interface configuration"
+        },
+        {
+          "index": -1,
+          "type": "eAsync",
+          "family": "async",
+          "name": "Auxiliary",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\01 Networking\\HomeRouter\\hr-isp-vlans-ip-dhcp.pkt",
@@ -1871,6 +1940,13 @@
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
           "name": "GigabitEthernet0/1"
+        },
+        {
+          "index": -1,
+          "type": "eAsync",
+          "family": "async",
+          "name": "Auxiliary",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\01 Networking\\IPv6\\ipv6_slaac.pkt",
@@ -1896,6 +1972,20 @@
           "type": "eCopperFastEthernet",
           "family": "fastethernet",
           "name": "FastEthernet0/1"
+        },
+        {
+          "index": -1,
+          "type": "eConsole",
+          "family": "console",
+          "name": "Console",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eAsync",
+          "family": "async",
+          "name": "Auxiliary",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\01 Networking\\LLDP\\lldp_sample.pkt",
@@ -2663,6 +2753,27 @@
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\829\\829_IoX.pkt",
@@ -2681,7 +2792,29 @@
         "PT-UNV-PWR-ADAPTER"
       ],
       "file": "devices/RGB-LED+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
-      "ports": [],
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        }
+      ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\829\\829_IoX.pkt",
       "sourceName": "IoE1",
       "hasConfig": false,
@@ -2890,6 +3023,13 @@
           "type": "eCopperFastEthernet",
           "family": "fastethernet",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Environment\\doors.pkt",
@@ -2915,6 +3055,13 @@
           "type": "eCopperFastEthernet",
           "family": "fastethernet",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Environment\\firesprinkler.pkt",
@@ -2989,6 +3136,13 @@
           "type": "eCopperFastEthernet",
           "family": "fastethernet",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Environment\\lights.pkt",
@@ -3014,6 +3168,13 @@
           "type": "eCopperFastEthernet",
           "family": "fastethernet",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Environment\\lights.pkt",
@@ -3032,7 +3193,15 @@
         "PT-UNV-PWR-ADAPTER"
       ],
       "file": "devices/Potentiometer+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
-      "ports": [],
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        }
+      ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Environment\\lights.pkt",
       "sourceName": "IoE4",
       "hasConfig": false,
@@ -3047,7 +3216,22 @@
         "PT-UNV-PWR-ADAPTER"
       ],
       "file": "devices/LED+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
-      "ports": [],
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        }
+      ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Environment\\lights.pkt",
       "sourceName": "IoE0",
       "hasConfig": false,
@@ -3069,6 +3253,13 @@
           "type": "eCopperFastEthernet",
           "family": "fastethernet",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Environment\\speakers.pkt",
@@ -3094,6 +3285,20 @@
           "type": "eCopperFastEthernet",
           "family": "fastethernet",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Environment\\thermostat.pkt",
@@ -3119,6 +3324,13 @@
           "type": "eCopperFastEthernet",
           "family": "fastethernet",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Environment\\thermostat.pkt",
@@ -3144,6 +3356,13 @@
           "type": "eCopperFastEthernet",
           "family": "fastethernet",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Environment\\thermostat.pkt",
@@ -3162,7 +3381,50 @@
         "PT-IOT-POWER-ADAPTER"
       ],
       "file": "devices/MCU-PT+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER.xml",
-      "ports": [],
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eUsb",
+          "family": "usb",
+          "name": "USB0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        }
+      ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Real HTTP\\real-http-server-js.pkt",
       "sourceName": "real http client",
       "hasConfig": false,
@@ -3189,6 +3451,20 @@
           "type": "",
           "family": "",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\appliance.pkt",
@@ -3205,7 +3481,15 @@
         "PT-UNV-PWR-ADAPTER"
       ],
       "file": "devices/Rocker-Switch+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
-      "ports": [],
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        }
+      ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\appliance.pkt",
       "sourceName": "IoT4",
       "hasConfig": false,
@@ -3227,6 +3511,13 @@
           "type": "eCopperFastEthernet",
           "family": "fastethernet",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\appliance.pkt",
@@ -3245,7 +3536,15 @@
         "PT-UNV-PWR-ADAPTER"
       ],
       "file": "devices/Push-Button+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
-      "ports": [],
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        }
+      ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\basic_io.pkt",
       "sourceName": "IoT0",
       "hasConfig": false,
@@ -3285,6 +3584,20 @@
           "type": "",
           "family": "",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\battery-solar_panel-power_meter.pkt",
@@ -3303,7 +3616,15 @@
         "PT-UNV-PWR-ADAPTER"
       ],
       "file": "devices/Thing+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
-      "ports": [],
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        }
+      ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\battery-solar_panel-power_meter.pkt",
       "sourceName": "Custom LED 1",
       "hasConfig": false,
@@ -3343,6 +3664,13 @@
           "type": "",
           "family": "",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\battery-solar_panel-power_meter.pkt",
@@ -3380,6 +3708,41 @@
           "type": "",
           "family": "",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\battery-solar_panel-power_meter.pkt",
@@ -3463,6 +3826,13 @@
           "type": "",
           "family": "",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\fire_monitor_sprinkler.pkt",
@@ -3488,6 +3858,13 @@
           "type": "eCopperFastEthernet",
           "family": "fastethernet",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\lcd-with-visual-scripting.pkt",
@@ -3506,7 +3883,22 @@
         "PT-UNV-PWR-ADAPTER"
       ],
       "file": "devices/LCD+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
-      "ports": [],
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        }
+      ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\lcd-with-visual-scripting.pkt",
       "sourceName": "Customized with Visual Programming",
       "hasConfig": false,
@@ -3521,7 +3913,15 @@
         "PT-UNV-PWR-ADAPTER"
       ],
       "file": "devices/Membrane-Potentiometer+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
-      "ports": [],
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        }
+      ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\membrane_sensor.pkt",
       "sourceName": "IoT3",
       "hasConfig": false,
@@ -3536,7 +3936,15 @@
         "PT-UNV-PWR-ADAPTER"
       ],
       "file": "devices/Metal-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
-      "ports": [],
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        }
+      ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\metal_sensor.pkt",
       "sourceName": "IoT1",
       "hasConfig": false,
@@ -3551,7 +3959,15 @@
         "PT-UNV-PWR-ADAPTER"
       ],
       "file": "devices/Motor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
-      "ports": [],
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        }
+      ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\metal_sensor.pkt",
       "sourceName": "CustomizedWithAlloyProperty",
       "hasConfig": false,
@@ -3566,7 +3982,15 @@
         "PT-UNV-PWR-ADAPTER"
       ],
       "file": "devices/Piezo-Speaker+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
-      "ports": [],
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        }
+      ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\piezo_speaker.pkt",
       "sourceName": "IoT1",
       "hasConfig": false,
@@ -3588,6 +4012,13 @@
           "type": "eCopperFastEthernet",
           "family": "fastethernet",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\power-grid-log-power.pkt",
@@ -3619,6 +4050,13 @@
           "type": "eBluetooth",
           "family": "",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\remote_trigger_over_http.pkt",
@@ -3637,7 +4075,15 @@
         "PT-UNV-PWR-ADAPTER"
       ],
       "file": "devices/Sound-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
-      "ports": [],
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        }
+      ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\sound_sensor.pkt",
       "sourceName": "IoT4",
       "hasConfig": false,
@@ -3652,7 +4098,15 @@
         "PT-UNV-PWR-ADAPTER"
       ],
       "file": "devices/Temperature-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
-      "ports": [],
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        }
+      ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\temperature_sensor.pkt",
       "sourceName": "TS",
       "hasConfig": false,
@@ -3697,7 +4151,36 @@
         "PT-UNV-PWR-ADAPTER"
       ],
       "file": "devices/Push-Button-Toggle-Switch+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
-      "ports": [],
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        }
+      ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\04 IoT\\Solution Examples\\toggle_switch.pkt",
       "sourceName": "TSW",
       "hasConfig": false,
@@ -3869,169 +4352,197 @@
           "index": 0,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/1"
+          "name": "GigabitEthernet1/0/1",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 1,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/2"
+          "name": "GigabitEthernet1/0/2",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 2,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/3"
+          "name": "GigabitEthernet1/0/3",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 3,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/4"
+          "name": "GigabitEthernet1/0/4",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 4,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/5"
+          "name": "GigabitEthernet1/0/5",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 5,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/6"
+          "name": "GigabitEthernet1/0/6",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 6,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/7"
+          "name": "GigabitEthernet1/0/7",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 7,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/8"
+          "name": "GigabitEthernet1/0/8",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 8,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/9"
+          "name": "GigabitEthernet1/0/9",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 9,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/10"
+          "name": "GigabitEthernet1/0/10",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 10,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/11"
+          "name": "GigabitEthernet1/0/11",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 11,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/12"
+          "name": "GigabitEthernet1/0/12",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 12,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/13"
+          "name": "GigabitEthernet1/0/13",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 13,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/14"
+          "name": "GigabitEthernet1/0/14",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 14,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/15"
+          "name": "GigabitEthernet1/0/15",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 15,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/16"
+          "name": "GigabitEthernet1/0/16",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 16,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/17"
+          "name": "GigabitEthernet1/0/17",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 17,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/18"
+          "name": "GigabitEthernet1/0/18",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 18,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/19"
+          "name": "GigabitEthernet1/0/19",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 19,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/20"
+          "name": "GigabitEthernet1/0/20",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 20,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/21"
+          "name": "GigabitEthernet1/0/21",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 21,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/22"
+          "name": "GigabitEthernet1/0/22",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 22,
           "type": "eFiberGigabitEthernet",
-          "family": "",
-          "name": ""
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/23",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 23,
           "type": "eFiberGigabitEthernet",
-          "family": "",
-          "name": ""
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/24",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 24,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/23"
+          "name": "GigabitEthernet1/0/25",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 25,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/24"
+          "name": "GigabitEthernet1/0/26",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 26,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/25"
+          "name": "GigabitEthernet1/0/27",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 27,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/26"
+          "name": "GigabitEthernet1/0/28",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\06 Industrial -  OT\\Industrial Communication and Protocols\\PRP\\prp_scenario3_layer3_prp_int_group_2.pkt",
@@ -4129,170 +4640,198 @@
         {
           "index": 0,
           "type": "eFiberGigabitEthernet",
-          "family": "",
-          "name": ""
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/1",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 1,
           "type": "eFiberGigabitEthernet",
-          "family": "",
-          "name": ""
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/2",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 2,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/1"
+          "name": "GigabitEthernet1/0/3",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 3,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/2"
+          "name": "GigabitEthernet1/0/4",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 4,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/3"
+          "name": "GigabitEthernet1/0/5",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 5,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/4"
+          "name": "GigabitEthernet1/0/6",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 6,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/5"
+          "name": "GigabitEthernet1/0/7",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 7,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/6"
+          "name": "GigabitEthernet1/0/8",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 8,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/7"
+          "name": "GigabitEthernet1/0/9",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 9,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/8"
+          "name": "GigabitEthernet1/0/10",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 10,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/9"
+          "name": "GigabitEthernet1/0/11",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 11,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/10"
+          "name": "GigabitEthernet1/0/12",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 12,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/11"
+          "name": "GigabitEthernet1/0/13",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 13,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/12"
+          "name": "GigabitEthernet1/0/14",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 14,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/13"
+          "name": "GigabitEthernet1/0/15",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 15,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/14"
+          "name": "GigabitEthernet1/0/16",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 16,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/15"
+          "name": "GigabitEthernet1/0/17",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 17,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/16"
+          "name": "GigabitEthernet1/0/18",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 18,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/17"
+          "name": "GigabitEthernet1/0/19",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 19,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/18"
+          "name": "GigabitEthernet1/0/20",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 20,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/19"
+          "name": "GigabitEthernet1/0/21",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 21,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/20"
+          "name": "GigabitEthernet1/0/22",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 22,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/21"
+          "name": "GigabitEthernet1/0/23",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 23,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/22"
+          "name": "GigabitEthernet1/0/24",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 24,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/23"
+          "name": "GigabitEthernet1/0/25",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 25,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/24"
+          "name": "GigabitEthernet1/0/26",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 26,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/25"
+          "name": "GigabitEthernet1/0/27",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 27,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/0/26"
+          "name": "GigabitEthernet1/0/28",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\06 Industrial -  OT\\Industrial Communication and Protocols\\PRP\\prp_scenario3_layer3_prp_int_group_2.pkt",
@@ -4341,6 +4880,20 @@
           "type": "eCopperFastEthernet",
           "family": "fastethernet",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\06 Industrial -  OT\\Industrial Communication and Protocols\\PTP\\ptp_ot_network.pkt",
@@ -4892,6 +5445,13 @@
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\06 Industrial -  OT\\Industrial Communication and Protocols\\Profinet\\hmi-arm-profinet.pkt",
@@ -4917,6 +5477,34 @@
           "type": "eCopperEthernet",
           "family": "ethernet",
           "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT-authored saved cable endpoint"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT-authored saved cable endpoint"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\06 Industrial -  OT\\Industrial Communication and Protocols\\Profinet\\hmi-arm-profinet.pkt",
@@ -5182,62 +5770,72 @@
         {
           "index": 0,
           "type": "eFiberGigabitEthernet",
-          "family": "",
-          "name": ""
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/1",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 1,
           "type": "eFiberGigabitEthernet",
-          "family": "",
-          "name": ""
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/2",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 2,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/1"
+          "name": "GigabitEthernet1/3",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 3,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/2"
+          "name": "GigabitEthernet1/4",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 4,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/3"
+          "name": "GigabitEthernet1/5",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 5,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/4"
+          "name": "GigabitEthernet1/6",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 6,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/5"
+          "name": "GigabitEthernet1/7",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 7,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/6"
+          "name": "GigabitEthernet1/8",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 8,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/7"
+          "name": "GigabitEthernet1/9",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 9,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/8"
+          "name": "GigabitEthernet1/10",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\06 Industrial -  OT\\Industrial Cybersecurity and Monitoring\\Firewall\\isa3000_dmz.pkt",
@@ -5267,25 +5865,29 @@
           "index": 1,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/1"
+          "name": "GigabitEthernet1/1",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 2,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/2"
+          "name": "GigabitEthernet1/2",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 3,
           "type": "eFiberGigabitEthernet",
-          "family": "",
-          "name": ""
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/3",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 4,
           "type": "eFiberGigabitEthernet",
-          "family": "",
-          "name": ""
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/4",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\06 Industrial -  OT\\Industrial Cybersecurity and Monitoring\\Firewall\\isa3000_dmz.pkt",
@@ -5314,25 +5916,29 @@
           "index": 1,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/1"
+          "name": "GigabitEthernet1/1",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 2,
           "type": "eCopperGigabitEthernet",
           "family": "gigabitethernet",
-          "name": "GigabitEthernet1/2"
+          "name": "GigabitEthernet1/2",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 3,
           "type": "eFiberGigabitEthernet",
-          "family": "",
-          "name": ""
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/3",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         },
         {
           "index": 4,
           "type": "eFiberGigabitEthernet",
-          "family": "",
-          "name": ""
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/4",
+          "namingEvidence": "Bundled PT-authored interface configuration"
         }
       ],
       "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\06 Industrial -  OT\\Industrial Cybersecurity and Monitoring\\Firewall\\isa3000_dmz.pkt",

@@ -9,6 +9,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 
 import pt_verify  # noqa: E402
+import pt_autopilot as autopilot  # noqa: E402
 
 
 def _plan(**over):
@@ -62,6 +63,102 @@ def test_service_tests_skip_dhcp_and_dedup():
     assert ("PC2", "SRV1") in pairs and ("PC2", "SRV2") in pairs
 
 
+def test_dns_check_is_separate_from_server_ping_and_uses_a_configured_record():
+    plan = _plan()
+    plan["nodes"][4]["serviceRules"] = {
+        "dns": {"records": [{"name": "web.lab", "address": "192.168.1.20"}]}
+    }
+    tests = pt_verify.derive_tests(plan)
+    dns = [t for t in tests if t["kind"] == "dns"]
+    assert len(dns) == 2
+    assert {(t["src"], t["query"], t["expectedIp"]) for t in dns} == {
+        ("PC1", "web.lab", "192.168.1.20"),
+        ("PC2", "web.lab", "192.168.1.20"),
+    }
+
+
+def test_dns_requires_a_reachable_dns_server_and_usable_record():
+    plan = _plan()
+    plan["nodes"][4]["serviceRules"] = {
+        "dns": {"records": [{"name": "bad.lab", "address": "not-an-ip"}]}
+    }
+    assert not [t for t in pt_verify.derive_tests(plan) if t["kind"] == "dns"]
+
+    plan["nodes"][4]["serviceRules"]["dns"]["records"] = [
+        {"name": "web.lab", "address": "192.168.1.20"}
+    ]
+    plan["links"] = [l for l in plan["links"] if l["a"] != "PC1" and l["b"] != "PC1"]
+    dns = [t for t in pt_verify.derive_tests(plan) if t["kind"] == "dns"]
+    assert {t["src"] for t in dns} == {"PC2"}
+
+
+def test_dns_result_needs_the_expected_lookup_evidence():
+    test = {
+        "src": "PC1", "dst": "SRV1", "kind": "dns",
+        "query": "web.lab", "expectedIp": "192.168.1.20",
+        "detail": "Resolve web.lab",
+    }
+    passed = pt_verify.shape_results([
+        {"source": "PC1", "target": "web.lab", "ok": True,
+         "available": True, "evidence": "Name: web.lab Address: 192.168.1.20"}
+    ], [test])
+    assert passed[0]["status"] == "passed"
+    failed = pt_verify.shape_results([
+        {"source": "PC1", "target": "web.lab", "ok": False,
+         "available": True, "evidence": "DNS request timed out"}
+    ], [test])
+    assert failed[0]["status"] == "failed"
+    skipped = pt_verify.shape_results([
+        {"source": "PC1", "target": "web.lab", "ok": False,
+         "available": False, "evidence": "Command Prompt unavailable"}
+    ], [test])
+    assert skipped[0]["status"] == "skipped"
+
+
+def test_live_dns_probe_types_nslookup_and_captures_the_expected_address(monkeypatch):
+    class Window:
+        def rectangle(self):
+            return type("Rect", (), {"left": 0, "top": 0, "right": 100, "bottom": 100})()
+
+    window = Window()
+    output = {"text": "Name: web.lab\nAddress: 192.168.1.20"}
+    commands = []
+    monkeypatch.setattr(autopilot, "_open_device_window", lambda *args: window)
+    monkeypatch.setattr(autopilot, "_pc_open_desktop_app", lambda *args: True)
+    monkeypatch.setattr(autopilot, "_safe_click", lambda *args: None)
+    monkeypatch.setattr(autopilot, "_interruptible_sleep", lambda *args: None)
+    monkeypatch.setattr(autopilot, "_type_line", lambda command, *args, **kwargs: commands.append(command) or True)
+    monkeypatch.setattr(autopilot, "_ocr_region", lambda *args: output["text"])
+    monkeypatch.setattr(autopilot, "_close_device_window", lambda *args: None)
+    monkeypatch.setattr(autopilot, "record_event", lambda *args, **kwargs: None)
+    monkeypatch.setattr(autopilot, "log", lambda *args, **kwargs: None)
+    monkeypatch.setattr(autopilot, "_OCR_CACHE", {})
+    results = []
+    autopilot._pc_dns_lookups(
+        None,
+        "PC1",
+        0,
+        [{"query": "web.lab", "expectedIp": "192.168.1.20"}],
+        "office",
+        results,
+    )
+    assert commands == ["nslookup web.lab"]
+    assert results[0]["ok"] is True
+    assert "192.168.1.20" in results[0]["evidence"]
+
+    output["text"] = "Name: web.lab\nAddress: 192.168.1.99"
+    results.clear()
+    autopilot._pc_dns_lookups(
+        None,
+        "PC1",
+        0,
+        [{"query": "web.lab", "expectedIp": "192.168.1.20"}],
+        "office",
+        results,
+    )
+    assert results[0]["ok"] is False
+
+
 def test_custom_tests_from_plan_are_appended():
     tests = pt_verify.derive_tests(_plan(tests=["PC1 must reach PC2"]))
     custom = [t for t in tests if t["kind"] == "custom"]
@@ -78,7 +175,7 @@ def test_cap_limits_test_count():
     nodes = [{"name": "R1", "type": "router"}]
     links = []
     addressing = [{"node": "R1", "iface": "g0/0", "ipCidr": "10.0.0.1/24"}]
-    for i in range(30):
+    for i in range(70):
         nodes.append({"name": f"PC{i}", "type": "pc"})
         links.append({"a": f"PC{i}", "aIf": "f0/1", "b": "SW1", "bIf": f"f0/{i}"})
     nodes.append({"name": "SW1", "type": "switch"})
@@ -86,6 +183,27 @@ def test_cap_limits_test_count():
     tests = pt_verify.derive_tests({"nodes": nodes, "links": links,
                                     "addressing": addressing})
     assert len(tests) <= pt_verify._MAX_TESTS
+    coverage = [t for t in tests if "Coverage limit:" in t.get("detail", "")]
+    assert len(coverage) == 1
+    assert "11 automatic checks were not run" in coverage[0]["detail"]
+
+
+def test_cap_reports_manual_checks_hidden_by_coverage_row():
+    services = ["dhcp", "dns", "http", "aaa", "ftp", "email", "ntp", "tftp", "syslog"]
+    plan = {
+        "nodes": [{"name": "SRV1", "type": "server", "services": services}],
+        "security": {
+            "extendedAcl": True,
+            "portSecurity": True,
+            "dhcpSnooping": True,
+            "tests": [f"Policy check {i}" for i in range(10)],
+        },
+    }
+    tests = pt_verify.derive_tests(plan)
+    coverage = [t for t in tests if "Coverage limit:" in t.get("detail", "")]
+    assert len(tests) == 20
+    assert len(coverage) == 1
+    assert "3 manual checks are not shown" in coverage[0]["detail"]
 
 
 # --------------------------------------------------------------------------

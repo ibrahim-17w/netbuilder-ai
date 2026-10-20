@@ -12,6 +12,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+from pathlib import Path
 import xml.etree.ElementTree as ET
 
 import pytest
@@ -1855,9 +1856,11 @@ class TestSidecar:
         with pytest.raises(ValueError):
             self.pt.pkt_templates_build([])
 
-    def test_offline_audit_reports_down_serial_as_advice(self):
-        # A file whose serial port saved as down must be flagged with the
-        # exact remediation, and nothing may be typed anywhere.
+    def test_offline_audit_reports_a_cabled_serial_saved_down_once(self):
+        # A cabled serial link saved down is a conditional warning, reported
+        # once for the link. Unused interfaces are not defects, and because
+        # the configs already say no shutdown, the audit must not invent a
+        # CLI repair for a physical/clocking mismatch.
         plan = {"steps": [
             {"action": "create_nodes", "nodes": [
                 {"name": "R1", "type": "router", "model": "2811"},
@@ -1879,7 +1882,8 @@ class TestSidecar:
         # generate must NOT flag the mismatch - proving the mirror works.
         assert not any("saved port state is down" in f["text"]
                        for f in by_device["R1"]["findings"])
-        # A hand-corrupted file (POWER flipped off) IS flagged.
+        # A hand-corrupted file (POWER flipped off) is flagged once for the
+        # cabled link, with no automatic repair suggestion.
         import re as _re
         xml = pkt_builder.decode_pkt_file(result["path"])
         broken = _re.sub(rb"<POWER>true</POWER>", b"<POWER>false</POWER>",
@@ -1890,29 +1894,154 @@ class TestSidecar:
         broken_report = self.pt.pkt_audit_network(broken_path)
         texts = [f["text"] for d in broken_report["devices"]
                  for f in d["findings"]]
-        assert any("saved port state is down" in t for t in texts)
         serial_findings = [f for d in broken_report["devices"]
                            for f in d["findings"]
-                           if "saved port state is down" in f["text"]]
-        assert serial_findings[0]["fix_cli"] == ["interface Serial0/2/0",
-                                                 "no shutdown"]
+                           if f.get("kind") == "connected_interface_down"]
+        assert len(serial_findings) == 1
+        assert "saved down despite 'no shutdown'" in serial_findings[0]["text"]
+        assert serial_findings[0]["severity"] == "medium"
+        assert serial_findings[0]["fix_cli"] == []
+        assert serial_findings[0]["repairs"] == []
         assert serial_findings[0]["offline_advice"] is True
 
-    def test_offline_audit_flags_ipless_port_and_shut_interface(self):
+    def test_offline_audit_does_not_flag_an_unused_shutdown_port(self):
         plan = {"steps": [
             {"action": "create_nodes", "nodes": [
                 {"name": "R1", "type": "router", "model": "2811"}]},
             {"action": "paste_cli", "configs": {
-                # config sets an IP on Fa0/0 but shuts it; Fa0/1 gets an IP
-                # while its port stays at template state (no power line) -
-                # the port-vs-config mismatch must be flagged.
-                "R1": "interface f0/0\nip address 192.168.1.1 255.255.255.0\n"
-                      "shutdown\nexit\n"}}]}
+                # Fa0/0 is an unused spare and intentionally shut down.
+                "R1": "interface f0/0\nshutdown\nexit\n"
+                       "interface f0/1\nshutdown\nexit\n"}}]}
         result = self.pt.pkt_generate(plan, project="auditlab2")
         report = self.pt.pkt_audit_network(result["path"])
         r1 = next(d for d in report["devices"] if d["name"] == "R1")
         texts = [f["text"] for f in r1["findings"]]
-        assert any("shut down in the saved config" in t for t in texts)
+        assert not any("shut down" in t for t in texts)
+
+    def test_shutdown_vlan1_without_an_ip_is_not_reported(self):
+        plan = {"steps": [
+            {"action": "create_nodes", "nodes": [
+                {"name": "SW1", "type": "switch"}]},
+            {"action": "paste_cli", "configs": {
+                "SW1": "interface vlan 1\nshutdown\nexit\n"}},
+        ]}
+        result = self.pt.pkt_generate(plan, project="audit-vlan1")
+        report = self.pt.pkt_audit_network(result["path"])
+        findings = [f for d in report["devices"] for f in d["findings"]]
+        assert not any("Vlan1" in f["text"] or "Vlan 1" in f["text"]
+                       for f in findings)
+
+    def test_cabled_interfaces_shutdown_are_reported_once_and_fixable_by_request(self):
+        plan = {"steps": [
+            {"action": "create_nodes", "nodes": [
+                {"name": "R1", "type": "router", "model": "2811"},
+                {"name": "R2", "type": "router", "model": "2811"}]},
+            {"action": "create_links", "links": [
+                {"a": "R1", "aIf": "s0/2/0", "b": "R2", "bIf": "s0/2/0",
+                 "cable": "serial"}]},
+            {"action": "paste_cli", "configs": {
+                "R1": "interface s0/2/0\nshutdown\nexit\n",
+                "R2": "interface s0/2/0\nshutdown\nexit\n"}},
+        ]}
+        result = self.pt.pkt_generate(plan, project="audit-shutdown-link")
+        report = self.pt.pkt_audit_network(result["path"])
+        findings = [f for d in report["devices"] for f in d["findings"]
+                    if f.get("kind") == "connected_interface_down"]
+        assert len(findings) == 1
+        finding = findings[0]
+        assert finding["severity"] == "medium"
+        assert "R1 Serial0/2/0 <-> R2 Serial0/2/0" in finding["text"]
+        assert finding["fix_cli"] == []
+        assert {fix["device"] for fix in finding["repairs"]} == {"R1", "R2"}
+        assert all(fix["fix_cli"][-1] == "no shutdown"
+                   for fix in finding["repairs"])
+        # The user-requested, approved repair makes a separately encrypted
+        # file; it neither opens Packet Tracer nor changes the source.
+        import pkt_fix
+        source_bytes = Path(result["path"]).read_bytes()
+        fixed = pkt_fix.apply_fixes(
+            result["path"], finding["repairs"],
+            out_name="approved-copy.pkt", project="audit-shutdown-link",
+            out_dir=str(self.tmp / "approved"))
+        assert Path(result["path"]).read_bytes() == source_bytes
+        assert fixed["path"] != result["path"]
+        fixed_report = self.pt.pkt_audit_network(fixed["path"])
+        assert not any(
+            f.get("kind") == "connected_interface_down"
+            for d in fixed_report["devices"] for f in d["findings"])
+
+    def test_offline_audit_reports_saved_vlan_and_acl_mismatches(self):
+        plan = {"steps": [
+            {"action": "create_nodes", "nodes": [
+                {"name": "SW1", "type": "switch", "model": "2960-24TT"},
+                {"name": "SW2", "type": "switch", "model": "2960-24TT"}]},
+            {"action": "create_links", "links": [
+                {"a": "SW1", "aIf": "FastEthernet0/1",
+                 "b": "SW2", "bIf": "FastEthernet0/1",
+                 "cable": "copper"}]},
+            {"action": "paste_cli", "configs": {
+                "SW1": "vlan 10\n"
+                       "interface FastEthernet0/1\n"
+                       "switchport mode trunk\n"
+                       "switchport trunk allowed vlan 10\n"
+                       "interface FastEthernet0/2\n"
+                       "switchport mode access\n"
+                       "switchport access vlan 99\n"
+                       "ip access-group MISSING in\n",
+                "SW2": "interface FastEthernet0/1\n"
+                       "switchport mode trunk\n"
+                       "switchport trunk allowed vlan 20\n"}}]}
+        built = self.pt.pkt_generate(plan, project="audit-vlan-acl")
+        report = self.pt.pkt_audit_network(built["path"])
+        findings = [f for d in report["devices"] for f in d["findings"]]
+        kinds = {f.get("kind") for f in findings}
+
+        assert "vlan_undefined_access" in kinds
+        assert "vlan_trunk_mismatch" in kinds
+        assert "acl_reference_missing" in kinds
+        diagnostics = [
+            f for f in findings if f.get("kind") in {
+                "vlan_undefined_access", "vlan_trunk_mismatch",
+                "acl_reference_missing",
+            }
+        ]
+        assert all(f["offline_advice"] and not f["fix_cli"]
+                   for f in diagnostics)
+
+    def test_offline_audit_catches_enabled_empty_dhcp_and_dns(self):
+        plan = {"steps": [
+            {"action": "create_nodes", "nodes": [
+                {"name": "SRV1", "type": "server", "model": "Server-PT"}]}]}
+        built = self.pt.pkt_generate(plan, project="audit-empty-services")
+        xml = pkt_builder.decode_pkt_file(built["path"])
+        # Model the Services panels from a hand-edited save. This small
+        # fixture's server template has no service subtree to rewrite.
+        services = (
+            b"<DHCP_SERVERS><ASSOCIATED_PORTS><ASSOCIATED_PORT><NAME>"
+            b"FastEthernet0</NAME><DHCP_SERVER><ENABLED>1</ENABLED>"
+            b"<POOLS></POOLS></DHCP_SERVER></ASSOCIATED_PORT>"
+            b"</ASSOCIATED_PORTS></DHCP_SERVERS>"
+            b"<DNS_SERVER><ENABLED>1</ENABLED><NAMESERVER-DATABASE>"
+            b"</NAMESERVER-DATABASE></DNS_SERVER>"
+        )
+        xml = xml.replace(b"</DEVICE>", services + b"</DEVICE>", 1)
+        assert b"<DHCP_SERVERS>" in xml
+        assert b"<DNS_SERVER>" in xml
+        broken_path = built["path"].replace(".pkt", "-empty-services.pkt")
+        Path(broken_path).write_bytes(pkt_codec.encrypt_pkt(xml))
+
+        report = self.pt.pkt_audit_network(broken_path)
+        findings = [f for d in report["devices"] for f in d["findings"]]
+        kinds = {f.get("kind") for f in findings}
+
+        assert "dhcp_empty_pools" in kinds, {
+            "kinds": kinds,
+            "services": [d.get("services") for d in report["devices"]],
+        }
+        assert "dns_empty_records" in kinds, {
+            "kinds": kinds,
+            "services": [d.get("services") for d in report["devices"]],
+        }
 
     def test_offline_audit_rejects_bad_paths(self):
         with pytest.raises(FileNotFoundError):

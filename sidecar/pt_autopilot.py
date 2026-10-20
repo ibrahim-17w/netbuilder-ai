@@ -1186,6 +1186,10 @@ LLM = {
     "calls": 0,
     "applied": 0,
     "rejected": 0,
+    "provider": "gemini",
+    "baseUrl": "",
+    "extraHeaders": {},
+    "configRevision": 0,
 }
 LLM_MAX_CALLS_PER_RUN = 5
 LLM_MAX_CALLS_PER_DEVICE = 2
@@ -1275,7 +1279,10 @@ def auto_learn_config(enabled=None, suggest_after_run=None, auto_teach=None,
 
 
 def llm_configure(api_key=None, model: str = "",
-                  enabled: bool = False) -> dict:
+                  enabled: bool = False, provider: str = "gemini",
+                  base_url: str = "", extra_headers=None, revision=None,
+                  auto_learn=None, auto_suggest=None, auto_teach=None,
+                  off_device=False) -> dict:
     """Accept (or clear) the app-supplied credential. Memory only.
 
     ``api_key=None`` keeps whatever is already configured (the app may send a
@@ -1283,11 +1290,29 @@ def llm_configure(api_key=None, model: str = "",
     key can never leave the loop enabled.  The key is never persisted and
     never logged.
     """
-    if api_key is not None:
-        LLM["apiKey"] = str(api_key or "").strip()
-    if str(model or "").strip():
-        LLM["model"] = str(model).strip()
-    LLM["enabled"] = bool(enabled) and bool(LLM["apiKey"])
+    from urllib.parse import urlparse
+    with LOCK:
+        stale = revision is not None and int(revision) <= LLM.get("configRevision", 0)
+        if not stale:
+            LLM["configRevision"] = int(revision) if revision is not None else LLM.get("configRevision", 0) + 1
+            if api_key is not None:
+                LLM["apiKey"] = str(api_key or "").strip()
+            if str(model or "").strip():
+                LLM["model"] = str(model).strip()
+            LLM["provider"] = "openai" if provider == "openai" else "gemini"
+            LLM["baseUrl"] = str(base_url or "").rstrip("/")
+            LLM["extraHeaders"] = dict(extra_headers or {}) if enabled else {}
+            host = (urlparse(LLM["baseUrl"]).hostname or "").lower()
+            local = host in {"localhost", "127.0.0.1", "::1", "10.0.2.2"}
+            credential = bool(LLM["apiKey"]) or (provider == "openai" and local)
+            LLM["enabled"] = bool(enabled) and credential
+            for name, value in (("enabled", auto_learn),
+                                ("suggestAfterRun", auto_suggest),
+                                ("autoTeach", auto_teach)):
+                if value is not None:
+                    AUTO_LEARN[name] = bool(value)
+            if off_device:
+                AUTO_LEARN["autoTeach"] = False
     return llm_status()
 
 
@@ -1296,7 +1321,7 @@ def llm_status() -> dict:
         auto = dict(AUTO_LEARN)
     auto["effective"] = bool(auto.get("enabled"))
     return {
-        "configured": bool(LLM["apiKey"]),
+        "configured": bool(LLM["apiKey"]) or bool(LLM["enabled"]),
         "enabled": bool(LLM["enabled"]),
         "model": LLM["model"],
         "calls": LLM["calls"],
@@ -1313,7 +1338,7 @@ def llm_redact(text: str) -> str:
 
 
 def llm_available(device: str = "") -> bool:
-    if not (LLM["enabled"] and str(LLM["apiKey"]).strip()):
+    if not LLM["enabled"]:
         return False
     if LLM["calls"] >= LLM_MAX_CALLS_PER_RUN:
         return False
@@ -1348,20 +1373,43 @@ def _llm_parse_commands(answer: str) -> list:
 
 
 def _llm_request(prompt: str) -> str:
-    """POST one prompt to Gemini and return the text; raises on failure."""
+    """POST one prompt to the selected provider; reject obsolete responses."""
     import urllib.request
-    url = ("https://generativelanguage.googleapis.com/v1beta/models/"
-           + str(LLM["model"]).strip() + ":generateContent")
-    payload = json.dumps({
-        "contents": [{"parts": [{"text": prompt}]}],
-    }).encode("utf-8")
+    with LOCK:
+        config = dict(LLM)
+    if not config["enabled"]:
+        raise RuntimeError("AI requests are disabled")
+    openai = config.get("provider") == "openai"
+    if openai:
+        from urllib.parse import urlparse
+        base = config.get("baseUrl", "")
+        if urlparse(base).scheme not in {"http", "https"} or not urlparse(base).hostname:
+            raise RuntimeError("Invalid model provider address")
+        url = base + "/chat/completions"
+        content = {"model": config["model"], "messages": [{"role": "user", "content": llm_redact(prompt)}], "stream": False}
+        headers = {"Content-Type": "application/json", **config.get("extraHeaders", {})}
+        if config["apiKey"]:
+            headers["Authorization"] = "Bearer " + config["apiKey"]
+    else:
+        url = ("https://generativelanguage.googleapis.com/v1beta/models/"
+               + str(config["model"]).strip() + ":generateContent")
+        content = {"contents": [{"parts": [{"text": llm_redact(prompt)}]}]}
+        headers = {"Content-Type": "application/json", "x-goog-api-key": config["apiKey"]}
+    payload = json.dumps(content).encode("utf-8")
     req = urllib.request.Request(
         url, data=payload, method="POST",
-        headers={"Content-Type": "application/json",
-                 "x-goog-api-key": str(LLM["apiKey"])},
+        headers=headers,
     )
+    with LOCK:
+        if not LLM["enabled"] or LLM.get("configRevision") != config.get("configRevision"):
+            raise RuntimeError("AI request cancelled because settings changed")
     with urllib.request.urlopen(req, timeout=LLM_TIMEOUT_S) as resp:
         data = json.loads(resp.read().decode("utf-8"))
+    if not LLM["enabled"] or LLM.get("configRevision") != config.get("configRevision"):
+        raise RuntimeError("AI request cancelled because settings changed")
+    if openai:
+        choices = data.get("choices") or []
+        return str(((choices[0] if choices else {}).get("message") or {}).get("content") or "").strip()
     candidates = data.get("candidates") or []
     parts = ((candidates[0] if candidates else {}).get("content") or {}) \
         .get("parts") or []
@@ -1877,7 +1925,7 @@ def ai_suggest_fixes(project: str = "") -> dict:
     """
     if AI_SUGGEST.get("running"):
         return {"ok": False, "error": "already running"}
-    if not (LLM["enabled"] and str(LLM["apiKey"]).strip()):
+    if not LLM["enabled"]:
         return {"ok": False,
                 "error": "no Gemini key - add one in Settings first"}
     project = str(project or _last_project() or "default")
@@ -10886,6 +10934,78 @@ def _pc_ping(rect, dev: str, slot: int, targets: list,
     return successes
 
 
+def _pc_dns_lookups(rect, dev: str, slot: int, tests: list,
+                    project: str, results: list) -> None:
+    """Resolve planned DNS records from a Packet Tracer PC and capture output.
+
+    This is intentionally separate from ping: a server can answer ICMP while
+    the client's resolver or the server's DNS records are still wrong.
+    """
+    tests = [t for t in (tests or []) if t.get("query") and t.get("expectedIp")]
+    if not tests:
+        return
+
+    def unavailable(reason: str) -> None:
+        for test in tests:
+            query = str(test.get("query") or "")
+            results.append({"source": dev, "target": query, "ok": False,
+                            "available": False, "attempts": 0,
+                            "evidence": reason})
+
+    win = _open_device_window(rect, dev, slot, project)
+    if win is None:
+        unavailable("client device window unavailable")
+        return
+    try:
+        if not _pc_open_desktop_app(win, dev, "cmd", ["Command Prompt"],
+                                    ["prompt", "command"],
+                                    ["command prompt", "command line", "c:"]):
+            unavailable("Command Prompt panel unavailable")
+            return
+        _interruptible_sleep(0.8)
+
+        def click_body():
+            r = win.rectangle()
+            _safe_click(r.left + int((r.right - r.left) * 0.5),
+                        r.top + int((r.bottom - r.top) * 0.45))
+            _interruptible_sleep(0.3)
+
+        click_body()
+        for test in tests:
+            query = str(test["query"]).strip()
+            expected = str(test["expectedIp"]).strip().split("/")[0]
+            ok = False
+            tail = ""
+            attempt = 0
+            for attempt in (1, 2):
+                typed = _type_line(f"nslookup {query}", 25, win=win, dev=dev)
+                _interruptible_sleep(2.5)
+                _OCR_CACHE.clear()
+                output = (_ocr_region(win, 0.10, 0.92) or "") if typed else ""
+                lower = output.lower()
+                query_at = lower.rfind(query.lower())
+                tail = output[query_at:] if query_at >= 0 else output[-600:]
+                addresses = re.findall(r"(?:\d{1,3}\.){3}\d{1,3}", tail)
+                got = bool(typed and query_at >= 0 and expected in addresses)
+                if got:
+                    ok = True
+                    break
+                click_body()
+            evidence = tail[-260:] or "No DNS response was readable from the client."
+            results.append({"source": dev, "target": query, "ok": ok,
+                            "available": True, "attempts": attempt,
+                            "evidence": evidence})
+            record_event("dns_test", f"nslookup {query} from {dev}",
+                         device=dev, recovered=ok)
+            log(f"VERIFY: nslookup {query} from {dev} -> "
+                f"{'SUCCESS' if ok else 'no matching address'}")
+    except Exception as e:
+        log(f"{dev}: DNS check failed: {e}")
+        unavailable(f"DNS check could not run: {e}")
+    finally:
+        _close_device_window(win, dev)
+
+
 def _audit_reachability(rect, devices: list, names: list, project: str) -> dict:
     """Run bounded endpoint reachability tests against the live PT network.
 
@@ -10984,6 +11104,13 @@ def verify_plan_live(plan: dict) -> dict:
         return {"ok": False,
                 "error": "no testable devices: the plan has no PCs or laptops",
                 **pt_verify.summarize([]), "tests": []}
+    if not any(t.get("kind") not in ("custom", "manual") for t in tests):
+        # There is nothing to automate in Packet Tracer; return the honest
+        # service/security checklist without focusing or touching its window.
+        manual = pt_verify.shape_results([], tests)
+        return {"ok": False,
+                "project": str(plan.get("project") or plan.get("projectName") or "default"),
+                **pt_verify.summarize(manual), "tests": manual}
 
     acquired, busy = begin_activity("audit")
     if not acquired:
@@ -11003,13 +11130,17 @@ def verify_plan_live(plan: dict) -> dict:
         # group tests by source device; targets resolved to IPs from the plan
         ips = pt_verify.ip_index(plan)
         by_src: dict[str, list] = {}
+        dns_by_src: dict[str, list] = {}
         for t in tests:
-            if t.get("kind") == "custom" or not t.get("src"):
+            if t.get("kind") in ("custom", "manual") or not t.get("src"):
                 continue
-            by_src.setdefault(str(t["src"]), []).append(t)
+            if t.get("kind") == "dns":
+                dns_by_src.setdefault(str(t["src"]), []).append(t)
+            else:
+                by_src.setdefault(str(t["src"]), []).append(t)
 
         rows: list = []
-        for src in sorted(by_src):
+        for src in sorted(set(by_src) | set(dns_by_src)):
             if stopped():
                 break
             slot = names.index(src) if src in names else -1
@@ -11017,7 +11148,7 @@ def verify_plan_live(plan: dict) -> dict:
                 log(f"VERIFY: {src} not on canvas - skipped")
                 continue
             targets = []
-            for t in by_src[src]:
+            for t in by_src.get(src, []):
                 dst = str(t.get("dst") or "")
                 if t.get("kind") == "gateway":
                     ip = pt_verify.gateway_ip_for(plan, src, dst)
@@ -11027,9 +11158,12 @@ def verify_plan_live(plan: dict) -> dict:
                 targets.append(t["_dstIp"])
             targets = [t for i, t in enumerate(targets)
                        if t and targets.index(t) == i][:6]
-            log(f"VERIFY: {src} -> {targets}")
-            _pc_ping(rect, src, slot, targets, project,
-                     results=rows, count_run=False)
+            if targets:
+                log(f"VERIFY: {src} -> {targets}")
+                _pc_ping(rect, src, slot, targets, project,
+                         results=rows, count_run=False)
+            if dns_by_src.get(src):
+                _pc_dns_lookups(rect, src, slot, dns_by_src[src], project, rows)
 
         shaped = pt_verify.shape_results(rows, tests, ips=ips)
         report = {"ok": True, "project": project,
@@ -13851,6 +13985,8 @@ def pkt_audit_network(path: str, project: str = "") -> dict:
     except Exception:  # noqa: BLE001 - never fail an audit over memory
         proven_repairs = {}
     devices_report = []
+    interface_facts_by_device: dict[str, dict] = {}
+    config_lines_by_device: dict[str, list[str]] = {}
     for block in re.findall(rb"<DEVICE>.*?</DEVICE>", xml, re.S):
         name_match = re.search(
             rb'<NAME translate="true">([^<]*)</NAME>', block)
@@ -13863,7 +13999,9 @@ def pkt_audit_network(path: str, project: str = "") -> dict:
         kind = type_match.group(2).decode("utf-8", "replace") \
             if type_match else ""
         config_lines = _pkt_config_lines(block)
+        config_lines_by_device[name] = config_lines
         facts = _pkt_interface_facts(block)
+        interface_facts_by_device[name] = facts
         interfaces = []
         findings = []
         counter = {"n": 0}
@@ -13894,14 +14032,6 @@ def pkt_audit_network(path: str, project: str = "") -> dict:
                                "clock": fact["clock"]})
             if not _cli_kind(kind):
                 continue
-            if fact["shutdown"]:
-                add("high", f"{ifname} is shut down in the saved config",
-                    fix_cli=[f"interface {ifname}", "no shutdown"])
-            elif fact["no_shutdown"] and power is False:
-                add("high", f"{ifname} should be up ('no shutdown') but its "
-                            "saved port state is down - the file was saved "
-                            "with the interface off; it will open down",
-                    fix_cli=[f"interface {ifname}", "no shutdown"])
             if fact["ip_in_config"] and not fact["ip"]:
                 match = re.search(
                     rf"interface\s+{re.escape(ifname)}.*?ip address\s+(\S+)\s+(\S+)",
@@ -13937,7 +14067,241 @@ def pkt_audit_network(path: str, project: str = "") -> dict:
     # is attached to the first device of the pair so the existing audit card
     # (which renders per-device findings) shows it without a schema change.
     device_by_name = {d["name"]: d for d in devices_report}
+
+    def add_diagnostic(device_name: str, kind: str, severity: str,
+                       text: str, evidence: dict | None = None) -> None:
+        owner = device_by_name.get(device_name)
+        if owner is None:
+            return
+        index = len(owner["findings"]) + 1
+        owner["findings"].append({
+            "id": f"{device_name}:offline:{kind}:{index}",
+            "kind": kind,
+            "category": kind.split("_")[0],
+            "severity": severity,
+            "text": text,
+            "evidence": dict(evidence or {}),
+            "fix_cli": [],
+            "fix_pc": False,
+            "offline_advice": True,
+        })
+
+    # Read the saved Services panels directly from the file. Pool/record counts
+    # are useful evidence, but an empty panel is only flagged when the service
+    # is enabled and explicitly reports no configured content.
+    service_inventory = pkt_audit.server_services(xml)
+    for device in devices_report:
+        name = device["name"]
+        rows = service_inventory.get(name, [])
+        device["services"] = rows
+        for row in rows:
+            service = str(row.get("service") or "").lower()
+            detail = str(row.get("detail") or "")
+            if not row.get("enabled"):
+                continue
+            if service == "dhcp" and re.search(r"\b0 pool", detail, re.I):
+                add_diagnostic(
+                    name, "dhcp_empty_pools", "medium",
+                    "DHCP is enabled, but the saved server has no configured "
+                    "address pool. Clients cannot receive leases from this "
+                    "server until a pool is added.",
+                    {"service": service, "detail": detail},
+                )
+            elif service == "dns" and re.search(r"\b0 record", detail, re.I):
+                add_diagnostic(
+                    name, "dns_empty_records", "medium",
+                    "DNS is enabled, but the saved server has no host records. "
+                    "Name lookups need records and a client configured to use "
+                    "this server.",
+                    {"service": service, "detail": detail},
+                )
+
+    # Parse only the configuration facts the save proves. These checks never
+    # infer the intended VLAN or security policy, so they report evidence and
+    # leave repair selection to the user.
+    switch_configs: dict[str, dict] = {}
+    defined_vlans: dict[str, set[int]] = {}
+    acl_definitions: dict[str, set[str]] = {}
+    acl_references: dict[str, list[tuple[str, str]]] = {}
+    for device in devices_report:
+        name = device["name"]
+        kind = str(device.get("type") or "").strip().lower()
+        lines = config_lines_by_device.get(name, [])
+        vlan_ids: set[int] = {1}
+        interfaces: dict[str, dict] = {}
+        current = ""
+        definitions: set[str] = set()
+        references: list[tuple[str, str]] = []
+        for raw_line in lines:
+            line = raw_line.strip()
+            low = line.lower()
+            vlan_match = re.match(r"^vlan\s+(\d+)\b", line, re.I)
+            if vlan_match:
+                vlan_ids.add(int(vlan_match.group(1)))
+            if low.startswith("interface "):
+                current = line.split(None, 1)[1].strip()
+                interfaces.setdefault(current, {"mode": "", "access": None,
+                                                 "allowed": None})
+                continue
+            if current:
+                entry = interfaces[current]
+                mode = re.match(r"^switchport\s+mode\s+(access|trunk)\b", line, re.I)
+                if mode:
+                    entry["mode"] = mode.group(1).lower()
+                access = re.match(r"^switchport\s+access\s+vlan\s+(\d+)\b", line, re.I)
+                if access:
+                    entry["access"] = int(access.group(1))
+                allowed = re.match(r"^switchport\s+trunk\s+allowed\s+vlan\s+(.+)$", line, re.I)
+                if allowed and not re.match(r"^(?:add|remove|except)\b", allowed.group(1), re.I):
+                    values: set[int] = set()
+                    valid = True
+                    for part in allowed.group(1).split(","):
+                        range_match = re.fullmatch(r"\s*(\d+)(?:\s*-\s*(\d+))?\s*", part)
+                        if not range_match:
+                            valid = False
+                            break
+                        first = int(range_match.group(1))
+                        last = int(range_match.group(2) or first)
+                        if first < 1 or last > 4094 or first > last:
+                            valid = False
+                            break
+                        values.update(range(first, last + 1))
+                    if valid:
+                        entry["allowed"] = values
+            access_list = re.match(r"^access-list\s+(\S+)\b", line, re.I)
+            if access_list:
+                definitions.add(access_list.group(1).lower())
+            named_acl = re.match(r"^ip\s+access-list\s+(?:standard|extended)\s+(\S+)\b", line, re.I)
+            if named_acl:
+                definitions.add(named_acl.group(1).lower())
+            applied = re.match(r"^ip\s+access-group\s+(\S+)\s+(?:in|out)\b", line, re.I)
+            if applied:
+                references.append((applied.group(1), current))
+
+        defined_vlans[name] = vlan_ids
+        acl_definitions[name] = definitions
+        acl_references[name] = references
+        if kind in ("switch", "multilayer switch", "layer3switch"):
+            switch_configs[name] = interfaces
+            for iface, entry in interfaces.items():
+                access_vlan = entry.get("access")
+                if access_vlan is not None and access_vlan not in vlan_ids:
+                    add_diagnostic(
+                        name, "vlan_undefined_access", "medium",
+                        f"{iface} assigns access VLAN {access_vlan}, but that "
+                        "VLAN is not defined in this saved switch configuration.",
+                        {"interface": iface, "vlan": access_vlan,
+                         "definedVlans": sorted(vlan_ids)},
+                    )
+        for acl_name, iface in references:
+            if acl_name.lower() not in definitions:
+                add_diagnostic(
+                    name, "acl_reference_missing", "high",
+                    f"{iface or 'A device interface'} applies ACL "
+                    f"'{acl_name}', but no matching access-list definition "
+                    "was found in this device's saved configuration.",
+                    {"interface": iface, "acl": acl_name},
+                )
+
+    # Compare the two saved switch-port configs on each switch-to-switch
+    # cable. A mismatch is a likely fault, but the report does not choose a
+    # side to rewrite because the intended access/trunk design is unknown.
+    switch_types = {"switch", "multilayer switch", "layer3switch", "bridge"}
+    for link_index, row in enumerate(pkt_audit.links(xml), start=1):
+        a, b = str(row.get("a") or ""), str(row.get("b") or "")
+        a_if, b_if = str(row.get("aIf") or ""), str(row.get("bIf") or "")
+        if not all((a, b, a_if, b_if)):
+            continue
+        if (str(device_by_name.get(a, {}).get("type") or "").lower() not in switch_types or
+                str(device_by_name.get(b, {}).get("type") or "").lower() not in switch_types):
+            continue
+        left = switch_configs.get(a, {}).get(a_if, {})
+        right = switch_configs.get(b, {}).get(b_if, {})
+        left_mode, right_mode = left.get("mode"), right.get("mode")
+        mismatch = ""
+        if {left_mode, right_mode} == {"access", "trunk"}:
+            mismatch = "one endpoint is configured as access and the other as trunk"
+        elif left_mode == right_mode == "access":
+            left_vlan, right_vlan = left.get("access"), right.get("access")
+            if left_vlan is not None and right_vlan is not None and left_vlan != right_vlan:
+                mismatch = f"access VLANs differ ({left_vlan} vs {right_vlan})"
+        elif left_mode == right_mode == "trunk":
+            left_allowed, right_allowed = left.get("allowed"), right.get("allowed")
+            if left_allowed is not None and right_allowed is not None and not (left_allowed & right_allowed):
+                mismatch = "the explicitly allowed VLAN lists have no overlap"
+        if mismatch:
+            add_diagnostic(
+                a, "vlan_trunk_mismatch", "medium",
+                f"Switch link {a} {a_if} <-> {b} {b_if}: {mismatch}. "
+                "Confirm the intended VLAN design on both ends.",
+                {"a": a, "aIf": a_if, "b": b, "bIf": b_if,
+                 "leftMode": left_mode, "rightMode": right_mode,
+                 "leftAccessVlan": left.get("access"),
+                 "rightAccessVlan": right.get("access")},
+            )
+
     cable_rows = pkt_audit.links(xml)
+    # A shutdown on an unused port is expected and often safer than leaving
+    # the port open.  VLAN 1 is also commonly shutdown when it has no
+    # management address.  Only report a saved-down state when the interface
+    # is actually attached to a cable, and report it once per link rather
+    # than once per endpoint.
+    for link_index, row in enumerate(cable_rows, start=1):
+        a, b = str(row.get("a") or ""), str(row.get("b") or "")
+        a_if, b_if = str(row.get("aIf") or ""), str(row.get("bIf") or "")
+        if not all((a, b, a_if, b_if)):
+            continue
+        a_fact = interface_facts_by_device.get(a, {}).get(a_if, {})
+        b_fact = interface_facts_by_device.get(b, {}).get(b_if, {})
+        endpoints = [(a, a_if, a_fact), (b, b_if, b_fact)]
+        down = []
+        repairs = []
+        for device, iface, fact in endpoints:
+            if fact.get("shutdown"):
+                down.append(f"{device} {iface} is administratively shut down")
+                repairs.append({
+                    # All endpoint commands clear this one link-level finding.
+                    "id": f"{a}:offline:link:{link_index}",
+                    "device": device,
+                    "severity": "medium",
+                    "text": f"Enable the cabled interface {iface}",
+                    "fix_cli": [f"interface {iface}", "no shutdown"],
+                })
+            elif fact.get("no_shutdown") and fact.get("power") is False:
+                down.append(f"{device} {iface} is saved down despite 'no shutdown'")
+        if not down:
+            continue
+        owner = device_by_name.get(a)
+        if owner is None:
+            continue
+        text = (
+            f"Cabled link {a} {a_if} <-> {b} {b_if} has a saved-down "
+            f"endpoint: {'; '.join(down)}. If this link is meant to carry "
+            "traffic, check that both interfaces are enabled and configured; "
+            "for serial links also check the DCE clock. If it is unused, "
+            "leaving it down is normal. This offline save cannot prove live "
+            "link state or user intent."
+        )
+        finding_class = pkt_learning.finding_class({
+            "severity": "medium", "text": text})
+        proven = (proven_repairs.get(finding_class) or {}) \
+            if finding_class else {}
+        owner["findings"].append({
+            "id": f"{a}:offline:link:{link_index}",
+            "severity": "medium",
+            "kind": "connected_interface_down",
+            "device": f"{a} <-> {b}",
+            "text": text,
+            "fix_cli": [],
+            "repairs": repairs,
+            "evidence": {
+                "a": a, "aIf": a_if, "b": b, "bIf": b_if,
+                "downEndpoints": down,
+            },
+            "fixedBefore": int(proven.get("count", 0)),
+            "fix_pc": False,
+            "offline_advice": True,
+        })
     for row in pkt_audit.cable_findings(
             cable_rows,
             [{"name": d["name"], "kind": d["type"]} for d in devices_report]):
@@ -13971,11 +14335,11 @@ def pkt_audit_network(path: str, project: str = "") -> dict:
         "red_dots": 0,
         "reachability": {},
         "scope": [f"offline read of {os.path.basename(path)}"],
-        "note": "Offline audit: read from the saved file - no Packet "
-                "Tracer was opened. Service panels (DHCP/DNS/...), pings "
-                "and canvas indicators are runtime state and are NOT "
-                "visible here. Findings are advice only; run a live audit "
-                "and apply fixes from it to change the real devices.",
+        "note": "Offline audit of the saved file - Packet Tracer was not "
+                "opened. Service panels (DHCP/DNS/...), pings and canvas "
+                "indicators are runtime state and are not visible here. "
+                "No change was made. An explicitly approved repair creates "
+                "a separate .pkt copy and leaves the original untouched.",
     }
 
 
@@ -16908,18 +17272,18 @@ class H(BaseHTTPRequestHandler):
             state = llm_configure(
                 api_key=str(req.get("apiKey", "")),
                 model=str(req.get("model", "")),
-                enabled=bool(req.get("enabled", False)))
-            # Auto-learning switches travel with the key so one POST configures
-            # the whole behaviour.  Any field the app omits keeps its value.
-            auto_learn_config(
-                enabled=(None if "autoLearn" not in req
+                enabled=bool(req.get("enabled", False)),
+                provider=str(req.get("provider", "gemini")),
+                base_url=str(req.get("baseUrl", "")),
+                extra_headers=req.get("extraHeaders"),
+                revision=req.get("configRevision"),
+                auto_learn=(None if "autoLearn" not in req
                          else bool(req.get("autoLearn"))),
-                suggest_after_run=(None if "autoSuggest" not in req
+                auto_suggest=(None if "autoSuggest" not in req
                                    else bool(req.get("autoSuggest"))),
                 auto_teach=(None if "autoTeach" not in req
                             else bool(req.get("autoTeach"))),
                 off_device=bool(req.get("offDevice", False)))
-            state = llm_status()
             log("LLM config updated: enabled=%s model=%s key=%s"
                 % (state["enabled"], state["model"],
                    "<set>" if state["configured"] else "<none>"))

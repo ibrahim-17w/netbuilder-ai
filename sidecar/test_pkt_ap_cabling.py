@@ -104,29 +104,51 @@ def test_a_plan_that_cables_a_switch_to_an_ap_keeps_the_link(tmp_path):
     assert not warnings, f"the AP link was not cabled cleanly: {warnings}"
 
 
-def test_the_generated_file_declares_the_port_its_cable_uses(tmp_path):
+def test_the_generated_file_cables_the_ap_without_inventing_a_name(tmp_path):
+    """The AP end of the cable is a port the file really has.
+
+    The first version of this test asserted the opposite of what Packet
+    Tracer accepts: it required the AP's `<PORT>` block to DECLARE a `<NAME>`
+    element. Real saves never carry one - 0 of 46 PORT blocks in demo-lab.pkt,
+    0 of 43 in prompt-star.pkt - and injecting one produced a file PT rejects
+    outright as "not compatible with this version of Cisco Packet Tracer".
+
+    What a LINK needs is a `<PORT>` whose name matches its own module layout,
+    which is what the manifest naming provides. So the assertions are: the
+    cable exists, its AP end is a port from the library, and no `<NAME>` was
+    invented inside any `<PORT>`.
+    """
     result, path = _build(tmp_path, "ap-named", PLAN)
     with open(path, "rb") as stream:
         xml = pkt_codec.decrypt_pkt(stream.read()).decode("utf-8", "replace")
 
-    ap_block = next(
-        (b for b in xml.split("</DEVICE>")
-         if "AccessPoint" in b and "<DEVICE>" in b),
-        None)
-    assert ap_block is not None, "the AP is not in the generated file"
-
-    # The AP end of the cable must be a port the AP's own block declares.
     link = next(
         (l for l in xml.split("</LINK>") if "AP1" in l and "SW1" in l),
         None)
     assert link is not None, "no cable between SW1 and AP1 in the file"
     ports = pb.re.findall(r"<PORT>([^<]*)</PORT>", link)
     assert ports, "the LINK block names no ports"
-    declared = pb.re.findall(r"<NAME[^>]*>([^<]*)</NAME>", ap_block)
-    ap_port = next((p for p in ports if p in declared), None)
-    assert ap_port is not None, (
-        f"the cable references {ports}, but the AP block only declares "
-        f"{declared} - so the AP end of the cable resolves to nothing")
+
+    ap_block = next(
+        (b for b in xml.split("</DEVICE>")
+         if "AccessPoint" in b and "<DEVICE>" in b),
+        None)
+    assert ap_block is not None, "the AP is not in the generated file"
+    ap_ports = pb.re.findall(
+        r"<PORT>\s*<TYPE>([^<]*)</TYPE>.*?</PORT>", ap_block, pb.re.S)
+
+    # The AP end of the cable must be a port the AP block really has, by
+    # position: the name comes from the manifest, the port from the template.
+    assert "FastEthernet0" in ports, (
+        f"the cable references {ports}, and none is the AP's Ethernet port")
+    assert len(ap_ports) >= 1, "the AP block has no ports at all"
+
+    invented = [p for p in pb.re.findall(r"<PORT>.*?</PORT>", xml, pb.re.S)
+                if "<NAME" in p]
+    assert not invented, (
+        f"{len(invented)} PORT block(s) carry a <NAME> element that a real "
+        "Packet Tracer save never writes; that is what makes PT call the file "
+        "incompatible")
 
 
 def test_the_ap_is_placed_on_the_canvas_not_floating(tmp_path):

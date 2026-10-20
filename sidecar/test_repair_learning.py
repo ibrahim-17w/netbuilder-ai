@@ -190,11 +190,13 @@ def test_the_wire_path_records_a_verified_repair_and_audits_read_it_back(
     before = pt.pkt_audit_network(before_path, project="learn")
     after = pt.pkt_audit_network(after_path, project="learn")
     shut = [f for d in before["devices"] for f in d["findings"]
-            if "shut down" in f["text"]]
+            if f.get("kind") == "connected_interface_down"]
     assert shut, "the fixture must produce a finding the fix clears"
     finding = shut[0]
     assert finding["fixedBefore"] == 0, (
         "nothing is proven before a repair is verified")
+    approved_fixes = finding["repairs"]
+    assert approved_fixes and all(f["device"] == "R1" for f in approved_fixes)
 
     server = HTTPServer(("127.0.0.1", 0), pt.H)
     port = server.server_address[1]
@@ -212,9 +214,7 @@ def test_the_wire_path_records_a_verified_repair_and_audits_read_it_back(
                     "path": before_path,
                     "project": "learn",
                     "args": {"before": before, "after": after,
-                             "fixes": [{"id": finding["id"],
-                                        "device": "R1",
-                                        "fix_cli": finding["fix_cli"]}]},
+                             "fixes": approved_fixes},
                 }),
                 headers={"Content-Type": "application/json"})
             response = conn.getresponse()
@@ -244,12 +244,12 @@ def test_the_wire_path_records_a_verified_repair_and_audits_read_it_back(
     # finding was fixed here before, and says so ONLY from real proof.
     again = pt.pkt_audit_network(before_path, project="learn")
     same = [f for d in again["devices"] for f in d["findings"]
-            if "shut down" in f["text"]]
+            if f.get("kind") == "connected_interface_down"]
     assert same, "the unfixed save still reports the finding"
     assert same[0]["fixedBefore"] == 1, same[0]
     # And an untouched project is unaffected by another project's lesson.
     other = pt.pkt_audit_network(before_path, project="elsewhere")
     other_shut = [f for d in other["devices"] for f in d["findings"]
-                  if "shut down" in f["text"]]
+                  if f.get("kind") == "connected_interface_down"]
     assert other_shut[0]["fixedBefore"] == 0, (
         "a repair proven on one project is not proof on another")
