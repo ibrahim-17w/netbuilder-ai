@@ -56,6 +56,12 @@ jobs:
       - name: Test suite
         run: flutter test
 
+      # The golden corpus is the app's behavior contract for real phrasings and
+      # advice shapes. Run it as its own named Linux gate so a regression is
+      # obvious in the checks list instead of buried in the full suite.
+      - name: Golden corpus (Linux)
+        run: flutter test test/nlu_golden_set_test.dart test/advisor_golden_test.dart
+
       - name: Release build (Linux target, proof the bundle assembles)
         run: flutter build linux --release
 
