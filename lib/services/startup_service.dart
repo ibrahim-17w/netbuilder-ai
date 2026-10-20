@@ -170,7 +170,9 @@ class StartupCoordinator extends ValueNotifier<StartupSnapshot> {
       '${detail.isEmpty ? '' : ': $detail'}',
     );
     if (phase == StartupPhase.failed && AppDiagnostics.instance.installed) {
-      debugPrint('[startup] recording $id failure in the local diagnostics log');
+      debugPrint(
+        '[startup] recording $id failure in the local diagnostics log',
+      );
       unawaited(
         AppDiagnostics.instance.record(
           'startup/$id',
