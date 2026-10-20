@@ -21,9 +21,10 @@ import 'package:net_builder/services/offline_assistant_service.dart';
 import 'package:net_builder/services/plan_repair_service.dart';
 import 'package:net_builder/services/validator_service.dart';
 
-const _brief = 'Build a three-site enterprise network. HQ needs 2 routers '
+const _brief =
+    'Build a three-site enterprise network. HQ needs 2 routers '
     'running HSRP, 1 firewall for the internet edge, 2 core multilayer '
-    'switches, 2 access switches, a WLC with 3 access points, 20 PCs, a '
+    'switches, 2 access switches, a WLC with 3 access points, 12 PCs, a '
     'DHCP server, a DNS server, a TACACS+ AAA server and a web server. Each '
     'of two branch offices needs 1 router, 1 switch and 8 PCs. Use OSPF '
     'everywhere, put HQ users on VLAN 10, branch users on VLAN 20 and '
@@ -32,26 +33,27 @@ const _brief = 'Build a three-site enterprise network. HQ needs 2 routers '
     'access switch ports.';
 
 List<String> _blocking(NetworkIntent p) => ValidatorService.validate(
-      p,
-      target: 'packet-tracer',
-    )
-        .where((i) => i.blocks)
-        .map((i) => i.message)
-        .toList();
+  p,
+  target: 'packet-tracer',
+).where((i) => i.blocks).map((i) => i.message).toList();
 
 void main() {
   group('the repair clears what it is asked for', () {
     test('one repair pass leaves nothing blocking', () {
       final plan = NetworkIntent.parseSimple('chat', _brief);
-      expect(_blocking(plan), isNotEmpty,
-          reason: 'the fixture must start with findings to clear');
+      expect(
+        _blocking(plan),
+        isNotEmpty,
+        reason: 'the fixture must start with findings to clear',
+      );
 
       final repair = PlanRepairService.repair(plan, target: 'packet-tracer');
       expect(repair.changes, isNotEmpty, reason: 'something must be repaired');
       expect(
         _blocking(repair.plan),
         isEmpty,
-        reason: 'a second press must have nothing left to do - that is what '
+        reason:
+            'a second press must have nothing left to do - that is what '
             'stops the loop',
       );
     });
@@ -65,7 +67,8 @@ void main() {
         (aaa.aaaUsername ?? '').isNotEmpty &&
             (aaa.aaaAccountPassword ?? '').isNotEmpty,
         isTrue,
-        reason: 'the repair must write the placeholder account the answer '
+        reason:
+            'the repair must write the placeholder account the answer '
             'used to ask the user to type - which the parser could not read',
       );
     });
@@ -154,9 +157,13 @@ void main() {
         ],
       );
       final repair = PlanRepairService.repair(plan, target: 'packet-tracer');
-      expect(repair.changes, isEmpty,
-          reason: 'nothing to repair is the case the button must not be '
-              'offered for');
+      expect(
+        repair.changes,
+        isEmpty,
+        reason:
+            'nothing to repair is the case the button must not be '
+            'offered for',
+      );
     });
   });
 }

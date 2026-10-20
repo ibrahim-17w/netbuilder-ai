@@ -244,13 +244,13 @@ void main() {
   });
 
   group('export and clearAll', () {
-    test('export carries clarification answers with schema version 4',
+    test('export carries clarification answers with the current schema version',
         () async {
       final mem = await fresh();
       await mem.rememberClarification('scale', '40', venue: 'office');
       final doc =
           jsonDecode(await mem.exportJson()) as Map<String, dynamic>;
-      expect(doc['schemaVersion'], 4);
+      expect(doc['schemaVersion'], MemoryService.exportSchemaVersion);
       final rows = (doc['clarificationAnswers'] as List)
           .cast<Map<String, dynamic>>();
       expect(rows, hasLength(1));

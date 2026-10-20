@@ -9,11 +9,16 @@ void main() {
     expect(all.length, greaterThan(30));
     for (final action in all) {
       expect(action.id.trim(), isNotEmpty, reason: 'an action needs an id');
-      expect(action.label.trim(), isNotEmpty, reason: '${action.id} has no label');
+      expect(
+        action.label.trim(),
+        isNotEmpty,
+        reason: '${action.id} has no label',
+      );
       expect(
         action.description.trim(),
         isNotEmpty,
-        reason: '${action.id} has no description - a button nobody can '
+        reason:
+            '${action.id} has no description - a button nobody can '
             'understand is not a feature',
       );
       expect(
@@ -31,15 +36,24 @@ void main() {
     }
   });
 
-  test('every screen in the app is reachable from a button', () {
-    for (final destination in AppDestination.values) {
+  test('every hub destination is reachable from a button', () {
+    for (final destination in AppDestination.values.where(
+      (destination) => destination != AppDestination.settings,
+    )) {
       expect(
         CapabilityRegistry.reaches(destination),
         isTrue,
-        reason: '${destination.title} has no button anywhere in the registry - '
+        reason:
+            '${destination.title} has no button anywhere in the registry - '
             'this is the bug this registry exists to prevent',
       );
     }
+    expect(
+      CapabilityRegistry.reaches(AppDestination.settings),
+      isFalse,
+      reason:
+          'settings have one dedicated app-bar button, not a duplicate hub action',
+    );
   });
 
   test('every group in the order has at least one action in it', () {

@@ -9,8 +9,10 @@ void main() {
         CasualEnglish.normalize('u wanna 2 routers'),
         contains('you want to 2 routers'),
       );
-      expect(CasualEnglish.normalize('i dont know what to do'),
-          contains('i do not know'));
+      expect(
+        CasualEnglish.normalize('i dont know what to do'),
+        contains('i do not know'),
+      );
     });
 
     test('fixes common device typos', () {
@@ -19,12 +21,26 @@ void main() {
       expect(n, contains('routers'));
     });
 
+    test(
+      'preserves the ordinary word services instead of inventing servers',
+      () {
+        expect(
+          CasualEnglish.normalize('Configure AAA services on eight servers'),
+          'Configure AAA services on eight servers',
+        );
+      },
+    );
+
     test('never damages data tokens', () {
-      expect(CasualEnglish.normalize('lan 192.168.1.0/24'),
-          contains('192.168.1.0/24'));
+      expect(
+        CasualEnglish.normalize('lan 192.168.1.0/24'),
+        contains('192.168.1.0/24'),
+      );
       expect(CasualEnglish.normalize('2 routers'), contains('2 routers'));
-      expect(CasualEnglish.normalize('password LabAdmin2026'),
-          contains('LabAdmin2026'));
+      expect(
+        CasualEnglish.normalize('password LabAdmin2026'),
+        contains('LabAdmin2026'),
+      );
       // A mixed-case word with no digits is treated as deliberate (a secret).
       expect(CasualEnglish.normalize('key SecretPass'), contains('SecretPass'));
     });
@@ -149,27 +165,32 @@ void main() {
       );
     });
 
-    test('concept-owned tokens: safe no-op at the table, routed by the chain', () {
-      // No knowledge entry triggers on the bare token, so emitting it is
-      // harmless there; the concept chain reads it ("nat" -> the NAT
-      // walkthrough). UDP and ICMP stay untouched - no hook anywhere.
-      expect(CasualEnglish.canonical('network address translation'), 'nat');
-      expect(CasualEnglish.canonical('port address translation'), 'pat');
-      expect(CasualEnglish.canonical('access control list'), 'acl');
-      expect(CasualEnglish.canonical('quality of service'), 'qos');
-      expect(CasualEnglish.canonical('transmission control protocol'), 'tcp');
-      expect(
-        CasualEnglish.canonical('user datagram protocol'),
-        'user datagram protocol',
-      );
-    });
+    test(
+      'concept-owned tokens: safe no-op at the table, routed by the chain',
+      () {
+        // No knowledge entry triggers on the bare token, so emitting it is
+        // harmless there; the concept chain reads it ("nat" -> the NAT
+        // walkthrough). UDP and ICMP stay untouched - no hook anywhere.
+        expect(CasualEnglish.canonical('network address translation'), 'nat');
+        expect(CasualEnglish.canonical('port address translation'), 'pat');
+        expect(CasualEnglish.canonical('access control list'), 'acl');
+        expect(CasualEnglish.canonical('quality of service'), 'qos');
+        expect(CasualEnglish.canonical('transmission control protocol'), 'tcp');
+        expect(
+          CasualEnglish.canonical('user datagram protocol'),
+          'user datagram protocol',
+        );
+      },
+    );
 
     test('plurals rewrite whole', () {
       expect(CasualEnglish.canonical('access control lists'), 'acl');
       expect(CasualEnglish.canonical('virtual lans'), 'vlan');
       // The plural marker must not eat a real word: a key never ends in s.
-      expect(CasualEnglish.canonical('how do access control lists work'),
-          'how do acl work');
+      expect(
+        CasualEnglish.canonical('how do access control lists work'),
+        'how do acl work',
+      );
     });
   });
 }

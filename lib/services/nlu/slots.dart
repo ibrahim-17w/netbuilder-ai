@@ -78,8 +78,10 @@ class BriefSlotPipeline {
     'tacacs+': 'aaa',
   };
 
-  static final _aaaWord =
-      RegExp(r'\baaa\b|\btacacs\+?\b|\bradius\b', caseSensitive: false);
+  static final _aaaWord = RegExp(
+    r'\baaa\b|\btacacs\+?\b|\bradius\b',
+    caseSensitive: false,
+  );
 
   /// Run the full pipeline over a raw brief.
   static BriefSlots extract(String projectName, String rawText) {
@@ -90,8 +92,7 @@ class BriefSlotPipeline {
     final roles = extractRoles(text);
     final routing = extractRouting(lower);
     final sites = NetworkIntent.siteCount(text);
-    final perSite =
-        sites == null ? null : NetworkIntent.perSiteCounts(text);
+    final perSite = sites == null ? null : NetworkIntent.perSiteCounts(text);
 
     return BriefSlots(
       counts: counts,
@@ -148,7 +149,11 @@ class BriefSlotPipeline {
     // asks for a PC whether or not it spells a digit.
     var pcCount = _quantityTotal(records, 'pc') ?? 0;
     if (pcCount == 0 &&
-        _mentionedBeyondHowMany(lower, const ['pc', 'computer', 'workstation'])) {
+        _mentionedBeyondHowMany(lower, const [
+          'pc',
+          'computer',
+          'workstation',
+        ])) {
       pcCount = 1;
     }
     var serverCount = _quantityTotal(records, 'server') ?? 0;
@@ -191,8 +196,9 @@ class BriefSlotPipeline {
 
     // per-site clauses can only raise a count, never shrink the plan
     final sites = NetworkIntent.siteCount(normText);
-    final perSite =
-        sites == null ? null : NetworkIntent.perSiteCounts(normText);
+    final perSite = sites == null
+        ? null
+        : NetworkIntent.perSiteCounts(normText);
     if (perSite != null) {
       int perSiteTotal(String type) {
         final per = perSite[type] ?? 0;
@@ -222,8 +228,9 @@ class BriefSlotPipeline {
         endpoints += counts[t] ?? 0;
       }
       final perSiteEndpoints = (endpoints + sites - 1) ~/ sites;
-      final switchesPerSite =
-          perSiteEndpoints <= 22 ? 1 : (perSiteEndpoints + 21) ~/ 22;
+      final switchesPerSite = perSiteEndpoints <= 22
+          ? 1
+          : (perSiteEndpoints + 21) ~/ 22;
       counts['router'] = sites;
       counts['switch'] = sites * switchesPerSite;
     }
@@ -254,7 +261,14 @@ class BriefSlotPipeline {
     // gets its router and switch. A caller counting a CORRECTION fragment
     // ("actually 8 pcs") opts out: the kinds the correction did not name
     // must stay with the standing lab, not grow an office out of nothing.
+    final explicitLaptopList =
+        (counts['laptop'] ?? 0) > 0 &&
+        records.any((r) => r.kind == 'laptop') &&
+        counts.entries
+            .where((e) => e.value > 0)
+            .every((e) => e.key == 'laptop');
     if (tinyOfficeDefault &&
+        !explicitLaptopList &&
         (counts['router'] ?? 0) == 0 &&
         (counts['switch'] ?? 0) == 0 &&
         (counts['pc'] ?? 0) == 0 &&
@@ -344,7 +358,9 @@ class BriefSlotPipeline {
         if (r.kind != 'router' || r.site != label) continue;
         // Same rule [quantityTotal] applies inside one site: a repeat
         // restates the count rather than adding to it.
-        total = r.correction ? r.value : (r.add ? total + r.value : (r.value > total ? r.value : total));
+        total = r.correction
+            ? r.value
+            : (r.add ? total + r.value : (r.value > total ? r.value : total));
       }
       if (total > 0) out.add(total);
     }
@@ -359,7 +375,8 @@ class BriefSlotPipeline {
   );
 
   static final _switchQty = RegExp(
-    r'\b(\d{1,3})\s*(?:(?:more|extra|additional|further)\s+)?'
+    r'\b(\d{1,3}|a|an)\s*(?:(?:more|extra|additional|further)\s+)?'
+    r'((?:(?:core|access|distribution|multilayer|layer\s+3|managed|unmanaged)\s+)*)'
     r'switch(?:es)?\b',
   );
 
@@ -369,7 +386,8 @@ class BriefSlotPipeline {
   );
 
   static final _serverQty = RegExp(
-    r'(\d+)\s*(?:(?:more|extra|additional|further)\s+)?servers?',
+    r'\b(\d+|a|an)\s*(?:(?:more|extra|additional|further)\s+)?'
+    r'((?:(?:second|web|http|https|dhcp|dns|tacacs\+?|aaa|radius|ftp|mail|email|ntp|syslog)\s+)*)servers?(?:-pt)?\b',
   );
 
   static final Map<String, RegExp> _keywordQty = {
@@ -403,10 +421,11 @@ class BriefSlotPipeline {
         records.add(
           _Qty(
             kind: type,
-            value: int.parse(m.group(1)!) + (moreThan ? 1 : 0),
+            value: (int.tryParse(m.group(1)!) ?? 1) + (moreThan ? 1 : 0),
             at: at,
             site: _siteAt(lower, anchors, at),
             correction: _correctionBefore(clause.text, local),
+            role: m.groupCount > 1 ? m.group(2)?.trim() : null,
           ),
         );
       }
@@ -433,6 +452,66 @@ class BriefSlotPipeline {
           for (final k in kind.keywords) {
             scan(kind.type, _keywordQty[k]!);
           }
+      }
+    }
+    final each = RegExp(r'\beach\b').firstMatch(lower);
+    if (each != null) {
+      final explicit = RegExp(
+        r'^\s+of\s+(\d+)',
+      ).firstMatch(lower.substring(each.end));
+      final before = lower.substring(0, each.start);
+      final preceding = RegExp(
+        r'(\d+)\s+(?:branch\s+)?(?:offices?|branches|sites?|floors?|buildings?)',
+      ).allMatches(before).toList();
+      final repetitions = explicit != null
+          ? int.parse(explicit.group(1)!)
+          : preceding.isNotEmpty
+          ? int.parse(preceding.last.group(1)!)
+          : NetworkIntent.siteCount(lower) ?? 1;
+      if (repetitions > 1 && repetitions <= 25) {
+        final stop = lower.indexOf(RegExp(r'[.;\n]'), each.end);
+        final end = stop < 0 ? lower.length : stop;
+        // A trailing site qualifier ("plus one server at HQ") belongs to
+        // that site, rather than to the preceding "each branch" list.
+        for (var i = 0; i < records.length; i++) {
+          final r = records[i];
+          if (r.at < each.end || r.at >= end) continue;
+          final clause = _clauseOf(clauses, r.at);
+          final trailing = anchors.where(
+            (a) => a.at > r.at && a.at <= clause.start + clause.text.length,
+          );
+          if (trailing.isNotEmpty) {
+            records[i] = _Qty(
+              kind: r.kind,
+              value: r.value,
+              at: r.at,
+              site: trailing.first.label,
+              correction: r.correction,
+              add: r.add,
+              role: r.role,
+            );
+          }
+        }
+        final candidates = records
+            .where((r) => r.at >= each.end && r.at < end)
+            .toList();
+        final site = candidates.isEmpty ? null : candidates.first.site;
+        final repeated = candidates.where((r) => r.site == site).toList();
+        records.removeWhere((r) => repeated.contains(r));
+        for (final r in repeated) {
+          for (var i = 0; i < repetitions; i++) {
+            records.add(
+              _Qty(
+                kind: r.kind,
+                value: r.value,
+                at: r.at,
+                site: '${r.site ?? 'site'}#${i + 1}',
+                correction: r.correction,
+                role: r.role,
+              ),
+            );
+          }
+        }
       }
     }
     records.sort((a, b) => a.at.compareTo(b.at));
@@ -497,23 +576,27 @@ class BriefSlotPipeline {
   static final Map<String, RegExp> _everydayQty = {};
 
   static RegExp _everydayPattern(String word) => _everydayQty.putIfAbsent(
-        word,
-        () => RegExp(
-          // The head is raw so \b and \s stay regex escapes; the tail is a
-          // NORMAL string because that is the only kind that interpolates
-          // (Dart raw strings do not), so its backslash is doubled. Writing
-          // '\b' there instead would put a backspace character in the pattern
-          // and the word would silently never match.
-          //
-          // The plural is optional because a brief counts the plural far more
-          // often than the singular - "6 kiosks", "15 staff" - and a pattern
-          // that only knew the singular dropped every one of them.
-          r'\b(\d{1,3})\s*(?:(?:more|extra|additional|further)\s+)?'
-          '${RegExp.escape(word)}'
-          '${_pluralSuffix.hasMatch(word) ? '(?:es)?' : 's?'}'
-          '\\b',
-        ),
-      );
+    word,
+    () => RegExp(
+      // The head is raw so \b and \s stay regex escapes; the tail is a
+      // NORMAL string because that is the only kind that interpolates
+      // (Dart raw strings do not), so its backslash is doubled. Writing
+      // '\b' there instead would put a backspace character in the pattern
+      // and the word would silently never match.
+      //
+      // The plural is optional because a brief counts the plural far more
+      // often than the singular - "6 kiosks", "15 staff" - and a pattern
+      // that only knew the singular dropped every one of them.
+      // A number following a slash or dot belongs to an IP address or CIDR
+      // prefix, not to a quantity. Without this guard `10.255.0.8/30 WAN`
+      // read the `/30` as thirty cloud devices because WAN is an everyday
+      // synonym for cloud.
+      r'(?<![\d./])\b(\d{1,3})\s*(?:(?:more|extra|additional|further)\s+)?'
+      '${RegExp.escape(word)}'
+      '${_pluralSuffix.hasMatch(word) ? '(?:es)?' : 's?'}'
+      '\\b',
+    ),
+  );
 
   /// Records a quantity for every everyday word in the brief that names a
   /// device the technical patterns never had a phrase for.
@@ -541,8 +624,17 @@ class BriefSlotPipeline {
     };
 
     final candidates =
-        <({int from, int to, String kind, int value, int at, String? site,
-            bool correction})>[];
+        <
+          ({
+            int from,
+            int to,
+            String kind,
+            int value,
+            int at,
+            String? site,
+            bool correction,
+          })
+        >[];
     for (final entry in DomainVocabulary.everydayDeviceWords().entries) {
       if (!deviceKinds.any((k) => k.type == entry.key)) continue;
       for (final word in entry.value) {
@@ -617,18 +709,34 @@ class BriefSlotPipeline {
   ///   downstairs" is still 6);
   /// * an unlabeled repeat is a restatement and adds nothing.
   static int? _quantityTotal(List<_Qty> records, String type) {
-    final own = [for (final r in records) if (r.kind == type) r];
+    final own = [
+      for (final r in records)
+        if (r.kind == type) r,
+    ];
     if (own.isEmpty) return null;
     var base = own.first.value;
     String? baseLabel = own.first.site;
+    final roles = <String>{
+      if ((own.first.role ?? '').isNotEmpty) own.first.role!,
+    };
     final sites = <String, int>{};
     var extra = 0;
     for (final r in own.skip(1)) {
       if (r.correction) {
+        if (r.site != null && baseLabel != null) {
+          if (r.site == baseLabel) {
+            base = r.value;
+            roles.clear();
+          } else {
+            sites[r.site!] = r.value;
+          }
+          continue;
+        }
         base = r.value;
         if (r.site != null) baseLabel = r.site;
         sites.clear();
         extra = 0;
+        roles.clear();
         continue;
       }
       if (baseLabel != null && r.site == baseLabel) {
@@ -639,7 +747,14 @@ class BriefSlotPipeline {
         // they run; reading the "1"s as restatements replaced 3 with 1 and
         // threw two requested servers away. Shrinking on purpose is still
         // possible - it is what a correction says, and that is handled above.
-        base = r.add ? base + r.value : (r.value > base ? r.value : base);
+        final distinctRole =
+            (r.role ?? '').isNotEmpty &&
+            roles.isNotEmpty &&
+            !roles.contains(r.role);
+        base = r.add || distinctRole
+            ? base + r.value
+            : (r.value > base ? r.value : base);
+        if ((r.role ?? '').isNotEmpty) roles.add(r.role!);
         continue;
       }
       if (r.add) {
@@ -660,6 +775,12 @@ class BriefSlotPipeline {
         continue;
       }
       // Unlabeled repeat: a restatement, deliberately not counted twice.
+      if ((r.role ?? '').isNotEmpty &&
+          roles.isNotEmpty &&
+          !roles.contains(r.role)) {
+        extra += r.value;
+        roles.add(r.role!);
+      }
     }
     if (baseLabel == null && extra == 0 && sites.isNotEmpty) {
       var sum = 0;
@@ -678,8 +799,8 @@ class BriefSlotPipeline {
   }
 
   static void _dedupeAt(List<_Qty> records) {
-    final seen = <int>{};
-    records.removeWhere((r) => !seen.add(r.at));
+    final seen = <String>{};
+    records.removeWhere((r) => !seen.add('${r.at}:${r.site ?? ''}'));
   }
 
   static final _clauseSegment = RegExp(r'[^,;.\n]+');
@@ -731,6 +852,9 @@ class BriefSlotPipeline {
   /// Every place the brief named a site, with the label it named.
   static List<({int at, String label})> _siteAnchors(String lower) {
     final out = <({int at, String label})>[];
+    for (final m in RegExp(r'\b(?:hq|headquarters)\b').allMatches(lower)) {
+      out.add((at: m.end, label: 'hq'));
+    }
     for (final m in _siteWord.allMatches(lower)) {
       final adj = m.group(1);
       final site = m.group(2)!;
@@ -742,6 +866,7 @@ class BriefSlotPipeline {
             : '${adj == null ? site : '$adj $site'} $designator',
       ));
     }
+    out.sort((a, b) => a.at.compareTo(b.at));
     return out;
   }
 
@@ -837,8 +962,10 @@ class BriefSlotPipeline {
     return _moreThanTail.hasMatch(head);
   }
 
-  static final RegExp _howManyWord =
-      RegExp(r'how\s+many', caseSensitive: false);
+  static final RegExp _howManyWord = RegExp(
+    r'how\s+many',
+    caseSensitive: false,
+  );
 
   static final Map<String, RegExp> _mentionByWord = {
     for (final w in const [
@@ -865,11 +992,41 @@ class BriefSlotPipeline {
       for (final m in _mentionByWord[k]!.allMatches(lower)) {
         final from = m.start - 40 < 0 ? 0 : m.start - 40;
         if (!_howManyWord.hasMatch(lower.substring(from, m.start))) {
+          final clauses = _clauses(lower);
+          final clause = _clauseOf(clauses, m.start);
+          if (_negationBefore(clause.text, m.start - clause.start) ||
+              _isInNegativeDeviceList(lower, m.start)) {
+            continue;
+          }
           return true;
         }
       }
     }
     return false;
+  }
+
+  /// A prohibition can name several device kinds as one list:
+  /// "do not add cloud devices, printers, or spare endpoints." The comma
+  /// starts a new count clause, but it does not cancel the prohibition.
+  static bool _isInNegativeDeviceList(String lower, int at) {
+    if (at <= 0) return false;
+    final sentenceStart =
+        [
+          lower.lastIndexOf('.', at - 1),
+          lower.lastIndexOf(';', at - 1),
+          lower.lastIndexOf('\n', at - 1),
+        ].reduce((a, b) => a > b ? a : b) +
+        1;
+    final head = lower.substring(sentenceStart, at);
+    final negative = RegExp(
+      r'\b(?:do\s+not|don.t|never|must\s+not|should\s+not)\s+'
+      r'(?:add|include|create|introduce|insert)\b',
+    ).allMatches(head).lastOrNull;
+    if (negative == null) return false;
+    final laterPositive = RegExp(
+      r'\b(?:but|however)\s+(?:do\s+)?(?:add|include|create|introduce|insert)\b',
+    ).allMatches(head).any((match) => match.start > negative.start);
+    return !laterPositive;
   }
 
   static final RegExp _negationTail = RegExp(
@@ -886,10 +1043,12 @@ class BriefSlotPipeline {
 
   /// The elliptical shapes' own pieces, hoisted out of [_ellipse] so the
   /// pattern is compiled once instead of on every call.
-  static final String _ellipseAdjacent = r'(?:ground|first|second|third|'
+  static final String _ellipseAdjacent =
+      r'(?:ground|first|second|third|'
       r'fourth|fifth|sixth|top|upper|'
       r'lower|main|front|back|branch|left|right|north|south|east|west)';
-  static const String _ellipseSiteWord = r'(?:floor|office|branch|site|'
+  static const String _ellipseSiteWord =
+      r'(?:floor|office|branch|site|'
       r'building|classroom|room|'
       'department|location)(?:es|s)?';
   static final RegExp _ellipseNumberFirst = RegExp(
@@ -986,6 +1145,7 @@ class _Qty {
   final String? site;
   final bool correction;
   final bool add;
+  final String? role;
   const _Qty({
     required this.kind,
     required this.value,
@@ -993,5 +1153,6 @@ class _Qty {
     this.site,
     this.correction = false,
     this.add = false,
+    this.role,
   });
 }

@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io' show File;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../app/destinations.dart';
 import '../models/build_record.dart';
@@ -12,11 +14,13 @@ import '../screens/network_toolkit_screen.dart';
 import '../screens/layout_gallery_screen.dart';
 import '../screens/topology_preview_screen.dart';
 import '../widgets/app_dialogs.dart';
+import '../widgets/packet_tracer_catalog.dart';
 import 'adapters/cisco_adapter.dart';
 import 'adapters/gns3_adapter.dart';
 import 'adapters/packet_tracer_adapter.dart';
 import 'adapters/terraform_adapter.dart';
 import 'autopilot_service.dart';
+import 'build_artifact_service.dart';
 import 'engine_status.dart';
 import 'export_support.dart';
 import 'layout_engine.dart';
@@ -24,6 +28,9 @@ import 'layout_intent.dart';
 import 'memory_service.dart';
 import 'network_math.dart';
 import 'network_tools.dart';
+import 'pkt/on_device_pkt_builder.dart';
+import 'pkt_build_job_service.dart';
+import 'pkt/pkt_export_service.dart';
 import 'planner_suggestions_service.dart';
 import 'privacy_search_service.dart';
 import 'settings_service.dart';
@@ -56,11 +63,14 @@ class ActionContext {
   final void Function(AppDestination destination) go;
   final void Function(Widget screen) push;
   final void Function({required String project, String prefill}) openChat;
-  final VoidCallback openDrawer;
 
   /// Persist a chosen drawing style back onto the open plan. Null when the
   /// host cannot do it (a test, a preview) - the caller then just previews.
   final void Function(String style)? applyLayout;
+
+  /// Save an edited topology as a new plan version, retaining the previous
+  /// build record so it remains available for comparison and rollback.
+  final Future<void> Function(NetworkIntent intent)? savePlanEdit;
 
   const ActionContext({
     required this.context,
@@ -68,15 +78,21 @@ class ActionContext {
     required this.go,
     required this.push,
     required this.openChat,
-    required this.openDrawer,
     this.intent,
     this.record,
     this.project = 'default',
     this.autopilot,
     this.applyLayout,
+    this.savePlanEdit,
   });
 
   bool get hasPlan => intent != null;
+
+  bool get hasChosenLayout =>
+      intent?.notes.any(
+        (note) => LayoutRequest.styleFromNote(note).isNotEmpty,
+      ) ??
+      false;
 
   /// The drawing style the open plan already has, read from its notes (a
   /// build stamps "layout: <style>"). Falls back to the default.
@@ -117,11 +133,7 @@ class ActionContext {
       return <LayoutZone>[
         for (final zone in recorded)
           LayoutZone(
-            resolveSideNames(
-              plan,
-              kinds: zone.kinds,
-              names: zone.names,
-            ),
+            resolveSideNames(plan, kinds: zone.kinds, names: zone.names),
             edge: zone.edge,
           ),
       ].where((z) => z.side.isNotEmpty).toList();
@@ -177,6 +189,10 @@ class AppAction {
   /// real devices, saved to disk. Marked in the UI, never run silently.
   final bool touchesDevices;
 
+  /// Whether this action has a real phone implementation. The hub hides
+  /// desktop-engine controls on Android instead of letting them fail there.
+  final bool phoneAvailable;
+
   final Future<void> Function(ActionContext context) run;
 
   const AppAction({
@@ -189,6 +205,7 @@ class AppAction {
     this.keywords = const [],
     this.needsPlan = false,
     this.touchesDevices = false,
+    this.phoneAvailable = true,
   });
 
   bool matches(String query) {
@@ -239,11 +256,15 @@ class CapabilityRegistry {
 
   static List<AppAction> get all => _all;
 
-  static List<AppAction> inGroup(String group) =>
-      [for (final action in _all) if (action.group == group) action];
+  static List<AppAction> inGroup(String group) => [
+    for (final action in _all)
+      if (action.group == group) action,
+  ];
 
-  static List<AppAction> search(String query) =>
-      [for (final action in _all) if (action.matches(query)) action];
+  static List<AppAction> search(String query) => [
+    for (final action in _all)
+      if (action.matches(query)) action,
+  ];
 
   /// True when [destination] has at least one button that reaches it. The
   /// shell asserts this while it builds the hub, which is how "every screen
@@ -282,6 +303,7 @@ class CapabilityRegistry {
     List<String> keywords = const [],
     bool needsPlan = false,
     bool touchesDevices = false,
+    bool phoneAvailable = false,
   }) => AppAction(
     id: id,
     label: label,
@@ -291,6 +313,7 @@ class CapabilityRegistry {
     keywords: keywords,
     needsPlan: needsPlan,
     touchesDevices: touchesDevices,
+    phoneAvailable: phoneAvailable,
     run: (context) async {
       final result = await runWithFeedback<({String title, String text})>(
         context.context,
@@ -338,6 +361,7 @@ class CapabilityRegistry {
     IconData? icon,
     String description = '',
     bool needsPlan = false,
+    bool phoneAvailable = true,
     List<String> keywords = const [],
   }) => AppAction(
     id: id,
@@ -346,6 +370,7 @@ class CapabilityRegistry {
     icon: icon ?? destination.icon,
     group: planGroup,
     needsPlan: needsPlan,
+    phoneAvailable: phoneAvailable,
     keywords: [..._destinations(destination), ...keywords],
     run: (context) => Future.sync(() => context.go(destination)),
   );
@@ -360,8 +385,7 @@ class CapabilityRegistry {
     return path == null || path.trim().isEmpty ? null : path;
   }
 
-  static String _filesLocked(NetworkIntent? intent) =>
-      intent == null
+  static String _filesLocked(NetworkIntent? intent) => intent == null
       ? 'no plan is open'
       : '${intent.nodes.length} devices, ${intent.links.length} links';
 
@@ -378,18 +402,140 @@ class CapabilityRegistry {
     return '$base\n\nSupport notes:\n${notes.map((n) => '• $n').join('\n')}';
   }
 
+  /// Build and export the current plan without a Python sidecar. This is the
+  /// phone implementation of the Packet Tracer build action; it uses the
+  /// saved layout note so the exported file follows the chosen design.
+  static Future<void> _buildPktOnPhone(
+    ActionContext context,
+    NetworkIntent intent,
+  ) async {
+    if (!context.hasChosenLayout) {
+      final picked = await LayoutGalleryScreen.show(
+        context.context,
+        intent: intent,
+        currentStyle: context.layoutStyle,
+        side: context.layoutSide,
+        zones: context.layoutZones,
+      );
+      if (picked != null && context.context.mounted) {
+        context.applyLayout?.call(picked);
+      }
+      return;
+    }
+    final issues = ValidatorService.validate(
+      intent,
+      target: context.settings?.defaultTarget ?? 'packet-tracer',
+    );
+    final errors = issues.where((issue) => issue.severity == 'error').toList();
+    if (errors.isNotEmpty) {
+      await showLinesDialog(
+        context.context,
+        title: 'Fix these plan errors first',
+        subtitle:
+            '${intent.nodes.length} devices, ${intent.links.length} links',
+        icon: Icons.error_outline,
+        warn: true,
+        lines: [for (final issue in errors) issue.message],
+      );
+      return;
+    }
+
+    final layout = PacketTracerAdapter.intentLayoutFromNotes(intent);
+    final plan = PacketTracerAdapter.autopilotPlan(intent, layout: layout);
+    final jobs = PktBuildJobService.instance;
+    final built = await jobs.start(
+      project: intent.projectName,
+      sourceRecordId: context.record?.id,
+      planRevision: intent.revision,
+      planJson: jsonEncode(intent.toPlannerJson()),
+      build: (reportProgress) async {
+        final appDir = await getApplicationDocumentsDirectory();
+        final outputDir = OnDevicePktBuilder.outDirIn(appDir);
+        final taken = <String>{};
+        if (outputDir.existsSync()) {
+          for (final entry in outputDir.listSync(followLinks: false)) {
+            if (entry is File) {
+              taken.add(entry.uri.pathSegments.last.toLowerCase());
+            }
+          }
+        }
+        final filename = BuildArtifactService.networkFileName(
+          plan: intent,
+          taken: taken,
+        );
+        return OnDevicePktBuilder.buildFromPlan(
+          plan: plan,
+          appDir: getApplicationDocumentsDirectory,
+          filename: filename,
+          project: intent.projectName,
+          onProgress: reportProgress,
+          isCancelled: () => jobs.cancelRequested,
+        );
+      },
+    );
+    if (built == null || !context.context.mounted) return;
+
+    final saved = await PktExportService.saveToChosenFolder(
+      built.file,
+      suggestedName: built.file.uri.pathSegments.last,
+    );
+    if (!context.context.mounted) return;
+    if (!saved.cancelled && saved.path.isNotEmpty) {
+      jobs.markSaved(saved.path);
+    }
+
+    final report = built.report ?? const <String, dynamic>{};
+    final reportLayout = report['layout'];
+    final layoutName = reportLayout is Map ? reportLayout['style'] : null;
+    final warnings = (report['warnings'] as List? ?? const [])
+        .map((warning) => warning.toString())
+        .toList();
+    await showArtifactDialog(
+      context.context,
+      title: saved.cancelled ? 'The .pkt is ready' : 'The .pkt is saved',
+      subtitle: saved.message,
+      text: [
+        'Built on this phone using the bundled Packet Tracer device library.',
+        'Devices: ${report['deviceCount'] ?? intent.nodes.length}',
+        'Cables: ${report['linkCount'] ?? intent.links.length}',
+        'Layout: ${layoutName ?? layout['style'] ?? 'saved design'}',
+        if (!saved.cancelled) 'Saved file: ${saved.path}',
+        if (saved.cancelled)
+          'The build is still in app storage at ${built.file.path}. '
+              'Choose a save location next time to make it visible in Files.',
+        if (warnings.isNotEmpty) '',
+        if (warnings.isNotEmpty) 'Warnings:',
+        ...warnings.map((warning) => '- $warning'),
+      ].join('\n'),
+    );
+  }
+
   // --- the capabilities ---------------------------------------------------
 
   static final List<AppAction> _all = [
-    // ---- Plan a network ----
-    _go(
+    // Chat is the one place to describe, design, and build a network.
+    AppAction(
       id: 'plan.new',
-      label: 'Plan a network from a sentence',
-      destination: AppDestination.newBuild,
+      label: 'Plan a network in chat',
       description:
-          'Describe it in plain words ("3 routers, 2 switches, OSPF on '
-          '10.0.0.0/24") and the planner builds the full design.',
-      keywords: ['create', 'design', 'build', 'start', 'wizard'],
+          'Describe the network in plain words. Chat creates the design, asks you to choose it, then builds the .pkt.',
+      icon: Icons.add_circle_outline,
+      group: planGroup,
+      keywords: ['create', 'design', 'build', 'start', 'network'],
+      run: (context) async {
+        context.openChat(
+          project: context.project,
+          prefill: 'Describe the network you want to design and build.',
+        );
+      },
+    ),
+    _go(
+      id: 'labs.open',
+      label: 'Guided practice labs',
+      destination: AppDestination.labs,
+      description:
+          'Practice VLANs and DHCP, DNS and web services, OSPF, and secure device management with checks against the generated configuration.',
+      keywords: ['practice', 'labs', 'training', 'exercise', 'learn'],
     ),
     _go(
       id: 'plan.review',
@@ -398,6 +544,7 @@ class CapabilityRegistry {
       description:
           'What was understood, what was assumed, what the checks say, and '
           'what is worth fixing before anything is touched.',
+      phoneAvailable: false,
       keywords: ['audit', 'review', 'inspect', 'live'],
     ),
     _go(
@@ -405,6 +552,7 @@ class CapabilityRegistry {
       label: 'Open the build workspace',
       destination: AppDestination.execution,
       needsPlan: true,
+      phoneAvailable: false,
       description:
           'Run the plan, approve each typed command, and prove the result on '
           'screen.',
@@ -421,9 +569,14 @@ class CapabilityRegistry {
       group: planGroup,
       needsPlan: true,
       keywords: ['topology', 'diagram', 'preview', 'map', 'graph', 'draw'],
-      run: (context) => Future.sync(() => context.push(
-            TopologyPreviewScreen(intent: context.intent!),
-          )),
+      run: (context) => Future.sync(
+        () => context.push(
+          TopologyPreviewScreen(
+            intent: context.intent!,
+            onIntentSaved: context.savePlanEdit,
+          ),
+        ),
+      ),
     ),
     AppAction(
       id: 'plan.layouts',
@@ -435,8 +588,18 @@ class CapabilityRegistry {
       icon: Icons.grid_view_outlined,
       group: planGroup,
       needsPlan: true,
-      keywords: ['layout', 'arrange', 'draw', 'style', 'compare', 'preview',
-                 'tree', 'rows', 'compact', 'wide'],
+      keywords: [
+        'layout',
+        'arrange',
+        'draw',
+        'style',
+        'compare',
+        'preview',
+        'tree',
+        'rows',
+        'compact',
+        'wide',
+      ],
       run: (context) async {
         final chosen = await LayoutGalleryScreen.show(
           context.context,
@@ -461,6 +624,7 @@ class CapabilityRegistry {
       label: 'Packet Tracer files',
       destination: AppDestination.files,
       description: 'Open, verify, back up and report on .pkt saves.',
+      phoneAvailable: false,
       keywords: ['pkt', 'save', 'open', 'backup', 'file'],
     ),
     AppAction(
@@ -485,8 +649,7 @@ class CapabilityRegistry {
           title: issues.isEmpty
               ? 'The plan is clean'
               : '${issues.length} finding(s)',
-          subtitle:
-              '${intent.projectName} - ${_filesLocked(intent)}',
+          subtitle: '${intent.projectName} - ${_filesLocked(intent)}',
           icon: Icons.fact_check_outlined,
           warn: issues.any((i) => i.severity == 'error'),
           lines: [
@@ -554,7 +717,13 @@ class CapabilityRegistry {
       id: 'tools.summarize',
       label: 'Summarization and ranges',
       section: ToolkitSection.summarize,
-      keywords: ['summarize', 'aggregate', 'supernet', 'summary route', 'range'],
+      keywords: [
+        'summarize',
+        'aggregate',
+        'supernet',
+        'summary route',
+        'range',
+      ],
     ),
     _toolkitSection(
       id: 'tools.addressing',
@@ -566,7 +735,13 @@ class CapabilityRegistry {
       id: 'tools.acl',
       label: 'ACL and mask helper',
       section: ToolkitSection.acl,
-      keywords: ['acl', 'wildcard', 'inverse mask', 'access list', 'reverse dns'],
+      keywords: [
+        'acl',
+        'wildcard',
+        'inverse mask',
+        'access list',
+        'reverse dns',
+      ],
     ),
     _toolkitSection(
       id: 'tools.diagnostics',
@@ -637,7 +812,8 @@ class CapabilityRegistry {
           title: pairs.isEmpty
               ? 'No overlapping subnets'
               : '${pairs.length} overlapping pair(s)',
-          subtitle: 'Checked ${cidrs.length} distinct subnets in '
+          subtitle:
+              'Checked ${cidrs.length} distinct subnets in '
               '${intent.projectName}',
           icon: Icons.layers_outlined,
           warn: pairs.isNotEmpty,
@@ -658,6 +834,7 @@ class CapabilityRegistry {
       description:
           'Read the devices that are on the screen now, list the faults and '
           'apply the fixes you approve.',
+      phoneAvailable: false,
       keywords: ['audit', 'scan', 'fault', 'repair', 'diagnose'],
     ),
     AppAction(
@@ -668,6 +845,7 @@ class CapabilityRegistry {
           'no clicks - and reports what is wrong inside it.',
       icon: Icons.plagiarism_outlined,
       group: analyzeGroup,
+      phoneAvailable: false,
       keywords: ['audit', 'pkt', 'offline', 'fault', 'check file'],
       run: (context) async {
         final path = await _pickPkt();
@@ -675,10 +853,7 @@ class CapabilityRegistry {
         final report = await runWithFeedback<Map<String, dynamic>>(
           context.context,
           busyLabel: 'Auditing $path...',
-          action: () => context.engine.pktAudit(
-            path,
-            project: context.project,
-          ),
+          action: () => context.engine.pktAudit(path, project: context.project),
         );
         if (report == null || !context.context.mounted) return;
         await showArtifactDialog(
@@ -691,22 +866,16 @@ class CapabilityRegistry {
     ),
     AppAction(
       id: 'analyze.verify',
-      label: 'Verify a build (ping tests)',
+      label: 'Verify a build',
       description:
-          'Runs the plan test list against the live Packet Tracer window: '
-          'every PC pings its gateway and each service server, with '
-          'pass/fail evidence per test.',
+          'Checks gateway and service reachability and resolves configured DNS '
+          'records in Packet Tracer, then lists DHCP, web, authentication, and '
+          'security checks for manual confirmation with clear pass/fail evidence.',
       icon: Icons.fact_check_outlined,
       group: analyzeGroup,
+      phoneAvailable: false,
       needsPlan: true,
-      keywords: [
-        'verify',
-        'test',
-        'ping',
-        'evidence',
-        'proof',
-        'works',
-      ],
+      keywords: ['verify', 'test', 'ping', 'evidence', 'proof', 'works'],
       run: (context) async {
         final intent = context.intent;
         final baseCtx = context.context;
@@ -727,22 +896,22 @@ class CapabilityRegistry {
             // ignore: use_build_context_synchronously - baseCtx is captured
             // before the await and re-checked with .mounted after it.
             await runWithFeedback<Map<String, dynamic>?>(
-          baseCtx,
-          busyLabel: 'Pinging every endpoint in Packet Tracer...',
-          action: () async {
-            await svc.verifyRun(plan);
-            Map<String, dynamic>? rep;
-            for (var i = 0; i < 150; i++) {
-              await Future<void>.delayed(const Duration(seconds: 4));
-              rep = await svc.verifyReport();
-              if (rep != null &&
-                  ((rep['total'] ?? 0) > 0 || rep['error'] != null)) {
-                break;
-              }
-            }
-            return rep;
-          },
-        );
+              baseCtx,
+              busyLabel: 'Checking reachability and DNS in Packet Tracer...',
+              action: () async {
+                await svc.verifyRun(plan);
+                Map<String, dynamic>? rep;
+                for (var i = 0; i < 150; i++) {
+                  await Future<void>.delayed(const Duration(seconds: 4));
+                  rep = await svc.verifyReport();
+                  if (rep != null &&
+                      ((rep['total'] ?? 0) > 0 || rep['error'] != null)) {
+                    break;
+                  }
+                }
+                return rep;
+              },
+            );
         if (report == null || !baseCtx.mounted) return;
         await showArtifactDialog(
           baseCtx,
@@ -750,10 +919,12 @@ class CapabilityRegistry {
           subtitle: report['summary']?.toString() ?? '',
           text: (report['tests'] as List? ?? const [])
               .whereType<Map>()
-              .map((t) =>
-                  '${(t['status'] ?? '').toString().toUpperCase()}'
-                  '  ${t['src']} -> ${t['dst']}'
-                  '  ${t['detail'] ?? ''}')
+              .map(
+                (t) =>
+                    '${(t['status'] ?? '').toString().toUpperCase()}'
+                    '  ${t['src']} -> ${t['dst']}'
+                    '  ${t['detail'] ?? ''}',
+              )
               .join('\n'),
         );
       },
@@ -767,6 +938,7 @@ class CapabilityRegistry {
           'for dead transits and incomplete configs - before anything runs.',
       icon: Icons.slow_motion_video_outlined,
       group: analyzeGroup,
+      phoneAvailable: false,
       needsPlan: true,
       keywords: [
         'dry run',
@@ -818,11 +990,11 @@ class CapabilityRegistry {
               '',
             ],
             'ACTIONS:',
-            ...(report['actions'] as List? ?? const [])
-                .whereType<Map>()
-                .map((a) =>
-                    ' ${(a['device'] ?? '')}: ${(a['action'] ?? '')}'
-                    '${a['detail'] != null ? ' - ${a['detail']}' : ''}'),
+            ...(report['actions'] as List? ?? const []).whereType<Map>().map(
+              (a) =>
+                  ' ${(a['device'] ?? '')}: ${(a['action'] ?? '')}'
+                  '${a['detail'] != null ? ' - ${a['detail']}' : ''}',
+            ),
           ].join('\n'),
         );
       },
@@ -835,13 +1007,13 @@ class CapabilityRegistry {
           'blockers for this project.',
       icon: Icons.block_outlined,
       group: analyzeGroup,
+      phoneAvailable: false,
       keywords: ['blocker', 'stuck', 'failure', 'known issue'],
       run: (context) async {
         final lines = await runWithFeedback<List<String>>(
           context.context,
           busyLabel: 'Reading the failure journal...',
-          action: () =>
-              context.engine.blockerLines(project: context.project),
+          action: () => context.engine.blockerLines(project: context.project),
         );
         if (lines == null || !context.context.mounted) return;
         await showLinesDialog(
@@ -864,6 +1036,7 @@ class CapabilityRegistry {
           'promising them.',
       icon: Icons.not_interested,
       group: analyzeGroup,
+      phoneAvailable: false,
       keywords: ['unsupported', 'limits', 'cannot', 'capability'],
       run: (context) async {
         final lines = await runWithFeedback<List<String>>(
@@ -911,6 +1084,32 @@ class CapabilityRegistry {
 
     // ---- Packet Tracer ----
     AppAction(
+      id: 'pt.chooseLayout',
+      label: 'Choose network design',
+      description:
+          'Preview the available network drawings and choose the layout used '
+          'by the next build on Android or Windows.',
+      icon: Icons.dashboard_customize_outlined,
+      group: pktGroup,
+      needsPlan: true,
+      phoneAvailable: true,
+      keywords: ['design', 'layout', 'drawing', 'topology', 'pkt', 'build'],
+      run: (context) async {
+        final intent = context.intent;
+        if (intent == null) return;
+        final picked = await LayoutGalleryScreen.show(
+          context.context,
+          intent: intent,
+          currentStyle: context.layoutStyle,
+          side: context.layoutSide,
+          zones: context.layoutZones,
+        );
+        if (picked != null && context.context.mounted) {
+          context.applyLayout?.call(picked);
+        }
+      },
+    ),
+    AppAction(
       id: 'pt.generate',
       label: 'Build a .pkt from the plan',
       description:
@@ -923,7 +1122,27 @@ class CapabilityRegistry {
       keywords: ['pkt', 'generate', 'build file', 'offline', 'create save'],
       run: (context) async {
         final intent = context.intent!;
-        final plan = PacketTracerAdapter.autopilotPlan(intent);
+        if (!context.hasChosenLayout) {
+          final picked = await LayoutGalleryScreen.show(
+            context.context,
+            intent: intent,
+            currentStyle: context.layoutStyle,
+            side: context.layoutSide,
+            zones: context.layoutZones,
+          );
+          if (picked != null && context.context.mounted) {
+            context.applyLayout?.call(picked);
+          }
+          return;
+        }
+        if (SettingsService.isMobile) {
+          await _buildPktOnPhone(context, intent);
+          return;
+        }
+        final plan = PacketTracerAdapter.autopilotPlan(
+          intent,
+          layout: PacketTracerAdapter.intentLayoutFromNotes(intent),
+        );
         final report = await runWithFeedback<Map<String, dynamic>>(
           context.context,
           busyLabel: 'Compiling ${intent.projectName}.pkt...',
@@ -934,6 +1153,15 @@ class CapabilityRegistry {
           ),
         );
         if (report == null || !context.context.mounted) return;
+        PktBuildJobService.instance.recordGeneratedFile(
+          project: intent.projectName,
+          filePath: '${report['path'] ?? ''}',
+          deviceCount: (report['deviceCount'] as num?)?.toInt() ?? 0,
+          linkCount: (report['linkCount'] as num?)?.toInt() ?? 0,
+          sourceRecordId: context.record?.id,
+          planRevision: intent.revision,
+          planJson: jsonEncode(intent.toPlannerJson()),
+        );
         await showArtifactDialog(
           context.context,
           title: 'Generated .pkt',
@@ -950,13 +1178,15 @@ class CapabilityRegistry {
           'manifest and a reopened proof that it loads.',
       icon: Icons.save_outlined,
       group: pktGroup,
+      phoneAvailable: false,
       touchesDevices: true,
       keywords: ['save', 'pkt', 'verified', 'manifest', 'backup'],
       run: (context) async {
         final confirmed = await confirmAction(
           context.context,
           title: 'Save the live topology?',
-          body: 'The engine will save the topology Packet Tracer is showing '
+          body:
+              'The engine will save the topology Packet Tracer is showing '
               'into a .pkt in your output folder, alongside a companion '
               'manifest, and reopen it to prove it loads.',
           icon: Icons.save_outlined,
@@ -985,6 +1215,7 @@ class CapabilityRegistry {
           'Packet Tracer.',
       icon: Icons.open_in_new,
       group: pktGroup,
+      phoneAvailable: false,
       touchesDevices: true,
       keywords: ['open', 'pkt', 'load', 'restore'],
       run: (context) async {
@@ -1007,6 +1238,7 @@ class CapabilityRegistry {
           'Reopens a saved file and reports whether Packet Tracer accepts it.',
       icon: Icons.verified_outlined,
       group: pktGroup,
+      phoneAvailable: false,
       keywords: ['verify', 'pkt', 'check', 'load test'],
       run: (context) async {
         final path = await _pickPkt();
@@ -1052,18 +1284,17 @@ class CapabilityRegistry {
         return (title: 'Fix ledger', text: _pretty(ledger));
       },
     ),
-    _probe(
+    AppAction(
       id: 'pt.templates',
-      label: 'What the .pkt generator can build',
+      label: 'Packet Tracer devices and cables',
       description:
           'Device models and cables the machine-local template library '
           'covers today.',
       icon: Icons.category_outlined,
       group: pktGroup,
       keywords: ['templates', 'models', 'library', 'harvest', 'pkt builder'],
-      probe: (engine) async {
-        final status = await engine.pktTemplatesStatus();
-        return (title: 'Template library', text: _pretty(status));
+      run: (context) async {
+        await PacketTracerCatalogSheet.show(context.context);
       },
     ),
     AppAction(
@@ -1074,6 +1305,7 @@ class CapabilityRegistry {
           'saves, so a plan asking for a 2911 gets a real 2911.',
       icon: Icons.auto_awesome_motion,
       group: pktGroup,
+      phoneAvailable: false,
       keywords: ['harvest', 'templates', 'models', 'samples'],
       run: (context) async {
         final report = await runWithFeedback<Map<String, dynamic>>(
@@ -1097,6 +1329,7 @@ class CapabilityRegistry {
           'the exact device models inside them.',
       icon: Icons.library_add_outlined,
       group: pktGroup,
+      phoneAvailable: false,
       keywords: ['templates', 'library', 'build', 'models', 'import pkt'],
       run: (context) async {
         final picked = await FilePicker.platform.pickFiles(
@@ -1205,9 +1438,7 @@ class CapabilityRegistry {
       group: pktGroup,
       keywords: ['suggest', 'advice', 'rules', 'patterns'],
       probe: (engine) async {
-        final suggestion = await engine.aiSuggest(
-          project: 'default',
-        );
+        final suggestion = await engine.aiSuggest(project: 'default');
         return (title: 'Engine suggestion', text: _pretty(suggestion));
       },
     ),
@@ -1246,6 +1477,7 @@ class CapabilityRegistry {
           'Tracer window at its next safe boundary.',
       icon: Icons.stop_circle_outlined,
       group: pktGroup,
+      phoneAvailable: false,
       touchesDevices: true,
       keywords: ['stop', 'cancel', 'abort', 'emergency'],
       run: (context) async {
@@ -1265,6 +1497,7 @@ class CapabilityRegistry {
           'releases it.',
       icon: Icons.pause_circle_outline,
       group: pktGroup,
+      phoneAvailable: false,
       touchesDevices: true,
       keywords: ['pause', 'resume', 'hold', 'f9'],
       run: (context) async {
@@ -1289,6 +1522,7 @@ class CapabilityRegistry {
           'Settings, and wires the links.',
       icon: Icons.hub_outlined,
       group: pktGroup,
+      phoneAvailable: false,
       needsPlan: true,
       touchesDevices: true,
       keywords: ['gns3', 'push', 'server', 'import', 'remote'],
@@ -1298,7 +1532,8 @@ class CapabilityRegistry {
         final confirmed = await confirmAction(
           context.context,
           title: 'Push this plan to GNS3?',
-          body: 'A new project will be created on ${settings.gns3Endpoint} '
+          body:
+              'A new project will be created on ${settings.gns3Endpoint} '
               'with ${context.intent!.nodes.length} nodes and '
               '${context.intent!.links.length} links.',
           icon: Icons.hub_outlined,
@@ -1395,7 +1630,8 @@ class CapabilityRegistry {
     AppAction(
       id: 'export.gns3',
       label: 'GNS3 project JSON',
-      description: 'Nodes, templates and links, ready to import by hand.',
+      description:
+          'Topology recipe and IOS configs; push through the GNS3 adapter.',
       icon: Icons.hub_outlined,
       group: exportGroup,
       needsPlan: true,
@@ -1417,7 +1653,7 @@ class CapabilityRegistry {
       id: 'export.terraform',
       label: 'Terraform (AWS VPC)',
       description:
-          'The cloud equivalent of the same topology, as Terraform.',
+          'A minimal AWS VPC example, with explicit topology limitations.',
       icon: Icons.cloud_outlined,
       group: exportGroup,
       needsPlan: true,
@@ -1443,6 +1679,7 @@ class CapabilityRegistry {
           'Screenshots are excluded.',
       icon: Icons.archive_outlined,
       group: exportGroup,
+      phoneAvailable: false,
       keywords: ['diagnostics', 'export', 'support', 'bug report', 'logs'],
       run: (context) async {
         final archive = await runWithFeedback<Map<String, dynamic>>(
@@ -1483,7 +1720,8 @@ class CapabilityRegistry {
           title: 'Name this conversation',
           label: 'Conversation',
           initial: 'chat ${DateTime.now().toIso8601String().substring(11, 16)}',
-          helper: 'The name is the conversation - it shows in the sidebar and '
+          helper:
+              'The name is the conversation - it shows in the sidebar and '
               'keeps its own transcript.',
         );
         if (name == null || name.trim().isEmpty) return;
@@ -1598,62 +1836,8 @@ class CapabilityRegistry {
       },
     ),
 
-    // ---- Settings and system ----
-    _go(
-      id: 'settings.open',
-      label: 'Settings',
-      destination: AppDestination.settings,
-      description:
-          'Keys, provider, engine address, output folder, context budget.',
-      keywords: ['settings', 'keys', 'api', 'provider', 'folder', 'config'],
-    ),
-    AppAction(
-      id: 'settings.drawer',
-      label: 'Open the settings sidebar',
-      description:
-          'The sidebar: chats, run controls, the ledger, live context and '
-          'every technical setting.',
-      icon: Icons.menu_open,
-      group: systemGroup,
-      keywords: ['sidebar', 'drawer', 'chats', 'run controls', 'ledger'],
-      run: (context) => Future.sync(context.openDrawer),
-    ),
-    AppAction(
-      id: 'settings.theme.system',
-      label: 'Theme: follow the system',
-      description: 'Light or dark, decided by the operating system.',
-      icon: Icons.brightness_auto_outlined,
-      group: systemGroup,
-      keywords: ['theme', 'appearance', 'dark', 'light', 'system'],
-      run: (context) async {
-        await context.settings?.setThemeMode('system');
-        context.toast('Theme follows the system');
-      },
-    ),
-    AppAction(
-      id: 'settings.theme.light',
-      label: 'Theme: light',
-      description: 'Always light - the readable choice in a bright room.',
-      icon: Icons.light_mode_outlined,
-      group: systemGroup,
-      keywords: ['theme', 'appearance', 'light', 'day'],
-      run: (context) async {
-        await context.settings?.setThemeMode('light');
-        context.toast('Light theme');
-      },
-    ),
-    AppAction(
-      id: 'settings.theme.dark',
-      label: 'Theme: dark',
-      description: 'Always dark - easier on the eyes at night.',
-      icon: Icons.dark_mode_outlined,
-      group: systemGroup,
-      keywords: ['theme', 'appearance', 'dark', 'night'],
-      run: (context) async {
-        await context.settings?.setThemeMode('dark');
-        context.toast('Dark theme');
-      },
-    ),
+    // Settings has one entry point in the shell app bar; app-wide values are
+    // not repeated as individual commands in the feature launcher.
     AppAction(
       id: 'settings.privacy',
       label: 'Check what a web lookup would send',
@@ -1684,7 +1868,8 @@ class CapabilityRegistry {
           subtitle:
               'This is everything the app would send. Addresses, hostnames '
               'and device names are removed before this point.',
-          text: '${PrivacySearchService.previewPayload(query)}\n\n'
+          text:
+              '${PrivacySearchService.previewPayload(query)}\n\n'
               '--- query ---\n$query',
         );
       },
@@ -1697,9 +1882,17 @@ class CapabilityRegistry {
           '(Packet Tracer control, OCR) and read its log when a start fails.',
       icon: Icons.dns_outlined,
       group: systemGroup,
+      phoneAvailable: false,
       keywords: [
-        'sidecar', 'engine', 'start', 'stop', 'restart', 'python', 'service',
-        'log', 'diagnose',
+        'sidecar',
+        'engine',
+        'start',
+        'stop',
+        'restart',
+        'python',
+        'service',
+        'log',
+        'diagnose',
       ],
       run: (context) => Future.sync(
         () => context.push(EngineScreen(settings: context.settings)),
@@ -1713,6 +1906,7 @@ class CapabilityRegistry {
           'so a failure comes with a reason instead of a dead end.',
       icon: Icons.power_settings_new,
       group: systemGroup,
+      phoneAvailable: false,
       keywords: ['sidecar', 'engine', 'start', 'python', 'service'],
       run: (context) async {
         // On a phone there is nothing here to start; the engine is on the PC.

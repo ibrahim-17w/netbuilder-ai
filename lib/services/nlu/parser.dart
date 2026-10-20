@@ -2,6 +2,8 @@ import 'package:net_builder/services/phrasing_memory_service.dart';
 
 import '../../models/network_intent.dart';
 import 'lexicon.dart';
+import '../packet_tracer/brief_reader.dart';
+import 'package:flutter/foundation.dart' show compute;
 
 /// THE BRIEF READER: English in, a NetworkIntent out.
 ///
@@ -37,13 +39,10 @@ String _foldArabic(String s) => s
 final RegExp _arabicIndicDigits = RegExp(r'[٠-٩۰-۹]');
 
 /// ٢٣ (Arabic-Indic) and ۲۳ (Extended Arabic-Indic) are the same numbers.
-String _asciiDigits(String s) => s.replaceAllMapped(
-  _arabicIndicDigits,
-  (m) {
-    final c = m.group(0)!.codeUnitAt(0);
-    return '${c >= 0x06f0 ? c - 0x06f0 : c - 0x0660}';
-  },
-);
+String _asciiDigits(String s) => s.replaceAllMapped(_arabicIndicDigits, (m) {
+  final c = m.group(0)!.codeUnitAt(0);
+  return '${c >= 0x06f0 ? c - 0x06f0 : c - 0x0660}';
+});
 
 /// The prefix length of a dotted mask, or null when it is not a mask.
 int? _maskToPrefix(String mask) {
@@ -73,14 +72,11 @@ final RegExp _maskPair = RegExp(
   r'(\d{1,3}(?:\.\d{1,3}){3})[\s,;:]*(?:/|subnet\s+mask|netmask|mask|prefix|qina3|قناع(?:\s+الشبكه)?)?[\s,;:]*(\d{1,3}(?:\.\d{1,3}){3})',
 );
 
-String _bridgeMasks(String s) => s.replaceAllMapped(
-  _maskPair,
-  (m) {
-    final prefix = _maskToPrefix(m.group(2)!);
-    if (prefix == null || prefix == 0) return m.group(0)!;
-    return '${m.group(1)!}/$prefix';
-  },
-);
+String _bridgeMasks(String s) => s.replaceAllMapped(_maskPair, (m) {
+  final prefix = _maskToPrefix(m.group(2)!);
+  if (prefix == null || prefix == 0) return m.group(0)!;
+  return '${m.group(1)!}/$prefix';
+});
 
 /// Arabic phrases -> the English words the rest of this parser already
 /// keys on.  Keys are written in folded form (see [_foldArabic]) and the
@@ -382,7 +378,9 @@ Map<String, int>? perSiteCounts(String text) {
     return 0;
   }
 
-  final counts = <String, int>{'router': countOf(['router', 'gateway'])};
+  final counts = <String, int>{
+    'router': countOf(['router', 'gateway']),
+  };
   counts['switch'] = countOf(['switch']);
   counts['pc'] = countOf(['pc', 'workstation', 'desktop']);
   counts['server'] = countOf(['server']);
@@ -407,8 +405,9 @@ final RegExp _extraSpaces = RegExp(r'[ \t]+');
 /// vanished from the brief before the roles were read. A key that
 /// starts and ends on a word character must not match inside one.
 final List<({RegExp? pattern, String from, String to})> _phraseBridgeTable = [
-  for (final e in [..._phraseBridge]
-    ..sort((a, b) => b[0].length.compareTo(a[0].length)))
+  for (final e in [
+    ..._phraseBridge,
+  ]..sort((a, b) => b[0].length.compareTo(a[0].length)))
     if (_isAscii(e[0]))
       (
         pattern: RegExp(
@@ -448,13 +447,11 @@ String bridgeBrief(String raw) {
 /// silently REPLACE the plan built from the user's real request.
 final RegExp namesAnyDevice = RegExp(
   '(?:\\b(?:'
-      '${deviceKinds
-          .expand((k) => k.keywords)
-          // Plural-tolerant: "2 routers" must count, and \brouter\b alone
-          // would not match it.
-          .map((k) => '${RegExp.escape(k)}(?:es|s)?')
-          .join('|')}'
-      ')\\b)',
+  '${deviceKinds.expand((k) => k.keywords)
+  // Plural-tolerant: "2 routers" must count, and \brouter\b alone
+  // would not match it.
+  .map((k) => '${RegExp.escape(k)}(?:es|s)?').join('|')}'
+  ')\\b)',
 );
 
 final RegExp _deviceLabel = RegExp(r'\b(?:R|SW|PC|SRV)\d{1,2}\b');
@@ -469,6 +466,29 @@ bool namesAnyDeviceIn(String lower) =>
 
 /// The learned-phrasing hop, run once at the top of every parse.
 NetworkIntent parseBrief(String projectName, String rawText) {
+  final request = PtBriefRequest.read(rawText);
+  return request.apply(_parseGeneralBrief(projectName, request.plannerText));
+}
+
+Map<String, dynamic> _parseInBackground(List<String> request) =>
+    parseBrief(request[0], request[1]).toJson();
+
+Future<NetworkIntent> parseBriefAsync(
+  String projectName,
+  String rawText,
+) async {
+  if (rawText.length < 1200) return parseBrief(projectName, rawText);
+  // Learned phrasing belongs to the main session's index. Preserve its
+  // existing one-hop behavior when a stored correction applies.
+  if (PhrasingMemoryService.lookupMatch(bridgeBrief(rawText)) != null) {
+    return parseBrief(projectName, rawText);
+  }
+  return NetworkIntent.fromJson(
+    await compute(_parseInBackground, [projectName, rawText]),
+  );
+}
+
+NetworkIntent _parseGeneralBrief(String projectName, String rawText) {
   final bridged = bridgeBrief(rawText);
   // Learned phrasing: when this exact wording was clarified before, the
   // resolved brief replays - the parser reads it as if the user had typed
@@ -480,7 +500,11 @@ NetworkIntent parseBrief(String projectName, String rawText) {
       replay.rewrite.trim().isNotEmpty &&
       replay.rewrite != bridged) {
     if (replay.exact) {
-      return NetworkIntent.parseBridged(projectName, bridgeBrief(replay.rewrite), rawText);
+      return NetworkIntent.parseBridged(
+        projectName,
+        bridgeBrief(replay.rewrite),
+        rawText,
+      );
     }
     // A NEAR TWIN is not the same request: the wording differs exactly
     // where the user said something new. The remembered resolution is
@@ -489,7 +513,11 @@ NetworkIntent parseBrief(String projectName, String rawText) {
     // address, model or constraint named in this message survives the
     // match instead of being replaced by what was learned earlier.
     final merged = '${replay.rewrite} $bridged';
-    final intent = NetworkIntent.parseBridged(projectName, bridgeBrief(merged), rawText);
+    final intent = NetworkIntent.parseBridged(
+      projectName,
+      bridgeBrief(merged),
+      rawText,
+    );
     final assumptions = [
       ...intent.assumptions,
       'Matched the phrasing "${replay.key}" remembered from an earlier '

@@ -151,6 +151,7 @@ class FuzzyMatch {
     'test',
     'text',
     'rest',
+    'services',
     'best',
     'west',
     'east',

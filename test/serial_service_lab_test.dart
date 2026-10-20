@@ -83,38 +83,35 @@ void main() {
     setUp(() => intent = _parse());
 
     test('builds exactly the twenty devices that were asked for', () {
-      expect(
-        intent.nodes.map((n) => n.name).toList(),
-        [
-          'R1',
-          'R2',
-          'SW1',
-          'SW2',
-          'PC1',
-          'PC2',
-          'PC3',
-          'PC4',
-          'PC5',
-          'PC6',
-          'PC7',
-          'PC8',
-          'PC9',
-          'PC10',
-          'DHCP1',
-          'DNS1',
-          'WEB1',
-          'AAA1',
-          'FTP1',
-          'MAIL1',
-        ],
-      );
+      expect(intent.nodes.map((n) => n.name).toList(), [
+        'R1',
+        'R2',
+        'SW1',
+        'SW2',
+        'PC1',
+        'PC2',
+        'PC3',
+        'PC4',
+        'PC5',
+        'PC6',
+        'PC7',
+        'PC8',
+        'PC9',
+        'PC10',
+        'DHCP1',
+        'DNS1',
+        'WEB1',
+        'AAA1',
+        'FTP1',
+        'MAIL1',
+      ]);
       expect(
         intent.nodes.where((n) => n.type == 'router').map((n) => n.model),
         ['2911', '2911'],
       );
       expect(
         intent.nodes.where((n) => n.type == 'switch').map((n) => n.model),
-        ['2960', '2960'],
+        ['2960-24TT', '2960-24TT'],
       );
       expect(intent.nodes.where((n) => n.type == 'server').length, 6);
     });
@@ -234,14 +231,20 @@ void main() {
       expect(pools, hasLength(2));
       String field(Map<String, dynamic> p, String key) =>
           (p[key] ?? '').toString();
-      final r1 = pools.firstWhere(
-        (p) => field(p as Map<String, dynamic>, 'startIp') ==
-            '192.168.10.150',
-      ) as Map<String, dynamic>;
-      final r2 = pools.firstWhere(
-        (p) => field(p as Map<String, dynamic>, 'startIp') ==
-            '192.168.20.100',
-      ) as Map<String, dynamic>;
+      final r1 =
+          pools.firstWhere(
+                (p) =>
+                    field(p as Map<String, dynamic>, 'startIp') ==
+                    '192.168.10.150',
+              )
+              as Map<String, dynamic>;
+      final r2 =
+          pools.firstWhere(
+                (p) =>
+                    field(p as Map<String, dynamic>, 'startIp') ==
+                    '192.168.20.100',
+              )
+              as Map<String, dynamic>;
       expect(field(r1, 'gateway'), '192.168.10.1');
       expect(field(r1, 'dnsServer'), '192.168.10.102');
       expect(field(r1, 'maxUsers'), '40');
@@ -266,9 +269,7 @@ void main() {
     test('reads the service accounts, and never invents a shared key', () {
       expect(
         _rule(intent, 'AAA1', 'aaa')['users'],
-        contains(
-          containsPair('username', 'netadmin'),
-        ),
+        contains(containsPair('username', 'netadmin')),
       );
       expect(
         _rule(intent, 'FTP1', 'ftp')['users'],
@@ -290,11 +291,30 @@ void main() {
       expect(routerKey.trim(), isEmpty);
     });
 
-    test('has no validator errors', () {
-      final issues = ValidatorService.validate(intent, target: 'packet-tracer');
-      final errors = issues.where((i) => i.severity == 'error').toList();
-      expect(errors, isEmpty, reason: errors.map((e) => e.message).join('\n'));
-    });
+    test(
+      'preserves exact 2911 serial requests and reports unavailable hardware',
+      () {
+        final issues = ValidatorService.validate(
+          intent,
+          target: 'packet-tracer',
+        );
+        final errors = issues.where((i) => i.severity == 'error').toList();
+        // The bundled 2911 has no serial module. Explicit hardware requests
+        // must stay blocked rather than silently becoming a different router.
+        expect(errors, hasLength(2));
+        expect(
+          errors.map((e) => e.message),
+          containsAll([
+            startsWith(
+              'R1: no 2911 variant has all requested ports and modules.',
+            ),
+            startsWith(
+              'R2: no 2911 variant has all requested ports and modules.',
+            ),
+          ]),
+        );
+      },
+    );
   });
 
   group('the same brief asked twice', () {

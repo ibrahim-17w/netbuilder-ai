@@ -762,6 +762,8 @@ final List<GoldenCase> contract = [
     'phone': 1,
   }, null, true),
 
+  // Bare model names are recognized by the hardware catalog.
+  ('ISR4331 and ISR4331 in a branch office, 4 pcs', {'router': 2}, null, false),
 ];
 
 // ===========================================================================
@@ -875,12 +877,7 @@ final List<GoldenCase> knownGaps = [
   // a set of PCs with nothing to connect to. Compare contract case #4,
   // "Cisco 2911 routers", which works - so the failure is the bare model name
   // with no type word, not the model recognition itself.
-  (
-    'ISR4331 and ISR4331 in a branch office, 4 pcs',
-    {'router': 0},
-    null,
-    false,
-  ),
+
 
   // --- "ONE X EACH" DOES NOT MULTIPLY ACROSS THE SET -------------------------
   // "a campus of 4 buildings, one router each" is four routers. The app

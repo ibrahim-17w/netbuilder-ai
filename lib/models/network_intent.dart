@@ -12,6 +12,8 @@ class NetNode {
   final String name;
   final String type; // router, switch, pc, server, firewall, cloud
   final String? model; // e.g. c3725, 2960
+  final bool exactModel;
+  final List<String> modules;
   final String? mgmtIp;
 
   /// Server roles for Services-tab automation: dhcp, dns, http, aaa,
@@ -28,6 +30,8 @@ class NetNode {
     required this.name,
     required this.type,
     this.model,
+    this.exactModel = false,
+    this.modules = const [],
     this.mgmtIp,
     this.services = const [],
     this.serviceRules = const {},
@@ -37,6 +41,8 @@ class NetNode {
     'name': name,
     'type': type,
     if (model != null) 'model': model,
+    if (exactModel) 'exactModel': true,
+    if (modules.isNotEmpty) 'modules': modules,
     if (mgmtIp != null) 'mgmtIp': mgmtIp,
     if (services.isNotEmpty) 'services': services,
     if (serviceRules.isNotEmpty)
@@ -47,6 +53,8 @@ class NetNode {
     name: j['name'] as String? ?? '',
     type: j['type'] as String? ?? '',
     model: j['model'] as String?,
+    exactModel: j['exactModel'] == true,
+    modules: List<String>.from(j['modules'] ?? const []),
     mgmtIp: j['mgmtIp'] as String?,
     services: ((j['services'] as List?) ?? [])
         .map((e) => e.toString())
@@ -92,6 +100,7 @@ class NetLink {
   /// interfaces are Serial ports is wired as serial whatever this says - the
   /// field exists for the pairs the interface names cannot express.
   final String? cable;
+  final bool exactPorts;
 
   /// Which endpoint supplies the clock on a serial link: 'a', 'b', or a
   /// device name.  Null leaves the executor's deterministic default ('a'),
@@ -104,12 +113,21 @@ class NetLink {
     required this.b,
     required this.bIf,
     this.cable,
+    this.exactPorts = false,
     this.dce,
   });
 
   /// True when either end sits on a Serial port.
   bool get isSerial =>
-      aIf.toLowerCase().startsWith('s') || bIf.toLowerCase().startsWith('s');
+      RegExp(
+        r'^(?:s|se|ser|serial)\d',
+        caseSensitive: false,
+      ).hasMatch(aIf.replaceAll(' ', '')) ||
+      RegExp(
+        r'^(?:s|se|ser|serial)\d',
+        caseSensitive: false,
+      ).hasMatch(bIf.replaceAll(' ', '')) ||
+      (cable ?? '').toLowerCase().startsWith('serial');
 
   /// The endpoint that clocks this link ('a' unless stated otherwise).
   ///
@@ -119,6 +137,7 @@ class NetLink {
   String get dceEnd {
     final hint = (dce ?? '').trim().toLowerCase();
     if (hint == 'b' || hint == b.toLowerCase()) return 'b';
+    if (hint.isEmpty && cable == 'serial-dte') return 'b';
     return 'a';
   }
 
@@ -128,6 +147,7 @@ class NetLink {
     'b': b,
     'bIf': bIf,
     if (cable != null) 'cable': cable,
+    if (exactPorts) 'exactPorts': true,
     if (dce != null) 'dce': dce,
   };
 
@@ -137,6 +157,7 @@ class NetLink {
     b: j['b'] as String,
     bIf: j['bIf'] as String,
     cable: j['cable'] as String?,
+    exactPorts: j['exactPorts'] == true,
     dce: j['dce'] as String?,
   );
 
@@ -245,8 +266,7 @@ class DeviceKind {
 
 /// Canonical node-name prefixes per device kind (FW1, AP1, ISP1, ...).
 
-String devicePrefix(String type) =>
-    devicePrefixes[type] ?? type.toUpperCase();
+String devicePrefix(String type) => devicePrefixes[type] ?? type.toUpperCase();
 
 /// The kind with this canonical type, or null.
 DeviceKind? deviceKindOf(String type) {
@@ -648,9 +668,7 @@ class PlanPrompt {
     message: j['message'] as String? ?? '',
     options: ((j['options'] as List?) ?? const [])
         .map(
-          (e) => PlanPromptOption.fromJson(
-            Map<String, dynamic>.from(e as Map),
-          ),
+          (e) => PlanPromptOption.fromJson(Map<String, dynamic>.from(e as Map)),
         )
         .toList(),
   );
@@ -681,12 +699,11 @@ class PlanPromptOption {
     'recommended': recommended,
   };
 
-  factory PlanPromptOption.fromJson(Map<String, dynamic> j) =>
-      PlanPromptOption(
-        label: j['label'] as String? ?? '',
-        reply: j['reply'] as String? ?? '',
-        recommended: j['recommended'] as bool? ?? false,
-      );
+  factory PlanPromptOption.fromJson(Map<String, dynamic> j) => PlanPromptOption(
+    label: j['label'] as String? ?? '',
+    reply: j['reply'] as String? ?? '',
+    recommended: j['recommended'] as bool? ?? false,
+  );
 }
 
 /// What kind of ADVISORY turn a message is, if any.
@@ -805,8 +822,9 @@ class AdviceIntentReader {
   /// question: "add a router or switch" is an addition, not advice.
   static bool _orPair(String t) {
     if (!t.endsWith('?') &&
-        !RegExp(r'^(?:which|what|should|is|are|do|does|can|could|would)\b')
-            .hasMatch(t)) {
+        !RegExp(
+          r'^(?:which|what|should|is|are|do|does|can|could|would)\b',
+        ).hasMatch(t)) {
       return false;
     }
     final parts = t.split(RegExp(r'\bor\b'));
@@ -931,13 +949,10 @@ class NetworkIntent {
     'planningSource': planningSource,
     'security': security.toJson(includeSecrets: includeSecrets),
     if (layout.isNotEmpty)
-      'layout': layout.map((k, v) => MapEntry(
-          k,
-          v == null
-              ? null
-              : {'x': v.dx, 'y': v.dy})),
-    if (prompts.isNotEmpty)
-      'prompts': prompts.map((e) => e.toJson()).toList(),
+      'layout': layout.map(
+        (k, v) => MapEntry(k, v == null ? null : {'x': v.dx, 'y': v.dy}),
+      ),
+    if (prompts.isNotEmpty) 'prompts': prompts.map((e) => e.toJson()).toList(),
   };
 
   /// Safe copy for third-party planners.  Credentials remain in the local
@@ -980,6 +995,11 @@ class NetworkIntent {
         ..write(n.model ?? '')
         ..write('/')
         ..write(services.join(','));
+      if (n.exactModel || n.modules.isNotEmpty) {
+        b.write(
+          '|hardware:${n.exactModel}:${(n.modules.toList()..sort()).join(',')}',
+        );
+      }
     }
     for (final l in links) {
       b
@@ -991,6 +1011,7 @@ class NetworkIntent {
         ..write(l.b)
         ..write(':')
         ..write(l.bIf);
+      if (l.exactPorts) b.write('|exact:${l.cable ?? 'auto'}:${l.dceEnd}');
     }
     for (final a in addressing) {
       b
@@ -1023,7 +1044,9 @@ class NetworkIntent {
     };
     return [
       for (final l in links)
-        if (l.isSerial || !_isCopperCable(l.cable))
+        if (l.isSerial ||
+            !_isCopperCable(l.cable) ||
+            (l.exactPorts && l.cable != null))
           l
         else
           NetLink(
@@ -1031,12 +1054,14 @@ class NetworkIntent {
             aIf: l.aIf,
             b: l.b,
             bIf: l.bIf,
-            cable: NetLink.pairNeedsCrossover(
-              types[l.a.toLowerCase()] ?? '',
-              types[l.b.toLowerCase()] ?? '',
-            )
+            cable:
+                NetLink.pairNeedsCrossover(
+                  types[l.a.toLowerCase()] ?? '',
+                  types[l.b.toLowerCase()] ?? '',
+                )
                 ? 'copper-cross'
                 : (l.cable ?? 'copper'),
+            exactPorts: l.exactPorts,
             dce: l.dce,
           ),
     ];
@@ -1044,8 +1069,12 @@ class NetworkIntent {
 
   static bool _isCopperCable(String? cable) {
     final c = (cable ?? '').trim().toLowerCase();
-    return c.isEmpty || c == 'copper' || c == 'straight' || c == 'copper-cross' ||
-        c == 'cross' || c == 'crossover';
+    return c.isEmpty ||
+        c == 'copper' ||
+        c == 'straight' ||
+        c == 'copper-cross' ||
+        c == 'cross' ||
+        c == 'crossover';
   }
 
   String get revisionLabel =>
@@ -1089,13 +1118,17 @@ class NetworkIntent {
     security: SecurityIntent.fromJson(
       Map<String, dynamic>.from((j['security'] as Map?) ?? const {}),
     ),
-    layout: ((j['layout'] as Map?) ?? const {}).map((k, v) => MapEntry(
-      k.toString(),
-      v == null
-          ? null
-          : Offset(((v as Map)['x'] as num?)?.toDouble() ?? 0,
-              ((v)['y'] as num?)?.toDouble() ?? 0),
-    )),
+    layout: ((j['layout'] as Map?) ?? const {}).map(
+      (k, v) => MapEntry(
+        k.toString(),
+        v == null
+            ? null
+            : Offset(
+                ((v as Map)['x'] as num?)?.toDouble() ?? 0,
+                ((v)['y'] as num?)?.toDouble() ?? 0,
+              ),
+      ),
+    ),
     prompts: ((j['prompts'] as List?) ?? const [])
         .map((e) => PlanPrompt.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList(),
@@ -1280,7 +1313,8 @@ class NetworkIntent {
     // office-hours rule the user never asked for - and blocked the build on
     // it. Digits that are part of a dotted address are rejected.
     final hoursMatch = _timeRange(text);
-    final wantsManager = lower.contains('manager') ||
+    final wantsManager =
+        lower.contains('manager') ||
         lower.contains('management access') ||
         lower.contains('office hours') ||
         lower.contains('office-hours') ||
@@ -1359,10 +1393,7 @@ class NetworkIntent {
       ),
     );
     key ??= firstMatch(
-      RegExp(
-        r'\bkey\s*(?:is|:|=)\s*([^\s,.]+)',
-        caseSensitive: false,
-      ),
+      RegExp(r'\bkey\s*(?:is|:|=)\s*([^\s,.]+)', caseSensitive: false),
     );
     final nodes = <NetNode>[
       NetNode(name: 'HQ_Router', type: 'router', model: routerModel),
@@ -1505,12 +1536,12 @@ class NetworkIntent {
         : 'weekdays ${hoursMatch.group(1)!.trim()}-${hoursMatch.group(2)!.trim()}';
     final hasTacacs = lower.contains('tacacs');
     final hasRadius = lower.contains('radius');
-    final hasTelnet =
-        lower.contains('telnet') || lower.contains('vty');
+    final hasTelnet = lower.contains('telnet') || lower.contains('vty');
     // Layer-2 security is what the brief asked for even when it names no
     // command: 'secure the access ports' is the same request as
     // 'enable port security on every user port'.
-    final layer2Security = lower.contains('layer 2 security') ||
+    final layer2Security =
+        lower.contains('layer 2 security') ||
         lower.contains('layer-2 security') ||
         lower.contains('access ports') ||
         lower.contains('user ports');
@@ -1518,7 +1549,8 @@ class NetworkIntent {
     // a password for a device it is about to configure.
     // Named once, because a tunnel the brief never asked for must not also
     // come with a demand for its pre-shared key.
-    final wantsIpsec = lower.contains('ipsec') ||
+    final wantsIpsec =
+        lower.contains('ipsec') ||
         lower.contains('site-to-site') ||
         lower.contains('vpn') ||
         lower.contains('tunnel');
@@ -1572,7 +1604,8 @@ class NetworkIntent {
       allowedWebServerIp: '192.168.1.102',
       ipsecVpn: wantsIpsec,
       ssh: lower.contains('ssh'),
-      spanningTree: lower.contains('spanning-tree') ||
+      spanningTree:
+          lower.contains('spanning-tree') ||
           lower.contains('spanning tree') ||
           lower.contains('root bridge') ||
           lower.contains('rapid-pvst'),
@@ -1756,25 +1789,35 @@ class NetworkIntent {
     final mentions =
         <({int at, String proto, bool negated, bool instructed})>[];
     for (final proto in const ['ospf', 'eigrp', 'bgp', 'static']) {
-      final pattern =
-          proto == 'static' ? RegExp(r'\bstatic\b') : RegExp('\\b$proto\\b');
+      final pattern = proto == 'static'
+          ? RegExp(r'\bstatic\b')
+          : RegExp('\\b$proto\\b');
       for (final m in pattern.allMatches(lower)) {
-        final before =
-            lower.substring(m.start > 40 ? m.start - 40 : 0, m.start);
+        final before = lower.substring(
+          m.start > 40 ? m.start - 40 : 0,
+          m.start,
+        );
         final end = m.end + 12 > lower.length ? lower.length : m.end + 12;
         mentions.add((
           at: m.start,
           proto: proto,
           negated: negatedBefore.hasMatch(before),
-          instructed: instructedBefore.hasMatch(before) ||
+          instructed:
+              instructedBefore.hasMatch(before) ||
               instructedAfter.hasMatch(lower.substring(m.end, end)),
         ));
       }
     }
     mentions.sort((a, b) => a.at.compareTo(b.at));
-    final positive = [for (final m in mentions) if (!m.negated) m];
+    final positive = [
+      for (final m in mentions)
+        if (!m.negated) m,
+    ];
     if (positive.isEmpty) return null;
-    final instructed = [for (final m in positive) if (m.instructed) m];
+    final instructed = [
+      for (final m in positive)
+        if (m.instructed) m,
+    ];
     final pool = instructed.isEmpty ? positive : instructed;
     return pool.last.proto;
   }
@@ -1824,6 +1867,30 @@ class NetworkIntent {
     }
     if (!hasStanding) {
       return (plan: parsed, brief: brief);
+    }
+    // A replacement and an addition are separate operations, in spoken order.
+    final mixed = RegExp(
+      r'(?:,|\band\b)\s*(?=(?:add|include|also\s+add)\b)',
+      caseSensitive: false,
+    ).firstMatch(brief);
+    if (mixed != null &&
+        _countCorrectionCue.hasMatch(brief.substring(0, mixed.start))) {
+      final replacement = brief.substring(0, mixed.start).trim();
+      final addition = brief.substring(mixed.end).trim();
+      final corrected = followUp(
+        previous: previous,
+        previousBrief: previousBrief,
+        brief: replacement,
+        parsed: parseSimple(project, replacement),
+        project: project,
+      );
+      return followUp(
+        previous: corrected.plan,
+        previousBrief: corrected.brief,
+        brief: addition,
+        parsed: parseSimple(project, addition),
+        project: project,
+      );
     }
     // "we will need more than 1 router and 1 switch and 1 server" states
     // FLOORS, not exact counts: the standing lab grows to meet them and is
@@ -1895,10 +1962,7 @@ class NetworkIntent {
     final changed = applyFollowUpChange(previous: previous, brief: brief);
     if (changed != null) {
       final base = previousBrief.trim();
-      return (
-        plan: changed,
-        brief: base.isEmpty ? brief : '$base $brief',
-      );
+      return (plan: changed, brief: base.isEmpty ? brief : '$base $brief');
     }
     return (plan: previous, brief: previousBrief);
   }
@@ -1984,7 +2048,13 @@ class NetworkIntent {
     // "layer 3 switch" is a term, not a stated count: without the lookbehind
     // the parser read "3 switch" as one switch and treated the design
     // question as a specification.
-    r'(?<!layer\s)\b\d{1,3}\s*(?:routers?|switches|switch|pcs?|servers?|'
+    // Exact Packet Tracer inventories often put a model between the count
+    // and kind: `3 Cisco 2911 routers`, `4 Catalyst 2960-24TT switches`, or
+    // `24 PC-PT PCs`. These are still explicit counts and a complete new
+    // specification must replace a standing lab instead of being merged as
+    // an uncounted follow-up.
+    r'(?<!layer\s)\b\d{1,3}\s*(?:(?:[a-z][a-z0-9.-]*|\d[a-z0-9.-]*)\s+){0,3}'
+    r'(?:routers?|switches|switch|pcs?|servers?|'
     r'laptops?|printers?|firewalls?|phones?|tablets?|clouds?|modems?|'
     r'access\s+points?|aps?)\b',
     caseSensitive: false,
@@ -2081,7 +2151,10 @@ class NetworkIntent {
       return 'confirm';
     }
     if (_readsAsGrowth(brief)) return 'growth';
-    if (additionWording.hasMatch(lower)) return 'addition';
+    // "Do not add cloud devices or printers" is a constraint in the brief,
+    // not an instruction to append those device kinds to the existing plan.
+    // The same distinction drives followUp so the card and plan agree.
+    if (_readsAsAddition(brief)) return 'addition';
     if (_briefStatesDeviceCounts(lower)) return 'build';
     if (_changeVerb.hasMatch(lower)) return 'change';
     return 'statement';
@@ -2115,11 +2188,12 @@ class NetworkIntent {
     // profile - and adding that profile's three servers to a four-server lab
     // grew it to eleven. What the user asked for is one more server.
     final additionLower = brief.toLowerCase();
-    final stated =
-        BriefSlotPipeline.extractCounts(additionLower, brief);
+    final stated = BriefSlotPipeline.extractCounts(additionLower, brief);
     int mergedCount(String type) {
       final added = stated[type] ?? 0;
-      return added == 0 ? countOf(previous, type) : countOf(previous, type) + added;
+      return added == 0
+          ? countOf(previous, type)
+          : countOf(previous, type) + added;
     }
 
     final kinds = <String, String>{
@@ -2305,6 +2379,43 @@ class NetworkIntent {
       // correction that names none - the standing lab already has its own.
       tinyOfficeDefault: false,
     );
+    // A count scoped to HQ replaces HQ's count, retaining the other sites.
+    final scoped = RegExp(
+      r'(\d+)\s*(pcs?|routers?|switch(?:es)?|servers?)\s+(?:at|in|for)\s+(hq|headquarters)\b',
+    ).firstMatch(lower);
+    if (scoped != null) {
+      final noun = scoped.group(2)!;
+      final type = noun.startsWith('pc')
+          ? 'pc'
+          : noun.startsWith('router')
+          ? 'router'
+          : noun.startsWith('switch')
+          ? 'switch'
+          : 'server';
+      final sentences = base.split(RegExp(r'(?<=[.;])\s+'));
+      var changed = false;
+      final revised = sentences
+          .map((sentence) {
+            if (!RegExp(
+              r'\b(?:hq|headquarters)\b',
+              caseSensitive: false,
+            ).hasMatch(sentence)) {
+              return sentence;
+            }
+            final quantity = RegExp(
+              '\\b\\d+\\s*${_correctionKindNoun(type)}?\\b',
+              caseSensitive: false,
+            );
+            if (!quantity.hasMatch(sentence)) return sentence;
+            changed = true;
+            return sentence.replaceFirst(
+              quantity,
+              '${scoped.group(1)} ${_correctionKindNoun(type)}',
+            );
+          })
+          .join(' ');
+      if (changed) return (plan: parseSimple(project, revised), brief: revised);
+    }
     final corrected = <String, int>{
       for (final entry in stated.entries)
         if (entry.value > 0) entry.key: entry.value,
@@ -2321,9 +2432,7 @@ class NetworkIntent {
     final tally = <String>[];
     final order = [
       ..._correctionTallyKinds,
-      ...corrected.keys.where(
-        (kind) => !_correctionTallyKinds.contains(kind),
-      ),
+      ...corrected.keys.where((kind) => !_correctionTallyKinds.contains(kind)),
     ];
     for (final kind in order) {
       final n = corrected[kind];
@@ -2340,8 +2449,8 @@ class NetworkIntent {
     final stripTail = RegExp(r'[\s,.;:]+$');
     final baseClean = base.replaceAll(stripTail, '');
     final briefClean = brief.trim().replaceAll(stripTail, '');
-    final combined =
-        '$baseClean, $briefClean, actually ${tally.join(' ')}'.trim();
+    final combined = '$baseClean, $briefClean, actually ${tally.join(' ')}'
+        .trim();
     final NetworkIntent merged;
     try {
       merged = parseSimple(
@@ -2403,8 +2512,9 @@ class NetworkIntent {
       final parts = kind.keywords.first.split(' ');
       final last = parts.last;
       const esEndings = ['ch', 'sh', 'ss', 's', 'x', 'z'];
-      parts[parts.length - 1] =
-          esEndings.any(last.endsWith) ? '${last}es' : '${last}s';
+      parts[parts.length - 1] = esEndings.any(last.endsWith)
+          ? '${last}es'
+          : '${last}s';
       return parts.join(' ');
     }
     return type.endsWith('s') ? type : '${type}s';
@@ -2428,13 +2538,15 @@ class NetworkIntent {
     if (before.routing != after.routing) {
       bits.add('routing is now ${after.routing} (was ${before.routing})');
     }
-    final addedVlans =
-        after.vlans.where((v) => !before.vlans.contains(v)).toList();
+    final addedVlans = after.vlans
+        .where((v) => !before.vlans.contains(v))
+        .toList();
     if (addedVlans.isNotEmpty) {
       bits.add('VLAN(s) ${addedVlans.join(', ')} added');
     }
-    final removedVlans =
-        before.vlans.where((v) => !after.vlans.contains(v)).toList();
+    final removedVlans = before.vlans
+        .where((v) => !after.vlans.contains(v))
+        .toList();
     if (removedVlans.isNotEmpty) {
       bits.add('VLAN(s) ${removedVlans.join(', ')} removed');
     }
@@ -2469,14 +2581,15 @@ class NetworkIntent {
     if (s.spanningTree) 'spanning-tree hardening',
     if (s.interVlanRouting) 'inter-VLAN routing',
     if (s.consolePassword) 'a console password',
-    if (s.enableSecret != null && s.enableSecret!.isNotEmpty) 'an enable secret',
+    if (s.enableSecret != null && s.enableSecret!.isNotEmpty)
+      'an enable secret',
   ];
 
   /// "PC7" -> ('pc', 7); a word that is not a numbered label -> null.
   static (String, int)? labelRun(String word) {
-    final m = RegExp(r'^([a-z]+?)(\d{1,3})$').firstMatch(
-      word.toLowerCase().trim(),
-    );
+    final m = RegExp(
+      r'^([a-z]+?)(\d{1,3})$',
+    ).firstMatch(word.toLowerCase().trim());
     if (m == null) return null;
     final number = int.tryParse(m.group(2)!);
     return number == null ? null : (m.group(1)!, number);
@@ -2557,9 +2670,11 @@ class NetworkIntent {
       final lastSlot = int.tryParse(m.group(6) ?? m.group(5)!) ?? 0;
       final portPrefix = '${m.group(2)!}${m.group(3)!}';
       final ports = <String>[];
-      for (var slot = firstSlot;
-          slot <= lastSlot && ports.length < devices.length;
-          slot++) {
+      for (
+        var slot = firstSlot;
+        slot <= lastSlot && ports.length < devices.length;
+        slot++
+      ) {
         ports.add('$portPrefix/$slot');
       }
       if (ports.isEmpty) return m.group(0)!;
@@ -2588,11 +2703,54 @@ class NetworkIntent {
   );
 
   static const Set<String> keyStopWords = {
-    'a', 'an', 'and', 'are', 'as', 'at', 'across', 'b', 'be', 'between',
-    'both', 'by', 'do', 'does', 'each', 'for', 'from', 'i', 'in', 'is', 'it',
-    'its', 'key', 'keys', 'must', 'no', 'not', 'of', 'on', 'or', 'same',
-    'server', 'shared', 'should', 'that', 'the', 'their', 'they', 'this',
-    'to', 'use', 'used', 'using', 'value', 'we', 'will', 'with', 'you',
+    'a',
+    'an',
+    'and',
+    'are',
+    'as',
+    'at',
+    'across',
+    'b',
+    'be',
+    'between',
+    'both',
+    'by',
+    'do',
+    'does',
+    'each',
+    'for',
+    'from',
+    'i',
+    'in',
+    'is',
+    'it',
+    'its',
+    'key',
+    'keys',
+    'must',
+    'no',
+    'not',
+    'of',
+    'on',
+    'or',
+    'same',
+    'server',
+    'shared',
+    'should',
+    'that',
+    'the',
+    'their',
+    'they',
+    'this',
+    'to',
+    'use',
+    'used',
+    'using',
+    'value',
+    'we',
+    'will',
+    'with',
+    'you',
   };
 
   static String? readSharedKey(String text) {
@@ -2896,6 +3054,8 @@ class NetworkIntent {
           name: node.name,
           type: node.type,
           model: node.model,
+          exactModel: node.exactModel,
+          modules: node.modules,
           mgmtIp: node.mgmtIp,
           services: node.services,
           serviceRules: rebuilt,
@@ -3006,14 +3166,33 @@ class NetworkIntent {
     // Words that carry no device meaning inside a pinned-VLAN phrase:
     // "the guest ACCESS POINTS" names the same kind as "access points".
     const filler = {
-      'the', 'a', 'an', 'our', 'their', 'all', 'guest', 'staff', 'wired',
-      'fixed', 'for', 'in', 'on', 'to', 'of', 'and', 'or', 'with',
-      'devices', 'device', 'kind', 'ones',
+      'the',
+      'a',
+      'an',
+      'our',
+      'their',
+      'all',
+      'guest',
+      'staff',
+      'wired',
+      'fixed',
+      'for',
+      'in',
+      'on',
+      'to',
+      'of',
+      'and',
+      'or',
+      'with',
+      'devices',
+      'device',
+      'kind',
+      'ones',
     };
     String single(String w) =>
         w.length > 2 && w.endsWith('s') && !w.endsWith('ss')
-            ? w.substring(0, w.length - 1)
-            : w;
+        ? w.substring(0, w.length - 1)
+        : w;
 
     // The longest device-kind phrase inside [phrase], if any: n-grams are
     // tried longest first, so "access points" beats a stray inner word.
@@ -3026,7 +3205,8 @@ class NetworkIntent {
       for (var start = 0; start < words.length; start++) {
         for (var end = words.length; end > start; end--) {
           final wordsIn = words.sublist(start, end);
-          final kind = deviceKindFor(wordsIn.join(' ')) ??
+          final kind =
+              deviceKindFor(wordsIn.join(' ')) ??
               deviceKindFor(wordsIn.map(single).join(' '));
           if (kind != null) return kind.type;
         }
@@ -3036,9 +3216,9 @@ class NetworkIntent {
 
     bool valid(int v) => v > 0 && v <= 4094;
     // "pcs in vlan 10", "servers in vlan 10", "access points in vlan 20".
-    for (final m
-        in RegExp(r'\b([\w-]+(?:\s+[\w-]+){0,3}?)\s+in\s+vlan\s*(\d{1,4})\b')
-            .allMatches(lower)) {
+    for (final m in RegExp(
+      r'\b([\w-]+(?:\s+[\w-]+){0,3}?)\s+in\s+vlan\s*(\d{1,4})\b',
+    ).allMatches(lower)) {
       final v = int.parse(m.group(2)!);
       if (!valid(v)) continue;
       final kind = kindIn(m.group(1)!);
@@ -3046,8 +3226,9 @@ class NetworkIntent {
     }
     // "vlan 20 for the guest access points" - the phrase runs to the next
     // clause boundary.
-    for (final m in RegExp(r'\bvlan\s*(\d{1,4})\s+for\s+([^,.;:!?]*)')
-        .allMatches(lower)) {
+    for (final m in RegExp(
+      r'\bvlan\s*(\d{1,4})\s+for\s+([^,.;:!?]*)',
+    ).allMatches(lower)) {
       final v = int.parse(m.group(1)!);
       if (!valid(v)) continue;
       final kind = kindIn(m.group(2)!);
@@ -3132,10 +3313,7 @@ class NetworkIntent {
   /// Record a headcount disagreement on the plan itself: the popup the user
   /// answers, and one assumption in the plan's own words - so the answer and
   /// the built file can never tell two different stories about the count.
-  static NetworkIntent _withHeadcountCheck(
-    String brief,
-    NetworkIntent intent,
-  ) {
+  static NetworkIntent _withHeadcountCheck(String brief, NetworkIntent intent) {
     final prompt = headcountPrompt(brief: brief, nodes: intent.nodes);
     if (prompt == null) return intent;
     return intent.copyWith(
@@ -3148,7 +3326,6 @@ class NetworkIntent {
       ],
     );
   }
-
 
   // Thin delegates to the extracted reader. Every caller in the app says
   // `NetworkIntent.bridgeBrief(...)`; Dart has no way to re-export a static
@@ -3166,6 +3343,11 @@ class NetworkIntent {
   /// moving a single call site.
   static NetworkIntent parseSimple(String projectName, String rawText) =>
       brief_reader.parseBrief(projectName, rawText);
+
+  static Future<NetworkIntent> parseSimpleAsync(
+    String projectName,
+    String rawText,
+  ) => brief_reader.parseBriefAsync(projectName, rawText);
 
   /// Sizing pass + parse over an already-bridged brief. The phrasing index
   /// is consulted once, at the top of [parseSimple] - never here - so a
@@ -3200,7 +3382,11 @@ class NetworkIntent {
         _parseBridgedBrief(projectName, bridged, rawText),
       );
     }
-    final intent = _parseBridgedBrief(projectName, sized.expandedBrief, rawText);
+    final intent = _parseBridgedBrief(
+      projectName,
+      sized.expandedBrief,
+      rawText,
+    );
     return _withHeadcountCheck(
       bridged,
       intent.copyWith(
@@ -3264,8 +3450,7 @@ class NetworkIntent {
     // What the brief actually stated, for the confidence below: a plan is
     // only as trustworthy as the details it was built from.
     final statedRouting = resolveRouting(lower) != null;
-    final statedAddresses =
-        RegExp(r'\d{1,3}(?:\.\d{1,3}){3}').hasMatch(text);
+    final statedAddresses = RegExp(r'\d{1,3}(?:\.\d{1,3}){3}').hasMatch(text);
     final statedCounts = deviceKinds.any(
       (kind) => RegExp(
         '(\\d{1,3})\\s*(?:${kind.keywords.map(RegExp.escape).join('|')})'
@@ -3462,7 +3647,8 @@ class NetworkIntent {
       r'\bconnects?\s+(?:the\s+)?routers?\s+to\s+each\s+other[^.]*?\b([sfg])\s*(\d+(?:/\d+){0,2})\s+on\s+both(?:\s+sides)?\b',
     ).firstMatch(normText);
     if (unnamedRouterPair != null && routers.length == 2) {
-      final iface = '${unnamedRouterPair.group(1)!}${unnamedRouterPair.group(2)!}';
+      final iface =
+          '${unnamedRouterPair.group(1)!}${unnamedRouterPair.group(2)!}';
       linksExplicit.add(
         NetLink(
           a: routers[0].name,
@@ -3586,14 +3772,15 @@ class NetworkIntent {
     for (var i = 0; i < links.length; i++) {
       final l = links[i];
       if (!l.isSerial) continue;
-      final clocksB = namedDce != null &&
-          namedDce.toLowerCase() == l.b.toLowerCase();
+      final clocksB =
+          namedDce != null && namedDce.toLowerCase() == l.b.toLowerCase();
       links[i] = NetLink(
         a: l.a,
         aIf: l.aIf,
         b: l.b,
         bIf: l.bIf,
         cable: l.cable ?? 'serial',
+        exactPorts: l.exactPorts,
         dce: l.dce ?? (clocksB ? 'b' : 'a'),
       );
     }
@@ -3604,9 +3791,8 @@ class NetworkIntent {
           (l.a == name && routers.any((r) => r.name == l.b)) ||
           (l.b == name && routers.any((r) => r.name == l.a)),
     );
-    bool cabledTogether(String a, String b) => links.any(
-      (l) => (l.a == a && l.b == b) || (l.a == b && l.b == a),
-    );
+    bool cabledTogether(String a, String b) =>
+        links.any((l) => (l.a == a && l.b == b) || (l.a == b && l.b == a));
     // The routers the BRIEF cabled to each other. Only these stop the layout
     // from adding a transit link: a router the layout itself chained earlier
     // must still get its next link, or a three-router plan loses one.
@@ -3643,7 +3829,8 @@ class NetworkIntent {
     // the adapter, the addressing, the DHCP pools - and the layout below,
     // which trunks the switches together instead of giving each one its own
     // router uplink (two uplinks would mean the same VLAN subnet twice).
-    final wantsInterVlan = vlans.isNotEmpty &&
+    final wantsInterVlan =
+        vlans.isNotEmpty &&
         nodes.any((n) => n.type == 'router') &&
         nodes.any((n) => n.type == 'switch') &&
         !lower.contains('flat network');
@@ -3782,7 +3969,9 @@ class NetworkIntent {
       for (final device in devices) {
         if (prefix == null) {
           final used = usedPorts.putIfAbsent(host, () => <int>{});
-          var port = used.isEmpty ? 2 : used.reduce((a, b) => a > b ? a : b) + 1;
+          var port = used.isEmpty
+              ? 2
+              : used.reduce((a, b) => a > b ? a : b) + 1;
           while (used.contains(port)) {
             port++;
           }
@@ -3815,10 +4004,7 @@ class NetworkIntent {
       var taken = 0;
       for (var s = 0; s < switches.length; s++) {
         final count = per + (s < extra ? 1 : 0);
-        attach(
-          switches[s].name,
-          userDevices.sublist(taken, taken + count),
-        );
+        attach(switches[s].name, userDevices.sublist(taken, taken + count));
         taken += count;
       }
       attach(switches.first.name, serverDevices);
@@ -3833,6 +4019,7 @@ class NetworkIntent {
       // one blocking finding per device: "1 router and 3 pcs" could not be
       // built and no reply could clear it.
       final lan = <NetNode>[...userDevices, ...serverDevices];
+
       /// The LAN interfaces a router is modelled with, the same four
       /// [PlanRepairService] hands out.
       const routerLanPorts = 4;
@@ -3888,12 +4075,7 @@ class NetworkIntent {
         nodes.add(sw);
         switches.add(sw);
         addLink(
-          NetLink(
-            a: uplinkHost,
-            aIf: uplinkPort,
-            b: sw.name,
-            bIf: 'f0/1',
-          ),
+          NetLink(a: uplinkHost, aIf: uplinkPort, b: sw.name, bIf: 'f0/1'),
         );
         attach(sw.name, lan);
       } else {
@@ -3927,7 +4109,8 @@ class NetworkIntent {
     // their last ports (f0/23, f0/24 - the classic uplink pair). Hoisted
     // here because the security block below reads the same flag, and the
     // channel-group lines only make sense once the links are real.
-    final wantsEtherChannel = lower.contains('etherchannel') ||
+    final wantsEtherChannel =
+        lower.contains('etherchannel') ||
         lower.contains('ether channel') ||
         lower.contains('port-channel') ||
         lower.contains('port channel') ||
@@ -4214,10 +4397,9 @@ class NetworkIntent {
               .firstWhere((n) => n.name == endpointsOnSwitch[e].$1)
               .type;
           final pinned = vlanRoles[type];
-          endpointVlan[e] =
-              pinned != null && vlans.contains(pinned)
-                  ? pinned
-                  : vlans[e % vlans.length];
+          endpointVlan[e] = pinned != null && vlans.contains(pinned)
+              ? pinned
+              : vlans[e % vlans.length];
         }
         for (var i = 0; i < vlans.length; i++) {
           final v = vlans[i];
@@ -4265,7 +4447,7 @@ class NetworkIntent {
           hostIdx++;
         }
       }
-    }    // A router cabled STRAIGHT to an endpoint - a lab with no switch at all -
+    } // A router cabled STRAIGHT to an endpoint - a lab with no switch at all -
     // is a LAN of its own: the router interface takes .1 (the endpoint's
     // default gateway) and the endpoint .10 of that interface's subnet. This
     // is the case the switch-less layout above creates, and without it those
@@ -4411,9 +4593,7 @@ class NetworkIntent {
           ? last.split('.').take(3).join('.')
           : '';
       if (headA.isNotEmpty && headB.isNotEmpty && headA != headB) return [last];
-      return [
-        for (var n = a; n <= b; n++) headA.isEmpty ? '.$n' : '$headA.$n',
-      ];
+      return [for (var n = a; n <= b; n++) headA.isEmpty ? '.$n' : '$headA.$n'];
     }
 
     /// The devices "PC1-PC5" (a numbered run) or "DHCP1-MAIL1" (the servers
@@ -4672,9 +4852,8 @@ class NetworkIntent {
     };
     final claimedElsewhere = <String, String>{};
     for (final s in servers) {
-      final role = roleByName[
-        s.name.replaceAll(RegExp(r'\d+$'), '').toUpperCase()
-      ];
+      final role =
+          roleByName[s.name.replaceAll(RegExp(r'\d+$'), '').toUpperCase()];
       if (role != null) claimedElsewhere[role] ??= s.name;
     }
     for (final m in RegExp(
@@ -4734,11 +4913,12 @@ class NetworkIntent {
           for (final hit in hits) {
             if (!found.contains(hit.$3)) found.add(hit.$3);
           }
-          final distributes = RegExp(
-            r'\bthe other\b|\banother\b|\bone\b[^.]{0,30}\bother\b|'
-            r'\bserver\s*\d\b|\beach\b',
-            caseSensitive: false,
-          ).hasMatch(frag) ||
+          final distributes =
+              RegExp(
+                r'\bthe other\b|\banother\b|\bone\b[^.]{0,30}\bother\b|'
+                r'\bserver\s*\d\b|\beach\b',
+                caseSensitive: false,
+              ).hasMatch(frag) ||
               // A number in front of a role IS the number of servers that run
               // it, so "3 servers (1 dhcp server and 1 AAA server)" asks for
               // exactly what "the other is AAA" asks for - it just counts it.
@@ -4749,8 +4929,7 @@ class NetworkIntent {
               .map((s) => s.name)
               .where((name) => !(roles[name]?.isNotEmpty ?? false))
               .toList();
-          if (distributes && found.length > 1 &&
-              free.length >= found.length) {
+          if (distributes && found.length > 1 && free.length >= found.length) {
             // One role per server, in the order they were said.
             for (var i = 0; i < found.length; i++) {
               final target = free[i];
@@ -4805,7 +4984,8 @@ class NetworkIntent {
             final owned = roles.putIfAbsent(target, () => []);
             if (!owned.contains(role)) owned.add(role);
           }
-          continue;        }
+          continue;
+        }
         // A named server owns the role words nearest to its own name, which
         // is what makes one service sentence per server work ("DNS1: a
         // record; WEB1: enable HTTP and HTTPS") even when the brief runs the
@@ -4829,9 +5009,8 @@ class NetworkIntent {
           if (owner != null && closest.isNotEmpty && owner != closest) {
             continue;
           }
-          final target = owner ?? (closest.isNotEmpty
-              ? closest
-              : nameAt[names.first]!);
+          final target =
+              owner ?? (closest.isNotEmpty ? closest : nameAt[names.first]!);
           final owned = roles.putIfAbsent(target, () => []);
           if (!owned.contains(hit.$3)) owned.add(hit.$3);
         }
@@ -4842,14 +5021,12 @@ class NetworkIntent {
       // nothing else still has to configure DNS on DNS1 and HTTP on WEB1,
       // or those devices are placed with an empty Services tab.
       for (final s in servers) {
-        final role = roleByName[
-          s.name.replaceAll(RegExp(r'\d+$'), '').toUpperCase()
-        ];
+        final role =
+            roleByName[s.name.replaceAll(RegExp(r'\d+$'), '').toUpperCase()];
         if (role == null) continue;
         final owned = roles.putIfAbsent(s.name, () => []);
         if (!owned.contains(role)) owned.add(role);
       }
-
 
       // Common service rules are intentionally small and deterministic. They
       // are only extracted when the request supplies the value; the adapter
@@ -4884,9 +5061,10 @@ class NetworkIntent {
       // HTTPS requirement can live, so the word becomes that panel's flag
       // instead of being dropped as an unknown parameter.
       if (RegExp(r'\bhttps\b', caseSensitive: false).hasMatch(text)) {
-        for (final name in servers
-            .where((s) => roles[s.name]?.contains('http') ?? false)
-            .map((s) => s.name)) {
+        for (final name
+            in servers
+                .where((s) => roles[s.name]?.contains('http') ?? false)
+                .map((s) => s.name)) {
           rulesFor(name)['http'] = {
             ...((rulesFor(name)['http'] as Map?) ?? const {}),
             'https': true,
@@ -4986,6 +5164,8 @@ class NetworkIntent {
             name: n.name,
             type: n.type,
             model: n.model,
+            exactModel: n.exactModel,
+            modules: n.modules,
             mgmtIp: n.mgmtIp,
             services: roles[n.name]!,
             serviceRules: serviceRules[n.name] ?? const {},
@@ -4999,30 +5179,30 @@ class NetworkIntent {
     // the builder can write the wireless ENGINE blocks (pkt_builder's
     // _wireless_elements).
     final wirelessDevices = nodes
-        .where((n) =>
-            n.type == 'wireless' ||
-            n.type == 'wireless-router' ||
-            n.type == 'ap')
+        .where(
+          (n) =>
+              n.type == 'wireless' ||
+              n.type == 'wireless-router' ||
+              n.type == 'ap',
+        )
         .toList();
     if (wirelessDevices.isNotEmpty) {
       final ssidMatch = RegExp(
         'ssid\\s*(?:name\\s*)?(["\']?)([a-z0-9_. -]{2,32}?)\\1(?=[\\s,.,]|\\s*(?:with|using|and|key|wep|wpa|hidden|\$))',
         caseSensitive: false,
       ).firstMatch(text);
-      final ssid = ssidMatch == null
-          ? null
-          : (ssidMatch.group(2) ?? '').trim();
+      final ssid = ssidMatch == null ? null : (ssidMatch.group(2) ?? '').trim();
       final wepMatch = RegExp(
         'wep(?:\\s+key)?\\s*["\']?([0-9a-f]{5,26})["\']?',
         caseSensitive: false,
       ).firstMatch(text);
-      final wantsWpa2 = lower.contains('wpa2') ||
+      final wantsWpa2 =
+          lower.contains('wpa2') ||
           lower.contains('wpa') ||
           lower.contains('wpa3');
       if (ssidMatch != null || wepMatch != null || wantsWpa2) {
         final rule = <String, dynamic>{
-          if (ssidMatch != null)
-            'ssid': ssid,
+          if (ssidMatch != null) 'ssid': ssid,
           if (wepMatch != null) 'wep': wepMatch.group(1),
           if (wantsWpa2) 'wpa2': true,
           if (lower.contains('hidden') || lower.contains('hide ssid'))
@@ -5035,12 +5215,11 @@ class NetworkIntent {
             name: n.name,
             type: n.type,
             model: n.model,
+            exactModel: n.exactModel,
+            modules: n.modules,
             mgmtIp: n.mgmtIp,
             services: n.services,
-            serviceRules: {
-              ...n.serviceRules,
-              'wireless': rule,
-            },
+            serviceRules: {...n.serviceRules, 'wireless': rule},
           );
         }
       }
@@ -5090,7 +5269,8 @@ class NetworkIntent {
     // AAA server (radius) and a firewall") also asked for controls - and
     // without this block its AAA stopped at the server tab while the router
     // was never pointed at the server.
-    final hasAaaWord = lower.contains('aaa') ||
+    final hasAaaWord =
+        lower.contains('aaa') ||
         RegExp(r'\btacacs\+?\b').hasMatch(lower) ||
         RegExp(r'\bradius\b').hasMatch(lower);
     final aaaServers = nodes
@@ -5105,24 +5285,33 @@ class NetworkIntent {
       // the first server so the control is actually buildable.
       final first = servers.first;
       final idx = nodes.indexOf(first);
-      final newServices = [...first.services, if (!first.services.contains('aaa')) 'aaa'];
+      final newServices = [
+        ...first.services,
+        if (!first.services.contains('aaa')) 'aaa',
+      ];
       nodes[idx] = NetNode(
         name: first.name,
         type: first.type,
         model: first.model,
+        exactModel: first.exactModel,
+        modules: first.modules,
         mgmtIp: first.mgmtIp,
         services: newServices,
         serviceRules: first.serviceRules,
       );
       aaaServerName = first.name;
     }
-    final wantsPortSecurity = lower.contains('port security') ||
+    final wantsPortSecurity =
+        lower.contains('port security') ||
         lower.contains('port-security') ||
         lower.contains('sticky mac');
-    final wantsSnooping = lower.contains('dhcp snooping') ||
+    final wantsSnooping =
+        lower.contains('dhcp snooping') ||
         lower.contains('rogue dhcp') ||
         lower.contains('fake dhcp');
-    final wantsTelnet = lower.contains('telnet') || lower.contains('vty') ||
+    final wantsTelnet =
+        lower.contains('telnet') ||
+        lower.contains('vty') ||
         hasAaaWord; // AAA without a named purpose is vty/login control
     // "use SSH instead of telnet", "ssh access", "configure ssh" - the
     // secure variant of remote access.
@@ -5130,7 +5319,8 @@ class NetworkIntent {
     final etherProto = lower.contains('pagp') && !lower.contains('lacp')
         ? 'pagp'
         : 'lacp';
-    final wantsHsrp = lower.contains('hsrp') ||
+    final wantsHsrp =
+        lower.contains('hsrp') ||
         lower.contains('vrrp') ||
         lower.contains('glbp') ||
         lower.contains('redundant gateways') ||
@@ -5139,7 +5329,8 @@ class NetworkIntent {
       r'hsrp[^\n.]{0,40}?((?:\d{1,3}\.){3}\d{1,3})',
       caseSensitive: false,
     ).firstMatch(lower)?.group(1);
-    final wantsSpanningTree = lower.contains('spanning-tree') ||
+    final wantsSpanningTree =
+        lower.contains('spanning-tree') ||
         lower.contains('spanning tree') ||
         lower.contains('rapid-pvst') ||
         lower.contains('root bridge') ||
@@ -5149,7 +5340,9 @@ class NetworkIntent {
       r'enable\s+secret\s+([^\s,;.]+)',
       caseSensitive: false,
     ).firstMatch(text)?.group(1);
-    final protocol = RegExp(r'\bradius\b').hasMatch(lower) ? 'radius' : 'tacacs+';
+    final protocol = RegExp(r'\bradius\b').hasMatch(lower)
+        ? 'radius'
+        : 'tacacs+';
     // A tunnel the brief asked for belongs IN the plan even when the brief
     // counted its own devices. "two sites, 2 routers, 2 switches and 8 pcs
     // each, site-to-site ipsec vpn with pre-shared key LabKey1 and ospf"
@@ -5157,7 +5350,8 @@ class NetworkIntent {
     // through this path - and this path never set ipsecVpn at all: the user
     // asked for a VPN and the plan, the config and the checklist said nothing
     // about one.
-    final wantsIpsec = lower.contains('ipsec') ||
+    final wantsIpsec =
+        lower.contains('ipsec') ||
         lower.contains('site-to-site') ||
         lower.contains('site to site') ||
         lower.contains('vpn') ||
@@ -5221,8 +5415,9 @@ class NetworkIntent {
         // is, and the adapters' documented default (cisco) is used for that
         // rather than typing a value the user did not give.
         aaaUsername: aaaAccount?.username,
-        aaaAccountPassword:
-            (aaaAccount?.password.isEmpty ?? true) ? null : aaaAccount!.password,
+        aaaAccountPassword: (aaaAccount?.password.isEmpty ?? true)
+            ? null
+            : aaaAccount!.password,
         // The account and the shared key are different secrets. A brief that
         // names a key but gives no value has left it unsaid - the adapters'
         // documented lab default stands rather than a value the user never
@@ -5230,7 +5425,8 @@ class NetworkIntent {
         // single-secret lab case, where the account password is the secret.
         aaaPassword: resolveAaaKey(text, aaaAccount),
         telnet: wantsTelnet && !wantsSsh,
-        extendedAcl: lower.contains('extended acl') ||
+        extendedAcl:
+            lower.contains('extended acl') ||
             lower.contains('acl') ||
             lower.contains('access-list') ||
             (lower.contains('block') && lower.contains('branch')),
@@ -5283,8 +5479,8 @@ class NetworkIntent {
             'Inter-VLAN routing: ${routers.first.name} routes between the VLANs through one dot1Q trunk interface (router-on-a-stick); PC gateways point at the matching sub-interface address.',
           if (wantsIpsec && tunnel.peerA != null)
             'Site-to-site IPsec between ${tunnel.peerA} and ${tunnel.peerB}, '
-            'protecting ${tunnel.local} and ${tunnel.remote}; '
-            '${_preSharedKeyIn(text) == null ? 'no pre-shared key was stated, so the tunnel is staged and cannot establish until one is given' : 'the stated pre-shared key is used on both ends'}.',
+                'protecting ${tunnel.local} and ${tunnel.remote}; '
+                '${_preSharedKeyIn(text) == null ? 'no pre-shared key was stated, so the tunnel is staged and cannot establish until one is given' : 'the stated pre-shared key is used on both ends'}.',
           if (wantsEtherChannel && switches.length >= 2)
             'EtherChannel: ${switches[0].name} and ${switches[1].name} bundle two ports facing each other with $etherProto (channel-group 1); give them matching member ports so the bundle forms.',
           if (wantsHsrp && hsrpIp == null)
@@ -5347,12 +5543,7 @@ class NetworkIntent {
   /// still describes a real tunnel, and the adapters' crypto block is keyed
   /// on exactly these four values - left null, the validator reported missing
   /// peers for a plan that plainly had both routers and both LANs.
-  static ({
-    String? peerA,
-    String? peerB,
-    String? local,
-    String? remote,
-  })
+  static ({String? peerA, String? peerB, String? local, String? remote})
   _tunnelEnds({
     required List<NetNode> nodes,
     required List<NetLink> links,
@@ -5369,8 +5560,8 @@ class NetworkIntent {
     // router owns is a LAN.
     bool onWan(String node, String iface) {
       for (final l in links) {
-        final mine = (l.a == node && l.aIf == iface) ||
-            (l.b == node && l.bIf == iface);
+        final mine =
+            (l.a == node && l.aIf == iface) || (l.b == node && l.bIf == iface);
         if (!mine) continue;
         if (typeOf(l.a) == 'router' && typeOf(l.b) == 'router') return true;
       }
@@ -5419,13 +5610,9 @@ class NetworkIntent {
         .map((s) => int.tryParse(s) ?? 0)
         .toList();
     if (octets.length != 4) return cidr;
-    var ip = (octets[0] << 24) |
-        (octets[1] << 16) |
-        (octets[2] << 8) |
-        octets[3];
-    final mask = prefix == 0
-        ? 0
-        : (0xFFFFFFFF << (32 - prefix)) & 0xFFFFFFFF;
+    var ip =
+        (octets[0] << 24) | (octets[1] << 16) | (octets[2] << 8) | octets[3];
+    final mask = prefix == 0 ? 0 : (0xFFFFFFFF << (32 - prefix)) & 0xFFFFFFFF;
     ip = ip & mask;
     return '${(ip >> 24) & 255}.${(ip >> 16) & 255}.${(ip >> 8) & 255}.'
         '${ip & 255}/$prefix';
@@ -5544,7 +5731,8 @@ class NetworkIntent {
       final kind = _kindAfterCueWord(lower, m.end, m.group(1)!);
       if (kind == null) continue;
       final label = kindPlurals[kind] ?? kind;
-      final question = 'How many $label do you want? Give a number (or a '
+      final question =
+          'How many $label do you want? Give a number (or a '
           'count per site) and I will plan them in.';
       if (!out.contains(question)) out.add(question);
     }
@@ -5570,7 +5758,7 @@ class NetworkIntent {
     if (_concreteSecurityWord.hasMatch(lower)) return const [];
     return const [
       'What should "secure" cover - port security on the access ports, '
-      'SSH-only management, an ACL between the sites, or a VPN?',
+          'SSH-only management, an ACL between the sites, or a VPN?',
     ];
   }
 
@@ -5592,7 +5780,8 @@ class NetworkIntent {
       final kind = _kindAfterCueWord(lower, m.end, m.group(2)!);
       if (kind == null) continue;
       final label = n == 1 ? _kindSingular(kind) : (kindPlurals[kind] ?? kind);
-      final note = 'You said "more than $n $label" - the plan uses '
+      final note =
+          'You said "more than $n $label" - the plan uses '
           '${n + 1} as the minimum that satisfies it. Give the exact count '
           'to pin it.';
       if (!out.contains(note)) out.add(note);

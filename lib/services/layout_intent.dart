@@ -1,7 +1,14 @@
 // The engine's own style list is the one source of truth for what a drawing
 // is called: [LayoutRequest.allStyles] aliases it so a style the gallery
 // offers is always a style the note reader accepts back.
-import 'layout_engine.dart' show kLayoutStyles;
+import '../models/network_intent.dart';
+import 'layout_engine.dart'
+    show
+        LayoutSnapshot,
+        LayoutZone,
+        computeLayoutSnapshot,
+        kLayoutStyles,
+        resolveSideNames;
 
 /// One group of devices sent to one edge.
 ///
@@ -23,7 +30,8 @@ class LayoutZoneRequest {
   bool get isEmpty => kinds.isEmpty && names.isEmpty;
 
   @override
-  String toString() => 'LayoutZoneRequest(${kinds.join('+')}|'
+  String toString() =>
+      'LayoutZoneRequest(${kinds.join('+')}|'
       '${names.join('+')}|$edge)';
 }
 
@@ -282,6 +290,7 @@ class LayoutRequest {
     r'close\s+together|zoom(?:ed)?\s*out|bunch\w*\s+(?:them\s+)?together)\b',
     caseSensitive: false,
   );
+
   /// Note the absence of a bare "apart" or "bigger": both read as distance in
   /// ordinary sentences ("2 subnets apart", "a bigger subnet") and used to
   /// turn networking talk into a drawing request. The phrases a person uses
@@ -425,7 +434,7 @@ class LayoutRequest {
   /// servers on one side not near the PCs" the PCs are what the servers are
   /// being moved AWAY from, so everything from this word on is context, not
   /// instructions.
-static final RegExp _separation = RegExp(
+  static final RegExp _separation = RegExp(
     r'\b(?:from|off|near)\b',
     caseSensitive: false,
   );
@@ -508,10 +517,7 @@ static final RegExp _separation = RegExp(
   /// between devices" - the two most ordinary ways to ask for a redraw - were
   /// thrown away before anything looked at them. Only a vague turn falls
   /// through to the topic-and-change gate and the blind cycle.
-  static LayoutRequest? read(
-    String text, {
-    String currentStyle = 'tree',
-  }) {
+  static LayoutRequest? read(String text, {String currentStyle = 'tree'}) {
     final t = text.trim().toLowerCase();
     if (t.isEmpty) return null;
     if (_deviceAddition.hasMatch(t)) return null;
@@ -561,11 +567,7 @@ static final RegExp _separation = RegExp(
     // together" for a request about rows.
     if (named == null && columns != null) named = 'rows';
     if (named != null) {
-      return LayoutRequest(
-        style: named,
-        explicitStyle: true,
-        columns: columns,
-      );
+      return LayoutRequest(style: named, explicitStyle: true, columns: columns);
     }
 
     // Nothing named and nothing else to go on: the request is "not this one".
@@ -638,14 +640,16 @@ static final RegExp _separation = RegExp(
         final upper = m.group(0)!.toUpperCase();
         if (!names.contains(upper)) names.add(upper);
       }
-      parts.add((kinds: _kindsIn(scope), names: names, edge: _rawEdgeIn(clause)));
+      parts.add((
+        kinds: _kindsIn(scope),
+        names: names,
+        edge: _rawEdgeIn(clause),
+      ));
     }
     if (parts.isEmpty) return null;
 
     final zoned = _assembleZones(parts);
-    final guessed = zoned.every(
-      (z) => z.kinds.isEmpty && z.names.isEmpty,
-    );
+    final guessed = zoned.every((z) => z.kinds.isEmpty && z.names.isEmpty);
     if (guessed) {
       return LayoutRequest(
         style: 'grouped',
@@ -659,11 +663,7 @@ static final RegExp _separation = RegExp(
         guessedSide: true,
       );
     }
-    return LayoutRequest(
-      style: 'grouped',
-      explicitStyle: true,
-      zones: zoned,
-    );
+    return LayoutRequest(style: 'grouped', explicitStyle: true, zones: zoned);
   }
 
   /// Turn per-clause destinations into zones.
@@ -759,7 +759,8 @@ static final RegExp _separation = RegExp(
     if (direct != null) return direct;
     for (final suffix in const <String>['es', 's']) {
       if (word.length > suffix.length && word.endsWith(suffix)) {
-        final hit = _kindAliases[word.substring(0, word.length - suffix.length)];
+        final hit =
+            _kindAliases[word.substring(0, word.length - suffix.length)];
         if (hit != null) return hit;
       }
     }
@@ -808,10 +809,10 @@ static final RegExp _separation = RegExp(
 
   /// The edge a note parked its column at ("edge: right").
   static String sideEdgeFromNote(String note) =>
-      RegExp(r'edge:\s*(left|right)', caseSensitive: false)
-              .firstMatch(note)
-              ?.group(1)
-              ?.toLowerCase() ??
+      RegExp(
+        r'edge:\s*(left|right)',
+        caseSensitive: false,
+      ).firstMatch(note)?.group(1)?.toLowerCase() ??
       'left';
 
   /// The note a chosen drawing is stamped as, read back by all three readers
@@ -832,11 +833,7 @@ static final RegExp _separation = RegExp(
     if (zones.isNotEmpty) {
       parts.add(
         'zones=${[
-          for (final zone in zones)
-            '${[
-              for (final kind in zone.kinds) 'kind:$kind',
-              for (final name in zone.names) 'name:$name',
-            ].join(',')}@${zone.edge}',
+          for (final zone in zones) '${[for (final kind in zone.kinds) 'kind:$kind', for (final name in zone.names) 'name:$name'].join(',')}@${zone.edge}',
         ].join('|')}',
       );
     } else if (sideKinds.isNotEmpty || sideNames.isNotEmpty) {
@@ -884,5 +881,39 @@ static final RegExp _separation = RegExp(
       }
     }
     return out;
+  }
+
+  /// The exact drawing preview represented by a plan's saved layout note.
+  ///
+  /// The review screen and the gallery use the same layout engine as the
+  /// Packet Tracer adapter. Keeping this conversion beside the note reader
+  /// prevents saved grouped layouts from being previewed as the default tree.
+  static LayoutSnapshot? previewFromNotes(NetworkIntent intent) {
+    for (final note in intent.notes) {
+      final style = styleFromNote(note);
+      if (style.isEmpty) continue;
+      final zones = <LayoutZone>[
+        for (final zone in zonesFromNote(note))
+          LayoutZone(
+            resolveSideNames(intent, kinds: zone.kinds, names: zone.names),
+            edge: zone.edge,
+          ),
+      ].where((zone) => zone.side.isNotEmpty).toList();
+      final side = zones.isEmpty
+          ? resolveSideNames(
+              intent,
+              kinds: sideKindsFromNote(note),
+              names: sideNamesFromNote(note),
+            )
+          : const <String>[];
+      return computeLayoutSnapshot(
+        intent,
+        style: style,
+        side: side,
+        sideEdge: sideEdgeFromNote(note),
+        zones: zones,
+      );
+    }
+    return null;
   }
 }
