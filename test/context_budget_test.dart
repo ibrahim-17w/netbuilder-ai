@@ -33,6 +33,33 @@ void main() {
       expect(plan.budgetTokens, 262144);
     });
 
+    test('background planning returns the same plan', () async {
+      final history = convo(turns: 30, fillerChars: 4000);
+      final synchronous = ContextBudget.plan(
+        history: history,
+        systemContext: 'sys',
+        pendingText: 'q',
+        budgetTokens: 30000,
+      );
+      final background = await ContextBudget.planInBackground(
+        history: history,
+        systemContext: 'sys',
+        pendingText: 'q',
+        budgetTokens: 30000,
+      );
+
+      expect(background.tokensUsed, synchronous.tokensUsed);
+      expect(background.turnsSummarized, synchronous.turnsSummarized);
+      expect(
+        background.recentTurns.map((m) => m.text),
+        synchronous.recentTurns.map((m) => m.text),
+      );
+      expect(
+        background.report?.sections.length,
+        synchronous.report?.sections.length,
+      );
+    });
+
     test('a bigger ceiling keeps strictly more turns', () {
       final history = convo(turns: 40, fillerChars: 4000);
       int kept(int budget) => ContextBudget.plan(

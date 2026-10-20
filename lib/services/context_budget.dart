@@ -1,3 +1,5 @@
+import 'dart:isolate';
+
 import '../models/chat_message.dart';
 import 'context_report.dart';
 import 'conversation_memory.dart';
@@ -477,6 +479,49 @@ class ContextBudget {
       ),
     );
   }
+
+  /// [plan], off the UI isolate.
+  ///
+  /// A 400-turn history takes a quarter of a second to budget, and that was
+  /// paid between tapping send and the request leaving the device. Isolate
+  /// startup is cheap next to the walk; the synchronous [plan] stays available
+  /// for tests, the context report, and callers that already own a background
+  /// worker.
+  static Future<ContextPlan> planInBackground({
+    required List<ChatMessage> history,
+    required String systemContext,
+    required String pendingText,
+    String networkContext = '',
+    String sessionState = '',
+    String memories = '',
+    String storedSummary = '',
+    int attachmentCount = 0,
+    int? budgetTokens,
+    int? runtimeWindowTokens,
+    String runtimeWindowSource = 'configured',
+    bool runtimeWindowAssumed = false,
+    String model = '',
+    String provider = '',
+    double workingFractionOverride = workingFraction,
+  }) => Isolate.run(
+    () => plan(
+      history: history,
+      systemContext: systemContext,
+      pendingText: pendingText,
+      networkContext: networkContext,
+      sessionState: sessionState,
+      memories: memories,
+      storedSummary: storedSummary,
+      attachmentCount: attachmentCount,
+      budgetTokens: budgetTokens,
+      runtimeWindowTokens: runtimeWindowTokens,
+      runtimeWindowSource: runtimeWindowSource,
+      runtimeWindowAssumed: runtimeWindowAssumed,
+      model: model,
+      provider: provider,
+      workingFractionOverride: workingFractionOverride,
+    ),
+  );
 
   /// Cut a conversation-memory block down to [maxTokens].
   ///

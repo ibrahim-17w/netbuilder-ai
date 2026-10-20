@@ -114,7 +114,7 @@ class ChatService {
     // budget an already-budgeted history and attach the memory block twice.
     final effectivePlan =
         plan ??
-        ContextBudget.plan(
+        await ContextBudget.planInBackground(
           history: history,
           systemContext: systemContext,
           pendingText: text,
@@ -267,7 +267,7 @@ class ChatService {
     signal.throwIfAborted();
     final effectivePlan =
         plan ??
-        ContextBudget.plan(
+        await ContextBudget.planInBackground(
           history: history,
           systemContext: systemContext,
           pendingText: text,

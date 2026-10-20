@@ -136,7 +136,7 @@ class ProviderChatService {
 
     final effective =
         plan ??
-        planContext(
+        await planContextInBackground(
           history: history,
           text: text,
           systemContext: systemContext,
@@ -201,7 +201,7 @@ class ProviderChatService {
 
     final effective =
         plan ??
-        planContext(
+        await planContextInBackground(
           history: history,
           text: text,
           systemContext: systemContext,
@@ -336,7 +336,7 @@ class ProviderChatService {
   }) async {
     final effective =
         plan ??
-        planContext(
+        await planContextInBackground(
           history: history,
           text: text,
           systemContext: systemContext,
@@ -454,6 +454,33 @@ class ProviderChatService {
     provider: _providerLabel,
   );
 
+  /// The same plan, built away from the frame that is waiting to send it.
+  Future<ContextPlan> planContextInBackground({
+    required List<ChatMessage> history,
+    required String text,
+    required String systemContext,
+    String networkContext = '',
+    String sessionState = '',
+    String memories = '',
+    String storedSummary = '',
+    int attachmentCount = 0,
+  }) => ContextBudget.planInBackground(
+    history: history,
+    systemContext: systemContext,
+    pendingText: text,
+    networkContext: networkContext,
+    sessionState: sessionState,
+    memories: memories,
+    storedSummary: storedSummary,
+    attachmentCount: attachmentCount,
+    budgetTokens: contextTokens,
+    runtimeWindowTokens: runtimeWindowTokens,
+    runtimeWindowSource: runtimeWindowSource,
+    runtimeWindowAssumed: runtimeWindowAssumed,
+    model: config.model,
+    provider: _providerLabel,
+  );
+
   Stream<String> stream({
     required List<ChatMessage> history,
     required String text,
@@ -465,8 +492,8 @@ class ProviderChatService {
     String storedSummary = '',
     Future<void>? abortTrigger,
     bool Function()? abortProbe,
-  }) {
-    final plan = planContext(
+  }) async* {
+    final plan = await planContextInBackground(
       history: history,
       text: text,
       systemContext: systemContext,
@@ -479,7 +506,7 @@ class ProviderChatService {
     lastPlan = plan;
     _record(plan);
     if (isGemini) {
-      return _gemini.stream(
+      yield* _gemini.stream(
         apiKey: geminiKey,
         model: config.model,
         history: plan.recentTurns,
@@ -492,8 +519,9 @@ class ProviderChatService {
         abortTrigger: abortTrigger,
         abortProbe: abortProbe,
       );
+      return;
     }
-    return _openAiTurn(
+    yield* _openAiTurn(
       history: history,
       text: text,
       systemContext: systemContext,
