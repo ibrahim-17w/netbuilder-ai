@@ -982,6 +982,30 @@ class BriefSlotPipeline {
         w: RegExp('\\b${RegExp.escape(w)}(?:es|s)?\\b'),
   };
 
+  /// A short keyword inside a longer device phrase belongs to the longer
+  /// kind, not to both. Without this, "wireless lan controller" was counted
+  /// as a WLC and a generic controller, "wireless router" as a wireless
+  /// router and a wired router, and "iot server" as an IoT device and a
+  /// server.
+  static bool _shadowedByLongerKeyword(
+    String lower,
+    String keyword,
+    int start,
+    int end,
+  ) {
+    for (final kind in deviceKinds) {
+      for (final other in kind.keywords) {
+        if (other.length <= keyword.length || !other.contains(keyword)) {
+          continue;
+        }
+        for (final longer in _mentionByWord[other]!.allMatches(lower)) {
+          if (longer.start <= start && longer.end >= end) return true;
+        }
+      }
+    }
+    return false;
+  }
+
   /// True when at least one mention of this kind is NOT part of a "how
   /// many ..." question. "i don't know how many phones" asks ABOUT phones
   /// instead of asking FOR them, so the bare mention must not become a
@@ -990,6 +1014,7 @@ class BriefSlotPipeline {
   static bool _mentionedBeyondHowMany(String lower, List<String> keywords) {
     for (final k in keywords) {
       for (final m in _mentionByWord[k]!.allMatches(lower)) {
+        if (_shadowedByLongerKeyword(lower, k, m.start, m.end)) continue;
         final from = m.start - 40 < 0 ? 0 : m.start - 40;
         if (!_howManyWord.hasMatch(lower.substring(from, m.start))) {
           final clauses = _clauses(lower);

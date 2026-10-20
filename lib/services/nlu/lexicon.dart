@@ -140,7 +140,8 @@ const List<DeviceKind> deviceKinds = [
     keywords: [
       'iot',
       'home gateway',
-      'mcu',
+      // "mcu" has its own DeviceKind below; keeping it here counted one
+      // request as both an IoT device and an MCU.
       'iot server',
       'smart bulb',
       'bulb',
@@ -206,6 +207,9 @@ const List<DeviceKind> deviceKinds = [
   ),
   DeviceKind(
     type: 'controller',
+    // The parser's overlap rule ignores this short word inside a longer
+    // "wireless lan controller" or "programmable logic controller", so a real
+    // WLC/PLC request is not also counted as a generic controller.
     keywords: ['controller', 'network controller', 'meraki controller'],
     models: ['NetworkController'],
   ),
@@ -230,6 +234,39 @@ const List<DeviceKind> deviceKinds = [
     models: ['Power Distribution Device'],
   ),
 ];
+
+/// Kinds the planner can recognize but the Packet Tracer executor cannot
+/// place yet.
+///
+/// They stay in [deviceKinds] so a brief that names one still parses into a
+/// visible node the user can correct, instead of making the device disappear.
+/// [ValidatorService] rejects them before a build, and the sidecar mirrors
+/// this list in `pt_autopilot.UNSUPPORTED_DEVICE_KINDS`
+/// (`sidecar/test_device_palette.py` keeps the two equal). Do not put a kind
+/// here once its palette and executor exist; add it to `DEVICE_PALETTE`.
+const Set<String> unsupportedDeviceKinds = {
+  'hub',
+  'bridge',
+  'repeater',
+  'mcu',
+  'sbc',
+  'plc',
+  'analog-phone',
+  'voip-adapter',
+  'cell-tower',
+  'central-office',
+  'controller',
+  'sniffer',
+  'historian',
+  'cyber-observer',
+  'power-distribution',
+};
+
+/// The device kinds a Packet Tracer build can actually place today.
+final Set<String> supportedDeviceKinds = Set.unmodifiable({
+  for (final kind in deviceKinds)
+    if (!unsupportedDeviceKinds.contains(kind.type)) kind.type,
+});
 
 /// The default name prefix for a device kind ("R", "SW", "PC").
 const Map<String, String> devicePrefixes = {

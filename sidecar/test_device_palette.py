@@ -16,6 +16,8 @@ import os
 import re
 import sys
 
+import pytest
+
 from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -50,17 +52,41 @@ def _dart_kinds() -> list:
     return kinds
 
 
+def _dart_unsupported_kinds() -> set:
+    """The `unsupportedDeviceKinds` set from the Dart lexicon."""
+    with open(DART_CATALOG, encoding="utf-8") as f:
+        source = f.read()
+    start = source.index("const Set<String> unsupportedDeviceKinds = {")
+    block = source[start:source.index("};", start)]
+    return set(re.findall(r"'([^']+)'", block))
+
+
 def test_the_dart_catalog_is_readable():
     kinds = _dart_kinds()
     assert len(kinds) >= 15, kinds
     assert ("router", "4331", "f0") in kinds, kinds
 
 
+def test_the_unsupported_lists_agree_in_both_directions():
+    unsupported = _dart_unsupported_kinds()
+    assert unsupported == pt.UNSUPPORTED_DEVICE_KINDS, (
+        "lib/services/nlu/lexicon.dart and pt_autopilot.py disagree about "
+        f"unsupported kinds: Dart-only {unsupported - pt.UNSUPPORTED_DEVICE_KINDS}, "
+        f"Python-only {pt.UNSUPPORTED_DEVICE_KINDS - unsupported}")
+    assert not (unsupported & set(pt.DEVICE_PALETTE)), (
+        "a kind cannot be both unsupported and palette-backed: "
+        f"{sorted(unsupported & set(pt.DEVICE_PALETTE))}")
+    planned = {t for t, _m, _p in _dart_kinds()}
+    assert unsupported <= planned, unsupported - planned
+
+
 def test_every_planner_kind_has_an_executor_palette_path():
-    missing = [t for t, _m, _p in _dart_kinds() if t not in pt.DEVICE_PALETTE]
+    unsupported = _dart_unsupported_kinds()
+    missing = [t for t, _m, _p in _dart_kinds()
+               if t not in pt.DEVICE_PALETTE and t not in unsupported]
     assert not missing, (
-        f"the planner can emit {missing}, but the executor has no palette "
-        "path for them - add a DEVICE_PALETTE entry")
+        f"the planner can emit {missing}, but the executor has neither a "
+        "DEVICE_PALETTE entry nor an explicit unsupported-list entry")
 
 
 def test_every_palette_kind_is_one_the_planner_can_emit():
@@ -170,12 +196,53 @@ def test_an_unknown_type_never_places_silently_as_a_router():
     assert ("Network Devices", "Network Device") in calls, calls
 
 
+def test_an_unsupported_planner_kind_is_skipped_not_substituted():
+    """A hub must not become a router: no palette click happens at all."""
+    _reset_run_state()
+    calls = []
+
+    with patch.object(pt, "click_by_names",
+                      side_effect=lambda names, what, **kw:
+                      calls.append(tuple(names)) or True), \
+         patch.object(pt, "click_frac"), \
+         patch.object(pt, "click_model"), \
+         patch.object(pt, "_slot_visual_state",
+                      return_value=("empty", "")), \
+         patch.object(pt, "_shot_region", return_value=""), \
+         patch.object(pt, "canvas_changed", return_value=(True, 0.9)), \
+         patch.object(pt, "_press_esc"), \
+         patch.object(pt, "_interruptible_sleep", return_value=True), \
+         patch.object(pt, "remember_device"), \
+         patch.object(pt, "shot"), \
+         patch.object(pt, "record_event"), \
+         patch.object(pt, "log"):
+        pt.place_nodes((0, 0, 1000, 700),
+                       [{"name": "H1", "type": "hub", "model": "Hub-PT"}],
+                       "test")
+
+    assert not calls, calls
+    assert pt.RUN["node_outcomes"]["H1"] == "unsupported"
+
+
+def test_generate_rejects_an_unsupported_kind_without_substituting():
+    plan = {"steps": [{"action": "create_nodes", "nodes": [
+        {"name": "H1", "type": "hub", "model": "Hub-PT"}]}]}
+    with pytest.raises(pt.pkt_builder.BuildError) as caught:
+        pt.pkt_generate(plan, project="unsupported", filename="unsupported")
+    assert "hub" in str(caught.value)
+    assert "Supported device types:" in str(caught.value)
+    assert "No substitute" in str(caught.value)
+
+
 if __name__ == "__main__":
     test_the_dart_catalog_is_readable()
+    test_the_unsupported_lists_agree_in_both_directions()
     test_every_planner_kind_has_an_executor_palette_path()
     test_every_palette_kind_is_one_the_planner_can_emit()
     test_the_palette_offers_the_model_the_planner_picks()
     test_every_declared_port_is_cableable()
     test_the_palette_group_is_clicked_before_the_model()
     test_an_unknown_type_never_places_silently_as_a_router()
+    test_an_unsupported_planner_kind_is_skipped_not_substituted()
+    test_generate_rejects_an_unsupported_kind_without_substituting()
     print("ALL TESTS PASSED")

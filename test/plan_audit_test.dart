@@ -19,10 +19,10 @@ import 'package:net_builder/services/validator_service.dart';
 /// for an endpoint cabled straight to a router); a brief of pure security
 /// controls produced a one-device plan; "VLANs 10, 20, 30 and 40" lost all four
 /// VLANs because the normalizer trims the commas that separated them.
-List<ValidationIssue> blocking(NetworkIntent plan) =>
-    ValidatorService.validate(plan, target: 'packet-tracer')
-        .where((i) => i.blocks)
-        .toList();
+List<ValidationIssue> blocking(NetworkIntent plan) => ValidatorService.validate(
+  plan,
+  target: 'packet-tracer',
+).where((i) => i.blocks).toList();
 
 NetworkIntent plan(String brief) =>
     NetworkIntent.parseSimple('audit', CasualEnglish.normalize(brief));
@@ -61,8 +61,10 @@ void main() {
           'a firewall between the internet and the LAN, 2 switches, 10 pcs',
       'hsrp': '2 routers with HSRP virtual ip 192.168.1.254, 1 switch, 10 pcs',
       'etherchannel': '2 switches with an etherchannel trunk and 2 pcs',
-      'voice': '1 router, 1 switch, 5 ip phones and 5 pcs with a voice vlan 110',
-      'typos': 'i wanna a netwrok with 3 routrs and 2 swtichs and like 10 pcs '
+      'voice':
+          '1 router, 1 switch, 5 ip phones and 5 pcs with a voice vlan 110',
+      'typos':
+          'i wanna a netwrok with 3 routrs and 2 swtichs and like 10 pcs '
           'and ospf pls',
       'ten pcs and no switch': '1 router and 10 pcs',
     };
@@ -149,8 +151,10 @@ void main() {
 
     test('still leaves a brief that names its own devices alone', () {
       // Counts are a specification: the profile must not replace them.
-      final built = plan('2 routers 2 switches 20 pcs and aaa with port '
-          'security');
+      final built = plan(
+        '2 routers 2 switches 20 pcs and aaa with port '
+        'security',
+      );
       expect(count(built, 'router'), 2);
       expect(count(built, 'switch'), 2);
       expect(count(built, 'pc'), 20);
@@ -320,7 +324,8 @@ void main() {
       expect(
         probes.every((c) => c['advisory'] == true),
         isTrue,
-        reason: 'Packet Tracer cannot type the crypto block, so a probe that '
+        reason:
+            'Packet Tracer cannot type the crypto block, so a probe that '
             'can never pass must not fail the run',
       );
       for (final probe in probes) {
@@ -336,8 +341,10 @@ void main() {
 
     test('a tunnel brief loses no other feature', () {
       // The security return path used to skip the IPv6 pass entirely.
-      final built = plan('2 routers and 4 pcs with ipv6 and ipsec vpn '
-          'pre-shared key Key9');
+      final built = plan(
+        '2 routers and 4 pcs with ipv6 and ipsec vpn '
+        'pre-shared key Key9',
+      );
       expect(built.security.ipsecVpn, isTrue);
       expect(
         built.addressing.any((a) => a.ip6Cidr != null),
@@ -355,11 +362,17 @@ void main() {
         'with WPA2 and SSID OFFICE',
       );
       expect(count(built, 'wlc'), 1);
+      expect(
+        count(built, 'controller'),
+        0,
+        reason: 'the WLC phrase must not also create a generic controller',
+      );
       expect(blocking(built), isEmpty);
       expect(
-        ValidatorService.validate(built, target: 'packet-tracer')
-            .map((i) => i.message)
-            .join(' | '),
+        ValidatorService.validate(
+          built,
+          target: 'packet-tracer',
+        ).map((i) => i.message).join(' | '),
         contains('placed but not cabled'),
         reason: 'uncabled by design is still said out loud',
       );
@@ -379,7 +392,10 @@ void main() {
     test('a vague request is never the drawing already on the table', () {
       var style = 'tree';
       for (var i = 0; i < LayoutRequest.styles.length; i++) {
-        final request = LayoutRequest.read('make it look better', currentStyle: style);
+        final request = LayoutRequest.read(
+          'make it look better',
+          currentStyle: style,
+        );
         expect(request, isNotNull);
         expect(request!.style, isNot(style));
         style = request.style;

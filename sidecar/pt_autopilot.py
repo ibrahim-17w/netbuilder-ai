@@ -4885,6 +4885,28 @@ DEVICE_PALETTE = {
             "pal_wireless"),
 }
 
+# Kinds the planner can name but the executor cannot place yet. They are kept
+# equal to `unsupportedDeviceKinds` in lib/services/nlu/lexicon.dart by
+# test_device_palette.py. A kind leaves this set only when DEVICE_PALETTE has
+# a real placement path for it; until then no substitute is placed.
+UNSUPPORTED_DEVICE_KINDS = {
+    "hub",
+    "bridge",
+    "repeater",
+    "mcu",
+    "sbc",
+    "plc",
+    "analog-phone",
+    "voip-adapter",
+    "cell-tower",
+    "central-office",
+    "controller",
+    "sniffer",
+    "historian",
+    "cyber-observer",
+    "power-distribution",
+}
+
 
 def ordered_models(requested: str, catalog: list) -> list:
     """Requested node model (from instruction) first, then catalog order."""
@@ -5221,6 +5243,18 @@ def place_nodes(rect, nodes, project: str = "default"):
         # placement path (Server-PT lives next to the PCs; an ASA lives under
         # Security; an AP/phone/cloud has its own port vocabulary but its
         # palette path is still an ordinary name click).
+        if ntype in UNSUPPORTED_DEVICE_KINDS:
+            # The planner recognizes this kind, so the user can see and
+            # correct it - but PT has no palette path yet. Never place a
+            # different device shape and call it done.
+            log(f"{name}: device type '{ntype}' is not supported by the "
+                "Packet Tracer executor yet; skipping instead of "
+                "substituting another device")
+            RUN["node_outcomes"][name] = "unsupported"
+            record_event("device_unsupported",
+                         f"Packet Tracer cannot place {ntype} yet; no "
+                         "substitute was made", device=name, recovered=False)
+            continue
         spec = DEVICE_PALETTE.get(ntype)
         if spec is None:
             # An unknown type must not silently place a ROUTER and call the
@@ -13799,9 +13833,22 @@ def pkt_generate(plan: dict, project: str = "", filename: str = "",
     plan with no steps and BuildError/FileExistsError like generate_pkt_file.
     """
     plan = plan if isinstance(plan, dict) else {}
-    if not [step for step in (plan.get("steps") or [])
-            if isinstance(step, dict)]:
+    steps = [step for step in (plan.get("steps") or [])
+             if isinstance(step, dict)]
+    if not steps:
         raise ValueError("plan has no steps to build")
+    unsupported = sorted({
+        str(node.get("type") or "")
+        for step in steps
+        for node in (step.get("nodes") or [])
+        if isinstance(node, dict)
+    } & UNSUPPORTED_DEVICE_KINDS)
+    if unsupported:
+        raise pkt_builder.BuildError(
+            "Packet Tracer cannot build a plan containing "
+            f"{', '.join(unsupported)}. Supported device types: "
+            f"{', '.join(sorted(DEVICE_PALETTE))}. "
+            "No substitute device was placed.")
     project = (str(project or plan.get("project") or "default").strip()
                or "default")
     requested = os.path.basename(str(filename or "").strip())

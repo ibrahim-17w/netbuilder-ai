@@ -769,19 +769,24 @@ class ValidatorService {
 
     // Target-specific
     if (isPacketTracerTarget(target)) {
-      // Every kind the plan model knows is placeable and cableable: the
-      // executor's palette table is gated against this very list
-      // (sidecar/test_device_palette.py), so the two cannot drift apart.
-      final supportedTypes = {for (final k in deviceKinds) k.type};
+      // The planner can recognize more kinds than Packet Tracer can place.
+      // Reject the difference here, before a build, rather than letting the
+      // executor silently substitute a router-shaped device. The list is
+      // shared with the sidecar's palette gate.
+      final supported = supportedDeviceKinds.toList()..sort();
       for (final node in intent.nodes) {
-        if (!supportedTypes.contains(node.type)) {
-          issues.add(
-            ValidationIssue(
-              'error',
-              'Packet Tracer autopilot cannot build ${node.name} of type ${node.type}.',
-            ),
-          );
-        }
+        if (supportedDeviceKinds.contains(node.type)) continue;
+        final reason = unsupportedDeviceKinds.contains(node.type)
+            ? 'the ${node.type} device type is not supported yet'
+            : 'the ${node.type} device type is unknown';
+        issues.add(
+          ValidationIssue(
+            'error',
+            'Packet Tracer autopilot cannot build ${node.name}: $reason. '
+                'Supported types: ${supported.join(', ')}. '
+                'No substitute device was placed.',
+          ),
+        );
       }
       if (intent.nodes.length > packetTracerMaxDevices) {
         issues.add(
