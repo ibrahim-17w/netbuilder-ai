@@ -34,6 +34,8 @@ void main() {
     });
 
     test('background planning returns the same plan', () async {
+      ContextBudget.backgroundIsolates = true;
+      addTearDown(() => ContextBudget.backgroundIsolates = false);
       final history = convo(turns: 30, fillerChars: 4000);
       final synchronous = ContextBudget.plan(
         history: history,

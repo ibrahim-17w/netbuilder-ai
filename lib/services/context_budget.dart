@@ -487,6 +487,14 @@ class ContextBudget {
   /// startup is cheap next to the walk; the synchronous [plan] stays available
   /// for tests, the context report, and callers that already own a background
   /// worker.
+  /// Whether [planInBackground] really starts an isolate.
+  ///
+  /// `main()` turns this on for a real launch. It stays off in widget tests,
+  /// where the fake async clock does not complete a real isolate's future, and
+  /// in callers that explicitly prefer the synchronous planner. The isolate
+  /// path still has a direct parity test.
+  static bool backgroundIsolates = false;
+
   static Future<ContextPlan> planInBackground({
     required List<ChatMessage> history,
     required String systemContext,
@@ -503,8 +511,8 @@ class ContextBudget {
     String model = '',
     String provider = '',
     double workingFractionOverride = workingFraction,
-  }) => Isolate.run(
-    () => plan(
+  }) {
+    ContextPlan build() => plan(
       history: history,
       systemContext: systemContext,
       pendingText: pendingText,
@@ -520,8 +528,10 @@ class ContextBudget {
       model: model,
       provider: provider,
       workingFractionOverride: workingFractionOverride,
-    ),
-  );
+    );
+    if (!backgroundIsolates) return Future.value(build());
+    return Isolate.run(build);
+  }
 
   /// Cut a conversation-memory block down to [maxTokens].
   ///

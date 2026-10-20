@@ -17,6 +17,7 @@ import 'screens/pkt_files_screen.dart';
 import 'services/app_diagnostics.dart';
 import 'services/capability_registry.dart';
 import 'services/app_version.dart';
+import 'services/context_budget.dart';
 import 'services/autopilot_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/memory_screen.dart';
@@ -43,6 +44,10 @@ import 'widgets/pkt_build_job_banner.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // The context budget walk runs before every provider turn. Keep it off the
+  // UI isolate in the shipped app; widget tests leave this off because their
+  // fake clock cannot complete a real isolate future.
+  ContextBudget.backgroundIsolates = true;
   // Install before any startup work so a failure in a loader is still logged,
   // and let the shell paint while the redacted file fills in the background.
   AppDiagnostics.instance.install();
