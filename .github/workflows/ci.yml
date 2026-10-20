@@ -86,6 +86,11 @@ jobs:
       - name: Release build
         run: flutter build windows --release
 
+      # A packaged launch is the only thing that proves the DLL set and bundle
+      # layout are complete. It runs the real executable, not a widget harness.
+      - name: Packaged Windows smoke test
+        run: powershell -ExecutionPolicy Bypass -File tool/windows_smoke_test.ps1 -ExePath build/windows/x64/runner/Release/net_builder.exe
+
   sidecar:
     name: sidecar pytest (ubuntu)
     runs-on: ubuntu-latest
