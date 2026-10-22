@@ -91,6 +91,39 @@ try {
         throw 'The installed uninstaller is missing.'
     }
 
+    # A default uninstall must keep the user's work while removing the app.
+    # Write fixtures the way the app would, then check both halves.
+    Write-Host 'Uninstalling without -Purge to check user data is kept...'
+    $fixtures = @(
+        'data\projects\kept.txt',
+        'output\kept.pkt',
+        'logs\kept.log',
+        'config\kept-settings.json')
+    foreach ($relative in $fixtures) {
+        $path = Join-Path $tempRoot $relative
+        New-Item -ItemType Directory -Path (Split-Path -Parent $path) -Force |
+            Out-Null
+        Set-Content -LiteralPath $path -Value 'fixture' -Encoding ASCII
+    }
+    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass `
+        -File (Join-Path $tempRoot 'uninstall.ps1') -Quiet
+    if ($LASTEXITCODE -ne 0) {
+        throw "uninstall.ps1 exited with $LASTEXITCODE."
+    }
+    foreach ($binary in @('net_builder.exe', 'sidecar\pt_autopilot.exe')) {
+        if (Test-Path -LiteralPath (Join-Path $tempRoot $binary)) {
+            throw "The default uninstall left $binary in place."
+        }
+    }
+    foreach ($relative in $fixtures) {
+        if (-not (Test-Path -LiteralPath (Join-Path $tempRoot $relative))) {
+            throw "The default uninstall removed $relative."
+        }
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $tempRoot 'UNINSTALLED.txt'))) {
+        throw 'The default uninstall did not write UNINSTALLED.txt.'
+    }
+
     Write-Host 'Uninstalling with -Purge...'
     & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass `
         -File (Join-Path $tempRoot 'uninstall.ps1') -Purge -Quiet
@@ -106,7 +139,7 @@ try {
         throw 'The uninstaller did not remove the install folder.'
     }
 
-    Write-Host 'Clean-install test passed.'
+    Write-Host 'Clean-install and uninstall tests passed.'
 } catch {
     $failed = $true
     Stop-TestInstallProcesses

@@ -63,8 +63,9 @@ powershell -ExecutionPolicy Bypass -File packaging\test_upgrade.ps1
 
 `test_install.ps1` installs into an isolated temporary root with no shortcuts or
 registry writes, verifies every manifest hash, starts the packaged app, checks
-that it started the bundled engine, checks the version handshake, then purges
-the install. `test_upgrade.ps1` installs a payload, writes synthetic history,
+that it started the bundled engine, checks the version handshake, exercises the
+default uninstall against synthetic user files, then purges the install.
+`test_upgrade.ps1` installs a payload, writes synthetic history,
 settings, output and logs, installs the new payload over it, and proves those
 files survive unchanged.
 
