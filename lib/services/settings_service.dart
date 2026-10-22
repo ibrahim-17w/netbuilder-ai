@@ -41,6 +41,7 @@ class SettingsService extends ChangeNotifier {
   static const _kPreferOnDevicePkt = 'prefer_on_device_pkt';
   static const _kThemeMode = 'theme_mode';
   static const _kTourDone = 'first_run_tour_done';
+  static const _kReadinessDismissed = 'first_run_readiness_dismissed';
   static const _kSeenChangelog = 'seen_changelog_version';
 
   final FlutterSecureStorage _secure;
@@ -101,6 +102,7 @@ class SettingsService extends ChangeNotifier {
   // First-run tour + changelog tracking. The tour shows once; the changelog
   // card reappears whenever the app version changes.
   bool _tourDone = false;
+  bool _readinessDismissed = false;
   String _seenChangelog = '';
   // Where the offline .pkt engine lives. On a desktop that is the local
   // sidecar. A phone never connects to one: it builds with the bundled
@@ -426,6 +428,22 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// True once the user hid the first-run readiness panel.
+  bool get readinessDismissed => _readinessDismissed;
+  Future<void> dismissReadiness() async {
+    _readinessDismissed = true;
+    await _prefs?.setBool(_kReadinessDismissed, true);
+    notifyListeners();
+  }
+
+  /// Put the checklist back after it was dismissed. Settings has the button;
+  /// the panel itself only hides, so this is the one way back.
+  Future<void> showReadiness() async {
+    _readinessDismissed = false;
+    await _prefs?.setBool(_kReadinessDismissed, false);
+    notifyListeners();
+  }
+
   /// The changelog version the user last saw, so a new version can surface
   /// its changes exactly once.
   String get seenChangelog => _seenChangelog;
@@ -520,6 +538,7 @@ class SettingsService extends ChangeNotifier {
     await _loadInstallInfo();
     _lastProject = _prefs!.getString(_kLastProject) ?? _lastProject;
     _tourDone = _prefs!.getBool(_kTourDone) ?? false;
+    _readinessDismissed = _prefs!.getBool(_kReadinessDismissed) ?? false;
     _seenChangelog = _prefs!.getString(_kSeenChangelog) ?? '';
     // A saved address is normalized on the way in, so a value that predates
     // these rules (or was written by hand) becomes the address the app will

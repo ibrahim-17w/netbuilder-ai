@@ -349,6 +349,7 @@ class AutopilotService {
   /// Create a redacted, opt-in tester diagnostics archive locally.
   Future<Map<String, dynamic>> exportDiagnostics({
     bool includeScreenshots = false,
+    String appLogHeader = '',
   }) async {
     // The app error log is local and redacted; it rides along so one archive
     // explains both sides of a failure. A missing log is not an export error.
@@ -356,6 +357,9 @@ class AutopilotService {
     try {
       appLog = await AppDiagnostics.instance.exportText();
     } catch (_) {}
+    if (appLogHeader.trim().isNotEmpty) {
+      appLog = '${appLogHeader.trim()}\n\n$appLog';
+    }
     try {
       final r = await _client
           .post(

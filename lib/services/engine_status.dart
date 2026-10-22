@@ -225,11 +225,14 @@ class EngineStatus extends ChangeNotifier {
               'together.';
         }
       }
-      if (_appVersion.isNotEmpty) {
-        final mismatch = AppVersion.majorMismatch(_appVersion);
-        if (mismatch != null && _compatWarning.isEmpty) {
-          _compatWarning = mismatch;
-        }
+      if (_appVersion.isNotEmpty && _compatWarning.isEmpty) {
+        // First the fatal-ish major mismatch, then the stale-build warning.
+        // A strict schema mismatch is more important than either, so it keeps
+        // the user-facing message slot.
+        _compatWarning =
+            AppVersion.majorMismatch(_appVersion) ??
+            AppVersion.versionMismatch(_appVersion) ??
+            '';
       }
 
       _lastAnswer = reportedOk && schemaOk;

@@ -28,6 +28,9 @@
 - Per-user uninstall entry and Start Menu shortcut, with data-preserving
   uninstall by default and a `-Purge` mode.
 - Clean-install and upgrade-preserves-data tests, plus a clean-VM checklist.
+- First-run readiness panel covering the local engine, optional model key,
+  Packet Tracer, OCR and the no-admin/local-diagnostics permission story.
+- Local-only navigation instrumentation in the redacted app log.
 - A pilot kit with scripted tasks, metrics definitions and a scorecard
   summarizer.
 
@@ -42,6 +45,8 @@
   into leaf modules; all existing names and call sites are preserved.
 - Upgraded `cupertino_icons` to 2.x and staged `flutter_secure_storage` 10.3.1
   so its first run migrates keys before the v11 move.
+- The engine handshake now distinguishes a different major version from a
+  stale same-major build and tells the user to restart the engine.
 - Applied `dart format` across the Dart tree and fixed the analyzer infos it
   exposed.
 

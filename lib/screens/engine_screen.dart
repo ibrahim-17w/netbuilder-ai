@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../services/app_version.dart';
 import '../services/engine_status.dart';
 import '../services/settings_service.dart';
 import '../theme/app_kit.dart';
@@ -213,10 +214,21 @@ class _EngineScreenState extends State<EngineScreen> {
           spacing: AppTheme.s8,
           runSpacing: AppTheme.s8,
           children: [
+            _factChip('App version', AppVersion.full, Icons.info_outline),
             _factChip(
               'Engine version',
               _engine.version.isEmpty ? 'unknown' : _engine.version,
               Icons.info_outline,
+            ),
+            _factChip(
+              'Engine launched by',
+              _engine.appVersion.isEmpty ? 'unknown' : _engine.appVersion,
+              Icons.link_outlined,
+              tone:
+                  _engine.appVersion.isNotEmpty &&
+                      _engine.appVersion != AppVersion.full
+                  ? AppTone.warning
+                  : AppTone.neutral,
             ),
             _factChip(
               'Drives Packet Tracer',

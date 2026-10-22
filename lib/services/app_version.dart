@@ -44,6 +44,21 @@ class AppVersion {
         'Update both before relying on this engine.';
   }
 
+  /// A warning when the engine was launched by a different build of this app.
+  ///
+  /// The engine reads `NETBUILDER_APP_VERSION` from its parent at launch. A
+  /// stale engine on port 5005 is otherwise invisible: it answers /health and
+  /// plans networks with last week's prompts. The exact build (not just the
+  /// major) is the useful signal because sidecar updates ship with app
+  /// patches. Null means there is nothing to compare or the builds match.
+  static String? versionMismatch(String other) {
+    final theirs = other.trim().replaceFirst(RegExp(r'^[vV]'), '');
+    final ours = full.trim();
+    if (theirs.isEmpty || ours.isEmpty || theirs == ours) return null;
+    return 'Engine v$theirs was started by a different app build; this app is '
+        'v$ours. Restart the engine so both use the same build.';
+  }
+
   /// Load the versions stamped into this build. Never throws: a missing
   /// plugin (tests, a headless build) keeps the compile-time fallbacks.
   static Future<void> load() async {

@@ -1231,6 +1231,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: const Icon(Icons.tour_outlined, size: 18),
                   label: const Text('Replay the tour'),
                 ),
+                OutlinedButton.icon(
+                  onPressed: s.showReadiness,
+                  icon: const Icon(Icons.checklist_rounded, size: 18),
+                  label: const Text('Show setup checklist'),
+                ),
               ],
             ),
           ],

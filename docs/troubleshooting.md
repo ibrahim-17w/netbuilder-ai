@@ -17,6 +17,23 @@ usable with safe defaults.
 The banner's **Details** action explains the memory failure. The same failure
 also appears in the app log.
 
+## The first-run readiness panel says something is missing
+
+The panel is a checklist, not a gate. Offline planning, the offline assistant
+and `.pkt` generation work with every optional item still missing.
+
+- **Local engine** - start it from the panel or close the old engine process.
+  The panel rechecks the configured loopback address.
+- **Online model key** - optional. Add one in Settings only for
+  model-written chat answers; Private Mode keeps the app offline by choice.
+- **Packet Tracer** - optional for offline `.pkt` work. Install it, then press
+  Recheck; live autopilot also needs it open, maximized and focused.
+- **OCR and permissions** - OCR comes from the bundled engine. No
+  administrator rights are required. If OCR is unavailable, live CLI checks
+  may need manual review.
+
+Use **Settings > Show setup checklist** to bring the panel back after hiding it.
+
 ## "Engine not running"
 
 The sidecar needs Python 3 and its packages, and runs on the same PC as the

@@ -290,11 +290,19 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
   }
 
   void _go(AppDestination destination) {
-    if (!mounted) return;
+    if (!mounted || _destination == destination) return;
+    // Local-only navigation instrumentation. This is deliberately a log line,
+    // not an analytics call: before changing the nine-destination shell we
+    // need to know which destinations first-run users actually find, and the
+    // tester diagnostics archive is the only place that data may go.
+    unawaited(AppDiagnostics.instance.record('nav', destination.name));
     setState(() => _destination = destination);
   }
 
   void _push(Widget screen) {
+    unawaited(
+      AppDiagnostics.instance.record('screen', screen.runtimeType.toString()),
+    );
     _navKey.currentState?.push(MaterialPageRoute<void>(builder: (_) => screen));
   }
 
@@ -305,6 +313,9 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
       _activeProject = name;
       _chatDraft = prefill;
       if (isNew) _chatEpoch++;
+      if (_destination != AppDestination.chat) {
+        unawaited(AppDiagnostics.instance.record('nav', 'chat'));
+      }
       _destination = AppDestination.chat;
     });
   }

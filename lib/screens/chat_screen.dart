@@ -82,6 +82,7 @@ import '../widgets/gemini_model_picker.dart';
 import '../widgets/rule_dialog.dart';
 import '../widgets/slot_fix_dialog.dart';
 import '../widgets/conversation_search.dart';
+import '../widgets/readiness_panel.dart';
 
 /// A real conversation with the model, with screenshots attached.
 ///
@@ -472,6 +473,18 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_ptDetectStarted || !_canOpenFiles) return;
     _ptDetectStarted = true;
     PacketTracerLocator.instance.isInstalled().then((installed) {
+      if (!mounted) return;
+      setState(() => _ptInstalled = installed);
+    });
+  }
+
+  void _recheckPacketTracer() {
+    if (!_canOpenFiles) return;
+    setState(() {
+      _ptDetectStarted = true;
+      _ptInstalled = null;
+    });
+    PacketTracerLocator.instance.refresh().then((installed) {
       if (!mounted) return;
       setState(() => _ptInstalled = installed);
     });
@@ -6140,10 +6153,23 @@ class _ChatScreenState extends State<ChatScreen> {
     // the bottom edge where a chat box belongs. Everything else about this
     // column is the page: a title bar, the conversation, and the box.
     final empty = _messages.isEmpty;
+    final settings = _settings;
+    final showReadiness =
+        !SettingsService.isMobile &&
+        settings != null &&
+        settings.loaded &&
+        !settings.readinessDismissed;
     return Column(
       children: [
         _conversationHeader(roomForSidebar),
-        if (!SettingsService.isMobile && _engineReachable == false)
+        if (showReadiness)
+          ReadinessPanel(
+            items: _readinessItems(settings),
+            onDismiss: settings.dismissReadiness,
+          ),
+        if (!SettingsService.isMobile &&
+            _engineReachable == false &&
+            !showReadiness)
           _engineBanner(),
         Expanded(
           child: empty
@@ -6533,6 +6559,96 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) => reveal());
+  }
+
+  /// The four things a first-run tester needs to know, in one place. The
+  /// engine and Packet Tracer rows are live; the key and permission rows
+  /// explain what is optional and what the app will never ask for.
+  List<ReadinessItem> _readinessItems(SettingsService settings) {
+    final engine = EngineStatus.instance;
+    final engineState = _engineStarting || _engineReachable == null
+        ? ReadinessState.checking
+        : _engineReachable!
+        ? ReadinessState.ready
+        : ReadinessState.blocked;
+    final ocrState = _engineReachable == true
+        ? engine.hasOcr
+              ? ReadinessState.ready
+              : ReadinessState.optional
+        : ReadinessState.checking;
+    final provider = settings.providerName == 'openai'
+        ? 'OpenAI-compatible'
+        : 'Google Gemini';
+    return [
+      ReadinessItem(
+        label: 'Local engine',
+        detail: switch (engineState) {
+          ReadinessState.ready =>
+            'Running at ${settings.engineBase}. Live Packet Tracer control '
+                'and generated .pkt files are available.',
+          ReadinessState.blocked =>
+            'No engine at ${settings.engineBase}. Planning, tools and .pkt '
+                'files still work offline.',
+          _ => 'Checking ${settings.engineBase}...',
+        },
+        state: engineState,
+        actionLabel:
+            engineState == ReadinessState.blocked && engine.canStartLocally
+            ? 'Start'
+            : null,
+        onAction:
+            engineState == ReadinessState.blocked && engine.canStartLocally
+            ? _startEngine
+            : null,
+      ),
+      ReadinessItem(
+        label: 'Online model key',
+        detail: settings.privateMode
+            ? 'Private mode is on, so the model is never called. The offline '
+                  'planner is active.'
+            : settings.aiKeyPresent
+            ? 'Configured for $provider. The key stays in this machine\'s '
+                  'secure storage.'
+            : 'No key set; the built-in planner answers offline. Add one only '
+                  'if you want online model answers.',
+        state: settings.privateMode || !settings.aiKeyPresent
+            ? ReadinessState.optional
+            : ReadinessState.ready,
+        actionLabel: 'Settings',
+        onAction: _openSettings,
+      ),
+      ReadinessItem(
+        label: 'Packet Tracer',
+        detail: switch (_ptInstalled) {
+          true =>
+            'Detected. Keep Packet Tracer open, maximized and focused during '
+                'a live autopilot run.',
+          false =>
+            'Not detected. Offline .pkt building still works; install it for '
+                'live autopilot control.',
+          null => 'Looking for Packet Tracer on this PC...',
+        },
+        state: _ptInstalled == true
+            ? ReadinessState.ready
+            : _ptInstalled == false
+            ? ReadinessState.optional
+            : ReadinessState.checking,
+        actionLabel: _ptInstalled == false ? 'Recheck' : null,
+        onAction: _ptInstalled == false ? _recheckPacketTracer : null,
+      ),
+      ReadinessItem(
+        label: 'OCR and permissions',
+        detail: ocrState == ReadinessState.ready
+            ? 'OCR is available for reading Packet Tracer CLI output. No '
+                  'administrator rights are required; diagnostics stay local '
+                  'and are redacted before export.'
+            : ocrState == ReadinessState.optional
+            ? 'OCR is not available. Live CLI checks may need manual review; '
+                  'offline planning is unaffected.'
+            : 'OCR and permissions are checked when the local engine starts.',
+        state: ocrState,
+      ),
+    ];
   }
 
   /// Says plainly that the local `.pkt` engine cannot be reached, and offers

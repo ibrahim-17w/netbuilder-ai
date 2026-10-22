@@ -9,9 +9,12 @@ import 'package:provider/provider.dart';
 import '../models/build_attempt.dart';
 import '../models/build_record.dart';
 import '../models/environment_profile.dart';
+import '../services/app_version.dart';
 import '../services/autopilot_service.dart';
+import '../services/engine_status.dart';
 import '../services/memory_service.dart';
 import '../services/misparse_ledger.dart';
+import '../services/settings_service.dart';
 import '../theme/app_kit.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
@@ -448,10 +451,29 @@ class _MemoryScreenState extends State<MemoryScreen> {
 
   Future<void> _exportDiagnostics() async {
     final engine = AutopilotService.of(context);
+    SettingsService? settings;
+    try {
+      settings = context.read<SettingsService>();
+    } catch (_) {}
+    final info = settings?.installInfo ?? const <String, dynamic>{};
+    final engineVersion = EngineStatus.instance.version.trim();
+    final header = [
+      'app version: ${AppVersion.full}',
+      'engine version: ${engineVersion.isEmpty ? 'unknown' : engineVersion}',
+      if ('${info['appVersion'] ?? ''}'.trim().isNotEmpty)
+        'installed app version: ${info['appVersion']}',
+      if ('${info['sidecarVersion'] ?? ''}'.trim().isNotEmpty)
+        'installed engine version: ${info['sidecarVersion']}',
+      if ('${info['sourceRevision'] ?? ''}'.trim().isNotEmpty)
+        'source revision: ${info['sourceRevision']}',
+      if ('${info['bundleManifestSha256'] ?? ''}'.trim().isNotEmpty)
+        'bundle manifest sha256: ${info['bundleManifestSha256']}',
+    ].join('\n');
     setState(() => _diagnosticsBusy = true);
     try {
       final result = await engine.exportDiagnostics(
         includeScreenshots: _includeScreenshots,
+        appLogHeader: header,
       );
       if (!mounted) return;
       setState(() => _diagnosticsPath = result['path']?.toString());

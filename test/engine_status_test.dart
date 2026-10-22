@@ -103,6 +103,25 @@ void main() {
       },
     );
 
+    test('a stale engine build warns without blocking the engine', () async {
+      AppVersion.overrideForTests(version: '1.0.0', buildNumber: '7');
+      addTearDown(AppVersion.resetForTests);
+      final status = EngineStatus(
+        healthProbe: (base, timeout) async => {
+          'ok': true,
+          'version': '9.9',
+          'apiSchemaVersion': 1,
+          'appVersion': '1.0.0+6',
+          'capabilities': ['health'],
+        },
+      );
+
+      expect(await status.probe(), isTrue);
+      expect(status.phase, EngineState.up);
+      expect(status.compatibilityWarning, contains('different app build'));
+      expect(status.summary, contains('different app build'));
+    });
+
     test('an incompatible engine is not restarted or duplicated', () async {
       var launched = 0;
       final status = EngineStatus(

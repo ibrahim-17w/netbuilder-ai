@@ -57,6 +57,14 @@ class PacketTracerLocator {
     return _cached!;
   }
 
+  /// Forget the cached answer and detect again. Used by the readiness panel's
+  /// Recheck button after the user installs Packet Tracer while the app is
+  /// open; the normal path still computes the answer once.
+  Future<bool> refresh() {
+    _cached = null;
+    return isInstalled();
+  }
+
   /// The test seam: forget the cached answer (call between scenarios).
   void resetForTest() => _cached = null;
 
