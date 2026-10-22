@@ -41,6 +41,9 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
+      - name: Pilot scorecard tool tests
+        run: python3 -m unittest pilot.test_summarize_metrics -v
+
       - name: Formatting
         run: dart format --output=none --set-exit-if-changed .
 
@@ -96,6 +99,95 @@ jobs:
       # layout are complete. It runs the real executable, not a widget harness.
       - name: Packaged Windows smoke test
         run: powershell -ExecutionPolicy Bypass -File tool/windows_smoke_test.ps1 -ExePath build/windows/x64/runner/Release/net_builder.exe
+
+  windows-package:
+    name: signed Windows package (tags)
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Log tool versions
+        run: |
+          flutter --version
+          python --version
+          Get-Command iexpress.exe | Select-Object -ExpandProperty Source
+          Get-Command signtool.exe -ErrorAction SilentlyContinue |
+            Select-Object -ExpandProperty Source
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Install engine build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r sidecar/requirements.txt pyinstaller
+
+      - name: Write signing certificate
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          if (-not $env:WINDOWS_CERT_PFX_BASE64) {
+            throw 'WINDOWS_CERT_PFX_BASE64 is not set; a tagged release must be signed.'
+          }
+          if (-not $env:WINDOWS_CERT_PASSWORD) {
+            throw 'WINDOWS_CERT_PASSWORD is not set; a tagged release must be signed.'
+          }
+          $path = Join-Path $env:RUNNER_TEMP 'netbuilder-signing.pfx'
+          [IO.File]::WriteAllBytes(
+            $path,
+            [Convert]::FromBase64String($env:WINDOWS_CERT_PFX_BASE64)
+          )
+          "NETBUILDER_PFX=$path" | Out-File -FilePath $env:GITHUB_ENV `
+            -Append -Encoding utf8
+
+      - name: Build signed installer and portable ZIP
+        shell: pwsh
+        env:
+          NETBUILDER_SIGN_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          powershell -NoLogo -NoProfile -ExecutionPolicy Bypass `
+            -File packaging/build_installer.ps1 `
+            -SignCertificatePath $env:NETBUILDER_PFX `
+            -RequireSignature
+
+      - name: Verify staged bundle, engine identity and signatures
+        run: powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File packaging/verify_bundle.ps1 -BundleRoot build/tester-installer/payload
+
+      - name: Verify release hashes and signatures
+        run: powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File packaging/verify_release.ps1 -RequireSigned
+
+      - name: Clean-install test
+        run: powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File packaging/test_install.ps1
+
+      - name: Upgrade-preserves-data test
+        run: powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File packaging/test_upgrade.ps1
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: netbuilder-windows-package
+          path: |
+            dist/NetBuilderAI-Tester-Setup.exe
+            dist/NetBuilderAI-Tester-Portable.zip
+            dist/bundle-manifest.json
+            dist/release-manifest.json
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
 
   sidecar:
     name: sidecar pytest (ubuntu)

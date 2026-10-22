@@ -30,6 +30,17 @@ python sidecar/pt_autopilot.py
 The app normally starts and stops its own engine and shows its state in the
 top bar. The Windows installer scripts live in `packaging/`.
 
+To build and verify the Windows tester package:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging\build_installer.ps1
+powershell -ExecutionPolicy Bypass -File packaging\verify_release.ps1
+powershell -ExecutionPolicy Bypass -File packaging\test_install.ps1
+```
+
+See [packaging/README.md](packaging/README.md) for signing, the portable ZIP,
+the clean-VM checklist and the upgrade test.
+
 ### Optional: a model key
 
 Settings > model key. Keys are stored in the OS secure storage, never in logs
@@ -59,6 +70,10 @@ the offline assistant and says so.
   autopilot failures, plus where the local logs are.
 - [Supported configurations](docs/supported-configurations.md) - platforms,
   providers and what is deliberately unsupported.
+- [Packaging and clean-VM check](packaging/README.md) - signed installer,
+  portable ZIP, manifests, install/upgrade tests and uninstall behavior.
+- [Pilot kit](pilot/README.md) - scripted tasks, metrics definitions and the
+  local scorecard summarizer.
 - [Dependency notes](docs/dependencies.md) - upgrade status, the staged
   secure-storage migration and the coupled `win32` 6 stack.
 - [Contributing](CONTRIBUTING.md) - setup, test commands and PR rules.

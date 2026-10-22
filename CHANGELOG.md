@@ -23,6 +23,13 @@
   in CI.
 - Architecture, troubleshooting, supported-configuration, contributing,
   dependency and security documentation.
+- Signed Windows packaging with a per-user installer, portable ZIP,
+  bundle/release manifests and `SHA256SUMS.txt`.
+- Per-user uninstall entry and Start Menu shortcut, with data-preserving
+  uninstall by default and a `-Purge` mode.
+- Clean-install and upgrade-preserves-data tests, plus a clean-VM checklist.
+- A pilot kit with scripted tasks, metrics definitions and a scorecard
+  summarizer.
 
 ### Changed
 
