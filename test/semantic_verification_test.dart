@@ -171,4 +171,160 @@ void main() {
       expect(r.lines.join('\n'), contains('missing from the file'));
     },
   );
+
+  group('the saved addresses are compared too', () {
+    // A plan whose addressing the audit can actually read: every interface
+    // the plan assigns appears in the file with the same IP, spelled the
+    // way Packet Tracer spells it in a save.
+    Map<String, dynamic> auditedRows(
+      Map<String, List<Map<String, String>>> rowsPerDevice,
+    ) => {
+      'devices': [
+        for (final n in plan.nodes)
+          {
+            'name': n.name,
+            'type': n.type,
+            'services': n.services,
+            'interfaces': rowsPerDevice[n.name] ?? const <dynamic>[],
+          },
+      ],
+      'findings': const <dynamic>[],
+    };
+
+    /// The plan's addressing as audit rows: {device: [{name, ip}]} with the
+    /// interface names expanded to Packet Tracer's full spelling.
+    Map<String, List<Map<String, String>>> matchingRows({
+      String Function(String ip)? rewrite,
+    }) {
+      final rows = <String, List<Map<String, String>>>{};
+      for (final a in plan.addressing) {
+        rows.putIfAbsent(a.node, () => []);
+        final ip = a.ipCidr.split('/').first;
+        rows[a.node]!.add({
+          'name': _expanded(a.iface),
+          'ip': rewrite == null ? ip : rewrite(ip),
+        });
+      }
+      return rows;
+    }
+
+    /// The generator's report for the addressing half: every plan interface
+    /// mapped to the real Packet Tracer port it landed on. The shared
+    /// `builtPorts()` helper writes fake names (`port0`), fine for the
+    /// structural link check, but the address comparison would then look on
+    /// a port that does not exist.
+    List<dynamic> identityPorts() {
+      final ports = <String, Map<String, String>>{};
+      void map(String device, String iface) {
+        ports
+            .putIfAbsent(device, () => <String, String>{})
+            .putIfAbsent(iface, () => _expanded(iface));
+      }
+
+      for (final a in plan.addressing) {
+        map(a.node, a.iface);
+      }
+      // The structural link check reads the same table, so every endpoint
+      // the plan cables needs a row too - grouped per device, or a device
+      // with two interfaces would keep only its last one.
+      for (final l in plan.links) {
+        map(l.a, l.aIf);
+        map(l.b, l.bIf);
+      }
+      return [
+        for (final e in ports.entries) {'name': e.key, 'ports': e.value},
+      ];
+    }
+
+    test('a file whose saved IPs match the plan verifies them by name', () {
+      final r = BuildPreflight.compare(
+        intent: plan,
+        audit: auditedRows(matchingRows()),
+        builtDevices: identityPorts(),
+      );
+      expect(r.verified, isTrue, reason: r.lines.join('\n'));
+      expect(
+        r.lines.join('\n'),
+        contains('address(es) verified against the saved ports'),
+      );
+    });
+
+    test('a gateway the file never received fails the verification', () {
+      final r = BuildPreflight.compare(
+        intent: plan,
+        audit: auditedRows(
+          matchingRows(rewrite: (ip) => ip.endsWith('.1') ? '' : ip),
+        ),
+        builtDevices: identityPorts(),
+      );
+      expect(r.verified, isFalse);
+      final text = r.lines.join('\n');
+      expect(text, contains('unconfigured in the file'));
+    });
+
+    test('a wrong saved IP is reported with both addresses', () {
+      final r = BuildPreflight.compare(
+        intent: plan,
+        audit: auditedRows(
+          matchingRows(rewrite: (ip) => ip.endsWith('.1') ? '10.9.9.1' : ip),
+        ),
+        builtDevices: identityPorts(),
+      );
+      expect(r.verified, isFalse);
+      final text = r.lines.join('\n');
+      expect(text, contains('carries 10.9.9.1'));
+      expect(text, contains('the plan assigns'));
+    });
+
+    test('a template leftover address on a planned device fails', () {
+      final rows = matchingRows();
+      final firstRouter = plan.nodes.firstWhere((n) => n.type == 'router');
+      rows[firstRouter.name]!.add({
+        'name': 'GigabitEthernet0/9',
+        'ip': '10.66.66.66',
+      });
+      final r = BuildPreflight.compare(
+        intent: plan,
+        audit: auditedRows(rows),
+        builtDevices: identityPorts(),
+      );
+      expect(r.verified, isFalse);
+      expect(r.lines.join('\n'), contains('template leftovers'));
+    });
+
+    test('a device the audit cannot read is not comparable, not failed', () {
+      final rows = matchingRows();
+      // The server's panel was never readable: no interface rows at all.
+      final server = plan.nodes.firstWhere((n) => n.type == 'server');
+      rows[server.name] = [];
+      final r = BuildPreflight.compare(
+        intent: plan,
+        audit: auditedRows(rows),
+        builtDevices: identityPorts(),
+      );
+      expect(r.verified, isTrue, reason: r.lines.join('\n'));
+      expect(
+        r.lines.join('\n'),
+        contains('not comparable'),
+        reason: 'the honest note belongs in the success line',
+      );
+    });
+  });
+}
+
+/// `g0/0` as Packet Tracer saves it: `GigabitEthernet0/0`.
+String _expanded(String iface) {
+  final m = RegExp(r'^([a-z]+)(.*)$').firstMatch(iface.trim().toLowerCase());
+  if (m == null) return iface;
+  const full = {
+    'g': 'GigabitEthernet',
+    'gi': 'GigabitEthernet',
+    'f': 'FastEthernet',
+    'fa': 'FastEthernet',
+    's': 'Serial',
+    'se': 'Serial',
+    'e': 'Ethernet',
+    'eth': 'Ethernet',
+  };
+  return '${full[m.group(1)] ?? m.group(1)!.toUpperCase()}${m.group(2)}';
 }

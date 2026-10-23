@@ -128,6 +128,90 @@ class BuildPreflight {
     ]..sort();
     final linksChecked = builtPorts.isNotEmpty;
 
+    // ADDRESSING. Names, ports and cables can all agree and the file can
+    // still carry a network that does not route: a gateway address the
+    // template never received, an IP that landed on the wrong port after a
+    // remap, or a template's stale address nobody asked for. The audit's
+    // per-port saved IPs are the evidence; the generator's port table
+    // translates a plan interface to the real port it landed on, so a
+    // remapped cable is compared on the port that exists, not the one that
+    // was requested.
+    final auditRows = <String, List<({String name, String ip})>>{};
+    for (final d in devices) {
+      if (d is! Map) continue;
+      final name = '${d['name'] ?? ''}'.trim();
+      final rows = d['interfaces'];
+      if (name.isEmpty || rows is! List) continue;
+      auditRows[name.toLowerCase()] = [
+        for (final row in rows)
+          if (row is Map)
+            (
+              name: '${row['name'] ?? ''}'.trim(),
+              ip: '${row['ip'] ?? ''}'.trim(),
+            ),
+      ];
+    }
+    final builtPortsLower = {
+      for (final entry in builtPorts.entries)
+        entry.key.toLowerCase(): entry.value,
+    };
+    String resolvePort(String device, String iface) =>
+        builtPortsLower[device.toLowerCase()]?[iface.trim()] ?? iface.trim();
+
+    final addressGaps = <String>[];
+    final covered = <String, Set<String>>{}; // deviceLower -> canon ports
+    var addressesNotComparable = 0;
+    for (final a in intent.addressing) {
+      final device = a.node.trim();
+      final rows = auditRows[device.toLowerCase()];
+      if (rows == null) continue; // the device itself is already reported
+      if (rows.isEmpty) {
+        // The audit could not read this device's interfaces at all (a host
+        // panel, a model the reader does not cover): say so, do not fail the
+        // build over evidence nobody collected.
+        addressesNotComparable++;
+        continue;
+      }
+      final wanted = a.ipCidr.split('/').first.trim();
+      final port = resolvePort(device, a.iface);
+      final row = _findByPort(rows, port);
+      (covered[device.toLowerCase()] ??= <String>{}).add(
+        _canonIface(row?.name ?? port),
+      );
+      if (row == null) {
+        addressGaps.add(
+          '$device: the file has no interface for ${a.iface}, which the plan '
+          'assigns ${a.ipCidr}',
+        );
+      } else if (row.ip.isEmpty || row.ip.toLowerCase() == 'unassigned') {
+        addressGaps.add(
+          '$device ${a.iface} is unconfigured in the file; the plan assigns '
+          '${a.ipCidr}',
+        );
+      } else if (row.ip.toLowerCase() != wanted.toLowerCase()) {
+        addressGaps.add(
+          '$device ${a.iface} carries ${row.ip} in the file; the plan assigns '
+          '${a.ipCidr}',
+        );
+      }
+    }
+    // The other direction: a planned device carrying a saved address the plan
+    // never assigned is template leftovers - exactly the state the builder
+    // promises to clear, so it is a defect, not a bonus.
+    final leftovers = <String>[];
+    for (final entry in auditRows.entries) {
+      final planned = intent.nodes
+          .where((n) => n.name.trim().toLowerCase() == entry.key)
+          .firstOrNull;
+      if (planned == null) continue; // extra devices are reported above
+      for (final row in entry.value) {
+        if (row.ip.isEmpty || row.ip.toLowerCase() == 'unassigned') continue;
+        final coveredPorts = covered[entry.key] ?? const <String>{};
+        if (coveredPorts.contains(_canonIface(row.name))) continue;
+        leftovers.add('${planned.name} ${row.name} = ${row.ip}');
+      }
+    }
+
     // THE SEMANTIC HALF. Everything above asks "is this the lab we asked
     // for?". That is not the same question as "is this a working lab": a file
     // can match its plan name-for-name and port-for-port and still carry a
@@ -172,17 +256,24 @@ class BuildPreflight {
         extra.isEmpty &&
         unbuilt.isEmpty &&
         doubled.isEmpty &&
+        addressGaps.isEmpty &&
+        leftovers.isEmpty &&
         semantic.isEmpty) {
       final links = linksChecked
           ? '${intent.links.length} link(s) verified against the ports the '
                 'generator wrote'
           : 'links not compared - the audit carries no link data and no '
                 'generator report was collected';
+      final compared = intent.addressing.length - addressesNotComparable;
+      final addresses = intent.addressing.isEmpty
+          ? ''
+          : '; $compared address(es) verified against the saved ports'
+                '${addressesNotComparable > 0 ? ' ($addressesNotComparable not comparable - no interface rows for that device)' : ''}';
       return (
         verified: true,
         lines: [
           '- Verification: the file agrees with the plan '
-              '(${foundNames.length} device(s); $links).',
+              '(${foundNames.length} device(s); $links$addresses).',
         ],
       );
     }
@@ -205,6 +296,18 @@ class BuildPreflight {
         '    - one interface carries more than one cable: '
         '${_cap(doubled)} - Packet Tracer cannot load a second cable on '
         'a port, and the extra interface config overwrites the first',
+      );
+    }
+    if (addressGaps.isNotEmpty) {
+      out.add(
+        '    - the saved addresses do not match the plan: '
+        '${_cap(addressGaps)}',
+      );
+    }
+    if (leftovers.isNotEmpty) {
+      out.add(
+        '    - the file carries addresses the plan never assigned '
+        '(template leftovers): ${_cap(leftovers)}',
       );
     }
     if (semantic.isNotEmpty) {
@@ -283,4 +386,30 @@ class BuildPreflight {
   static String _cap(List<String> items, [int n = 8]) => items.length <= n
       ? items.join(', ')
       : '${items.take(n).join(', ')}... (+${items.length - n} more)';
+
+  /// The row whose port matches [port], comparing names the way Cisco
+  /// abbreviates them: the plan says `g0/0`, the save says
+  /// `GigabitEthernet0/0`, and both must read as the same interface.
+  static ({String name, String ip})? _findByPort(
+    List<({String name, String ip})> rows,
+    String port,
+  ) {
+    final wanted = _canonIface(port);
+    for (final row in rows) {
+      if (_canonIface(row.name) == wanted) return row;
+    }
+    return null;
+  }
+
+  /// Canonical interface name: `FastEthernet0/1`, `fa0/1` and `f0/1` all
+  /// become `f0/1`, so a plan written in shorthand compares against a save
+  /// written in full. Dot1Q sub-interfaces keep their `.10` suffix.
+  static String _canonIface(String raw) {
+    var s = raw.trim().toLowerCase();
+    s = s.replaceFirst(RegExp(r'^(?:gigabitethernet|gi)(?=[\d/])'), 'g');
+    s = s.replaceFirst(RegExp(r'^(?:fastethernet|fa)(?=[\d/])'), 'f');
+    s = s.replaceFirst(RegExp(r'^(?:serial|se)(?=[\d/])'), 's');
+    s = s.replaceFirst(RegExp(r'^(?:ethernet|eth)(?=[\d/])'), 'e');
+    return s;
+  }
 }
