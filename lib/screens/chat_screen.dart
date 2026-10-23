@@ -23,6 +23,8 @@ import '../services/build_guide.dart';
 import '../services/build_preflight.dart';
 import '../services/build_request_reader.dart';
 import '../services/casual_english.dart';
+import '../services/config_explainer.dart';
+import '../services/config_paste_reader.dart';
 import '../services/clarification_service.dart';
 import '../services/design_brief_service.dart';
 import '../services/environment_profile_service.dart';
@@ -2453,6 +2455,55 @@ class _ChatScreenState extends State<ChatScreen> {
   /// right now, so the same version check and the same blocking-finding check
   /// run - the quick paths do not bypass the gate.
   /// Give the standing plan as instructions, not a file.
+  /// Review a pasted running-config: plain-English sections and the classic
+  /// mistakes, each with its reason. Deterministic and offline, so the same
+  /// paste gets the same review with or without a key - and the standing
+  /// plan is never touched by interface lines the parser would have counted
+  /// as devices.
+  Future<void> _reviewConfigPaste(String text) async {
+    final ask = _makeUserTurn(text, const []);
+    _state.observe(ask).withIntent(_lastIntent);
+    await _commitUserTurn(ask);
+    final review = ConfigExplainer.explain(text);
+    final closing = review.findings.isEmpty
+        ? 'Ask about any line you do not understand, or say "build a lab like '
+              'this" and I will plan it.'
+        : 'Ask about any finding, or say "build a lab like this" and I will '
+              'plan the corrected version.';
+    if (!mounted) return;
+    setState(() {
+      _messages = [
+        ..._messages,
+        ChatMessage(
+          role: 'model',
+          text: '',
+          createdAt: DateTime.now().toIso8601String(),
+          source: AiStatus.plannerSource,
+        ),
+      ];
+    });
+    _jumpToEnd();
+    final answer = ChatMessage(
+      role: 'model',
+      text: '${review.toMarkdown()}\n\n$closing',
+      createdAt: DateTime.now().toIso8601String(),
+      source: AiStatus.plannerSource,
+    );
+    _state.observe(answer);
+    _revealAnswer(
+      _messages.last,
+      answer.text,
+      onDone: () async {
+        final mem = _memory;
+        if (mem == null || !mem.ready) return;
+        try {
+          await mem.logChat(answer, conversation: _conversation);
+          await mem.setSessionState(_conversation, _state.encode());
+        } catch (_) {}
+      },
+    );
+  }
+
   Future<void> _guideCurrentPlan() async {
     final plan = _lastIntent;
     if (plan == null || plan.nodes.isEmpty) {
@@ -3888,6 +3939,15 @@ class _ChatScreenState extends State<ChatScreen> {
     // screen to go to any more.
     if (editingMessage == null && await _handleCommand(text)) {
       _input.clear();
+      return;
+    }
+    // A PASTED CONFIG IS A REVIEW REQUEST, NOT A BRIEF. "interface ..." lines
+    // once planned as devices; the review is deterministic and offline, so it
+    // runs before the parser and before any model, the same way for every
+    // user. Read before the guide/build readers: a paste never names a file.
+    if (editingMessage == null && ConfigPasteReader.matches(text)) {
+      _input.clear();
+      await _reviewConfigPaste(text);
       return;
     }
     // "Undo that" is answered from the exact change log, before a model is

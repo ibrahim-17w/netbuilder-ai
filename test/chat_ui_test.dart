@@ -1601,6 +1601,49 @@ void main() {
       expect(find.textContaining('Fixed: ospf'), findsOneWidget);
     });
   });
+
+  group('a pasted running-config is reviewed, not planned', () {
+    const paste = '''
+Building configuration...
+
+Current configuration : 980 bytes
+!
+hostname R1
+!
+interface GigabitEthernet0/0
+ ip address 10.0.0.1 255.255.255.0
+ no shutdown
+!
+line vty 0 4
+ password letmein
+ login
+ transport input telnet
+!
+end
+''';
+
+    testWidgets('the paste gets a config review and no devices are planned', (
+      tester,
+    ) async {
+      _wide(tester);
+      final store = _seeded();
+      await tester.pumpWidget(_chat(store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('New chat').first);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), paste);
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      // The review is the answer: device named, the telnet finding present.
+      expect(find.textContaining('Config review - R1'), findsOneWidget);
+      expect(find.textContaining('cleartext'), findsOneWidget);
+      // And the planner never ran: no build card, no device count.
+      expect(find.textContaining('device(s)'), findsNothing);
+      expect(find.byKey(const ValueKey('brief-card')), findsNothing);
+    });
+  });
 }
 
 void _noop() {}
