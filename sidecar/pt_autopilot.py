@@ -88,18 +88,18 @@ except ImportError:  # pragma: no cover - package import fallback
 try:
     from catalog import (AP_MODELS, CLOUD_MODELS, DEVICE_PALETTE,
                          FIREWALL_MODELS, IOT_MODELS, LAPTOP_MODELS,
-                         MODEM_MODELS, PC_MODELS, PHONE_MODELS,
-                         PRINTER_MODELS, ROUTER_MODELS, SERVER_MODELS,
-                         SMARTPHONE_MODELS, SWITCH_MODELS, TABLET_MODELS,
-                         TV_MODELS, UNSUPPORTED_DEVICE_KINDS,
+                         MODEM_MODELS, OFFLINE_ONLY_DEVICE_KINDS, PC_MODELS,
+                         PHONE_MODELS, PRINTER_MODELS, ROUTER_MODELS,
+                         SERVER_MODELS, SMARTPHONE_MODELS, SWITCH_MODELS,
+                         TABLET_MODELS, TV_MODELS, UNSUPPORTED_DEVICE_KINDS,
                          WIRELESS_ROUTER_MODELS, WLC_MODELS, ordered_models)
 except ImportError:  # pragma: no cover - package import fallback
     from .catalog import (AP_MODELS, CLOUD_MODELS, DEVICE_PALETTE,
                           FIREWALL_MODELS, IOT_MODELS, LAPTOP_MODELS,
-                          MODEM_MODELS, PC_MODELS, PHONE_MODELS,
-                          PRINTER_MODELS, ROUTER_MODELS, SERVER_MODELS,
-                          SMARTPHONE_MODELS, SWITCH_MODELS, TABLET_MODELS,
-                          TV_MODELS, UNSUPPORTED_DEVICE_KINDS,
+                          MODEM_MODELS, OFFLINE_ONLY_DEVICE_KINDS, PC_MODELS,
+                          PHONE_MODELS, PRINTER_MODELS, ROUTER_MODELS,
+                          SERVER_MODELS, SMARTPHONE_MODELS, SWITCH_MODELS,
+                          TABLET_MODELS, TV_MODELS, UNSUPPORTED_DEVICE_KINDS,
                           WIRELESS_ROUTER_MODELS, WLC_MODELS,
                           ordered_models)
 
@@ -263,7 +263,7 @@ def _run_hidden(command, **kwargs):
 # Bump on every behaviour change. Served on /health so a stale process
 # (old code, old port-holder, double instance) is detectable remotely
 # instead of producing "nothing changed" mystery runs.
-VERSION = "2026-10-20-app-schema-health-redaction"
+VERSION = "2026-10-23-offline-kinds-ocr-utf8"
 
 # The /health contract. Bump only for an incompatible route/shape change; the
 # app blocks an engine whose schema it does not speak, so a mixed installer
@@ -5186,6 +5186,18 @@ def place_nodes(rect, nodes, project: str = "default"):
         # placement path (Server-PT lives next to the PCs; an ASA lives under
         # Security; an AP/phone/cloud has its own port vocabulary but its
         # palette path is still an ordinary name click).
+        if ntype in OFFLINE_ONLY_DEVICE_KINDS:
+            # The offline compiler writes this device from a real template,
+            # but there is no taught palette path for a live run. Never place
+            # a different shape and call it done.
+            log(f"{name}: device type '{ntype}' is built into offline .pkt "
+                "files, but the live Packet Tracer executor cannot place it "
+                "yet; skipping instead of substituting another device")
+            RUN["node_outcomes"][name] = "offline_only"
+            record_event("device_offline_only",
+                         f"{ntype} is offline-buildable only; no substitute "
+                         "was made", device=name, recovered=False)
+            continue
         if ntype in UNSUPPORTED_DEVICE_KINDS:
             # The planner recognizes this kind, so the user can see and
             # correct it - but PT has no palette path yet. Never place a
@@ -6389,8 +6401,16 @@ def _tesseract_run(img, psm: int) -> str:
         img.save(tmp, compress_level=1)
         out = _run_hidden(
             [TESSERACT_CMD, tmp, "stdout", "--psm", flag],
-            capture_output=True, text=True, timeout=10)
-        return out.stdout or ""
+            capture_output=True, timeout=10)
+        # File input makes Tesseract emit UTF-8 (see the docstring). Decoding
+        # with `text=True` instead would use the console locale, so the same
+        # crop read as mojibake on a cp1252 machine and clean text under
+        # PYTHONUTF8=1 - the golden baseline then depended on the shell that
+        # recorded it. Decode as bytes, always UTF-8, and keep the LF-only
+        # line endings `text=True` used to normalize.
+        return ((out.stdout or b"")
+                .decode("utf-8", errors="replace")
+                .replace("\r\n", "\n"))
     except Exception as e:
         log(f"tesseract temp-file read failed: {e}")
         return ""

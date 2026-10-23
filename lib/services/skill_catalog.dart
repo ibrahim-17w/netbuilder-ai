@@ -249,6 +249,27 @@ class SkillCatalog {
       category: 'App',
       send: '/pc ',
     ),
+    // --- Networking help ------------------------------------------------------
+    // Listed last on purpose: the "/" menu shows the first eight matches, and
+    // the Packet Tracer skills above are the ones a returning user reaches
+    // for first.
+    Skill(
+      command: '/guide',
+      title: 'Show build instructions',
+      detail:
+          'Step-by-step guidance for the current plan without writing a file.',
+      category: 'Networking help',
+      send: '/guide',
+      sendNow: true,
+    ),
+    Skill(
+      command: '',
+      title: 'Explain a networking topic',
+      detail:
+          'Learn concepts and configuration steps without a topology or .pkt.',
+      category: 'Networking help',
+      send: 'Explain VLANs',
+    ),
   ];
 
   /// The skills matching what is typed in the composer.

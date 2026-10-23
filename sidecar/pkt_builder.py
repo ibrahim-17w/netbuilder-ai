@@ -73,6 +73,14 @@ KIND_PATTERNS = {
     "iot": ("iot", "mcu", "homegateway"),
     "tablet": ("tablet",),
     "smartphone": ("smartphone", "cellphone", "pda"),
+    # Offline-only kinds: real PT templates, no live palette path yet.
+    "hub": ("hub",),
+    "sniffer": ("sniffer",),
+    "plc": ("plc",),
+    "historian": ("datahistorian", "historian"),
+    "cyber-observer": ("cyberobserver",),
+    "controller": ("networkcontroller",),
+    "power-distribution": ("powerdistribution", "power distribution device"),
 }
 
 CLI_KINDS = ("router", "switch", "multilayer switch")
@@ -83,7 +91,8 @@ CLI_KINDS = ("router", "switch", "multilayer switch")
 # hosts'.
 CORE_TYPES = ("router", "firewall", "cloud", "modem", "wireless-router")
 AGGREGATION_TYPES = ("multilayer switch", "wlc")
-ACCESS_TYPES = ("switch", "wireless", "accesspoint", "wireless access point")
+ACCESS_TYPES = ("switch", "wireless", "accesspoint", "wireless access point",
+                "hub")
 SERVICE_TYPES = ("server",)
 TIER_CORE, TIER_AGGREGATION, TIER_ACCESS, TIER_SERVICES, TIER_HOSTS = range(5)
 

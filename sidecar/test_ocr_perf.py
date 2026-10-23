@@ -258,7 +258,10 @@ def test_tesseract_run_goes_through_the_temp_file(tmp_path):
 
     def run_hidden(command, **kwargs):
         seen.append((list(command), kwargs))
-        return types.SimpleNamespace(returncode=0, stdout="from-file")
+        # UTF-8 bytes with CRLF, the way a real file-input Tesseract answers:
+        # the decode in _tesseract_run must not depend on the console locale.
+        return types.SimpleNamespace(
+            returncode=0, stdout="café\r\nline".encode("utf-8"))
 
     pt.TESSERACT_CMD = "tesseract-not-really"
     pt.SHOTS = str(tmp_path)
@@ -269,11 +272,11 @@ def test_tesseract_run_goes_through_the_temp_file(tmp_path):
         text = pt._tesseract_run(Image.new("L", (40, 20), 255), 6)
     finally:
         pt.TESSERACT_CMD, pt._run_hidden, pt.SHOTS, pt.log = saved
-    assert text == "from-file"
+    assert text == "café\nline", text
     assert len(seen) == 1, seen
     assert seen[0][0][1].endswith("_ocr_tmp.png"), seen[0][0]
     assert seen[0][0][-1] == "6", seen[0][0]
-    assert seen[0][1].get("text") is True, seen[0][1]
+    assert seen[0][1].get("text") is not True, seen[0][1]
     assert os.path.isfile(os.path.join(str(tmp_path), "_ocr_tmp.png"))
 
 

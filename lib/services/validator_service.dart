@@ -788,6 +788,23 @@ class ValidatorService {
           ),
         );
       }
+      // Offline-only kinds are real devices in the generated .pkt, but the
+      // live executor has no palette path yet. Say so once, without blocking:
+      // the file is complete, and the limitation belongs to a live run.
+      final offlineOnly = {
+        for (final node in intent.nodes)
+          if (offlineOnlyDeviceKinds.contains(node.type)) node.name,
+      }.toList()..sort();
+      if (offlineOnly.isNotEmpty) {
+        issues.add(
+          ValidationIssue(
+            'info',
+            '${offlineOnly.join(', ')} will be in the offline .pkt; the live '
+            'Packet Tracer autopilot does not place '
+            '${offlineOnly.length == 1 ? 'it' : 'them'} yet.',
+          ),
+        );
+      }
       if (intent.nodes.length > packetTracerMaxDevices) {
         issues.add(
           const ValidationIssue(

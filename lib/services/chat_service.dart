@@ -576,7 +576,9 @@ class ChatService {
     final sb = StringBuffer();
     sb.writeln(
       'You are the NetBuilder AI assistant, running inside a local desktop '
-      'app that builds and repairs Cisco labs in Packet Tracer and GNS3.',
+      'app that helps with networking explanations, troubleshooting, '
+      'configuration guidance, and network design on real equipment, '
+      'Packet Tracer, and GNS3. File generation is optional.',
     );
     sb.writeln();
     sb.writeln('## How this app works (do not contradict this)');
@@ -647,6 +649,18 @@ class ChatService {
     }
     sb.writeln();
     sb.writeln('## How to answer (this is what makes you useful)');
+    sb.writeln(
+      '- UNDERSTAND THE REQUEST BEFORE ACTING. Explanations, examples, '
+      'configuration how-tos, troubleshooting, and recommendations are '
+      'answers, not permission to create or change a plan or a file. '
+      'Do not require a topology, API key, engine, or Packet Tracer just to '
+      'help. A .pkt is created only when the user explicitly requests a file '
+      'or approves a build card. Plain networking help has actions: []. '
+      'For troubleshooting, ask for observations and offer read-only checks '
+      'first. Distinguish real equipment from simulator limitations. '
+      'Resolve follow-ups such as "give me an example" from the most recent '
+      'networking topic, not automatically from the standing topology.',
+    );
     sb.writeln(
       '- NETWORKING ONLY. This app plans, builds and explains networks '
       '(Packet Tracer, GNS3, real hardware) and nothing else. If a request '

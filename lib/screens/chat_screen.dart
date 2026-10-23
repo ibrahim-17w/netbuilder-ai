@@ -18,12 +18,15 @@ import '../services/adapters/packet_tracer_adapter.dart';
 import '../services/advisor_service.dart' show AdviceAnswer;
 import '../services/ai_provider.dart';
 import '../services/autopilot_service.dart';
+import '../services/build_guide.dart';
 import '../services/build_preflight.dart';
 import '../services/build_request_reader.dart';
 import '../services/casual_english.dart';
 import '../services/clarification_service.dart';
 import '../services/design_brief_service.dart';
 import '../services/environment_profile_service.dart';
+import '../services/guide_request_reader.dart';
+import '../services/networking_help_reader.dart';
 import '../services/learned_answers_service.dart';
 import '../services/chat_service.dart';
 import '../services/file_edit_intent.dart';
@@ -1235,6 +1238,10 @@ class _ChatScreenState extends State<ChatScreen> {
     if (lower == '/help' || lower == 'help me') {
       _appendSystem(
         'Things you can do right here:\n'
+        '- Ask for networking explanations, configuration examples, design '
+        'advice, or troubleshooting. No .pkt file is required.\n'
+        '- `/guide` or `/steps` - copyable instructions for the current plan; '
+        'does not write a file.\n'
         '- Attach a Packet Tracer save (.pkt) with the router button, or '
         'type `/scan C:\\path\\to\\lab.pkt` - I decrypt and audit it '
         'offline, with no Packet Tracer involved.\n'
@@ -1269,6 +1276,13 @@ class _ChatScreenState extends State<ChatScreen> {
     // The assistant's own suggestion chip says "Build the .pkt", so that exact
     // wording has to be understood: a suggestion the app cannot act on is
     // worse than no suggestion.
+    if (lower == '/guide' ||
+        lower == '/steps' ||
+        ((_lastIntent?.nodes.isNotEmpty ?? false) &&
+            GuideRequestReader.matches(text))) {
+      await _guideCurrentPlan();
+      return true;
+    }
     if (lower == '/build' ||
         lower == '/generate' ||
         BuildRequestReader.matches(text)) {
@@ -1769,6 +1783,28 @@ class _ChatScreenState extends State<ChatScreen> {
       },
     );
   }
+
+  /// The same plan, as instructions rather than a file.
+  ///
+  /// Carries the revision for the same reason the build card does: a guide
+  /// opened later must describe the plan the user actually tapped, never a
+  /// newer plan the conversation has moved on to.
+  ChatAction _guideCardFor(NetworkIntent plan) => ChatAction(
+    kind: 'build_guide',
+    summary: 'Show step-by-step build instructions (no .pkt)',
+    payload: <String, dynamic>{
+      'revision': plan.revision,
+      'project': plan.projectName,
+      'devices': plan.nodes.length,
+      'links': plan.links.length,
+    },
+  );
+
+  /// Both ways to act on a finished plan: read the steps, or compile the file.
+  List<ChatAction> _planActions(NetworkIntent plan, {String mode = 'new'}) => [
+    _guideCardFor(plan),
+    _buildCardFor(plan, mode: mode),
+  ];
 
   /// Why this build card must not run right now, or null when it can.
   ///
@@ -2415,6 +2451,73 @@ class _ChatScreenState extends State<ChatScreen> {
   /// command, the Capture sheet). The card is minted for the plan that stands
   /// right now, so the same version check and the same blocking-finding check
   /// run - the quick paths do not bypass the gate.
+  /// Give the standing plan as instructions, not a file.
+  Future<void> _guideCurrentPlan() async {
+    final plan = _lastIntent;
+    if (plan == null || plan.nodes.isEmpty) {
+      _appendSystem(
+        'There is no plan to explain yet. Describe the network first - for '
+        'example "2 routers, 3 switches and 12 PCs" - and then ask for the '
+        'build steps.',
+      );
+      return;
+    }
+    await _openBuildGuide(plan);
+  }
+
+  /// Open the guide card's plan, refusing a card written for another revision.
+  Future<String> _showBuildGuide(ChatAction action) async {
+    final plan = _lastIntent;
+    if (plan == null || plan.nodes.isEmpty) {
+      return 'There is no plan to explain yet.';
+    }
+    final stamped = (action.payload['revision'] ?? '').toString();
+    if (stamped.isNotEmpty && stamped != plan.revision) {
+      return 'The plan has changed since this card was written, so the guide '
+          'would describe a different network. Ask for the build steps again.';
+    }
+    await _openBuildGuide(plan);
+    return 'Build guide shown.';
+  }
+
+  /// Render the guide in a copyable dialog. Pure text: no file is written.
+  Future<void> _openBuildGuide(NetworkIntent plan) async {
+    final guide = BuildGuide.markdown(plan, target: _target);
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          'Build guide - ${plan.projectName.trim().isEmpty ? 'network' : plan.projectName}',
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: SingleChildScrollView(
+            child: SelectableText(
+              guide,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12.5,
+                height: 1.45,
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () => _copyMessage(guide),
+            icon: const Icon(Icons.copy_all_outlined, size: 18),
+            label: const Text('Copy guide'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _buildCurrentPlan() async {
     final plan = _lastIntent;
     if (plan == null || plan.nodes.isEmpty) {
@@ -2439,7 +2542,7 @@ class _ChatScreenState extends State<ChatScreen> {
               text:
                   'Design selected. The build action is ready for **$style**.',
               createdAt: DateTime.now().toIso8601String(),
-              actions: <ChatAction>[_buildCardFor(chosen)],
+              actions: _planActions(chosen),
               source: AiStatus.plannerSource,
             ),
           ];
@@ -3862,7 +3965,17 @@ class _ChatScreenState extends State<ChatScreen> {
         TentativeLanguageService.analyze(
           CasualEnglish.normalize(text).trim(),
         ).tentative;
+    final helpOnly =
+        NetworkingHelpReader.matches(text) ||
+        const {
+          'howto',
+          'question',
+          'advice',
+          'social',
+          'empty',
+        }.contains(NetworkIntent.classifyBrief(CasualEnglish.normalize(text)));
     if (!ScopeGate.isOffTopic(text) &&
+        !helpOnly &&
         !smallTalk &&
         !exploring &&
         !_wantsPreview.hasMatch(text)) {
@@ -4012,10 +4125,9 @@ class _ChatScreenState extends State<ChatScreen> {
     // deterministic coordinates came back - the user read that as being
     // ignored. A redraw now picks a drawing that is different from the one on
     // the table (or the one the user named) and says which it used.
-    final drawingRequest = LayoutRequest.read(
-      text,
-      currentStyle: _layoutStyleOf(_artifactPath),
-    );
+    final drawingRequest = helpOnly
+        ? null
+        : LayoutRequest.read(text, currentStyle: _layoutStyleOf(_artifactPath));
     if (drawingRequest != null) {
       final hasSomethingToRedraw =
           _state.knownArtifacts.isNotEmpty || _artifactPath.trim().isNotEmpty;
@@ -4051,7 +4163,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final files = _state.knownArtifacts;
     final namedArtifact = _resolveNamedArtifact(text);
-    final fileIntent = namedArtifact.isNotEmpty
+    final fileIntent = helpOnly
+        ? FileEditIntent.none
+        : namedArtifact.isNotEmpty
         ? FileEditIntent.editExisting
         : FileEditIntentReader.read(
             text,
@@ -4230,7 +4344,7 @@ class _ChatScreenState extends State<ChatScreen> {
       //    reasoning is ever shown);
       //  * plain model -> stream the tokens;
       //  * no model -> the existing offline path in the catch below.
-      if (service.usesTools) {
+      if (service.usesTools && !helpOnly) {
         // The tool path gets the SAME conversation the plain path does: the
         // live network, the structured state, the recalled memories, the saved
         // summary and the screenshots on this turn. It used to pass only the
@@ -4288,7 +4402,8 @@ class _ChatScreenState extends State<ChatScreen> {
           }
         }
       } else {
-        await for (final piece in service.streamWithTools(
+        final stream = helpOnly ? service.stream : service.streamWithTools;
+        await for (final piece in stream(
           history: historyBeforeCurrent.where((m) => !m.isError).toList(),
           text: text,
           systemContext: parts.system,
@@ -4322,15 +4437,26 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
       final reply = ChatService.parseReply(live.toString());
-      final unsupportedModel =
-          PacketTracerModelCompatibility.unsupportedExactModels(
-            _lastIntent,
-          ).firstOrNull;
+      final unsupportedModel = helpOnly
+          ? null
+          : PacketTracerModelCompatibility.unsupportedExactModels(
+              _lastIntent,
+            ).firstOrNull;
       final visibleText = unsupportedModel == null
           ? reply.text
           : PacketTracerModelCompatibility.question(unsupportedModel);
       final visibleActions = unsupportedModel == null
           ? reply.actions
+                .where(
+                  (action) =>
+                      !helpOnly ||
+                      const {
+                        'check_plan',
+                        'open_project',
+                        'build_guide',
+                      }.contains(action.kind),
+                )
+                .toList()
           : const <ChatAction>[];
       final turn = ChatMessage(
         role: 'model',
@@ -4478,7 +4604,16 @@ class _ChatScreenState extends State<ChatScreen> {
     bool privateMode = false,
   }) async {
     final normalized = CasualEnglish.normalize(text);
-    NetworkIntent? plan;
+    final helpOnly =
+        NetworkingHelpReader.matches(text) ||
+        const {
+          'howto',
+          'question',
+          'advice',
+          'social',
+          'empty',
+        }.contains(NetworkIntent.classifyBrief(normalized));
+    NetworkIntent? plan = helpOnly ? _lastIntent : null;
     List<String> suggestions = const [];
     bool briefChanged = false;
     // THE TENTATIVE GATE RUNS FIRST - before the pending questions, because a
@@ -4497,6 +4632,9 @@ class _ChatScreenState extends State<ChatScreen> {
     // message resolves one, apply it, remember it for this environment, and
     // do not treat it as a new request. Unresolved text falls through to the
     // normal routing (the user changed the subject; the questions stay).
+    // Deliberately BEFORE the help gate: a bare topic word ("OSPF") is
+    // exactly the shape a typed or tapped answer has, and a resolver miss
+    // falls through to the help branches untouched.
     if (_state.pendingQuestionIds.isNotEmpty && !ScopeGate.isOffTopic(text)) {
       final answered = await _resolvePendingClarification(
         normalized.isEmpty ? text : normalized,
@@ -4508,7 +4646,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     // An off-topic message gets the scope decline, never a parsed plan: the
     // standing plan and its action cards stay untouched.
-    if (!ScopeGate.isOffTopic(text)) {
+    if (!helpOnly && !ScopeGate.isOffTopic(text)) {
       try {
         final rules = await _learnedRules();
         final prefs = await _learnedPrefs();
@@ -4607,7 +4745,7 @@ class _ChatScreenState extends State<ChatScreen> {
     // of committing a plan - unless the user insisted ("just build it"),
     // in which case the safe defaults are visible on the brief card.
     List<ClarificationQuestion> clarifying = const [];
-    if (plan != null && plan.nodes.isNotEmpty) {
+    if (!helpOnly && plan != null && plan.nodes.isNotEmpty) {
       if (_brief.ready ||
           _isForcedBuild(normalized.isEmpty ? text : normalized)) {
         _state.pendingQuestionIds = const [];
@@ -4616,8 +4754,11 @@ class _ChatScreenState extends State<ChatScreen> {
         _state.pendingQuestionIds = [for (final q in clarifying) q.id];
       }
     }
-    var unsupportedGroup =
-        PacketTracerModelCompatibility.unsupportedExactModels(plan).firstOrNull;
+    var unsupportedGroup = helpOnly
+        ? null
+        : PacketTracerModelCompatibility.unsupportedExactModels(
+            plan,
+          ).firstOrNull;
     // Exact model support is checked before any design or build action. This
     // question takes priority over generic brief clarifications because the
     // user explicitly asked not to accept a silent hardware substitution.
@@ -4707,11 +4848,12 @@ class _ChatScreenState extends State<ChatScreen> {
       // asks instead. The brief card rides when the brief moved, except on
       // the asking turn itself - see the action list below.
       actions: [
-        if (unsupportedGroup == null &&
+        if (!helpOnly &&
+            unsupportedGroup == null &&
             plan != null &&
             plan.nodes.isNotEmpty &&
             clarifying.isEmpty)
-          _buildCardFor(plan),
+          ..._planActions(plan),
         // The brief card rides when the brief moved - EXCEPT on the turn
         // that is asking: there the questions ARE the open list, and a card
         // repeating "still open" beside them says the same thing twice.
@@ -4730,6 +4872,11 @@ class _ChatScreenState extends State<ChatScreen> {
       _status = '';
       _quickReplies = unsupportedGroup == null
           ? reply.quickReplies
+                .where(
+                  (suggestion) =>
+                      !helpOnly || !BuildRequestReader.matches(suggestion),
+                )
+                .toList()
           : PacketTracerModelCompatibility.compatibleModels(unsupportedGroup)
                 .map(
                   (model) =>
@@ -5207,6 +5354,9 @@ class _ChatScreenState extends State<ChatScreen> {
             '${action.payload['style'] ?? ''}',
           );
           outcome = opened ? '' : 'There is no plan to preview yet.';
+          break;
+        case 'build_guide':
+          outcome = await _showBuildGuide(action);
           break;
         case 'pkt_generate':
           await _buildPktFromPlan(action);
@@ -5697,9 +5847,7 @@ class _ChatScreenState extends State<ChatScreen> {
               'device(s) to $selectedModel. All device names, links, and the '
               '${updated.nodes.length}-device inventory are unchanged. Choose a '
               'network design to continue.';
-    final actions = remaining.isEmpty
-        ? [_buildCardFor(updated)]
-        : <ChatAction>[];
+    final actions = remaining.isEmpty ? _planActions(updated) : <ChatAction>[];
     final turn = ChatMessage(
       role: 'model',
       text: '',
@@ -5806,7 +5954,7 @@ class _ChatScreenState extends State<ChatScreen> {
       // ask a second time to get a buildable plan.
       actions: repaired == null || repaired.nodes.isEmpty
           ? const <ChatAction>[]
-          : <ChatAction>[_buildCardFor(repaired)],
+          : _planActions(repaired),
     );
     if (!mounted) return true;
     setState(() {

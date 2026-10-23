@@ -81,26 +81,34 @@ DEVICE_PALETTE = {
             "pal_wireless"),
 }
 
-# Kinds the planner can name but the executor cannot place yet. They are kept
+# Kinds the offline compiler can build from Packet Tracer's own templates but
+# the live executor has no palette path for yet. They remain buildable offline;
+# a live run skips them with an `offline_only` outcome instead of substituting
+# another device. Kept equal to `offlineOnlyDeviceKinds` in
+# lib/services/nlu/lexicon.dart by test_device_palette.py.
+OFFLINE_ONLY_DEVICE_KINDS = {
+    "hub",
+    "sniffer",
+    "plc",
+    "historian",
+    "cyber-observer",
+    "controller",
+    "power-distribution",
+}
+
+# Kinds the planner can name but neither builder can place yet. They are kept
 # equal to `unsupportedDeviceKinds` in lib/services/nlu/lexicon.dart by
 # test_device_palette.py. A kind leaves this set only when DEVICE_PALETTE has
 # a real placement path for it; until then no substitute is placed.
 UNSUPPORTED_DEVICE_KINDS = {
-    "hub",
     "bridge",
     "repeater",
     "mcu",
     "sbc",
-    "plc",
     "analog-phone",
     "voip-adapter",
     "cell-tower",
     "central-office",
-    "controller",
-    "sniffer",
-    "historian",
-    "cyber-observer",
-    "power-distribution",
 }
 
 

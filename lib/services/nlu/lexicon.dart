@@ -159,7 +159,15 @@ const List<DeviceKind> deviceKinds = [
     // of a guessed cable.
     wireless: true,
   ),
-  DeviceKind(type: 'hub', keywords: ['hub', 'hub'], models: ['Hub-PT']),
+  // The kinds below have real Packet Tracer templates and copper ports, so
+  // the offline compiler can build them. The live autopilot has no palette
+  // path for them yet; see [offlineOnlyDeviceKinds].
+  DeviceKind(
+    type: 'hub',
+    keywords: ['hub'],
+    models: ['Hub-PT'],
+    port: 'f0',
+  ),
   DeviceKind(
     type: 'bridge',
     keywords: ['bridge', 'bridge'],
@@ -182,8 +190,9 @@ const List<DeviceKind> deviceKinds = [
   ),
   DeviceKind(
     type: 'plc',
-    keywords: ['plc', 'programmable logic controller', 'plc'],
+    keywords: ['plc', 'programmable logic controller'],
     models: ['PLC-PT'],
+    port: 'g0',
   ),
   DeviceKind(
     type: 'analog-phone',
@@ -212,31 +221,56 @@ const List<DeviceKind> deviceKinds = [
     // WLC/PLC request is not also counted as a generic controller.
     keywords: ['controller', 'network controller', 'meraki controller'],
     models: ['NetworkController'],
+    port: 'g0',
   ),
   DeviceKind(
     type: 'sniffer',
-    keywords: ['sniffer', 'sniffer'],
+    keywords: ['sniffer', 'packet sniffer'],
     models: ['Sniffer'],
+    port: 'ethernet0',
   ),
   DeviceKind(
     type: 'historian',
     keywords: ['historian', 'data historian'],
     models: ['DataHistorianServer'],
+    port: 'g0',
   ),
   DeviceKind(
     type: 'cyber-observer',
-    keywords: ['cyber-observer', 'cyberobserver'],
+    keywords: ['cyber-observer', 'cyber observer', 'cyberobserver'],
     models: ['CyberObserver'],
+    port: 'g0',
   ),
   DeviceKind(
     type: 'power-distribution',
-    keywords: ['power-distribution', 'power distribution device'],
+    keywords: [
+      'power-distribution',
+      'power distribution',
+      'power distribution device',
+    ],
     models: ['Power Distribution Device'],
   ),
 ];
 
-/// Kinds the planner can recognize but the Packet Tracer executor cannot
-/// place yet.
+/// Kinds the offline compiler can build from Packet Tracer's own templates,
+/// but that the live executor has no palette path for yet.
+///
+/// The offline `.pkt` is the product's primary build path, so these devices
+/// are plan-able, analyzable and compile into a real file. A live autopilot
+/// run reports each one as `offline_only` instead of substituting a different
+/// device shape; see `OFFLINE_ONLY_DEVICE_KINDS` in `sidecar/catalog.py`
+/// (`sidecar/test_device_palette.py` keeps the two lists equal).
+const Set<String> offlineOnlyDeviceKinds = {
+  'hub',
+  'sniffer',
+  'plc',
+  'historian',
+  'cyber-observer',
+  'controller',
+  'power-distribution',
+};
+
+/// Kinds the planner can recognize but neither builder can place yet.
 ///
 /// They stay in [deviceKinds] so a brief that names one still parses into a
 /// visible node the user can correct, instead of making the device disappear.
@@ -245,21 +279,14 @@ const List<DeviceKind> deviceKinds = [
 /// (`sidecar/test_device_palette.py` keeps the two equal). Do not put a kind
 /// here once its palette and executor exist; add it to `DEVICE_PALETTE`.
 const Set<String> unsupportedDeviceKinds = {
-  'hub',
   'bridge',
   'repeater',
   'mcu',
   'sbc',
-  'plc',
   'analog-phone',
   'voip-adapter',
   'cell-tower',
   'central-office',
-  'controller',
-  'sniffer',
-  'historian',
-  'cyber-observer',
-  'power-distribution',
 };
 
 /// The device kinds a Packet Tracer build can actually place today.
@@ -283,6 +310,13 @@ const Map<String, String> devicePrefixes = {
   'iot': 'IOT',
   'laptop': 'LT',
   'printer': 'PRN',
+  'hub': 'HUB',
+  'sniffer': 'SNIFF',
+  'plc': 'PLC',
+  'historian': 'HIST',
+  'cyber-observer': 'CYBER',
+  'controller': 'CTRL',
+  'power-distribution': 'PDU',
 };
 
 /// Spelled-out numbers, bridged to digits before anything reads them.

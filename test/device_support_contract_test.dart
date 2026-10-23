@@ -13,39 +13,53 @@ void main() {
     expect(supportedDeviceKinds.union(unsupportedDeviceKinds), known);
   });
 
-  test('a hub is rejected with the supported-device list', () {
+  test('a hub is offline-buildable, not silently rejected', () {
     const intent = NetworkIntent(
       projectName: 'contract',
       nodes: [NetNode(name: 'H1', type: 'hub')],
     );
-    final errors = ValidatorService.validate(
-      intent,
-      target: 'packet-tracer',
-    ).where((issue) => issue.severity == 'error').toList();
+    final issues = ValidatorService.validate(intent, target: 'packet-tracer');
 
-    expect(errors, isNotEmpty);
-    final message = errors.map((issue) => issue.message).join('\n');
-    expect(message, contains('hub device type is not supported yet'));
-    expect(message, contains('Supported types:'));
-    expect(message, contains('router'));
-    expect(message, contains('No substitute device was placed'));
-  });
-
-  test('a bare controller is recognized and rejected, not ignored', () {
-    final built = NetworkIntent.parseSimple(
-      'contract',
-      CasualEnglish.normalize('1 controller'),
-    );
+    // The offline .pkt is the primary build path, so a hub is no longer a
+    // device-kind error: it compiles from a real Packet Tracer template. The
+    // finding is the honest note that only the LIVE executor cannot place it
+    // yet. (A lone node with no links is still an island error - the
+    // topology's business, not the device gate's.)
     expect(
-      built.nodes.where((node) => node.type == 'controller'),
-      hasLength(1),
+      issues.where(
+        (issue) =>
+            issue.severity == 'error' && issue.message.contains('device type'),
+      ),
+      isEmpty,
+      reason: issues.map((issue) => issue.message).join('\n'),
     );
-    final message = ValidatorService.validate(
-      built,
-      target: 'packet-tracer',
-    ).map((issue) => issue.message).join('\n');
-    expect(message, contains('controller device type is not supported yet'));
+    final message = issues.map((issue) => issue.message).join('\n');
+    expect(message, contains('H1 will be in the offline .pkt'));
+    expect(message, contains('does not place it yet'));
   });
+
+  test(
+    'a bare controller is recognized and offline-buildable, not ignored',
+    () {
+      final built = NetworkIntent.parseSimple(
+        'contract',
+        CasualEnglish.normalize('1 controller'),
+      );
+      expect(
+        built.nodes.where((node) => node.type == 'controller'),
+        hasLength(1),
+      );
+      final message = ValidatorService.validate(
+        built,
+        target: 'packet-tracer',
+      ).map((issue) => issue.message).join('\n');
+      expect(
+        message,
+        isNot(contains('controller device type is not supported')),
+      );
+      expect(message, contains('CTRL1 will be in the offline .pkt'));
+    },
+  );
 
   test('a supported device does not trip the unsupported gate', () {
     const intent = NetworkIntent(

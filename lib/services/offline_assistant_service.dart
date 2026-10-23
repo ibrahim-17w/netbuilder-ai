@@ -7,6 +7,7 @@ import 'chat_capabilities.dart';
 import 'clarification_service.dart';
 import 'conversation_memory.dart';
 import 'learned_answers_service.dart';
+import 'networking_help_reader.dart';
 import 'offline_knowledge.dart';
 import 'plan_config_composer.dart';
 import 'plan_repair_service.dart';
@@ -132,7 +133,26 @@ class OfflineAssistantService {
     // model, so it reads them directly.
     final asks = ConversationMemory.userAsks(history);
     final originalAsk = asks.isEmpty ? '' : asks.first;
-    final t = normalized.trim().toLowerCase();
+    var t = normalized.trim().toLowerCase();
+    if (NetworkingHelpReader.isFollowup(t) &&
+        (activeFlow == null || activeFlow.isEmpty)) {
+      for (final message in history.reversed) {
+        if (!message.isUser ||
+            message.text.trim().toLowerCase() == t ||
+            NetworkingHelpReader.isFollowup(message.text)) {
+          continue;
+        }
+        if (NetworkingHelpReader.matches(message.text) ||
+            const {
+              'advice',
+              'howto',
+              'question',
+            }.contains(NetworkIntent.classifyBrief(message.text))) {
+          t = '${message.text.toLowerCase()} $t';
+        }
+        break;
+      }
+    }
     // Deterministic variety: the same question gets the same words, but two
     // consecutive turns do not get the same opener.
     final seed = history.length;
@@ -547,10 +567,11 @@ class OfflineAssistantService {
           '${arabic ? '$_arabicLead\n\n' : ''}${_continuity(plan, t, history)}'
           '${_conceptAnswer(concept)}'
           '${grounded == null ? '\n\nIf you tell me the lab you are building '
-                    'I will turn this into a plan and give you the exact steps.' : '\n\n$grounded'}'
+                    'I can tailor the steps to your equipment or simulator if you share '
+                    'the relevant devices and addressing; no file is required.' : '\n\n$grounded'}'
           '${briefNote.isEmpty ? '' : '\n\n$briefNote'}',
         ),
-        quickReplies: _nextStepsFor(plan),
+        quickReplies: _nextStepsFor(plan, help: true),
         intent: 'howto',
       );
     }
@@ -574,10 +595,11 @@ class OfflineAssistantService {
           opening,
           '${arabic ? '$_arabicLead\n\n' : ''}${_continuity(plan, t, history)}$knowledge'
           '${grounded == null ? '\n\nIf you tell me the lab you are building '
-                    'I will turn this into a plan and give you the exact steps.' : '\n\n$grounded'}'
+                    'I can tailor the steps to your equipment or simulator if you share '
+                    'the relevant devices and addressing; no file is required.' : '\n\n$grounded'}'
           '${briefNote.isEmpty ? '' : '\n\n$briefNote'}',
         ),
-        quickReplies: _nextStepsFor(plan),
+        quickReplies: _nextStepsFor(plan, help: true),
         intent: 'howto',
       );
     }
@@ -606,7 +628,7 @@ class OfflineAssistantService {
             '${_continuity(plan, t, history)}$grounded'
             '${briefNote.isEmpty ? '' : '\n\n$briefNote'}',
           ),
-          quickReplies: _nextStepsFor(plan),
+          quickReplies: _nextStepsFor(plan, help: true),
           intent: 'howto',
         );
       }
@@ -621,6 +643,26 @@ class OfflineAssistantService {
       hasPlan: plan != null && plan.nodes.isNotEmpty,
     )) {
       return _missingReply(t, arabic: arabic, opening: opening, plan: plan);
+    }
+    if (NetworkingHelpReader.matches(t)) {
+      return AssistantReply(
+        'I can help with networking explanations, configuration guidance, '
+        'design choices, and troubleshooting without creating a .pkt file. '
+        'Tell me the topic or symptom and whether this is real equipment or '
+        'a simulator. For a fault, include the affected device, what you '
+        'expected, and the result of a relevant read-only check such as '
+        '`ipconfig`, `ping <gateway>`, or `show ip interface brief`. '
+        'Do not share passwords or API keys.',
+        questions: const [
+          'What networking topic or problem are you working on?',
+        ],
+        quickReplies: const [
+          'Explain VLANs',
+          'Help me troubleshoot no internet',
+          'How do I configure OSPF?',
+        ],
+        intent: 'howto',
+      );
     }
     if (plan != null && plan.nodes.isNotEmpty) {
       // ASK BEFORE PLAN: the brief has critical gaps and the chat supplied
@@ -819,12 +861,14 @@ class OfflineAssistantService {
     NetworkIntent? plan, {
     bool building = false,
     List<ValidationIssue> blocked = const [],
+    bool help = false,
   }) {
     if (plan == null || plan.nodes.isEmpty) return const [];
     return [
-      if (blocked.isEmpty) 'Build the .pkt',
-      if (plan.routing != 'ospf') 'Use OSPF for routing',
-      if (plan.routing == 'ospf') 'Use static routing instead',
+      if (!help && blocked.isEmpty) 'Build the .pkt',
+      'Show me the build instructions',
+      if (!help && plan.routing != 'ospf') 'Use OSPF for routing',
+      if (!help && plan.routing == 'ospf') 'Use static routing instead',
     ];
   }
 
@@ -2786,10 +2830,6 @@ class OfflineAssistantService {
         _openArabicLead.hasMatch(t);
     if (!shaped) return false;
     if (_deviceCount.hasMatch(t)) return false;
-    // With a plan on the table, an unmatched question is answered by the
-    // build reply that describes that plan - the standing behaviour, kept
-    // deliberately: it is the only answer that uses the lab's real names.
-    if (hasPlan) return false;
     return true;
   }
 

@@ -41,6 +41,8 @@ void main() {
         'never build the pkt',
         'build the .pkt for 2 routers', // changes the plan, then builds
         'explain how to build pkt files',
+        'build the lab', // asks for a plan/guide, not a file
+        'build the project', // same: no file noun
         '/build', // the slash form is the command path
         '2 routers and 4 switches',
       ];

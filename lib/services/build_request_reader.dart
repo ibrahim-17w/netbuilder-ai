@@ -11,6 +11,11 @@
 /// .pkt?"), a deferral ("don't build it yet"), or a request that adds
 /// devices ("build the .pkt for 2 routers") must be answered - not executed
 /// against a plan they are trying to change.
+///
+/// It also requires an object that names a file: `pkt`, `packet tracer`,
+/// `file` or `topology`. "Build the lab" is a request for a plan or a build
+/// guide, not an instruction to compile one; the user has to say the file
+/// word when they want the file.
 class BuildRequestReader {
   /// Words a pure build request may contain. Anything else - a question
   /// word ("how", "why"), a refusal ("don't", "never"), or new devices
@@ -77,9 +82,6 @@ class BuildRequestReader {
     '.pkt',
     'packet',
     'tracer',
-    'lab',
-    'project',
-    'projects',
     'file',
     'files',
     'topology',

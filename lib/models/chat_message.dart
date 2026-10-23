@@ -73,6 +73,8 @@ class ChatAction {
     'pkt_fix',
     'pkt_undo',
     'pkt_generate',
+    // Render the standing plan as a human build guide - no file, no engine.
+    'build_guide',
     // Rewriting the file this conversation already produced, with a backup.
     'pkt_edit',
     // Hand a built file to the operating system (Packet Tracer takes it via
@@ -171,6 +173,8 @@ class ChatAction {
         return 'Undo the last repair';
       case 'pkt_generate':
         return 'Build the .pkt from the current plan';
+      case 'build_guide':
+        return 'Show step-by-step build instructions (no .pkt)';
       case 'pkt_edit':
         return 'Edit ${payload['name'] ?? payload['path'] ?? 'the file'} in '
             'place (a backup is kept)';

@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:ui' show Offset;
 
 import '../services/nlu/slots.dart';
+import '../services/networking_help_reader.dart';
 import '../services/sizing_service.dart';
 
 class NetNode {
@@ -2079,6 +2080,7 @@ class NetworkIntent {
     // An advisory turn (a choice, a size, a comparison or a review) keeps
     // the plan exactly as it is - see [_readsAsAdvice].
     if (_readsAsAdvice(lower)) return true;
+    if (NetworkingHelpReader.matches(brief)) return true;
     final questionShaped =
         lower.endsWith('?') || _questionStart.hasMatch(lower);
     if (!questionShaped) return false;
@@ -2126,12 +2128,8 @@ class NetworkIntent {
     final lower = brief.trim().toLowerCase();
     if (lower.isEmpty) return 'empty';
     if (_socialOnly.hasMatch(lower)) return 'social';
-    // An advisory turn is its own kind: it is answered with a recommendation
-    // and leaves the plan alone. A stated count still wins when the sentence
-    // asks to build - "recommend 2 routers" is a build request - but not
-    // when the count is the subject of a question ("what switch do I need
-    // for 30 PCs?").
     if (_readsAsAdvice(lower)) return 'advice';
+    if (NetworkingHelpReader.matches(brief)) return 'howto';
     final questionShaped =
         lower.endsWith('?') || _questionStart.hasMatch(lower);
     if (questionShaped) {

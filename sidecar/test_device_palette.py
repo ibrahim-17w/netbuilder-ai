@@ -61,6 +61,15 @@ def _dart_unsupported_kinds() -> set:
     return set(re.findall(r"'([^']+)'", block))
 
 
+def _dart_offline_only_kinds() -> set:
+    """The `offlineOnlyDeviceKinds` set from the Dart lexicon."""
+    with open(DART_CATALOG, encoding="utf-8") as f:
+        source = f.read()
+    start = source.index("const Set<String> offlineOnlyDeviceKinds = {")
+    block = source[start:source.index("};", start)]
+    return set(re.findall(r"'([^']+)'", block))
+
+
 def test_the_dart_catalog_is_readable():
     kinds = _dart_kinds()
     assert len(kinds) >= 15, kinds
@@ -73,20 +82,33 @@ def test_the_unsupported_lists_agree_in_both_directions():
         "lib/services/nlu/lexicon.dart and pt_autopilot.py disagree about "
         f"unsupported kinds: Dart-only {unsupported - pt.UNSUPPORTED_DEVICE_KINDS}, "
         f"Python-only {pt.UNSUPPORTED_DEVICE_KINDS - unsupported}")
+    offline = _dart_offline_only_kinds()
+    assert offline == pt.OFFLINE_ONLY_DEVICE_KINDS, (
+        "lib/services/nlu/lexicon.dart and catalog.py disagree about "
+        f"offline-only kinds: Dart-only {offline - pt.OFFLINE_ONLY_DEVICE_KINDS}, "
+        f"Python-only {pt.OFFLINE_ONLY_DEVICE_KINDS - offline}")
+    assert not (unsupported & offline), sorted(unsupported & offline)
     assert not (unsupported & set(pt.DEVICE_PALETTE)), (
         "a kind cannot be both unsupported and palette-backed: "
         f"{sorted(unsupported & set(pt.DEVICE_PALETTE))}")
+    assert not (offline & set(pt.DEVICE_PALETTE)), (
+        "a kind cannot be both offline-only and palette-backed: "
+        f"{sorted(offline & set(pt.DEVICE_PALETTE))}")
     planned = {t for t, _m, _p in _dart_kinds()}
     assert unsupported <= planned, unsupported - planned
+    assert offline <= planned, offline - planned
 
 
 def test_every_planner_kind_has_an_executor_palette_path():
     unsupported = _dart_unsupported_kinds()
+    offline = _dart_offline_only_kinds()
     missing = [t for t, _m, _p in _dart_kinds()
-               if t not in pt.DEVICE_PALETTE and t not in unsupported]
+               if t not in pt.DEVICE_PALETTE and t not in unsupported
+               and t not in offline]
     assert not missing, (
         f"the planner can emit {missing}, but the executor has neither a "
-        "DEVICE_PALETTE entry nor an explicit unsupported-list entry")
+        "DEVICE_PALETTE entry, an offline-only entry, nor an explicit "
+        "unsupported-list entry")
 
 
 def test_every_palette_kind_is_one_the_planner_can_emit():
@@ -197,7 +219,35 @@ def test_an_unknown_type_never_places_silently_as_a_router():
 
 
 def test_an_unsupported_planner_kind_is_skipped_not_substituted():
-    """A hub must not become a router: no palette click happens at all."""
+    """A bridge must not become a router: no palette click happens at all."""
+    _reset_run_state()
+    calls = []
+
+    with patch.object(pt, "click_by_names",
+                      side_effect=lambda names, what, **kw:
+                      calls.append(tuple(names)) or True), \
+         patch.object(pt, "click_frac"), \
+         patch.object(pt, "click_model"), \
+         patch.object(pt, "_slot_visual_state",
+                      return_value=("empty", "")), \
+         patch.object(pt, "_shot_region", return_value=""), \
+         patch.object(pt, "canvas_changed", return_value=(True, 0.9)), \
+         patch.object(pt, "_press_esc"), \
+         patch.object(pt, "_interruptible_sleep", return_value=True), \
+         patch.object(pt, "remember_device"), \
+         patch.object(pt, "shot"), \
+         patch.object(pt, "record_event"), \
+         patch.object(pt, "log"):
+        pt.place_nodes((0, 0, 1000, 700),
+                       [{"name": "B1", "type": "bridge", "model": "Bridge-PT"}],
+                       "test")
+
+    assert not calls, calls
+    assert pt.RUN["node_outcomes"]["B1"] == "unsupported"
+
+
+def test_an_offline_only_kind_is_skipped_live_not_substituted():
+    """A hub builds offline; a live run skips it instead of picking a router."""
     _reset_run_state()
     calls = []
 
@@ -221,15 +271,36 @@ def test_an_unsupported_planner_kind_is_skipped_not_substituted():
                        "test")
 
     assert not calls, calls
-    assert pt.RUN["node_outcomes"]["H1"] == "unsupported"
+    assert pt.RUN["node_outcomes"]["H1"] == "offline_only"
+
+
+def test_offline_only_kinds_compile_from_real_templates():
+    """Every offline-only kind must resolve to a PT template and a device."""
+    offline = sorted(pt.OFFLINE_ONLY_DEVICE_KINDS)
+    models = {
+        "hub": "Hub-PT",
+        "sniffer": "Sniffer",
+        "plc": "PLC-PT",
+        "historian": "DataHistorianServer",
+        "cyber-observer": "CyberObserver",
+        "controller": "NetworkController",
+        "power-distribution": "Power Distribution Device",
+    }
+    nodes = [{"name": f"D{i}", "type": kind, "model": models[kind]}
+             for i, kind in enumerate(offline)]
+    report = pt.pkt_builder.build_pkt({"project": "offline-only", "steps": [
+        {"action": "create_nodes", "nodes": nodes}]})
+    assert report["deviceCount"] == len(nodes), report
+    assert not [w for w in report["warnings"] if "template" in w.lower()], \
+        report["warnings"]
 
 
 def test_generate_rejects_an_unsupported_kind_without_substituting():
     plan = {"steps": [{"action": "create_nodes", "nodes": [
-        {"name": "H1", "type": "hub", "model": "Hub-PT"}]}]}
+        {"name": "B1", "type": "bridge", "model": "Bridge-PT"}]}]}
     with pytest.raises(pt.pkt_builder.BuildError) as caught:
         pt.pkt_generate(plan, project="unsupported", filename="unsupported")
-    assert "hub" in str(caught.value)
+    assert "bridge" in str(caught.value)
     assert "Supported device types:" in str(caught.value)
     assert "No substitute" in str(caught.value)
 
@@ -244,5 +315,7 @@ if __name__ == "__main__":
     test_the_palette_group_is_clicked_before_the_model()
     test_an_unknown_type_never_places_silently_as_a_router()
     test_an_unsupported_planner_kind_is_skipped_not_substituted()
+    test_an_offline_only_kind_is_skipped_live_not_substituted()
+    test_offline_only_kinds_compile_from_real_templates()
     test_generate_rejects_an_unsupported_kind_without_substituting()
     print("ALL TESTS PASSED")
