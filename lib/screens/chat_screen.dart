@@ -18,6 +18,7 @@ import '../services/adapters/packet_tracer_adapter.dart';
 import '../services/advisor_service.dart' show AdviceAnswer;
 import '../services/ai_provider.dart';
 import '../services/autopilot_service.dart';
+import '../services/attachment_ocr.dart';
 import '../services/build_guide.dart';
 import '../services/build_preflight.dart';
 import '../services/build_request_reader.dart';
@@ -4281,7 +4282,12 @@ class _ChatScreenState extends State<ChatScreen> {
     // this turn must not reach a provider, a tool loop or a web search.
     if (settings.privateMode) {
       try {
-        await _appendOfflinePlan(text, 'private mode is on', privateMode: true);
+        await _appendOfflinePlan(
+          text,
+          'private mode is on',
+          privateMode: true,
+          attachments: attachments,
+        );
         _failedText = null;
       } catch (offlineError) {
         if (mounted) {
@@ -4575,7 +4581,7 @@ class _ChatScreenState extends State<ChatScreen> {
               .first
               .trim();
           if (mounted) setState(() {});
-          await _appendOfflinePlan(text, e);
+          await _appendOfflinePlan(text, e, attachments: attachments);
           _failedText = null;
         } catch (offlineError) {
           if (mounted) {
@@ -4602,6 +4608,7 @@ class _ChatScreenState extends State<ChatScreen> {
     String text,
     Object error, {
     bool privateMode = false,
+    List<ChatImage> attachments = const [],
   }) async {
     final normalized = CasualEnglish.normalize(text);
     final helpOnly =
@@ -4727,6 +4734,45 @@ class _ChatScreenState extends State<ChatScreen> {
         .split('\n')
         .first
         .trim();
+    // SCREENSHOTS, READ WITHOUT A KEY: the engine's own Tesseract reads an
+    // attached image locally - nothing leaves the device, no model needed.
+    // The text is quoted as machine-read evidence beside the answer; it is
+    // never interpreted, because the offline corpus has no picture
+    // understanding and invented confidence is what this app refuses.
+    var imageBlock = '';
+    var imageNote = '';
+    if (attachments.isNotEmpty) {
+      final svc = _engine();
+      if (await svc.healthy) {
+        final evidence = await AttachmentOcr.read(
+          attachments,
+          readBase64: ChatService().readBase64,
+          ocr: svc.ocrImageBase64,
+        );
+        imageBlock = evidence.block;
+        imageNote = evidence.note;
+        if (evidence.any && normalized.trim().isEmpty && text.trim().isEmpty) {
+          // An image-only turn: the extracted text IS the subject. Show it
+          // and ask what the user wants to know about it.
+          _revealAnswer(
+            ChatMessage(
+              role: 'model',
+              text: '',
+              createdAt: DateTime.now().toIso8601String(),
+            ),
+            '$imageBlock\n\nTell me what you want to know about this - for '
+            'example "what error does this show?" or "which interface is '
+            'down?". No API key is needed.',
+          );
+          return;
+        }
+      } else {
+        imageNote =
+            'I cannot read the attached image(s) without the local engine '
+            '(no API key needed once it is running), and this reply was '
+            'written without a model.';
+      }
+    }
     // LEARNED ANSWERS: the same question answered by the keyed model
     // before is replayed here, offline. Loaded before the reply so the
     // assistant can lead with the exact answer the model gave.
@@ -4864,7 +4910,9 @@ class _ChatScreenState extends State<ChatScreen> {
       ],
     );
     final answerText = unsupportedGroup == null
-        ? reply.text
+        ? (imageBlock.isEmpty
+              ? (reply.text.trim().isEmpty ? imageNote : reply.text)
+              : '$imageBlock\n\n${reply.text.trim().isEmpty ? imageNote : reply.text}')
         : PacketTracerModelCompatibility.question(unsupportedGroup);
     if (!mounted) return;
     setState(() {

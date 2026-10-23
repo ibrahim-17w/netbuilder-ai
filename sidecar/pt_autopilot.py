@@ -263,7 +263,7 @@ def _run_hidden(command, **kwargs):
 # Bump on every behaviour change. Served on /health so a stale process
 # (old code, old port-holder, double instance) is detectable remotely
 # instead of producing "nothing changed" mystery runs.
-VERSION = "2026-10-23-offline-kinds-ocr-utf8"
+VERSION = "2026-10-23-ocr-endpoint"
 
 # The /health contract. Bump only for an incompatible route/shape change; the
 # app blocks an engine whose schema it does not speak, so a mixed installer
@@ -6414,6 +6414,31 @@ def _tesseract_run(img, psm: int) -> str:
     except Exception as e:
         log(f"tesseract temp-file read failed: {e}")
         return ""
+
+
+def ocr_image_data(image_b64: str) -> tuple[str, str]:
+    """OCR a caller-supplied image (base64 PNG/JPEG) with this engine's own
+    Tesseract: the keyless chat's eyes for an attached screenshot.
+
+    Returns ``(text, "")`` or ``("", reason)``. Pure read: no window is
+    opened, nothing is typed anywhere, and the image never touches disk
+    (the temp file ``_tesseract_run`` writes is the evidence copy it always
+    keeps, overwritten per call).
+    """
+    if not TESSERACT_CMD:
+        return "", "tesseract is not installed on this machine"
+    try:
+        import base64
+        import io
+        from PIL import Image
+        raw = base64.b64decode(image_b64 or "", validate=False)
+        img = Image.open(io.BytesIO(raw))
+        img.load()
+    except Exception as exc:  # noqa: BLE001 - a bad upload is a reply, not a crash
+        return "", f"unreadable image: {exc}"
+    # psm 6 (uniform block): a screenshot of a terminal or a device panel is
+    # exactly that shape; the live reader's second pass buys little here.
+    return _tesseract_run(img, 6), ""
 
 
 def _ocr_region(win, fy0: float = 0.40, fy1: float = 0.94,
@@ -16722,6 +16747,21 @@ class H(BaseHTTPRequestHandler):
     def do_POST(self):
         n = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(n) if n else b"{}"
+        if self.path == "/ocr":
+            # Read an attached image with the engine's own Tesseract - no
+            # Packet Tracer, no window, nothing typed. The reply is evidence
+            # for the chat, not a claim about any device.
+            try:
+                req = json.loads(body.decode() or "{}")
+            except Exception as exc:
+                self._json({"ok": False, "error": f"bad json: {exc}"}, 400)
+                return
+            text, err = ocr_image_data(str(req.get("image") or ""))
+            if err:
+                self._json({"ok": False, "error": err}, 503)
+                return
+            self._json({"ok": True, "text": text})
+            return
         if self.path == "/pkt/save_verified":
             # Save the live topology as a .pkt with its companion manifest,
             # optionally reopening it to prove the file loads.  The path is

@@ -1228,6 +1228,16 @@ class AutopilotService {
   Future<Map<String, dynamic>> pktIdentify(String path) =>
       _postJson('/pkt/identify', {'path': path}, timeoutSeconds: 20);
 
+  /// Read an attached image with the engine's own Tesseract - the keyless
+  /// chat's eyes for a screenshot. No Packet Tracer, no window: the text is
+  /// evidence for the reply, never a claim about any device.
+  Future<String> ocrImageBase64(String imageBase64) async {
+    final r = await _postJson('/ocr', {
+      'image': imageBase64,
+    }, timeoutSeconds: 90);
+    return (r['text'] ?? '').toString();
+  }
+
   /// Apply ONLY the approved fixes to a .pkt and encrypt a valid save again.
   /// The source file is never modified, and Packet Tracer is not involved.
   Future<Map<String, dynamic>> pktApplyFixes(Map<String, dynamic> request) =>
