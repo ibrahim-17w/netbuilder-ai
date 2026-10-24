@@ -8,6 +8,7 @@ import 'clarification_service.dart';
 import 'conversation_memory.dart';
 import 'learned_answers_service.dart';
 import 'networking_help_reader.dart';
+import 'plan_device_explainer.dart';
 import 'offline_knowledge.dart';
 import 'plan_config_composer.dart';
 import 'plan_repair_service.dart';
@@ -136,21 +137,29 @@ class OfflineAssistantService {
     var t = normalized.trim().toLowerCase();
     if (NetworkingHelpReader.isFollowup(t) &&
         (activeFlow == null || activeFlow.isEmpty)) {
+      // Walk back through the turns for the topic this "give me an example"
+      // points at. Acknowledgements in between ("thanks", "ok") are skipped:
+      // they are turns of the conversation, not topics of it, and stopping
+      // at one lost the question two messages up.
+      var looked = 0;
       for (final message in history.reversed) {
-        if (!message.isUser ||
-            message.text.trim().toLowerCase() == t ||
-            NetworkingHelpReader.isFollowup(message.text)) {
+        if (!message.isUser) continue;
+        final prior = message.text.trim().toLowerCase();
+        if (prior == t || NetworkingHelpReader.isFollowup(prior)) continue;
+        if (_isAck(prior) || _isYes(prior) || _isNo(prior) || prior.isEmpty) {
           continue;
         }
-        if (NetworkingHelpReader.matches(message.text) ||
+        if (NetworkingHelpReader.matches(prior) ||
             const {
               'advice',
               'howto',
               'question',
-            }.contains(NetworkIntent.classifyBrief(message.text))) {
-          t = '${message.text.toLowerCase()} $t';
+            }.contains(NetworkIntent.classifyBrief(prior))) {
+          t = '$prior $t';
+          break;
         }
-        break;
+        looked++;
+        if (looked >= 6) break;
       }
     }
     // Deterministic variety: the same question gets the same words, but two
@@ -633,6 +642,40 @@ class OfflineAssistantService {
         );
       }
     }
+    if (NetworkingHelpReader.matches(t)) {
+      // A DEVICE OF THE STANDING PLAN, ASKED ABOUT BY NAME: the plan itself
+      // is the whole answer - type, addresses, cables, roles, and the
+      // read-only commands that show the same facts on the real device.
+      final askedDevice = plan == null || plan.nodes.isEmpty
+          ? null
+          : PlanDeviceExplainer.namedDevice(t, plan);
+      if (askedDevice != null) {
+        return AssistantReply(
+          _join(opening, PlanDeviceExplainer.explain(plan!, askedDevice)),
+          quickReplies: _nextStepsFor(plan, help: true),
+          intent: 'howto',
+        );
+      }
+      // Anything else uncovered keeps the GUIDED near-miss below - the same
+      // answer with and without a plan, plus a pointer at the plan's own
+      // devices when one stands, because a lab on the table is ground the
+      // near-miss does not name by itself.
+      final gap = _missingReply(
+        t,
+        arabic: arabic,
+        opening: opening,
+        plan: plan,
+      );
+      if (plan == null || plan.nodes.isEmpty) return gap;
+      return AssistantReply(
+        '${gap.text}\n\nYour lab on the table: ${_labLine(plan)}. Name one of '
+        'its devices (for example ${plan.nodes.first.name}) and I will '
+        'explain exactly what it does there.',
+        questions: gap.questions,
+        quickReplies: gap.quickReplies,
+        intent: gap.intent,
+      );
+    }
     // NOT COVERED: a real question this material does not know. Say exactly
     // that - a guess dressed as fact is worse than an honest gap - but first
     // offer the ground that IS covered and sits nearest to the question.
@@ -643,26 +686,6 @@ class OfflineAssistantService {
       hasPlan: plan != null && plan.nodes.isNotEmpty,
     )) {
       return _missingReply(t, arabic: arabic, opening: opening, plan: plan);
-    }
-    if (NetworkingHelpReader.matches(t)) {
-      return AssistantReply(
-        'I can help with networking explanations, configuration guidance, '
-        'design choices, and troubleshooting without creating a .pkt file. '
-        'Tell me the topic or symptom and whether this is real equipment or '
-        'a simulator. For a fault, include the affected device, what you '
-        'expected, and the result of a relevant read-only check such as '
-        '`ipconfig`, `ping <gateway>`, or `show ip interface brief`. '
-        'Do not share passwords or API keys.',
-        questions: const [
-          'What networking topic or problem are you working on?',
-        ],
-        quickReplies: const [
-          'Explain VLANs',
-          'Help me troubleshoot no internet',
-          'How do I configure OSPF?',
-        ],
-        intent: 'howto',
-      );
     }
     if (plan != null && plan.nodes.isNotEmpty) {
       // ASK BEFORE PLAN: the brief has critical gaps and the chat supplied
@@ -2545,7 +2568,9 @@ class OfflineAssistantService {
     if (near.isEmpty) {
       return AssistantReply(
         _join(opening, arabic ? _arabicMissing : _missingCoverage),
-        quickReplies: _nextStepsFor(plan),
+        // help: true - a gap answer must not advertise a build; the plan is
+        // context for the question, not an offer.
+        quickReplies: _nextStepsFor(plan, help: true),
         intent: 'missing',
       );
     }
@@ -2830,6 +2855,11 @@ class OfflineAssistantService {
         _openArabicLead.hasMatch(t);
     if (!shaped) return false;
     if (_deviceCount.hasMatch(t)) return false;
+    // A NON-help question with a plan on the table is answered by the build
+    // reply that describes that plan - the standing behaviour, kept
+    // deliberately: it is the only answer that uses the lab's real names.
+    // (Help-shaped asks never reach here; the help branch runs first.)
+    if (hasPlan) return false;
     return true;
   }
 

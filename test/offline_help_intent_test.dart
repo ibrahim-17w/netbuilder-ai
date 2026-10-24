@@ -47,7 +47,7 @@ void main() {
     expect(reply.text, contains('ospf'));
   });
 
-  test('a follow-up after a build answer asks what to explain', () {
+  test('a follow-up after a build answer gets the guided near-miss', () {
     final history = [
       const ChatMessage(role: 'user', text: '2 routers and 4 switches'),
       const ChatMessage(role: 'model', text: 'Here is the lab.'),
@@ -59,7 +59,10 @@ void main() {
       plan: plan,
       history: history,
     );
-    expect(reply.text, contains('Tell me the topic or symptom'));
+    // No networking topic is standing, so the answer is the honest gap - and
+    // the lab on the table is named as ground the user can point at.
+    expect(reply.text, contains('not in my offline material'));
+    expect(reply.text, contains('Name one of its devices'));
     expect(reply.quickReplies, isNot(contains('Build the .pkt')));
   });
 
