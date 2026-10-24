@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 import '../models/build_record.dart';
 import '../models/network_intent.dart';
 import '../services/memory_service.dart';
+import '../services/plan_version_diff.dart';
+import '../services/plan_version_service.dart';
 import '../theme/app_kit.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
@@ -447,6 +449,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         value: 'copy-json',
                         child: Text('Copy the plan JSON'),
                       ),
+                      PopupMenuItem(
+                        value: 'restore-version',
+                        child: Text('Restore this version'),
+                      ),
                     ],
                   ),
                 ],
@@ -461,6 +467,33 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _rowAction(String action, BuildRecord record) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
     switch (action) {
+      case 'restore-version':
+        // RESTORE IS AN EDIT: a new version is written parented to the
+        // project's newest row, and it opens for review. History keeps both
+        // originals - nothing is rewritten.
+        final mem = context.read<MemoryService>();
+        if (!mem.ready) return;
+        final versions = await PlanVersionService.timeline(
+          mem,
+          projectKey: PlanVersionService.projectKeyOf(record),
+        );
+        final latest = versions.isEmpty ? null : versions.last;
+        final restored = await PlanVersionService.restoreVersion(
+          memory: mem,
+          original: record,
+          latest: latest,
+        );
+        if (!mounted) return;
+        await _refresh();
+        widget.onOpen(restored);
+        messenger?.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Version #${record.id ?? '?'} restored as a new version '
+              '(#${restored.id ?? '?'}); both originals are kept.',
+            ),
+          ),
+        );
       case 'checkpoint':
         final name = TextEditingController();
         final checkpointName = await showDialog<String>(
@@ -534,7 +567,8 @@ class _HomeScreenState extends State<HomeScreen> {
             .toList()
           ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
     if (records.length != 2) return;
-    final changes = <String>[];
+    PlanVersionDiff? diff;
+    var compareError = '';
     NetworkIntent? beforeIntent;
     NetworkIntent? afterIntent;
     try {
@@ -546,92 +580,10 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       beforeIntent = before;
       afterIntent = after;
-      final oldNodes = {for (final n in before.nodes) n.name: n};
-      final newNodes = {for (final n in after.nodes) n.name: n};
-      if (before.projectName != after.projectName) {
-        changes.add(
-          'Project name: ${before.projectName} → ${after.projectName}',
-        );
-      }
-      final names = {...oldNodes.keys, ...newNodes.keys}.toList()..sort();
-      for (final name in names) {
-        final oldNode = oldNodes[name];
-        final newNode = newNodes[name];
-        if (oldNode == null) {
-          changes.add('Device added: $name (${newNode!.type})');
-        } else if (newNode == null) {
-          changes.add('Device removed: $name (${oldNode.type})');
-        } else {
-          final oldJson = oldNode.toJson(includeSecrets: false);
-          final newJson = newNode.toJson(includeSecrets: false);
-          final fields = {...oldJson.keys, ...newJson.keys}.toList()..sort();
-          for (final field in fields) {
-            if (jsonEncode(oldJson[field]) != jsonEncode(newJson[field])) {
-              changes.add(
-                'Device $name $field: ${jsonEncode(oldJson[field] ?? 'unset')} → ${jsonEncode(newJson[field] ?? 'unset')}',
-              );
-            }
-          }
-        }
-      }
-      String linkKey(NetLink link) {
-        final ends = ['${link.a}:${link.aIf}', '${link.b}:${link.bIf}']..sort();
-        final clock = link.dce == null ? '' : ', clock ${link.dce}';
-        return '${ends[0]} <-> ${ends[1]} (${link.cable ?? 'auto'}$clock)';
-      }
-
-      final oldLinks = before.links.map(linkKey).toSet();
-      final newLinks = after.links.map(linkKey).toSet();
-      for (final link in (newLinks.difference(oldLinks).toList()..sort())) {
-        changes.add('Cable added: $link');
-      }
-      for (final link in (oldLinks.difference(newLinks).toList()..sort())) {
-        changes.add('Cable removed: $link');
-      }
-      if (before.routing != after.routing) {
-        changes.add('Routing: ${before.routing} → ${after.routing}');
-      }
-      final oldVlans = before.vlans.toList()..sort();
-      final newVlans = after.vlans.toList()..sort();
-      if (jsonEncode(oldVlans) != jsonEncode(newVlans)) {
-        changes.add('VLANs: ${oldVlans.join(', ')} → ${newVlans.join(', ')}');
-      }
-      if (jsonEncode(before.security.toJson(includeSecrets: false)) !=
-          jsonEncode(after.security.toJson(includeSecrets: false))) {
-        final oldSecurity = before.security.toJson(includeSecrets: false);
-        final newSecurity = after.security.toJson(includeSecrets: false);
-        final fields = {...oldSecurity.keys, ...newSecurity.keys}.toList()
-          ..sort();
-        for (final field in fields) {
-          if (jsonEncode(oldSecurity[field]) !=
-              jsonEncode(newSecurity[field])) {
-            changes.add(
-              'Security $field: ${jsonEncode(oldSecurity[field] ?? 'unset')} → ${jsonEncode(newSecurity[field] ?? 'unset')}',
-            );
-          }
-        }
-      }
-      final oldAddresses = {
-        for (final a in before.addressing)
-          '${a.node}/${a.iface}':
-              '${a.ipCidr}${a.ip6Cidr == null ? '' : ' · ${a.ip6Cidr}'}',
-      };
-      final newAddresses = {
-        for (final a in after.addressing)
-          '${a.node}/${a.iface}':
-              '${a.ipCidr}${a.ip6Cidr == null ? '' : ' · ${a.ip6Cidr}'}',
-      };
-      final addressKeys = {...oldAddresses.keys, ...newAddresses.keys}.toList()
-        ..sort();
-      for (final key in addressKeys) {
-        if (oldAddresses[key] != newAddresses[key]) {
-          changes.add(
-            'Address $key: ${oldAddresses[key] ?? 'none'} → ${newAddresses[key] ?? 'none'}',
-          );
-        }
-      }
+      diff = PlanVersionDiff.compare(before, after);
     } catch (e) {
-      changes.add('These plan versions could not be compared: $e');
+      diff = null;
+      compareError = e.toString();
     }
     if (!mounted) return;
     await showDialog<void>(
@@ -697,15 +649,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: AppTheme.s6),
-                if (changes.isEmpty)
+                if (compareError.isNotEmpty)
+                  Text(
+                    'These plan versions could not be compared: $compareError',
+                  )
+                else if (diff == null || diff.isEmpty)
                   const Text(
                     'No device, cable, address, routing, VLAN, or security changes found.',
-                  ),
-                for (final change in changes)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppTheme.s6),
-                    child: Text('• $change'),
-                  ),
+                  )
+                else
+                  for (final change in diff.toMarkdown().split('\n'))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppTheme.s6),
+                      child: Text(change),
+                    ),
               ],
             ),
           ),

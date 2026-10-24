@@ -14,6 +14,17 @@ class BuildRecord {
   final String? fix;
   final DateTime createdAt;
 
+  /// The stable identity every version of one project shares. Empty on
+  /// legacy rows, which fall back to the project name - so a history saved
+  /// before this field existed still forms a timeline instead of splitting
+  /// into orphans.
+  final String projectKey;
+
+  /// The build id this version was edited FROM, or null for a first
+  /// version. The chain is what makes "restore an older version" create a
+  /// NEW version instead of rewriting history.
+  final int? parentVersionId;
+
   const BuildRecord({
     this.id,
     required this.projectName,
@@ -25,6 +36,8 @@ class BuildRecord {
     this.error,
     this.fix,
     required this.createdAt,
+    this.projectKey = '',
+    this.parentVersionId,
   });
 
   Map<String, dynamic> toMap() => {
@@ -38,6 +51,8 @@ class BuildRecord {
     'error': error,
     'fix': fix,
     'createdAt': createdAt.toIso8601String(),
+    'projectKey': projectKey,
+    if (parentVersionId != null) 'parentVersion': parentVersionId,
   };
 
   factory BuildRecord.fromMap(Map<String, dynamic> m) => BuildRecord(
@@ -54,6 +69,8 @@ class BuildRecord {
     fix: m['fix'] as String?,
     createdAt:
         DateTime.tryParse(m['createdAt'] as String? ?? '') ?? DateTime.now(),
+    projectKey: m['projectKey'] as String? ?? '',
+    parentVersionId: m['parentVersion'] as int?,
   );
 }
 

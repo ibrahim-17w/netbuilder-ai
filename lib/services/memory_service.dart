@@ -130,7 +130,7 @@ class MemoryService extends ChangeNotifier {
   static Future<Database> _openAt(String path) async {
     final db = await openDatabase(
       path,
-      version: 11,
+      version: 12,
       // PRAGMA assignments return a row in SQLite. Android's sqflite plugin
       // requires rawQuery for statements with a result, while the FFI backend
       // happens to accept execute and hid this startup failure in tests.
@@ -239,6 +239,44 @@ CREATE TABLE IF NOT EXISTS attempts(
         // grown from real misses instead of guesses.
         await db.execute(_openQuestionTableSql);
       }
+      if (oldVersion < 12) {
+        // Plan version history: a stable project key shared by every
+        // version of one project, and the build id a version was edited
+        // from. Both are nullable on purpose - legacy rows keep working
+        // with the project name as their implicit identity.
+        //
+        // A half-applied store can be missing the builds table entirely
+        // (the exact state the recovery tests hold), so the table is
+        // ensured first and the columns then only added when absent. On a
+        // real store the CREATE is a no-op and the columns exist already.
+        await db.execute('''
+CREATE TABLE IF NOT EXISTS builds(
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ projectName TEXT NOT NULL,
+ instruction TEXT NOT NULL,
+ intentJson TEXT NOT NULL,
+ target TEXT NOT NULL,
+ success INTEGER NOT NULL DEFAULT 1,
+ status TEXT NOT NULL DEFAULT 'verified',
+ error TEXT,
+ fix TEXT,
+ createdAt TEXT NOT NULL,
+ projectKey TEXT NOT NULL DEFAULT '',
+ parentVersion INTEGER
+)''');
+        await _addColumnIfMissing(
+          db,
+          'builds',
+          'projectKey',
+          "ALTER TABLE builds ADD COLUMN projectKey TEXT NOT NULL DEFAULT ''",
+        );
+        await _addColumnIfMissing(
+          db,
+          'builds',
+          'parentVersion',
+          'ALTER TABLE builds ADD COLUMN parentVersion INTEGER',
+        );
+      }
     }
   }
 
@@ -256,8 +294,13 @@ CREATE TABLE IF NOT EXISTS attempts(
     String column,
     String alter,
   ) async {
+    // BOTH sides normalize: SQLite column names are case-insensitive, and a
+    // camelCase argument ('projectKey') against a lowercased readout
+    // ('projectkey') read as missing forever - the ALTER then ran on every
+    // launch and failed as a duplicate on any store that already had it.
+    final wanted = column.toLowerCase();
     final rows = await db.rawQuery('PRAGMA table_info($table)');
-    final has = rows.any((r) => '${r['name']}'.toLowerCase() == column);
+    final has = rows.any((r) => '${r['name']}'.toLowerCase() == wanted);
     if (has) return;
     await db.execute(alter);
   }
@@ -274,7 +317,9 @@ CREATE TABLE IF NOT EXISTS builds(
  status TEXT NOT NULL DEFAULT 'verified',
  error TEXT,
  fix TEXT,
- createdAt TEXT NOT NULL
+ createdAt TEXT NOT NULL,
+ projectKey TEXT NOT NULL DEFAULT '',
+ parentVersion INTEGER
 )''');
     await db.execute('''
 CREATE TABLE IF NOT EXISTS rules(
