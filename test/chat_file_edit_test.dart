@@ -136,7 +136,10 @@ Widget _chat(MemoryService mem) => MultiProvider(
 Future<void> _send(WidgetTester tester, String text) async {
   await tester.enterText(_composer(), text);
   await tester.testTextInput.receiveAction(TextInputAction.send);
-  for (var i = 0; i < 90; i++) {
+  // 300 pumps: the in-place compile does real CPU work between
+  // pumps (template library, save XML), and the budget needs
+  // headroom over a loaded machine, not a timing guess.
+  for (var i = 0; i < 300; i++) {
     await tester.pump(const Duration(milliseconds: 100));
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 1)),

@@ -99,6 +99,15 @@ class SessionState {
   String captureName;
   String captureAnalysisJson;
 
+  /// The active guided lab, as JSON (`{'lab': <id>}`), so lab progress
+  /// survives a reopen like the troubleshoot flow does. Empty string when
+  /// no lab is running. Kept OUT of [flowState] on purpose: a non-empty
+  /// flowState makes the offline assistant treat the next turn as an answer
+  /// inside a diagnostic ladder, which a lab update never is. The grade
+  /// itself is always recomputed from the standing plan, so only the id is
+  /// stored.
+  String labJson;
+
   SessionState({
     this.project = '',
     List<String>? focus,
@@ -122,6 +131,7 @@ class SessionState {
     this.capturePath = '',
     this.captureName = '',
     this.captureAnalysisJson = '',
+    this.labJson = '',
   }) : focus = focus ?? <String>[],
        confirmedFindings = confirmedFindings ?? <String>[],
        openFindings = openFindings ?? <String>[],
@@ -532,6 +542,7 @@ class SessionState {
     if (captureName.isNotEmpty) 'captureName': captureName,
     if (captureAnalysisJson.isNotEmpty)
       'captureAnalysisJson': captureAnalysisJson,
+    if (labJson.isNotEmpty) 'labJson': labJson,
   };
 
   String encode() => jsonEncode(toJson());
@@ -572,6 +583,7 @@ class SessionState {
     capturePath: (j['capturePath'] ?? '').toString(),
     captureName: (j['captureName'] ?? '').toString(),
     captureAnalysisJson: (j['captureAnalysisJson'] ?? '').toString(),
+    labJson: (j['labJson'] ?? '').toString(),
   );
 
   // --- deterministic extraction -------------------------------------------

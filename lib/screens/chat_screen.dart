@@ -53,6 +53,7 @@ import '../services/pkt_analysis_chat.dart';
 import '../services/pkt_import_request.dart';
 import '../services/pkt_plan_import_service.dart';
 import '../services/pkt_scan_diff.dart';
+import '../services/lab_catalog.dart';
 import '../services/pkt/template_library.dart' show PktBuildFailure;
 import '../services/design_memory.dart';
 import '../services/design_review.dart';
@@ -3324,6 +3325,121 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  /// Commit a computed answer as a normal assistant turn: appended to the
+  /// transcript, observed, persisted. The caller has already committed the
+  /// user's turn and set/cleared [_busy] around its own work.
+  Future<void> _appendOfflineAnswer(String body) async {
+    if (!mounted) return;
+    final turn = ChatMessage(
+      role: 'model',
+      text: body,
+      createdAt: DateTime.now().toIso8601String(),
+      source: AiStatus.plannerSource,
+    );
+    setState(() {
+      _messages = [..._messages, turn];
+      _busy = false;
+      _status = '';
+    });
+    _state.observe(turn);
+    _jumpToEnd();
+    final mem = _memory;
+    if (mem != null && mem.ready) {
+      try {
+        await mem.logChat(turn, conversation: _conversation);
+        await mem.setSessionState(_conversation, _state.encode());
+      } catch (_) {}
+    }
+  }
+
+  /// The guided-lab flow: /lab lists, "start the ospf lab" adopts one, and
+  /// "check my lab" grades the STANDING PLAN against the lab's steps - the
+  /// same validator-grade evidence a build would be judged by, never an
+  /// opinion. Progress lives in the session state, so it survives a reopen.
+  Future<bool> _handleLab(String text) async {
+    final request = LabRequest.read(text);
+    if (request == null) return false;
+    final ask = _makeUserTurn(text, const []);
+    _state.observe(ask).withIntent(_lastIntent);
+    await _commitUserTurn(ask, openActivity: true);
+    if (!mounted) return true;
+    setState(() => _busy = true);
+    switch (request.action) {
+      case LabAction.list:
+        final b = StringBuffer()
+          ..writeln(
+            '**Guided labs** - say "start the <name> lab", then "check my '
+            'lab" any time to grade the standing plan against it:',
+          )
+          ..writeln();
+        for (final lab in LabCatalog.all) {
+          b.writeln('- **${lab.title}** - ${lab.blurb}');
+        }
+        await _appendOfflineAnswer(b.toString());
+      case LabAction.start:
+        final lab = request.lab;
+        if (lab == null) {
+          await _appendOfflineAnswer(
+            'Which lab? The ones I can grade: '
+            '${LabCatalog.all.map((l) => l.title).join(', ')}.',
+          );
+          break;
+        }
+        _state.labJson = jsonEncode({'lab': lab.id});
+        final plan = _lastIntent;
+        final graded = plan != null && plan.nodes.isNotEmpty
+            ? LabGrader.grade(lab, plan).toMarkdown()
+            : 'Describe the network first (for example "2 routers, 2 '
+                  'switches and 4 PCs"), then say "check my lab" - the grade '
+                  'is the standing plan, not a guess.';
+        await _appendOfflineAnswer(
+          '**Started: ${lab.title}.** ${lab.blurb}\n\n$graded',
+        );
+      case LabAction.check:
+        final labId = _decodeLabId();
+        final lab = labId == null ? null : LabCatalog.byId(labId);
+        if (lab == null) {
+          await _appendOfflineAnswer(
+            'No lab is running. Say "/lab" to see the catalog, or "start '
+            'the <name> lab" to begin one.',
+          );
+          break;
+        }
+        final plan = _lastIntent;
+        if (plan == null || plan.nodes.isEmpty) {
+          await _appendOfflineAnswer(
+            'There is no plan to grade yet - ${lab.title} grades the '
+            'standing plan. Describe the network first.',
+          );
+          break;
+        }
+        await _appendOfflineAnswer(LabGrader.grade(lab, plan).toMarkdown());
+      case LabAction.stop:
+        if (_decodeLabId() == null) {
+          await _appendOfflineAnswer('No lab is running.');
+          break;
+        }
+        _state.labJson = '';
+        await _appendOfflineAnswer(
+          'Lab closed. The plan stays exactly as it is - say "check my lab" '
+          'any time to start grading again.',
+        );
+    }
+    return true;
+  }
+
+  /// The id of the lab this conversation is working through, or null.
+  String? _decodeLabId() {
+    if (_state.labJson.trim().isEmpty) return null;
+    try {
+      final v = jsonDecode(_state.labJson);
+      if (v is Map && '${v['lab'] ?? ''}'.trim().isNotEmpty) {
+        return '${v['lab']}';
+      }
+    } catch (_) {}
+    return null;
+  }
+
   /// Compare two scanned files and report what changed.
   ///
   /// Both files are audited fresh by the engine (read-only), so the diff is
@@ -3356,7 +3472,7 @@ class _ChatScreenState extends State<ChatScreen> {
               '${side.split(RegExp(r'[\\/]')).last} is not a .pkt save, so '
               'the two cannot be compared. '
               '${ident['message'] ?? ''}';
-          await _appendDiffAnswer(text, outcome);
+          await _appendOfflineAnswer(outcome);
           return true;
         }
       }
@@ -3381,33 +3497,8 @@ class _ChatScreenState extends State<ChatScreen> {
           'Could not compare the two files: '
           '${e.toString().replaceFirst('Exception: ', '')}';
     }
-    await _appendDiffAnswer(text, outcome);
+    await _appendOfflineAnswer(outcome);
     return true;
-  }
-
-  /// Commit the diff answer as a normal assistant turn.
-  Future<void> _appendDiffAnswer(String text, String body) async {
-    if (!mounted) return;
-    final turn = ChatMessage(
-      role: 'model',
-      text: body,
-      createdAt: DateTime.now().toIso8601String(),
-      source: AiStatus.plannerSource,
-    );
-    setState(() {
-      _messages = [..._messages, turn];
-      _busy = false;
-      _status = '';
-    });
-    _state.observe(turn);
-    _jumpToEnd();
-    final mem = _memory;
-    if (mem != null && mem.ready) {
-      try {
-        await mem.logChat(turn, conversation: _conversation);
-        await mem.setSessionState(_conversation, _state.encode());
-      } catch (_) {}
-    }
   }
 
   /// Turn the scanned file into the standing plan.
@@ -4150,6 +4241,13 @@ class _ChatScreenState extends State<ChatScreen> {
     // "DIFF A AND B" - a comparison request naming two files (or one plus
     // the scan on the table). Read before planning: paths are not devices.
     if (editingMessage == null && await _handleScanDiff(text)) {
+      _input.clear();
+      return;
+    }
+    // "/lab" AND THE LAB FLOW - a guided checklist graded against the
+    // standing plan. Read before the command handler: /lab is a flow, not
+    // a settings command.
+    if (editingMessage == null && await _handleLab(text)) {
       _input.clear();
       return;
     }
