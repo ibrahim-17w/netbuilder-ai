@@ -166,18 +166,40 @@ the full suite.
    remedy per open step. Progress survives a reopen via the session
    state; the grade is always recomputed, never replayed.
 
+# Backlog, report and checklist (2026-10-24, `aec68b5`..`8a42067`)
+
+1. **Unanswered-questions loop** (`aec68b5`): a keyless miss (the
+   guided near-miss reply) is recorded in a local backlog - one row per
+   distinct ask, deduped on normalized wording, hit-counted, capped at
+   the newest 200. The Memory screen's learned tab shows the list
+   newest-first with hit counts and a clear button. Deliberately NOT in
+   the backup export: it is a local to-do, not memory to reproduce.
+   DB schema version 11; the migration is re-runnable.
+2. **Lab report export** (`4790eff`): "export a lab report" (or
+   /report) assembles one Markdown file beside the .pkt ones - the plan
+   with its addressing, the design review with its score, every build
+   with its verification note, the offline scan findings, and the full
+   build guide. The report invents nothing: missing evidence (no build
+   yet, no scan) says so in words.
+3. **Persisted guide checkboxes** (`8a42067`): the guide dialog renders
+   the verification checklist as real checkboxes, keyed by plan
+   revision in the session state, so a long build can be put down and
+   picked up. The markdown stays the one truth: copied or saved text
+   always reflects the ticks.
+
 Also: the file-edit widget tests' pump budget widened - the in-place
 compile does real CPU work between pumps and the old 9-second budget
 ran out on a loaded machine (the behavior itself was and is correct).
 
-## Batch gates (2026-10-24, final state `62a0ed5`)
+## Batch gates (2026-10-24, final state `8a42067`)
 
-- `flutter analyze --fatal-infos` clean; `flutter test` 2614 passed.
+- `flutter analyze --fatal-infos` clean; `flutter test` 2631 passed.
 
 ## What is still not verified here
 
-- The 2026-10-23 package artifacts predate both batches: rebuild the
-  tester package from `62a0ed5` before handing it to testers.
+- The 2026-10-23 package artifacts predate all of today's batches:
+  rebuild the tester package from `8a42067` before handing it to
+  testers.
 - The build is unsigned; SmartScreen will warn testers. A signed build
   still needs the certificate secrets in the tag-only CI job.
 - The clean-VM walkthrough and the 3-5 tester pilot remain manual gates.
