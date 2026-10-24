@@ -5318,6 +5318,14 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mem == null || !mem.ready) return;
         try {
           await mem.logChat(answer, conversation: _conversation);
+          // THE UNANSWERED-QUESTIONS LOOP: a question the offline material
+          // could not answer is the corpus's backlog, recorded locally
+          // only. Ranked by how often it was asked, it is exactly which
+          // topics to teach [OfflineKnowledge] next - real misses, not
+          // guesses.
+          if (reply.intent == 'missing') {
+            await mem.recordOpenQuestion(text);
+          }
           // Same preference auto-teach as the model path: "always use a
           // 4331" typed while offline is a rule too.
           await _autoTeachPreference(text);

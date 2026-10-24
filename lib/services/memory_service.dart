@@ -130,7 +130,7 @@ class MemoryService extends ChangeNotifier {
   static Future<Database> _openAt(String path) async {
     final db = await openDatabase(
       path,
-      version: 10,
+      version: 11,
       // PRAGMA assignments return a row in SQLite. Android's sqflite plugin
       // requires rawQuery for statements with a result, while the FFI backend
       // happens to accept execute and hid this startup failure in tests.
@@ -233,6 +233,12 @@ CREATE TABLE IF NOT EXISTS attempts(
         // is never asked the same thing twice (see [ClarificationService]).
         await db.execute(_clarificationAnswerTableSql);
       }
+      if (oldVersion < 11) {
+        // Questions the offline material could not answer. The pilot's
+        // ranked backlog: which topics to teach [OfflineKnowledge] next,
+        // grown from real misses instead of guesses.
+        await db.execute(_openQuestionTableSql);
+      }
     }
   }
 
@@ -308,6 +314,7 @@ CREATE TABLE IF NOT EXISTS attempts(
     await db.execute(_learnedAnswerIndexSql);
     await db.execute(_envProfileTableSql);
     await db.execute(_clarificationAnswerTableSql);
+    await db.execute(_openQuestionTableSql);
   }
 
   /// Attachments are paths on disk, not blobs: screenshots are hundreds of
@@ -394,6 +401,133 @@ CREATE TABLE IF NOT EXISTS learned_answer(
   static const _learnedAnswerIndexSql =
       'CREATE INDEX IF NOT EXISTS idx_learned_answer_qkey '
       'ON learned_answer(qkey)';
+
+  /// One row per DISTINCT question the offline material could not answer.
+  /// The question text is the key (normalized), so the same ask asked twice
+  /// is one row with a bigger hit count - the ranking a corpus backlog needs.
+  /// Deliberately NOT in the backup export: it is a local to-do, not memory
+  /// the user is asked to reproduce on another machine.
+  static const _openQuestionTableSql = '''
+CREATE TABLE IF NOT EXISTS open_question(
+ question TEXT PRIMARY KEY,
+ hits INTEGER NOT NULL DEFAULT 1,
+ firstSeenAt TEXT NOT NULL,
+ lastSeenAt TEXT NOT NULL
+)''';
+
+  /// How many distinct open questions the backlog keeps. Beyond this, the
+  /// least-recently-asked rows fall off: a backlog that grows forever is a
+  /// list nobody reads, and the newest misses are the live ones.
+  static const int openQuestionCap = 200;
+
+  /// Record a question the offline material could not answer.
+  ///
+  /// The text is normalized for the key (case and whitespace collapsed) so
+  /// "What is VTP?" and "what is vtp" rank as one miss; the FIRST spelling
+  /// is what the screen shows. A learning hiccup must never cost the turn
+  /// its answer - callers wrap this in try/catch and so does the SQL.
+  Future<void> recordOpenQuestion(String question) async {
+    final db = _active;
+    if (db == null) return;
+    final raw = question.trim();
+    if (raw.isEmpty) return;
+    final key = _openQuestionKey(raw);
+    final now = DateTime.now().toIso8601String();
+    try {
+      await db.transaction((txn) async {
+        final existing = await txn.query(
+          'open_question',
+          where: 'question=?',
+          whereArgs: [key],
+          limit: 1,
+        );
+        if (existing.isEmpty) {
+          await txn.insert('open_question', {
+            'question': key,
+            'hits': 1,
+            'firstSeenAt': now,
+            'lastSeenAt': now,
+          });
+        } else {
+          await txn.update(
+            'open_question',
+            {
+              'hits': (existing.first['hits'] as int? ?? 1) + 1,
+              'lastSeenAt': now,
+            },
+            where: 'question=?',
+            whereArgs: [key],
+          );
+        }
+        // Enforce the cap inside the same transaction: the newest misses
+        // stay, the stale ones fall off.
+        final stale = await txn.query(
+          'open_question',
+          columns: ['lastSeenAt'],
+          orderBy: 'lastSeenAt DESC',
+          offset: openQuestionCap,
+          limit: 1,
+        );
+        if (stale.isNotEmpty) {
+          await txn.delete(
+            'open_question',
+            where: 'lastSeenAt<=?',
+            whereArgs: [stale.first['lastSeenAt']],
+          );
+        }
+      });
+      notifyListeners();
+    } catch (_) {
+      // A backlog row is never worth a crash.
+    }
+  }
+
+  /// The distinct questions the offline material could not answer, most
+  /// recently asked first, with their hit counts.
+  Future<List<({String question, int hits, String lastSeenAt})>> openQuestions({
+    int limit = 50,
+  }) async {
+    final db = _active;
+    if (db == null) return const [];
+    try {
+      final rows = await db.query(
+        'open_question',
+        orderBy: 'lastSeenAt DESC',
+        limit: limit,
+      );
+      return [
+        for (final row in rows)
+          (
+            question: '${row['question'] ?? ''}',
+            hits: (row['hits'] as num?)?.toInt() ?? 1,
+            lastSeenAt: '${row['lastSeenAt'] ?? ''}',
+          ),
+      ];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Clear the whole backlog. The screen is the only caller: the list is
+  /// the user's to-do, so the user owns deleting it.
+  Future<void> clearOpenQuestions() async {
+    final db = _active;
+    if (db == null) return;
+    try {
+      await db.delete('open_question');
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// The dedupe key for an open question: case and whitespace collapsed,
+  /// trailing punctuation stripped - the same ask typed as a question and
+  /// as a sentence is one miss, not two.
+  static String _openQuestionKey(String raw) => raw
+      .toLowerCase()
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim()
+      .replaceAll(RegExp(r'[?!.]+$'), '')
+      .trim();
 
   /// The remembered environment (see [EnvironmentProfile]): exactly one row,
   /// because "the user's environment" is one fact, not a history - the newest

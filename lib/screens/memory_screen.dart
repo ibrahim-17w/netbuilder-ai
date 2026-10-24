@@ -50,10 +50,14 @@ class _MemoryScreenState extends State<MemoryScreen> {
   List<BuildAttempt> _attempts = [];
   Map<String, String> _prefs = {};
 
-  /// Learned answers from keyed-model replies (question -> answer),
-  /// newest-seen first. Each row replays offline when the same question is
+  /// Learned answers from keyed-model replies (question -> answer),  /// newest-seen first. Each row replays offline when the same question is
   /// asked with no key - and can be dropped here.
   List<Map<String, dynamic>> _learnedAnswers = [];
+
+  /// Questions the offline material could not answer, most recent first.
+  /// The corpus's backlog, recorded from real misses.
+  List<({String question, int hits, String lastSeenAt})> _openQuestions =
+      const [];
 
   /// Learned phrasings (words -> resolved brief), newest first. The app's
   /// own replay index: each row is a lesson the user can review and drop.
@@ -298,6 +302,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
     _prefs = await mem.allPrefs();
     _phrasings = await mem.allPhrasings();
     _learnedAnswers = await mem.allLearnedAnswers();
+    _openQuestions = await mem.openQuestions();
     _envProfile = await mem.environmentProfile();
     _loadEnvEditor();
     if (mounted) setState(() {});
@@ -1371,32 +1376,131 @@ class _MemoryScreenState extends State<MemoryScreen> {
   /// assistant stops giving it immediately.
   Widget _learnedAnswersTab() {
     final theme = Theme.of(context);
-    return AppPanel(
-      icon: Icons.lightbulb_outline,
-      title: 'Learned answers',
-      subtitle:
-          'When an API key was active and the model answered a question, '
-          'the answer is kept and replayed offline for the same question. '
-          'An answer seen twice is confirmed. Drop any lesson you do not '
-          'trust. On this device only.',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_learnedAnswers.isEmpty)
+        _openQuestionsPanel(theme),
+        AppPanel(
+          icon: Icons.lightbulb_outline,
+          title: 'Learned answers',
+          subtitle:
+              'When an API key was active and the model answered a question, '
+              'the answer is kept and replayed offline for the same question. '
+              'An answer seen twice is confirmed. Drop any lesson you do not '
+              'trust. On this device only.',
+          children: [
+            if (_learnedAnswers.isEmpty)
+              Text(
+                'Nothing learned yet. Ask a question while your API key is '
+                'active and the answer is kept here for offline replay.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              )
+            else
+              for (final a in _learnedAnswers)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppTheme.s8),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppTheme.s12,
+                      AppTheme.s8,
+                      AppTheme.s4,
+                      AppTheme.s8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppPalette.panelAlt(theme.colorScheme),
+                      borderRadius: BorderRadius.circular(AppTheme.rMd),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      (a['question'] ?? '').toString(),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.titleSmall,
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppTheme.s8),
+                                  Text(
+                                    '${a['seenCount'] ?? 1}x'
+                                    '${(a['confirmed'] ?? 0) == 1 ? ' · confirmed' : ''}',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: (a['confirmed'] ?? 0) == 1
+                                          ? AppPalette.success(
+                                              theme.colorScheme,
+                                            )
+                                          : theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                (a['answer'] ?? '').toString(),
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Forget this answer',
+                          icon: const Icon(Icons.close, size: 18),
+                          onPressed: () => _forgetLearnedAnswer(
+                            (a['id'] as num?)?.toInt() ?? 0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// The questions the offline material could not answer, most recently
+  /// asked first. This is the corpus's backlog: each row is a real miss,
+  /// and the hit count is how often it was asked. Nothing here ever left
+  /// the device.
+  Widget _openQuestionsPanel(ThemeData theme) {
+    return AppPanel(
+      icon: Icons.help_outline,
+      title: 'Questions I could not answer',
+      subtitle:
+          'Asked without a key and not covered by the offline material. '
+          'The hit count is how often it came up - the top of this list is '
+          'what to teach the app next. On this device only.',
+      children: [
+        if (_openQuestions.isEmpty)
           Text(
-            'Nothing learned yet. Ask a question while your API key is '
-            'active and the answer is kept here for offline replay.',
+            'Nothing recorded. When the offline assistant cannot answer '
+            'something, the question lands here.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           )
-        else
-          for (final a in _learnedAnswers)
+        else ...[
+          for (final q in _openQuestions)
             Padding(
-              padding: const EdgeInsets.only(bottom: AppTheme.s8),
+              padding: const EdgeInsets.only(bottom: AppTheme.s6),
               child: Container(
                 padding: const EdgeInsets.fromLTRB(
                   AppTheme.s12,
                   AppTheme.s8,
-                  AppTheme.s4,
+                  AppTheme.s6,
                   AppTheme.s8,
                 ),
                 decoration: BoxDecoration(
@@ -1406,53 +1510,37 @@ class _MemoryScreenState extends State<MemoryScreen> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  (a['question'] ?? '').toString(),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.titleSmall,
-                                ),
-                              ),
-                              const SizedBox(width: AppTheme.s8),
-                              Text(
-                                '${a['seenCount'] ?? 1}x'
-                                '${(a['confirmed'] ?? 0) == 1 ? ' · confirmed' : ''}',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: (a['confirmed'] ?? 0) == 1
-                                      ? AppPalette.success(theme.colorScheme)
-                                      : theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            (a['answer'] ?? '').toString(),
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        q.question,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    IconButton(
-                      tooltip: 'Forget this answer',
-                      icon: const Icon(Icons.close, size: 18),
-                      onPressed: () =>
-                          _forgetLearnedAnswer((a['id'] as num?)?.toInt() ?? 0),
+                    const SizedBox(width: AppTheme.s8),
+                    Text(
+                      '${q.hits}x',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
+          const SizedBox(height: AppTheme.s6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () async {
+                final mem = context.read<MemoryService>();
+                await mem.clearOpenQuestions();
+                await _refresh();
+              },
+              icon: const Icon(Icons.clear_all, size: 18),
+              label: const Text('Clear the list'),
+            ),
+          ),
+        ],
       ],
     );
   }
