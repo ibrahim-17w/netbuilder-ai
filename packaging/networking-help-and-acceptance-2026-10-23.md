@@ -20,11 +20,10 @@ and the tester package was rebuilt and re-verified from that source.
   conversation context.
 - Pending clarification questions are resolved BEFORE the help gate, so
   typing "OSPF" still answers the routing question the app just asked.
-- Offline, a help ask the corpus does not cover says what it needs
-  (topic or symptom, real equipment or simulator, one read-only check)
-  instead of dumping the plan; follow-ups re-resolve to the previous
-  networking topic rather than the standing topology. How-to answers
-  offer the guide chip, not the build chip.
+- Offline, a help ask the corpus does not cover keeps the guided
+  near-miss reply; follow-ups re-resolve to the previous networking topic
+  rather than the standing topology. How-to answers offer the guide chip,
+  not the build chip.
 - `GuideRequestReader` only claims whole-message plan instructions
   ("how do I build this?", "walk me through it", "just the steps").
   A topic how-to ("how to configure a trunk port") is answered, not
@@ -82,18 +81,75 @@ passes identically under both locale modes.
   bundle-manifest SHA256
   `fb945712534ecc9e6959d457d4921ed4122a7cffdfda04ce11c2ad341a75f076`.
 
+# Help-first feature batch (2026-10-24, `ff68fde`..`d02d64a`)
+
+Six features deepened the help-first direction. Each was committed
+separately after its own checks (targeted suites + analyzer; features 5
+and 6 additionally ran the FULL Flutter suite / full sidecar suite).
+
+1. **Verified addressing after a build** (`1fe55bd` line of work,
+   committed as the addressing extension): the plan-vs-file comparison
+   now reads the audit's per-port saved IPs, resolves plan interfaces
+   through the generator's port-remap table, matches Cisco shorthand to
+   full save names, and reports unconfigured, wrong and leftover
+   (template) addresses. A device whose interfaces the audit cannot
+   read is marked "not comparable" instead of failed.
+2. **Keyless OCR for attachments** (`ff68fde`): the engine gained a
+   local `/ocr` endpoint (base64 image in, UTF-8 text out, no window,
+   nothing typed; `sidecar/test_ocr_endpoint.py` 4 tests). The app reads
+   attached screenshots through it and the offline reply quotes the
+   machine-read text as evidence; an image-only turn shows the text and
+   asks what to make of it; without the engine the reply says so.
+3. **Pasted-config review** (`deab1b4`): a pasted `show run` is
+   recognized before parsing (a single line never matches) and answered
+   with a deterministic offline review - plain-English sections for what
+   the config actually contains, classic mistakes as findings with
+   reasons (telnet vty, shared vty password, enable password without
+   secret, plaintext without encryption, access ports on VLAN 1).
+   Absent sections are not described.
+4. **Device questions from the plan** (`b773f21`): "what does SW1 do?"
+   is answered from the standing plan - type, addresses, cables with
+   both ports, service roles, and the read-only commands that show the
+   same facts on the device. Uncovered help keeps the guided near-miss
+   with the plan's devices named as ground; follow-ups find their topic
+   past acknowledgements; a gap answer never advertises the build.
+5. **Scan-side reachability** (`3aa384a`): "why can't PC1 ping PC2?"
+   against a scanned .pkt walks the file's own rows - addresses, cable
+   path (BFS over the link table), admin-down interfaces on the path -
+   and reports the first blocking rung with its fix; a clean file earns
+   the honest limit plus the live checks (mask, gateway, route).
+6. **Industrial kinds place live** (`3e5cf30`): hub, sniffer, plc,
+   historian, cyber-observer, controller and power-distribution gained
+   taught DEVICE_PALETTE paths, so a live run places them instead of
+   recording `offline_only`. Both offline-only sets are now empty (kept
+   as the landing place for the next template-backed kind without a
+   click-path) and the palette gate tests pin both directions, including
+   that a graduated kind keeps its offline template compile. Engine
+   version `2026-10-24-industrial-palette-paths`.
+7. **Real-hardware guide + export** (`d02d64a`): a non-PT target speaks
+   console/rack (rack and console, physical cabling, PT-equivalent model
+   note) and leaves out the ASA/offline-only notes; the guide dialog
+   gained Save to file, writing `guide-<network>.md` (same network
+   naming the .pkt uses, numbered when taken) beside the .pkt files.
+   Persisted checkboxes in the dialog are deliberately NOT in this
+   slice.
+
+## Batch gates (2026-10-24, final state `d02d64a`)
+
+- `flutter analyze --fatal-infos` clean; `flutter test` 2581 passed.
+- Sidecar `python -m pytest -q` (PYTHONUTF8=1): 584 passed, 1 skipped -
+  the skip is the offline-only compile test, legitimately vacuous now
+  that the set is empty.
+
 ## What is still not verified here
 
+- The 2026-10-23 package artifacts predate this batch: rebuild the
+  tester package from `d02d64a` before handing it to testers.
 - The build is unsigned; SmartScreen will warn testers. A signed build
   still needs the certificate secrets in the tag-only CI job.
-- The clean-VM walkthrough in `CLEAN-VM-TEST.md` remains a manual gate:
-  the install/upgrade tests above isolate the install root but run on
-  the development machine, not on a machine without Flutter, Python, or
-  this checkout.
-- The 3-5 tester pilot (`pilot/README.md`, tasks T0-T6) has not been
-  run; the kit and metrics summarizer are ready.
-- Live Packet Tracer autopilot workflows (device placement, DHCP/DNS/
-  HTTP probes, SSH) were not exercised in this pass; offline `.pkt`
-  generation is covered by the widget-level build test and the packaged
-  engine health check. The offline-only device kinds are skipped, never
-  substituted, in a live run.
+- The clean-VM walkthrough in `CLEAN-VM-TEST.md` remains a manual gate;
+  the 3-5 tester pilot has not been run.
+- The new live palette paths are pinned by mocked click tests only -
+  real Packet Tracer acceptance (does the IoT submenu actually hold
+  these rows on the pilot machine's PT build?) is a recorded manual
+  gate, same as the rest of the live simulator checks.
