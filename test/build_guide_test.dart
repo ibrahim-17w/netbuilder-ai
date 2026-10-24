@@ -137,4 +137,40 @@ void main() {
       'guide-two-sites-40-pcs.md',
     );
   });
+
+  group('the verification checklist round-trips', () {
+    final intent = NetworkIntent(
+      projectName: 'office',
+      nodes: [node('R1', 'router', '4331'), node('SW1', 'switch', '2960')],
+      links: const [NetLink(a: 'R1', aIf: 'g0/0', b: 'SW1', bIf: 'f0/1')],
+      addressing: const [
+        InterfaceAddr(node: 'R1', iface: 'g0/0', ipCidr: '10.0.0.1/30'),
+      ],
+    );
+    final guide = BuildGuide.markdown(intent);
+
+    test('the checklist items are found in section 4', () {
+      final items = BuildGuide.checklistItems(guide);
+      expect(items, isNotEmpty);
+      expect(items.every((i) => !i.startsWith('[ ')), isTrue);
+      // The device-existence check is always there.
+      expect(items.any((i) => i.contains('Every device above exists')), isTrue);
+    });
+
+    test('applyChecks writes the ticks and leaves the rest alone', () {
+      final items = BuildGuide.checklistItems(guide);
+      final ticked = {items.first};
+      final out = BuildGuide.applyChecks(guide, ticked);
+      expect(out, contains('- [x] ${items.first}'));
+      // The other items stay unticked.
+      for (final item in items.skip(1)) {
+        expect(out, contains('- [ ] $item'));
+      }
+      // Unticking restores the plain box.
+      final back = BuildGuide.applyChecks(out, <String>{});
+      expect(back, contains('- [ ] ${items.first}'));
+      // And the heading text is untouched by the round trip.
+      expect(back, contains('# Build guide - office'));
+    });
+  });
 }

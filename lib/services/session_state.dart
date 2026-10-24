@@ -99,6 +99,13 @@ class SessionState {
   String captureName;
   String captureAnalysisJson;
 
+  /// Checked items of the build guide's verification checklist, as JSON
+  /// (plan revision -> list of step titles). A long build can be put
+  /// down and picked up: the checkboxes survive a conversation reopen, and
+  /// the exported guide text reflects them as [x]. Empty string when
+  /// nothing was ticked.
+  String guideChecksJson;
+
   /// The active guided lab, as JSON (`{'lab': <id>}`), so lab progress
   /// survives a reopen like the troubleshoot flow does. Empty string when
   /// no lab is running. Kept OUT of [flowState] on purpose: a non-empty
@@ -132,6 +139,7 @@ class SessionState {
     this.captureName = '',
     this.captureAnalysisJson = '',
     this.labJson = '',
+    this.guideChecksJson = '',
   }) : focus = focus ?? <String>[],
        confirmedFindings = confirmedFindings ?? <String>[],
        openFindings = openFindings ?? <String>[],
@@ -543,6 +551,7 @@ class SessionState {
     if (captureAnalysisJson.isNotEmpty)
       'captureAnalysisJson': captureAnalysisJson,
     if (labJson.isNotEmpty) 'labJson': labJson,
+    if (guideChecksJson.isNotEmpty) 'guideChecksJson': guideChecksJson,
   };
 
   String encode() => jsonEncode(toJson());
@@ -584,6 +593,7 @@ class SessionState {
     captureName: (j['captureName'] ?? '').toString(),
     captureAnalysisJson: (j['captureAnalysisJson'] ?? '').toString(),
     labJson: (j['labJson'] ?? '').toString(),
+    guideChecksJson: (j['guideChecksJson'] ?? '').toString(),
   );
 
   // --- deterministic extraction -------------------------------------------

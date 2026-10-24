@@ -27,6 +27,20 @@ void main() {
     final restored = SessionState.decode(state.encode());
     expect(labIdOf(restored), isNull);
   });
+
+  test('guide checklist ticks survive the round trip', () {
+    final state = SessionState()
+      ..guideChecksJson =
+          '{"rev-1":["Every device above exists, with the model shown."]}';
+    final restored = SessionState.decode(state.encode());
+    expect(restored.guideChecksJson, contains('rev-1'));
+    expect(restored.guideChecksJson, contains('Every device above exists'));
+  });
+
+  test('an empty guide checks field decodes clean', () {
+    final restored = SessionState.decode(SessionState().encode());
+    expect(restored.guideChecksJson, '');
+  });
 }
 
 /// The same decode the chat screen uses to find the running lab.

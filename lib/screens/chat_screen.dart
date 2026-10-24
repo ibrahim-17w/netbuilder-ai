@@ -2638,60 +2638,148 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  /// Render the guide in a copyable dialog: read it, copy it, or save it
-  /// as a Markdown file. No .pkt is ever written by this path.
+  /// Render the guide in a copyable dialog: read it, tick steps off the
+  /// verification checklist, copy it, or save it as a Markdown file. No
+  /// .pkt is ever written by this path.
+  ///
+  /// The checklist ticks persist per plan revision in the session state, so
+  /// a long build can be put down and picked up; the text copied or saved
+  /// always reflects the ticks, because the markdown stays the one truth.
   Future<void> _openBuildGuide(NetworkIntent plan) async {
     final guide = BuildGuide.markdown(plan, target: _target);
+    final checks = _guideChecksFor(plan.revision);
     if (!mounted) return;
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(
-          'Build guide - ${plan.projectName.trim().isEmpty ? 'network' : plan.projectName}',
-        ),
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: SingleChildScrollView(
-            child: SelectableText(
-              guide,
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12.5,
-                height: 1.45,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          // The text reflects the ticks: what is copied or saved carries
+          // exactly the progress the user recorded.
+          final rendered = BuildGuide.applyChecks(guide, checks);
+          final items = BuildGuide.checklistItems(guide);
+          return AlertDialog(
+            title: Text(
+              'Build guide - ${plan.projectName.trim().isEmpty ? 'network' : plan.projectName}',
+            ),
+            content: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SelectableText(
+                      rendered,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12.5,
+                        height: 1.45,
+                      ),
+                    ),
+                    if (items.isNotEmpty) ...[
+                      const SizedBox(height: AppTheme.s8),
+                      Text(
+                        'Progress (saved with this conversation):',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      for (final item in items)
+                        CheckboxListTile(
+                          dense: true,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          contentPadding: EdgeInsets.zero,
+                          value: checks.contains(item),
+                          title: Text(
+                            item,
+                            style: TextStyle(
+                              decoration: checks.contains(item)
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                          ),
+                          onChanged: (ticked) {
+                            setDialogState(() {
+                              ticked == true
+                                  ? checks.add(item)
+                                  : checks.remove(item);
+                            });
+                            _persistGuideChecks(plan.revision, checks);
+                          },
+                        ),
+                    ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ),
-        actions: [
-          TextButton.icon(
-            onPressed: () => _copyMessage(guide),
-            icon: const Icon(Icons.copy_all_outlined, size: 18),
-            label: const Text('Copy guide'),
-          ),
-          TextButton.icon(
-            onPressed: () async {
-              final path = await _saveGuideFile(plan, guide);
-              if (!dialogContext.mounted) return;
-              Navigator.of(dialogContext).pop();
-              _appendSystem(
-                path == null
-                    ? 'The guide could not be saved as a file. The Copy '
-                          'button still puts the whole thing on the '
-                          'clipboard.'
-                    : 'Guide saved as `$path` - it sits beside your .pkt '
-                          'files and opens in any text editor.',
-              );
-            },
-            icon: const Icon(Icons.save_outlined, size: 18),
-            label: const Text('Save to file'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Done'),
-          ),
-        ],
+            actions: [
+              TextButton.icon(
+                onPressed: () => _copyMessage(rendered),
+                icon: const Icon(Icons.copy_all_outlined, size: 18),
+                label: const Text('Copy guide'),
+              ),
+              TextButton.icon(
+                onPressed: () async {
+                  final path = await _saveGuideFile(plan, rendered);
+                  if (!dialogContext.mounted) return;
+                  Navigator.of(dialogContext).pop();
+                  _appendSystem(
+                    path == null
+                        ? 'The guide could not be saved as a file. The Copy '
+                              'button still puts the whole thing on the '
+                              'clipboard.'
+                        : 'Guide saved as `$path` - it sits beside your .pkt '
+                              'files and opens in any text editor.',
+                  );
+                },
+                icon: const Icon(Icons.save_outlined, size: 18),
+                label: const Text('Save to file'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Done'),
+              ),
+            ],
+          );
+        },
       ),
     );
+  }
+
+  /// The checked checklist steps for one plan revision, or a fresh set.
+  /// The set is LIVE: the dialog mutates it and [_persistGuideChecks]
+  /// writes it back, so a tick survives a reopen.
+  Set<String> _guideChecksFor(String revision) {
+    if (_state.guideChecksJson.trim().isEmpty) return <String>{};
+    try {
+      final v = jsonDecode(_state.guideChecksJson);
+      if (v is Map) {
+        final list = (v[revision] as List?) ?? const [];
+        return {for (final item in list) '$item'};
+      }
+    } catch (_) {}
+    return <String>{};
+  }
+
+  /// Write the ticks back into the session state (and the store), keyed by
+  /// the plan revision the guide was written for.
+  Future<void> _persistGuideChecks(String revision, Set<String> checks) async {
+    Map<String, dynamic> all = {};
+    if (_state.guideChecksJson.trim().isNotEmpty) {
+      try {
+        final v = jsonDecode(_state.guideChecksJson);
+        if (v is Map) all = Map<String, dynamic>.from(v);
+      } catch (_) {}
+    }
+    if (checks.isEmpty) {
+      all.remove(revision);
+    } else {
+      all[revision] = checks.toList();
+    }
+    _state.guideChecksJson = all.isEmpty ? '' : jsonEncode(all);
+    final mem = _memory;
+    if (mem != null && mem.ready) {
+      try {
+        await mem.setSessionState(_conversation, _state.encode());
+      } catch (_) {}
+    }
   }
 
   Future<void> _buildCurrentPlan() async {

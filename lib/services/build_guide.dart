@@ -44,7 +44,8 @@ class BuildGuide {
     NetworkIntent intent, {
     String target = 'packet-tracer',
   }) {
-    final realHardware = target.trim().toLowerCase() != 'packet-tracer' &&
+    final realHardware =
+        target.trim().toLowerCase() != 'packet-tracer' &&
         target.trim().toLowerCase() != 'packet_tracer' &&
         target.trim().toLowerCase() != 'pt';
     final plan = PacketTracerAdapter.autopilotPlan(intent);
@@ -344,6 +345,31 @@ class BuildGuide {
     final trimmed = safe.replaceAll(RegExp(r'^-+|-+$'), '');
     return 'guide-${trimmed.isEmpty ? 'network' : trimmed}.md';
   }
+
+  /// Parse the guide's verification checklist back out of the markdown.
+  ///
+  /// Section 4's `- [ ] step` lines are the progress a long build tracks;
+  /// the dialog renders them as real checkboxes and [apply] writes the
+  /// ticked ones back, so the copyable/exported text stays the one truth.
+  static List<String> checklistItems(String guide) => [
+    for (final line in guide.split('\n'))
+      if (RegExp(r'^- \[[ x]\] (.+)$').hasMatch(line.trim()))
+        line.trim().substring(6),
+  ];
+
+  /// The guide with the ticked steps written as `- [x]` (and unticked ones
+  /// restored to `- [ ]`), so an exported or copied guide carries exactly
+  /// the progress the user recorded.
+  static String applyChecks(String guide, Set<String> checked) => guide
+      .split('\n')
+      .map((line) {
+        final t = line.trim();
+        final m = RegExp(r'^- \[([ x])\] (.+)$').firstMatch(t);
+        if (m == null) return line;
+        final ticked = checked.contains(m.group(2));
+        return '- [${ticked ? 'x' : ' '}] ${m.group(2)}';
+      })
+      .join('\n');
 
   static String _cell(String text) => text.replaceAll('|', r'\|');
 

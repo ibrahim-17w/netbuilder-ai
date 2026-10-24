@@ -240,4 +240,47 @@ void main() {
     expect(text, contains('No .pkt was analyzed'));
     expect(text, contains('## How to build it'));
   });
+
+  testWidgets('guide checklist ticks persist across reopen', (tester) async {
+    PathProviderPlatform.instance = _FakePathProvider();
+    addTearDown(
+      () => PathProviderPlatform.instance = MethodChannelPathProvider(),
+    );
+    await tester.pumpWidget(const NetBuilderApp());
+    await tester.pumpAndSettle();
+
+    final composer = find.byWidgetPredicate(
+      (w) => w is TextField && w.decoration?.labelText == 'Message',
+    );
+    await tester.enterText(composer, '2 routers and 4 switches');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await _settle(tester);
+
+    // Open the guide the way a user does.
+    await tester.enterText(composer, 'how do I build this?');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await _settle(tester);
+    expect(find.textContaining('Build guide'), findsWidgets);
+
+    // Tick the first checklist step and close. The checklist sits below a
+    // long guide, so it is brought into view before the tap.
+    final box = find.byType(CheckboxListTile).first;
+    await tester.ensureVisible(box);
+    await tester.pumpAndSettle();
+    await tester.tap(box);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+
+    // Reopen: the tick is still there, and the rendered text carries it.
+    await tester.enterText(composer, 'how do I build this?');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await _settle(tester);
+    expect(find.byType(CheckboxListTile).first, findsOneWidget);
+    final checkbox = tester.widget<CheckboxListTile>(
+      find.byType(CheckboxListTile).first,
+    );
+    expect(checkbox.value, isTrue, reason: 'the tick survived the reopen');
+    expect(find.textContaining('- [x] Every device'), findsOneWidget);
+  });
 }
