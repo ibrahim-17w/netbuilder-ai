@@ -141,15 +141,46 @@ and 6 additionally ran the FULL Flutter suite / full sidecar suite).
   the skip is the offline-only compile test, legitimately vacuous now
   that the set is empty.
 
+# Adoption, diff and guided labs (2026-10-24, `cbf49d2`..`62a0ed5`)
+
+Three features closed the biggest remaining gaps after the help-first
+batch. Each was committed after its own check; the final tree passes
+the full suite.
+
+1. **Any scanned file becomes the lab** (`cbf49d2`): the scan card now
+   carries "Make this file the lab this conversation edits", and typed
+   "use this file as my lab" runs the same import - the save becomes
+   the standing plan, the reply names what was kept, what the save
+   cannot prove, and what it replaced. The guide, build, edit and
+   change machinery now work on any Packet Tracer file the user brings.
+2. **Scan diff** (`e06a2bd`): "diff A.pkt and B.pkt" (or "compare this
+   file with B.pkt" against the current scan) audits both files
+   read-only and reports devices added/removed, addresses moved per
+   interface, cable endpoint pairs, and findings cleared/introduced -
+   matched by text, never per-scan ids. Interface state flapping is not
+   reported; identical files say so.
+3. **Guided labs** (`62a0ed5`): three starter labs (VLANs with DHCP,
+   two-router OSPF WAN, secure management) with `/lab`, "start the
+   <name> lab", and "check my lab" - the standing plan graded step by
+   step, each check reading fields the planner actually writes, with a
+   remedy per open step. Progress survives a reopen via the session
+   state; the grade is always recomputed, never replayed.
+
+Also: the file-edit widget tests' pump budget widened - the in-place
+compile does real CPU work between pumps and the old 9-second budget
+ran out on a loaded machine (the behavior itself was and is correct).
+
+## Batch gates (2026-10-24, final state `62a0ed5`)
+
+- `flutter analyze --fatal-infos` clean; `flutter test` 2614 passed.
+
 ## What is still not verified here
 
-- The 2026-10-23 package artifacts predate this batch: rebuild the
-  tester package from `d02d64a` before handing it to testers.
+- The 2026-10-23 package artifacts predate both batches: rebuild the
+  tester package from `62a0ed5` before handing it to testers.
 - The build is unsigned; SmartScreen will warn testers. A signed build
   still needs the certificate secrets in the tag-only CI job.
-- The clean-VM walkthrough in `CLEAN-VM-TEST.md` remains a manual gate;
-  the 3-5 tester pilot has not been run.
-- The new live palette paths are pinned by mocked click tests only -
-  real Packet Tracer acceptance (does the IoT submenu actually hold
-  these rows on the pilot machine's PT build?) is a recorded manual
-  gate, same as the rest of the live simulator checks.
+- The clean-VM walkthrough and the 3-5 tester pilot remain manual gates.
+- Live Packet Tracer checks (industrial palette rows, DHCP/HTTP probes)
+  remain recorded manual acceptance runs.
+
