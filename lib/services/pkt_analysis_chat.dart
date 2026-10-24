@@ -153,6 +153,11 @@ class PktAnalysisChat {
     if (_asksForOverview(q)) {
       return PktAnalysisReply(reportText(analysis));
     }
+    // A NAMED PAIR IS A REACHABILITY QUESTION, answered by walking THIS
+    // FILE's rows - addresses, interface states, cable path - never the plan
+    // on the table, which may be a different network entirely.
+    final reachability = _reachability(q, analysis);
+    if (reachability != null) return reachability;
     if (!explanatory && _isExplicitFix(q)) {
       return _prepareRepair(q, analysis, findings);
     }
@@ -194,6 +199,188 @@ class PktAnalysisChat {
       if (general != null) return PktAnalysisReply(general);
     }
     return null;
+  }
+
+  /// "Why can't PC1 ping PC2?", answered from the scan's own rows.
+  ///
+  /// The rungs, first blocker first: an endpoint with no address on any
+  /// interface, an administratively down interface on the cable path, no
+  /// cable path at all - and when the file gives both an address and a path,
+  /// the honest limit: an offline scan cannot prove a live ping, so the
+  /// answer says what to run instead of claiming success.
+  static PktAnalysisReply? _reachability(
+    String q,
+    Map<String, dynamic> analysis,
+  ) {
+    final m = RegExp(
+      "\\b(?:why\\s+)?(?:can(?:not|'t)|won't|doesn't|does\\s+not)\\s+"
+      '([a-z0-9_.-]+)\\s+ping\\s+([a-z0-9_.-]+)',
+    ).firstMatch(q);
+    if (m == null) return null;
+    final devices = [
+      for (final d in (analysis['devices'] as List?) ?? const [])
+        if (d is Map) '${d['name'] ?? ''}'.trim(),
+    ].where((name) => name.isNotEmpty).toList();
+    String? resolve(String word) {
+      final w = word.toLowerCase();
+      for (final name in devices) {
+        if (name.toLowerCase() == w) return name;
+      }
+      // "ping pc2?" - the trailing punctuation was not stripped by the regex.
+      for (final name in devices) {
+        if (name.toLowerCase() == w.replaceAll(RegExp(r'[?!.]+$'), '')) {
+          return name;
+        }
+      }
+      return null;
+    }
+
+    final from = resolve(m.group(1)!);
+    final to = resolve(m.group(2)!);
+    if (from == null || to == null) {
+      // A ping question about something that is not a device in THIS file
+      // ("cannot ping the internet") is somebody else's answer.
+      return null;
+    }
+
+    final interfaces = [
+      for (final row in (analysis['interfaces'] as List?) ?? const [])
+        if (row is Map)
+          Map<String, dynamic>.from(row),
+    ];
+    List<Map<String, dynamic>> rowsOf(String device) => interfaces
+        .where((r) => '${r['device'] ?? ''}'.toLowerCase() == device.toLowerCase())
+        .toList();
+
+    PktAnalysisReply noAddress(String device) {
+      final names = rowsOf(device)
+          .map((r) => '${r['name'] ?? ''}')
+          .where((n) => n.isNotEmpty)
+          .take(3)
+          .join(', ');
+      return PktAnalysisReply(
+        '$device has no configured address on any interface in this file'
+        '${names.isEmpty ? '' : ' (its interfaces: $names)'}. Without an IP '
+        'it has nothing to send a ping from. Give it an address - on a PC '
+        'that is Desktop > IP Configuration, on a router an `ip address` on '
+        'the interface - and read the scan again.',
+      );
+    }
+
+    final fromRows = rowsOf(from);
+    final toRows = rowsOf(to);
+    if (fromRows.isEmpty ||
+        fromRows.every((r) => '${r['ip'] ?? ''}'.trim().isEmpty)) {
+      return noAddress(from);
+    }
+    if (toRows.isEmpty ||
+        toRows.every((r) => '${r['ip'] ?? ''}'.trim().isEmpty)) {
+      return noAddress(to);
+    }
+
+    // The cable path between them, from THIS file's link rows.
+    final links = [
+      for (final row in (analysis['links'] as List?) ?? const [])
+        if (row is Map)
+          (
+            a: '${row['a'] ?? ''}'.trim(),
+            b: '${row['b'] ?? ''}'.trim(),
+            aIf: '${row['aIf'] ?? ''}'.trim(),
+            bIf: '${row['bIf'] ?? ''}'.trim(),
+          ),
+    ];
+    final neighbors = <String, Set<String>>{};
+    for (final l in links) {
+      neighbors.putIfAbsent(l.a.toLowerCase(), () => {}).add(l.b);
+      neighbors.putIfAbsent(l.b.toLowerCase(), () => {}).add(l.a);
+    }
+    final visited = {from.toLowerCase()};
+    final parent = <String, String>{};
+    final queue = [from];
+    while (queue.isNotEmpty) {
+      final current = queue.removeAt(0);
+      if (current.toLowerCase() == to.toLowerCase()) break;
+      for (final next in neighbors[current.toLowerCase()] ?? const {}) {
+        if (visited.contains(next.toLowerCase())) continue;
+        visited.add(next.toLowerCase());
+        parent[next] = current;
+        queue.add(next);
+      }
+    }
+    if (!visited.contains(to.toLowerCase())) {
+      String wiredTo(String device) {
+        final peers = (neighbors[device.toLowerCase()] ?? const {}).toList()
+          ..sort();
+        return peers.isEmpty
+            ? '$device has no cable at all in this file'
+            : '$device is cabled to ${peers.join(', ')}';
+      }
+
+      return PktAnalysisReply(
+        'There is no cable path between $from and $to in this file - a ping '
+        'has no road to travel. ${wiredTo(from)}; ${wiredTo(to)}. Cable a '
+        'path between them (switch to switch, or each to a shared switch) '
+        'and read the scan again.',
+      );
+    }
+
+    // Rebuild the path and check each interface along it for admin-down.
+    final path = <String>[to];
+    while (path.last != from) {
+      path.add(parent[path.last]!);
+    }
+    final ordered = path.reversed.toList();
+    path
+      ..clear()
+      ..addAll(ordered);
+    for (var i = 0; i < path.length - 1; i++) {
+      for (final l in links) {
+        final hop = path[i].toLowerCase();
+        final next = path[i + 1].toLowerCase();
+        final isHop =
+            (l.a.toLowerCase() == hop && l.b.toLowerCase() == next) ||
+            (l.b.toLowerCase() == hop && l.a.toLowerCase() == next);
+        if (!isHop) continue;
+        for (final end in [
+          (device: l.a, iface: l.aIf),
+          (device: l.b, iface: l.bIf),
+        ]) {
+          final row = rowsOf(end.device).firstWhere(
+            (r) =>
+                '${r['name'] ?? ''}'.toLowerCase() == end.iface.toLowerCase(),
+            orElse: () => const {},
+          );
+          if (row.isEmpty) continue;
+          if ('${row['status'] ?? ''}'.contains('down')) {
+            return PktAnalysisReply(
+              '${end.device} ${end.iface} is administratively down in this '
+              'file - the cable is there but the interface is switched off, '
+              'so nothing crosses it. `no shutdown` on that interface and '
+              'the link comes up.',
+            );
+          }
+        }
+      }
+    }
+
+    // Both addressed, a cable path exists, nothing admin-down: the file is
+    // as good as an offline scan can prove. Say the limit and name the run.
+    final fromIp = fromRows
+        .map((r) => '${r['ip'] ?? ''}'.trim())
+        .firstWhere((ip) => ip.isNotEmpty);
+    final toIp = toRows
+        .map((r) => '${r['ip'] ?? ''}'.trim())
+        .firstWhere((ip) => ip.isNotEmpty);
+    return PktAnalysisReply(
+      'In this file, $from ($fromIp) and $to ($toIp) each have an address, '
+      'a cable path exists (VIA ${path.join(' -> ')}), and no '
+      'interface on the path is shut down. An offline scan cannot prove a '
+      'live ping - masks, the default gateway and the routing table are what '
+      'to check next: on each device `show ip interface brief` for the mask, '
+      'on the PCs the Desktop > IP Configuration gateway, and `show ip '
+      'route` for a route to $toIp\'s network. If all of those look right, '
+      'run the ping in Packet Tracer and tell me what it printed.',
+    );
   }
 
   static PktAnalysisReply _prepareRepair(

@@ -172,4 +172,143 @@ void main() {
       expect(prompt, isNot(contains(r'C:\labs\office.pkt')));
     },
   );
+
+  group('reachability is reasoned over the scanned file', () {
+    // A small LAN whose two PCs are cabled through SW0, with real addresses
+    // in the interface rows - the shape a clean office-lab scan has.
+    Map<String, dynamic> lanScan({
+      Map<String, String> overrideIp = const {},
+      Map<String, String> overrideStatus = const {},
+      List<Map<String, String>> links = const [
+        {
+          'a': 'PC1',
+          'aIf': 'FastEthernet0',
+          'b': 'SW0',
+          'bIf': 'FastEthernet0/1',
+        },
+        {
+          'a': 'PC2',
+          'aIf': 'FastEthernet0',
+          'b': 'SW0',
+          'bIf': 'FastEthernet0/2',
+        },
+      ],
+    }) {
+      String ip(String device) =>
+          overrideIp[device] ??
+          (device == 'PC1' ? '192.168.1.10' : '192.168.1.11');
+      String status(String device) =>
+          overrideStatus[device] ?? (device == 'PC1' ? 'up' : 'up');
+      return PktAnalysisChat.snapshot(
+        {
+          'summary': {'device_count': 3, 'links': links.length},
+          'devices': [
+            {
+              'name': 'PC1',
+              'type': 'PC',
+              'interfaces': [
+                {
+                  'name': 'FastEthernet0',
+                  'status': status('PC1'),
+                  'ip': ip('PC1'),
+                },
+              ],
+              'findings': [],
+            },
+            {
+              'name': 'PC2',
+              'type': 'PC',
+              'interfaces': [
+                {
+                  'name': 'FastEthernet0',
+                  'status': status('PC2'),
+                  'ip': ip('PC2'),
+                },
+              ],
+              'findings': [],
+            },
+            {
+              'name': 'SW0',
+              'type': 'Switch',
+              'interfaces': [
+                {'name': 'FastEthernet0/1', 'status': 'up', 'ip': ''},
+                {'name': 'FastEthernet0/2', 'status': 'up', 'ip': ''},
+              ],
+              'findings': [],
+            },
+          ],
+          'links': links,
+        },
+        path: r'C:\labs\lan.pkt',
+        name: 'lan.pkt',
+      );
+    }
+
+    test('two addressed, cabled hosts get the honest can-prove answer', () {
+      final reply = PktAnalysisChat.answer(
+        "why can't PC1 ping PC2?",
+        lanScan(),
+      );
+      expect(reply, isNotNull);
+      expect(reply!.text, contains('192.168.1.10'));
+      expect(reply.text, contains('PC1 -> SW0 -> PC2'));
+      expect(
+        reply.text,
+        contains('cannot prove a live ping'),
+        reason: 'the offline scan states its own limit',
+      );
+    });
+
+    test('an unaddressed endpoint is named with its fix', () {
+      final reply = PktAnalysisChat.answer(
+        "why can't PC2 ping PC1?",
+        lanScan(overrideIp: const {'PC2': ''}),
+      );
+      expect(reply, isNotNull);
+      expect(reply!.text, contains('PC2 has no configured address'));
+      expect(reply.text, contains('IP Configuration'));
+    });
+
+    test(
+      'no cable path between the two ends is reported, with who IS cabled',
+      () {
+        final reply = PktAnalysisChat.answer(
+          "why can't PC1 ping PC2?",
+          lanScan(
+            links: const [
+              {
+                'a': 'PC1',
+                'aIf': 'FastEthernet0',
+                'b': 'SW0',
+                'bIf': 'FastEthernet0/1',
+              },
+            ],
+          ),
+        );
+        expect(reply, isNotNull);
+        expect(reply!.text, contains('no cable path between PC1 and PC2'));
+        expect(reply.text, contains('PC2 has no cable at all'));
+      },
+    );
+
+    test('an admin-down interface on the path names the exact port', () {
+      final reply = PktAnalysisChat.answer(
+        "why can't PC1 ping PC2?",
+        lanScan(overrideStatus: const {'PC1': 'administratively down'}),
+      );
+      expect(reply, isNotNull);
+      expect(
+        reply!.text,
+        contains('PC1 FastEthernet0 is administratively down'),
+      );
+      expect(reply.text, contains('no shutdown'));
+    });
+
+    test('a ping question about a non-device stays with the other answers', () {
+      expect(
+        PktAnalysisChat.answer("why can't PC1 ping the internet?", lanScan()),
+        isNull,
+      );
+    });
+  });
 }
