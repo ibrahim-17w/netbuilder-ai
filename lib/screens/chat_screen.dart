@@ -50,6 +50,8 @@ import '../services/pkt/on_device_pkt_builder.dart';
 import '../services/pkt_build_job_service.dart';
 import '../services/pkt/pkt_export_service.dart';
 import '../services/pkt_analysis_chat.dart';
+import '../services/pkt_import_request.dart';
+import '../services/pkt_plan_import_service.dart';
 import '../services/pkt/template_library.dart' show PktBuildFailure;
 import '../services/design_memory.dart';
 import '../services/design_review.dart';
@@ -3262,6 +3264,16 @@ class _ChatScreenState extends State<ChatScreen> {
         role: 'model',
         text: _auditText(report, name, path),
         createdAt: DateTime.now().toIso8601String(),
+        // The scan is a report; this card turns it into the lab. The whole
+        // guide/build/edit machinery only works on a standing plan, and the
+        // import service can make one from exactly this file.
+        actions: [
+          ChatAction(
+            kind: 'pkt_import_plan',
+            summary: 'Make this file the lab this conversation edits',
+            payload: {'path': path, 'name': name},
+          ),
+        ],
       );
       if (!mounted) return;
       _state
@@ -3309,6 +3321,41 @@ class _ChatScreenState extends State<ChatScreen> {
     return PktAnalysisChat.reportText(
       PktAnalysisChat.snapshot(report, path: path, name: name),
     );
+  }
+
+  /// Turn the scanned file into the standing plan.
+  ///
+  /// The import is structural: devices, models, cable endpoints and IOS
+  /// addresses survive; GUI settings and scenario state may not, and the
+  /// reply says so instead of implying a lossless conversion. The source
+  /// file is never modified.
+  Future<String> _importScannedPlan(ChatAction action) async {
+    final path = '${action.payload['path'] ?? _capturePath}'.trim();
+    final name =
+        '${action.payload['name'] ?? path.split(RegExp(r'[\\/]')).last}';
+    if (path.isEmpty) return 'That card has no file path.';
+    final previous = _lastIntent;
+    final bytes = await File(path).readAsBytes();
+    final imported = PktPlanImportService.fromBytes(
+      bytes,
+      projectName: name.replaceAll(RegExp(r'\.pkt$'), ''),
+    );
+    if (!mounted) return '';
+    setState(() {
+      _previousIntent = previous;
+      _lastIntent = imported.intent;
+      _lastBrief = 'the file $name';
+    });
+    _state.withIntentJson(
+      jsonEncode(imported.intent.toJson(includeSecrets: false)),
+    );
+    final mem = _memory;
+    if (mem != null && mem.ready) {
+      try {
+        await mem.setSessionState(_conversation, _state.encode());
+      } catch (_) {}
+    }
+    return PktImportReply.text(imported, fileName: name, replaced: previous);
   }
 
   /// Write the plan-vs-file verification block from the collected audit.
@@ -5491,6 +5538,9 @@ class _ChatScreenState extends State<ChatScreen> {
           await _scanPkt(scanPath, '${action.payload['name'] ?? scanPath}');
           outcome = 'Re-analyzed.';
           break;
+        case 'pkt_import_plan':
+          outcome = await _importScannedPlan(action);
+          break;
         case 'pkt_open':
           final openPath = '${action.payload['path'] ?? ''}';
           if (openPath.isEmpty) {
@@ -5819,6 +5869,61 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_pending.isNotEmpty) return false;
     final analysis = PktAnalysisChat.decode(_state.captureAnalysisJson);
     if (analysis == null) return false;
+    // "USE THIS FILE AS MY LAB" - adopt the scanned capture as the standing
+    // plan. Read before the Q&A engine: the phrase is about the file's
+    // ROLE, not a question about its contents.
+    if (PktImportRequest.matches(text)) {
+      final user = ChatMessage(
+        role: 'user',
+        text: text,
+        createdAt: DateTime.now().toIso8601String(),
+      );
+      if (!mounted) return true;
+      setState(() {
+        _messages = [..._messages, user];
+        _busy = true;
+        _status = 'Importing ${analysis['name'] ?? 'the file'}...';
+      });
+      _jumpToEnd();
+      String outcome;
+      try {
+        outcome = await _importScannedPlan(
+          ChatAction(
+            kind: 'pkt_import_plan',
+            payload: {
+              'path': '${analysis['path'] ?? _capturePath}',
+              'name': '${analysis['name'] ?? ''}',
+            },
+          ),
+        );
+      } catch (e) {
+        outcome =
+            'Could not import that file: '
+            '${e.toString().replaceFirst('Exception: ', '')}';
+      }
+      if (!mounted) return true;
+      final turn = ChatMessage(
+        role: 'model',
+        text: outcome,
+        createdAt: DateTime.now().toIso8601String(),
+        source: AiStatus.plannerSource,
+      );
+      setState(() {
+        _messages = [..._messages, turn];
+        _busy = false;
+        _status = '';
+      });
+      _state.observe(turn);
+      _jumpToEnd();
+      final mem = _memory;
+      if (mem != null && mem.ready) {
+        try {
+          await mem.logChat(turn, conversation: _conversation);
+          await mem.setSessionState(_conversation, _state.encode());
+        } catch (_) {}
+      }
+      return true;
+    }
     final reply = PktAnalysisChat.answer(text, analysis);
     if (reply == null) return false;
 
