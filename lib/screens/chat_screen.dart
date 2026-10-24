@@ -54,6 +54,7 @@ import '../services/pkt_import_request.dart';
 import '../services/pkt_plan_import_service.dart';
 import '../services/pkt_scan_diff.dart';
 import '../services/lab_catalog.dart';
+import '../services/lab_report.dart';
 import '../services/pkt/template_library.dart' show PktBuildFailure;
 import '../services/design_memory.dart';
 import '../services/design_review.dart';
@@ -2567,6 +2568,76 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  /// Export the lab report: plan, design review, builds with their
+  /// verification notes, the offline scan, and the build guide, as one
+  /// Markdown file beside the .pkt files. The report invents nothing -
+  /// every section comes from a generator that already ran for the user.
+  Future<void> _exportLabReport() async {
+    const askText = 'export a lab report';
+    final ask = _makeUserTurn(askText, const []);
+    _state.observe(ask).withIntent(_lastIntent);
+    await _commitUserTurn(ask);
+    if (!mounted) return;
+    final plan = _lastIntent;
+    if (plan == null || plan.nodes.isEmpty) {
+      _appendSystem(
+        'There is no plan to report on yet. Describe the network first - '
+        'the report assembles the plan, its review, the builds and the '
+        'scan, so there has to be one.',
+      );
+      return;
+    }
+    String body;
+    try {
+      body = LabReport.markdown(
+        intent: plan,
+        target: _target,
+        artifacts: [
+          for (final f in _state.knownArtifacts) (name: f.name, note: f.note),
+        ],
+        scanAnalysis: PktAnalysisChat.decode(_state.captureAnalysisJson),
+      );
+    } catch (e) {
+      _appendSystem('Could not compose the report: $e');
+      return;
+    }
+    final path = await _saveReportFile(plan, body);
+    _appendSystem(
+      path == null
+          ? 'The report was composed but could not be saved as a file. '
+                'Nothing was lost - ask again after freeing disk space.'
+          : '**Lab report saved: `$path`**\n\nIt carries the plan, the '
+                'design review, every build with its verification note, the '
+                'offline scan findings, and the full build guide - the one '
+                'file to hand in or share.',
+    );
+  }
+
+  /// Write the report under the documents output folder, named for the
+  /// network the same way the .pkt and the guide are.
+  Future<String?> _saveReportFile(NetworkIntent plan, String body) async {
+    try {
+      final base = BuildArtifactService.networkFileName(
+        plan: plan,
+        brief: _lastBrief,
+        taken: {for (final a in _state.knownArtifacts) a.name, ..._builtNames},
+      ).replaceAll(RegExp(r'\.pkt$'), '');
+      final dir = await getApplicationDocumentsDirectory();
+      final outDir = Directory('${dir.path}${Platform.pathSeparator}output');
+      await outDir.create(recursive: true);
+      var path = '${outDir.path}${Platform.pathSeparator}report-$base.md';
+      var n = 2;
+      while (File(path).existsSync()) {
+        path = '${outDir.path}${Platform.pathSeparator}report-$base-$n.md';
+        n++;
+      }
+      await File(path).writeAsString(body, flush: true);
+      return path;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Render the guide in a copyable dialog: read it, copy it, or save it
   /// as a Markdown file. No .pkt is ever written by this path.
   Future<void> _openBuildGuide(NetworkIntent plan) async {
@@ -4249,6 +4320,14 @@ class _ChatScreenState extends State<ChatScreen> {
     // a settings command.
     if (editingMessage == null && await _handleLab(text)) {
       _input.clear();
+      return;
+    }
+    // "EXPORT A LAB REPORT" - one Markdown document from the pieces this
+    // conversation already produced. Read before planning: a report is a
+    // document, not a brief.
+    if (editingMessage == null && LabReportRequest.matches(text)) {
+      _input.clear();
+      await _exportLabReport();
       return;
     }
     // An unsupported exact model is a real blocking choice, not an automatic

@@ -188,4 +188,56 @@ void main() {
     expect(written.existsSync(), isTrue);
     expect(written.readAsStringSync(), contains('# Build guide - '));
   });
+
+  testWidgets('export a lab report writes one document from real evidence', (
+    tester,
+  ) async {
+    PathProviderPlatform.instance = _FakePathProvider();
+    addTearDown(
+      () => PathProviderPlatform.instance = MethodChannelPathProvider(),
+    );
+    final outDir = Directory('build/test-docs/output');
+    if (outDir.existsSync()) outDir.deleteSync(recursive: true);
+    await tester.pumpWidget(const NetBuilderApp());
+    await tester.pumpAndSettle();
+
+    final composer = find.byWidgetPredicate(
+      (w) => w is TextField && w.decoration?.labelText == 'Message',
+    );
+    await tester.enterText(composer, '2 routers and 4 switches');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await _settle(tester);
+
+    await tester.enterText(composer, 'export a lab report');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    // The report is composed and written with real IO on this fake docs
+    // folder; fake-async time only lets it progress when real time is
+    // handed back between pumps.
+    for (
+      var i = 0;
+      i < 60 && find.textContaining('Lab report saved').evaluate().isEmpty;
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 1)),
+      );
+    }
+
+    expect(find.textContaining('Lab report saved'), findsOneWidget);
+    final reports = outDir
+        .listSync()
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.md') && f.path.contains('report-'))
+        .toList();
+    expect(reports, hasLength(1));
+    final text = reports.single.readAsStringSync();
+    // Every section is there, composed from what this conversation made.
+    expect(text, contains('# Lab report - '));
+    expect(text, contains('## The plan'));
+    expect(text, contains('## Design review'));
+    expect(text, contains('No .pkt was built in this conversation yet'));
+    expect(text, contains('No .pkt was analyzed'));
+    expect(text, contains('## How to build it'));
+  });
 }
