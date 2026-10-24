@@ -33,10 +33,20 @@ class BuildGuide {
   };
 
   /// Markdown for the standing plan. Pure: no file, no provider, no UI.
+  ///
+  /// [target] picks the dialect: `packet-tracer` (the default) speaks the
+  /// canvas - place, cable, Desktop panels; a real-hardware target
+  /// (`cisco-ssh`, anything else) speaks console and rack: the same devices,
+  /// addresses and configs, but physical cabling and console access instead
+  /// of palette clicks, and the Packet-Tracer-only manual notes (ASA inside
+  /// the .pkt, offline-only kinds) do not apply and are left out.
   static String markdown(
     NetworkIntent intent, {
     String target = 'packet-tracer',
   }) {
+    final realHardware = target.trim().toLowerCase() != 'packet-tracer' &&
+        target.trim().toLowerCase() != 'packet_tracer' &&
+        target.trim().toLowerCase() != 'pt';
     final plan = PacketTracerAdapter.autopilotPlan(intent);
     final steps = (plan['steps'] as List?) ?? const [];
     Map<String, dynamic> step(String action) => steps
@@ -68,21 +78,39 @@ class BuildGuide {
       ..writeln('# Build guide - $project')
       ..writeln()
       ..writeln(
-        'Follow these steps in Packet Tracer. Nothing is compiled here and no '
-        '.pkt is written; ask me to **build the .pkt** when you want the file.',
+        realHardware
+            ? 'Follow these steps on the real equipment: console or SSH to '
+                  'each device, apply the configs, and verify from a host. '
+                  'Nothing is compiled here; ask me to **build the .pkt** '
+                  'when you want the simulator file.'
+            : 'Follow these steps in Packet Tracer. Nothing is compiled here '
+                  'and no .pkt is written; ask me to **build the .pkt** when '
+                  'you want the file.',
       )
       ..writeln()
       ..writeln(
         'Plan: ${nodes.length} device(s), ${links.length} cable(s), routing '
         '`${intent.routing}`'
-        '${target == 'packet-tracer' ? ', target Packet Tracer' : ''}.',
+        '${realHardware ? ', target real hardware' : ', target Packet Tracer'}.',
       );
 
     // 1. Devices -----------------------------------------------------------
     out
       ..writeln()
-      ..writeln('## 1. Place the devices (${nodes.length})')
+      ..writeln(
+        realHardware
+            ? '## 1. Rack and console the devices (${nodes.length})'
+            : '## 1. Place the devices (${nodes.length})',
+      )
       ..writeln();
+    if (realHardware) {
+      out.writeln(
+        'The model column is the Packet Tracer equivalent - on real hardware '
+        'any device of the same class (ISR router, Catalyst access switch) '
+        'takes the same configuration.',
+      );
+      out.writeln();
+    }
     if (nodes.isEmpty) {
       out.writeln('_The plan has no devices._');
     } else {
@@ -95,9 +123,11 @@ class BuildGuide {
         final model = '${node['model'] ?? ''}';
         final notes = <String>[
           if (servers[name] != null) 'services: ${_roles(servers[name])}',
-          if (offlineOnlyDeviceKinds.contains(type))
+          // The two PT-specific notes below are meaningless on real hardware:
+          // an ASA IS its own device there, and nothing is offline-only.
+          if (!realHardware && offlineOnlyDeviceKinds.contains(type))
             'offline .pkt only; live autopilot cannot place it yet',
-          if (type == 'firewall' && configs[name] != null)
+          if (!realHardware && type == 'firewall' && configs[name] != null)
             'ASA config is in the .pkt; it is not typed into a live session',
           if (deviceKindOf(type)?.wireless ?? false) 'joins wirelessly',
         ];
@@ -108,7 +138,11 @@ class BuildGuide {
     // 2. Cabling -----------------------------------------------------------
     out
       ..writeln()
-      ..writeln('## 2. Cable and associate (${links.length})')
+      ..writeln(
+        realHardware
+            ? '## 2. Cable the links (${links.length})'
+            : '## 2. Cable and associate (${links.length})',
+      )
       ..writeln();
     if (links.isEmpty) {
       out.writeln(
@@ -267,13 +301,15 @@ class BuildGuide {
 
     // 5. Limits ------------------------------------------------------------
     final notes = <String>[
-      if (nodes.any((n) => n['type'] == 'firewall'))
+      // Both PT-specific notes below are meaningless on real hardware.
+      if (!realHardware && nodes.any((n) => n['type'] == 'firewall'))
         'Firewall: the ASA configuration is stored inside the generated .pkt. '
             'A live Packet Tracer session is never typed into for ASA '
             'devices; apply it by opening the file or configure it by hand.',
-      if (nodes.any(
-        (n) => offlineOnlyDeviceKinds.contains('${n['type'] ?? ''}'),
-      ))
+      if (!realHardware &&
+          nodes.any(
+            (n) => offlineOnlyDeviceKinds.contains('${n['type'] ?? ''}'),
+          ))
         'Offline-only devices (${nodes.where((n) => offlineOnlyDeviceKinds.contains('${n['type'] ?? ''}')).map((n) => '${n['name'] ?? ''}').join(', ')}) '
             'are written into the .pkt, but the live autopilot does not place '
             'them yet. Place them by hand for a live run.',
@@ -295,6 +331,18 @@ class BuildGuide {
   static String _roles(dynamic serverEntry) {
     final services = ((serverEntry as Map?)?['services'] as Map?) ?? const {};
     return services.keys.map((k) => _serviceLabels['$k'] ?? '$k').join(', ');
+  }
+
+  /// The file name an exported guide saves as - the brief's own words when
+  /// they name a network, the same naming rule the .pkt builds use, so a
+  /// guide and its file sort together in a folder.
+  static String guideFileName(NetworkIntent intent) {
+    final slug = intent.projectName.trim().isEmpty
+        ? 'network'
+        : intent.projectName.trim().toLowerCase();
+    final safe = slug.replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+    final trimmed = safe.replaceAll(RegExp(r'^-+|-+$'), '');
+    return 'guide-${trimmed.isEmpty ? 'network' : trimmed}.md';
   }
 
   static String _cell(String text) => text.replaceAll('|', r'\|');

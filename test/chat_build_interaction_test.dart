@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:net_builder/main.dart';
@@ -140,4 +142,50 @@ void main() {
       expect(find.text('Set address'), findsOneWidget);
     },
   );
+
+  testWidgets('the build guide exports to a Markdown file', (tester) async {
+    PathProviderPlatform.instance = _FakePathProvider();
+    addTearDown(
+      () => PathProviderPlatform.instance = MethodChannelPathProvider(),
+    );
+    // A stale export from an earlier run would push this write to -2: the
+    // uniqueness loop is real, so the folder starts empty.
+    final outDir = Directory('build/test-docs/output');
+    if (outDir.existsSync()) outDir.deleteSync(recursive: true);
+    await tester.pumpWidget(const NetBuilderApp());
+    await tester.pumpAndSettle();
+
+    final composer = find.byWidgetPredicate(
+      (w) => w is TextField && w.decoration?.labelText == 'Message',
+    );
+    await tester.enterText(composer, '2 routers and 4 switches');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await _settle(tester);
+
+    // Ask for the guide the way a user does, then save it from the dialog.
+    await tester.enterText(composer, 'how do I build this?');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await _settle(tester);
+    expect(find.textContaining('Build guide'), findsWidgets);
+
+    await tester.tap(find.text('Save to file'));
+    for (
+      var i = 0;
+      i < 40 && find.textContaining('Guide saved as').evaluate().isEmpty;
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 100));
+      // The write is real IO on this fake docs folder; fake-async time only
+      // lets it progress when real time is handed back between pumps.
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 1)),
+      );
+    }
+    expect(find.textContaining('Guide saved as'), findsOneWidget);
+    // Named for the network, beside the .pkt files, and really on disk.
+    expect(find.textContaining('guide-routers-switches.md'), findsOneWidget);
+    final written = File('build/test-docs/output/guide-routers-switches.md');
+    expect(written.existsSync(), isTrue);
+    expect(written.readAsStringSync(), contains('# Build guide - '));
+  });
 }

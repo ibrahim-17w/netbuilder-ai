@@ -9,14 +9,13 @@ void main() {
     String model, {
     List<String> services = const [],
     Map<String, dynamic> rules = const {},
-  }) =>
-      NetNode(
-        name: name,
-        type: type,
-        model: model,
-        services: services,
-        serviceRules: rules,
-      );
+  }) => NetNode(
+    name: name,
+    type: type,
+    model: model,
+    services: services,
+    serviceRules: rules,
+  );
 
   test('the guide lists devices, cables, configs and server roles', () {
     final intent = NetworkIntent(
@@ -93,5 +92,49 @@ void main() {
     expect(guide, contains('No copper cables are defined'));
     expect(guide, contains('## 4. Check it works'));
     expect(guide, contains('show ip route'));
+  });
+
+  test('a real-hardware target speaks console, not canvas', () {
+    final intent = NetworkIntent(
+      projectName: 'rack',
+      nodes: [
+        node('R1', 'router', '4331'),
+        node('FW1', 'firewall', '5506', rules: {}),
+      ],
+      links: const [NetLink(a: 'R1', aIf: 'g0/1', b: 'FW1', bIf: 'g1/1')],
+    );
+    final guide = BuildGuide.markdown(intent, target: 'cisco-ssh');
+    expect(guide, contains('real equipment'));
+    expect(guide, contains('Rack and console the devices (2)'));
+    expect(guide, contains('Cable the links (1)'));
+    expect(guide, contains('target real hardware'));
+    expect(guide, contains('same class'));
+    // The Packet-Tracer-only manual notes do not apply on a rack.
+    expect(guide, isNot(contains('stored inside the generated .pkt')));
+    expect(guide, isNot(contains('offline .pkt only')));
+    // The Packet Tracer guide is unchanged by the variant.
+    final ptGuide = BuildGuide.markdown(intent, target: 'packet-tracer');
+    expect(ptGuide, contains('Follow these steps in Packet Tracer'));
+    expect(
+      ptGuide,
+      contains('ASA configuration is stored inside the generated'),
+    );
+  });
+
+  test('the exported guide file is named for the network', () {
+    expect(
+      BuildGuide.guideFileName(const NetworkIntent(projectName: 'Office LAN')),
+      'guide-office-lan.md',
+    );
+    expect(
+      BuildGuide.guideFileName(const NetworkIntent(projectName: '')),
+      'guide-network.md',
+    );
+    expect(
+      BuildGuide.guideFileName(
+        const NetworkIntent(projectName: 'two sites / 40 PCs!'),
+      ),
+      'guide-two-sites-40-pcs.md',
+    );
   });
 }

@@ -2532,7 +2532,39 @@ class _ChatScreenState extends State<ChatScreen> {
     return 'Build guide shown.';
   }
 
-  /// Render the guide in a copyable dialog. Pure text: no file is written.
+  /// Write the guide to the documents folder as Markdown, and return the
+  /// path - or null when writing failed. The dialog closes either way: the
+  /// copy path never depended on a file existing.
+  ///
+  /// The name follows the same network naming the .pkt builds use, so a
+  /// guide and its compiled file sort together in the folder.
+  Future<String?> _saveGuideFile(NetworkIntent plan, String guide) async {
+    try {
+      // networkFileName answers the .pkt NAME (extension included); the
+      // guide borrows the stem only, so the pair still sorts together.
+      final base = BuildArtifactService.networkFileName(
+        plan: plan,
+        brief: _lastBrief,
+        taken: {for (final a in _state.knownArtifacts) a.name, ..._builtNames},
+      ).replaceAll(RegExp(r'\.pkt$'), '');
+      final dir = await getApplicationDocumentsDirectory();
+      final outDir = Directory('${dir.path}${Platform.pathSeparator}output');
+      await outDir.create(recursive: true);
+      var path = '${outDir.path}${Platform.pathSeparator}guide-$base.md';
+      var n = 2;
+      while (File(path).existsSync()) {
+        path = '${outDir.path}${Platform.pathSeparator}guide-$base-$n.md';
+        n++;
+      }
+      await File(path).writeAsString(guide, flush: true);
+      return path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Render the guide in a copyable dialog: read it, copy it, or save it
+  /// as a Markdown file. No .pkt is ever written by this path.
   Future<void> _openBuildGuide(NetworkIntent plan) async {
     final guide = BuildGuide.markdown(plan, target: _target);
     if (!mounted) return;
@@ -2560,6 +2592,23 @@ class _ChatScreenState extends State<ChatScreen> {
             onPressed: () => _copyMessage(guide),
             icon: const Icon(Icons.copy_all_outlined, size: 18),
             label: const Text('Copy guide'),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              final path = await _saveGuideFile(plan, guide);
+              if (!dialogContext.mounted) return;
+              Navigator.of(dialogContext).pop();
+              _appendSystem(
+                path == null
+                    ? 'The guide could not be saved as a file. The Copy '
+                          'button still puts the whole thing on the '
+                          'clipboard.'
+                    : 'Guide saved as `$path` - it sits beside your .pkt '
+                          'files and opens in any text editor.',
+              );
+            },
+            icon: const Icon(Icons.save_outlined, size: 18),
+            label: const Text('Save to file'),
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
