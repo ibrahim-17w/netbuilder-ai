@@ -159,9 +159,9 @@ const List<DeviceKind> deviceKinds = [
     // of a guessed cable.
     wireless: true,
   ),
-  // The kinds below have real Packet Tracer templates and copper ports, so
-  // the offline compiler can build them. The live autopilot has no palette
-  // path for them yet; see [offlineOnlyDeviceKinds].
+  // The kinds below have real Packet Tracer templates AND a taught live
+  // palette path (see DEVICE_PALETTE in sidecar/catalog.py): they build
+  // offline and place live.
   DeviceKind(
     type: 'hub',
     keywords: ['hub'],
@@ -260,15 +260,11 @@ const List<DeviceKind> deviceKinds = [
 /// run reports each one as `offline_only` instead of substituting a different
 /// device shape; see `OFFLINE_ONLY_DEVICE_KINDS` in `sidecar/catalog.py`
 /// (`sidecar/test_device_palette.py` keeps the two lists equal).
-const Set<String> offlineOnlyDeviceKinds = {
-  'hub',
-  'sniffer',
-  'plc',
-  'historian',
-  'cyber-observer',
-  'controller',
-  'power-distribution',
-};
+///
+/// Empty since the seven industrial/control kinds were taught live palette
+/// paths (they build offline AND place live now). The set stays as the
+/// landing place for the next offline-buildable kind with no click-path.
+const Set<String> offlineOnlyDeviceKinds = {};
 
 /// Kinds the planner can recognize but neither builder can place yet.
 ///

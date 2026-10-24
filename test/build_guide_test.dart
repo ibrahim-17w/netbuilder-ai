@@ -74,7 +74,9 @@ void main() {
     expect(guide, contains('| PC1 | 192.168.1.10 |'));
     expect(guide, contains('## 4. Check it works'));
     expect(guide, contains('## 5. What is manual'));
-    expect(guide, contains('offline .pkt only'));
+    // The sniffer now has a taught live palette path, so it is no longer
+    // flagged offline-only; the firewall ASA note is the manual part left.
+    expect(guide, isNot(contains('offline .pkt only')));
     expect(guide, contains('ASA configuration is stored inside the generated'));
     // The guide is instructions only: it never claims a file was written.
     expect(guide, contains('no .pkt is written'));

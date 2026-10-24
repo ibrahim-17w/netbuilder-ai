@@ -13,17 +13,16 @@ void main() {
     expect(supportedDeviceKinds.union(unsupportedDeviceKinds), known);
   });
 
-  test('a hub is offline-buildable, not silently rejected', () {
+  test('a hub is fully supported: offline build AND live placement', () {
     const intent = NetworkIntent(
       projectName: 'contract',
       nodes: [NetNode(name: 'H1', type: 'hub')],
     );
     final issues = ValidatorService.validate(intent, target: 'packet-tracer');
 
-    // The offline .pkt is the primary build path, so a hub is no longer a
-    // device-kind error: it compiles from a real Packet Tracer template. The
-    // finding is the honest note that only the LIVE executor cannot place it
-    // yet. (A lone node with no links is still an island error - the
+    // The hub graduated: a taught palette path places it live, so it is a
+    // plain supported device - no device-kind error and no offline-only
+    // note. (A lone node with no links is still an island error - the
     // topology's business, not the device gate's.)
     expect(
       issues.where(
@@ -34,12 +33,12 @@ void main() {
       reason: issues.map((issue) => issue.message).join('\n'),
     );
     final message = issues.map((issue) => issue.message).join('\n');
-    expect(message, contains('H1 will be in the offline .pkt'));
-    expect(message, contains('does not place it yet'));
+    expect(message, isNot(contains('offline .pkt')));
+    expect(supportedDeviceKinds.contains('hub'), isTrue);
   });
 
   test(
-    'a bare controller is recognized and offline-buildable, not ignored',
+    'a bare controller is recognized and fully supported, not ignored',
     () {
       final built = NetworkIntent.parseSimple(
         'contract',
@@ -57,7 +56,7 @@ void main() {
         message,
         isNot(contains('controller device type is not supported')),
       );
-      expect(message, contains('CTRL1 will be in the offline .pkt'));
+      expect(message, isNot(contains('offline .pkt')));
     },
   );
 

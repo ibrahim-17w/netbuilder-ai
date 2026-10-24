@@ -263,7 +263,7 @@ def _run_hidden(command, **kwargs):
 # Bump on every behaviour change. Served on /health so a stale process
 # (old code, old port-holder, double instance) is detectable remotely
 # instead of producing "nothing changed" mystery runs.
-VERSION = "2026-10-23-ocr-endpoint"
+VERSION = "2026-10-24-industrial-palette-paths"
 
 # The /health contract. Bump only for an incompatible route/shape change; the
 # app blocks an engine whose schema it does not speak, so a mixed installer

@@ -246,16 +246,25 @@ def test_an_unsupported_planner_kind_is_skipped_not_substituted():
     assert pt.RUN["node_outcomes"]["B1"] == "unsupported"
 
 
-def test_an_offline_only_kind_is_skipped_live_not_substituted():
-    """A hub builds offline; a live run skips it instead of picking a router."""
+def test_a_formerly_offline_only_kind_now_places_live():
+    """A hub is no longer skipped: its palette path is taught, so a live run
+    clicks the group and the model instead of recording `offline_only`."""
     _reset_run_state()
     calls = []
 
-    with patch.object(pt, "click_by_names",
-                      side_effect=lambda names, what, **kw:
-                      calls.append(tuple(names)) or True), \
-         patch.object(pt, "click_frac"), \
-         patch.object(pt, "click_model"), \
+    def by_names(names, what, **kwargs):
+        calls.append(("names", tuple(names), what))
+        return names[0] in ("Network Devices", "Hubs", "Hub")
+
+    model_calls = []
+
+    with patch.object(pt, "click_by_names", side_effect=by_names), \
+         patch.object(pt, "click_frac",
+                         side_effect=lambda *a, **k: calls.append(
+                             ("frac", a[1], a[2]))), \
+         patch.object(pt, "click_model",
+                         side_effect=lambda rect, names, col, what:
+                         model_calls.append((tuple(names), col)) or True), \
          patch.object(pt, "_slot_visual_state",
                       return_value=("empty", "")), \
          patch.object(pt, "_shot_region", return_value=""), \
@@ -270,13 +279,28 @@ def test_an_offline_only_kind_is_skipped_live_not_substituted():
                        [{"name": "H1", "type": "hub", "model": "Hub-PT"}],
                        "test")
 
-    assert not calls, calls
-    assert pt.RUN["node_outcomes"]["H1"] == "offline_only"
+    assert pt.RUN["node_outcomes"].get("H1") != "offline_only", \
+        pt.RUN["node_outcomes"]
+    assert pt.RUN["devices_placed"] == 1, pt.RUN
+    # GROUP -> (TYPE) -> MODEL, the same shape every palette kind follows.
+    assert model_calls, "the model step must happen for a hub"
+    assert model_calls[0][0][0] == "Hub-PT", model_calls[0]
+    group_names = [c[1] for c in calls if c[0] == "names"]
+    assert group_names and group_names[0][0] == "Network Devices", calls
+
+
+def test_every_offline_only_kind_has_a_taught_palette_path():
+    """A kind cannot stay in OFFLINE_ONLY_DEVICE_KINDS while DEVICE_PALETTE
+    answers for it: graduating means the set entry is REMOVED, not both."""
+    assert not (pt.OFFLINE_ONLY_DEVICE_KINDS & set(pt.DEVICE_PALETTE)), (
+        "a kind cannot be both offline-only and palette-backed")
 
 
 def test_offline_only_kinds_compile_from_real_templates():
     """Every offline-only kind must resolve to a PT template and a device."""
     offline = sorted(pt.OFFLINE_ONLY_DEVICE_KINDS)
+    if not offline:
+        pytest.skip("no offline-only kinds: every kind has a taught path")
     models = {
         "hub": "Hub-PT",
         "sniffer": "Sniffer",
@@ -289,6 +313,29 @@ def test_offline_only_kinds_compile_from_real_templates():
     nodes = [{"name": f"D{i}", "type": kind, "model": models[kind]}
              for i, kind in enumerate(offline)]
     report = pt.pkt_builder.build_pkt({"project": "offline-only", "steps": [
+        {"action": "create_nodes", "nodes": nodes}]})
+    assert report["deviceCount"] == len(nodes), report
+    assert not [w for w in report["warnings"] if "template" in w.lower()], \
+        report["warnings"]
+
+
+def test_the_seven_former_offline_kinds_compile_from_real_templates():
+    """The graduated kinds keep their offline compile path: a palette entry
+    never took the template away."""
+    kinds = ("hub", "sniffer", "plc", "historian", "cyber-observer",
+             "controller", "power-distribution")
+    models = {
+        "hub": "Hub-PT",
+        "sniffer": "Sniffer",
+        "plc": "PLC-PT",
+        "historian": "DataHistorianServer",
+        "cyber-observer": "CyberObserver",
+        "controller": "NetworkController",
+        "power-distribution": "Power Distribution Device",
+    }
+    nodes = [{"name": f"D{i}", "type": kind, "model": models[kind]}
+             for i, kind in enumerate(kinds)]
+    report = pt.pkt_builder.build_pkt({"project": "graduated", "steps": [
         {"action": "create_nodes", "nodes": nodes}]})
     assert report["deviceCount"] == len(nodes), report
     assert not [w for w in report["warnings"] if "template" in w.lower()], \
@@ -315,7 +362,9 @@ if __name__ == "__main__":
     test_the_palette_group_is_clicked_before_the_model()
     test_an_unknown_type_never_places_silently_as_a_router()
     test_an_unsupported_planner_kind_is_skipped_not_substituted()
-    test_an_offline_only_kind_is_skipped_live_not_substituted()
+    test_a_formerly_offline_only_kind_now_places_live()
+    test_every_offline_only_kind_has_a_taught_palette_path()
     test_offline_only_kinds_compile_from_real_templates()
+    test_the_seven_former_offline_kinds_compile_from_real_templates()
     test_generate_rejects_an_unsupported_kind_without_substituting()
     print("ALL TESTS PASSED")
