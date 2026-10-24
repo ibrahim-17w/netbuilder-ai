@@ -52,6 +52,7 @@ import '../services/pkt/pkt_export_service.dart';
 import '../services/pkt_analysis_chat.dart';
 import '../services/pkt_import_request.dart';
 import '../services/pkt_plan_import_service.dart';
+import '../services/pkt_scan_diff.dart';
 import '../services/pkt/template_library.dart' show PktBuildFailure;
 import '../services/design_memory.dart';
 import '../services/design_review.dart';
@@ -3323,6 +3324,92 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  /// Compare two scanned files and report what changed.
+  ///
+  /// Both files are audited fresh by the engine (read-only), so the diff is
+  /// evidence about the FILES, not about memory of an earlier scan. Neither
+  /// file is modified and neither becomes the standing plan - a comparison
+  /// is a question, not an adoption.
+  Future<bool> _handleScanDiff(String text) async {
+    final capture = PktAnalysisChat.decode(_state.captureAnalysisJson);
+    final request = PktScanDiffRequest.read(
+      text,
+      currentCapturePath: _capturePath,
+      currentCaptureName: capture == null ? null : '${capture['name'] ?? ''}',
+    );
+    if (request == null) return false;
+    final ask = _makeUserTurn(text, const []);
+    _state.observe(ask).withIntent(_lastIntent);
+    await _commitUserTurn(ask, openActivity: true);
+    if (!mounted) return true;
+    setState(() {
+      _busy = true;
+      _status = 'Scanning both files (read-only)...';
+    });
+    String outcome;
+    try {
+      final svc = _engine();
+      for (final side in [request.pathA, request.pathB]) {
+        final ident = await svc.pktIdentify(side);
+        if (ident['isPkt'] != true) {
+          outcome =
+              '${side.split(RegExp(r'[\\/]')).last} is not a .pkt save, so '
+              'the two cannot be compared. '
+              '${ident['message'] ?? ''}';
+          await _appendDiffAnswer(text, outcome);
+          return true;
+        }
+      }
+      final before = PktAnalysisChat.snapshot(
+        await svc.pktAudit(request.pathA, project: _project.text.trim()),
+        path: request.pathA,
+        name: request.nameA,
+      );
+      final after = PktAnalysisChat.snapshot(
+        await svc.pktAudit(request.pathB, project: _project.text.trim()),
+        path: request.pathB,
+        name: request.nameB,
+      );
+      final diff = PktScanDiff.diff(before, after);
+      outcome = PktScanDiff.toMarkdown(
+        diff,
+        beforeName: request.nameA,
+        afterName: request.nameB,
+      );
+    } catch (e) {
+      outcome =
+          'Could not compare the two files: '
+          '${e.toString().replaceFirst('Exception: ', '')}';
+    }
+    await _appendDiffAnswer(text, outcome);
+    return true;
+  }
+
+  /// Commit the diff answer as a normal assistant turn.
+  Future<void> _appendDiffAnswer(String text, String body) async {
+    if (!mounted) return;
+    final turn = ChatMessage(
+      role: 'model',
+      text: body,
+      createdAt: DateTime.now().toIso8601String(),
+      source: AiStatus.plannerSource,
+    );
+    setState(() {
+      _messages = [..._messages, turn];
+      _busy = false;
+      _status = '';
+    });
+    _state.observe(turn);
+    _jumpToEnd();
+    final mem = _memory;
+    if (mem != null && mem.ready) {
+      try {
+        await mem.logChat(turn, conversation: _conversation);
+        await mem.setSessionState(_conversation, _state.encode());
+      } catch (_) {}
+    }
+  }
+
   /// Turn the scanned file into the standing plan.
   ///
   /// The import is structural: devices, models, cable endpoints and IOS
@@ -4057,6 +4144,12 @@ class _ChatScreenState extends State<ChatScreen> {
     // before the network planner sees the question, so "why is no shutdown
     // important?" cannot become a new build or a repair request by accident.
     if (editingMessage == null && await _handlePktAnalysisFollowup(text)) {
+      _input.clear();
+      return;
+    }
+    // "DIFF A AND B" - a comparison request naming two files (or one plus
+    // the scan on the table). Read before planning: paths are not devices.
+    if (editingMessage == null && await _handleScanDiff(text)) {
       _input.clear();
       return;
     }
