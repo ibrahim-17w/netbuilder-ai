@@ -252,6 +252,63 @@ class BuildPreflight {
     }
     semantic.addAll(roleGaps);
 
+    // THE SAVED CABLES. Ports and counts agreeing still leaves one hole: a
+    // cable that was never written, or one written between the wrong pair
+    // of ports, reads in the generator's report as a port that was "used".
+    // The audit reads the LINK blocks back out of the save, so the plan's
+    // cables are compared against the file's actual cables - endpoints
+    // normalized (Cisco shorthand vs the full save name), pair order
+    // ignored. Link data is only comparable when the audit explicitly says
+    // what it counted: rows present, or a linkCount/summary that answers
+    // zero. An empty list with no count is the OLD audits' "no link data"
+    // shape and keeps the ports-based verdict plus the honest note.
+    final savedRows = [
+      for (final row in (audit['links'] as List?) ?? const [])
+        if (row is Map)
+          (
+            a: '${row['a'] ?? ''}'.trim(),
+            aIf: '${row['aIf'] ?? ''}'.trim(),
+            b: '${row['b'] ?? ''}'.trim(),
+            bIf: '${row['bIf'] ?? ''}'.trim(),
+          ),
+    ];
+    final declaredLinkCount =
+        (audit['linkCount'] as num?)?.toInt() ??
+        (audit['summary'] is Map
+            ? ((audit['summary'] as Map)['links'] as num?)?.toInt()
+            : null);
+    final linksComparable =
+        savedRows.isNotEmpty ||
+        (declaredLinkCount != null && declaredLinkCount == 0);
+    String pairKey(String devA, String ifA, String devB, String ifB) {
+      final left = '${devA.toLowerCase()}|${_canonIface(ifA)}';
+      final right = '${devB.toLowerCase()}|${_canonIface(ifB)}';
+      return left.compareTo(right) <= 0 ? '$left<->$right' : '$right<->$left';
+    }
+
+    final savedCables = <String>{
+      for (final row in savedRows)
+        if (row.a.isNotEmpty && row.b.isNotEmpty)
+          pairKey(row.a, row.aIf, row.b, row.bIf),
+    };
+    final plannedCables = <String>{
+      for (final l in intent.links)
+        pairKey(l.a, resolvePort(l.a, l.aIf), l.b, resolvePort(l.b, l.bIf)),
+    };
+    final cablesMissing = plannedCables.difference(savedCables).toList()
+      ..sort();
+    final cablesUnexpected = savedCables.difference(plannedCables).toList()
+      ..sort();
+    if (linksComparable &&
+        (cablesMissing.isNotEmpty || cablesUnexpected.isNotEmpty)) {
+      semantic.add(
+        'the saved cables do not match the plan: '
+        '${cablesMissing.isEmpty ? '' : 'missing ${_cap(cablesMissing)}'}'
+        '${cablesMissing.isNotEmpty && cablesUnexpected.isNotEmpty ? '; ' : ''}'
+        '${cablesUnexpected.isEmpty ? '' : 'in the file but not planned: ${_cap(cablesUnexpected)}'}',
+      );
+    }
+
     if (missing.isEmpty &&
         extra.isEmpty &&
         unbuilt.isEmpty &&
@@ -259,9 +316,11 @@ class BuildPreflight {
         addressGaps.isEmpty &&
         leftovers.isEmpty &&
         semantic.isEmpty) {
-      final links = linksChecked
-          ? '${intent.links.length} link(s) verified against the ports the '
-                'generator wrote'
+      final links = linksComparable
+          ? '${savedCables.length} cable(s) verified against the saved file'
+          : linksChecked
+          ? '${intent.links.length} link(s) verified against the ports '
+                'the generator wrote'
           : 'links not compared - the audit carries no link data and no '
                 'generator report was collected';
       final compared = intent.addressing.length - addressesNotComparable;

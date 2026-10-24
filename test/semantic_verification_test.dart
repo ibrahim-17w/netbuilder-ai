@@ -310,6 +310,8 @@ void main() {
       );
     });
   });
+
+  cableCheckTests();
 }
 
 /// `g0/0` as Packet Tracer saves it: `GigabitEthernet0/0`.
@@ -327,4 +329,194 @@ String _expanded(String iface) {
     'eth': 'Ethernet',
   };
   return '${full[m.group(1)] ?? m.group(1)!.toUpperCase()}${m.group(2)}';
+}
+
+/// The saved cables are read back out of the file and compared against the
+/// plan, endpoint pair against endpoint pair, order ignored - because a
+/// generator report that says "the port was used" cannot tell a cable that
+/// was written from one that was not, or one that landed on the wrong port.
+void cableCheckTests() {
+  // A small plan whose shape a cable inventory can be checked against.
+  final plan = NetworkIntent.parseSimple('p', '1 router 1 switch 2 pcs');
+
+  Map<String, String> portOf() => {
+    for (final l in plan.links) ...{
+      '${l.a}|${l.aIf}': _expanded(l.aIf),
+      '${l.b}|${l.bIf}': _expanded(l.bIf),
+    },
+  };
+
+  /// The audit the compare gets: devices named, generator port table, and a
+  /// cable inventory whose rows are what the save actually holds.
+  Map<String, dynamic> auditWithCables(List<Map<String, String>> cables) => {
+    'devices': [
+      for (final n in plan.nodes)
+        {'name': n.name, 'type': n.type, 'services': n.services},
+    ],
+    'linkCount': cables.length,
+    'summary': {'links': cables.length},
+    'links': [
+      for (final c in cables)
+        {
+          'a': c['a'],
+          'aIf': c['aIf'],
+          'b': c['b'],
+          'bIf': c['bIf'],
+          'medium': 'eCopper',
+          'cable': 'eStraightThrough',
+        },
+    ],
+  };
+
+  List<dynamic> identityPorts() {
+    // One entry PER DEVICE with every port it carries - a switch holds three
+    // links here, and per-endpoint entries would overwrite each other.
+    final ports = <String, Map<String, String>>{};
+    for (final entry in portOf().entries) {
+      final device = entry.key.split('|').first;
+      final iface = entry.key.split('|').last;
+      ports.putIfAbsent(device, () => {})[iface] = entry.value;
+    }
+    return [
+      for (final e in ports.entries) {'name': e.key, 'ports': e.value},
+    ];
+  }
+
+  /// The plan's cables exactly as the save should hold them.
+  List<Map<String, String>> plannedCables() => [
+    for (final l in plan.links)
+      {'a': l.a, 'aIf': _expanded(l.aIf), 'b': l.b, 'bIf': _expanded(l.bIf)},
+  ];
+
+  test('a file whose saved cables match the plan verifies them by name', () {
+    final r = BuildPreflight.compare(
+      intent: plan,
+      audit: auditWithCables(plannedCables()),
+      builtDevices: identityPorts(),
+    );
+    expect(r.verified, isTrue, reason: r.lines.join('\n'));
+    expect(
+      r.lines.join('\n'),
+      contains('cable(s) verified against the saved file'),
+    );
+  });
+
+  test('a removed cable fails even when counts and devices still match', () {
+    // SW1 keeps the same number of cables - one is just wired to the wrong
+    // place, so count-based checks see nothing.
+    final cables = plannedCables()
+      ..removeAt(plannedCables().length - 1)
+      ..add({
+        'a': 'SW1',
+        'aIf': 'FastEthernet0/1',
+        'b': 'PC1',
+        'bIf': 'FastEthernet0',
+      });
+    final r = BuildPreflight.compare(
+      intent: plan,
+      audit: auditWithCables(cables),
+      builtDevices: identityPorts(),
+    );
+    expect(r.verified, isFalse);
+    final text = r.lines.join('\n');
+    expect(text, contains('the saved cables do not match the plan'));
+    expect(text, contains('in the file but not planned'));
+  });
+
+  test('a misconnected port is reported as missing plus unexpected', () {
+    // The R1<->SW1 cable exists but lands on the switch's wrong port: same
+    // device pair, same cable count, different endpoint.
+    Map<String, String> swap(String a, String aIf, String b, String bIf) => {
+      'a': a,
+      'aIf': aIf,
+      'b': b,
+      'bIf': bIf,
+    };
+    final cables = plannedCables()
+        .map((c) {
+          if (c['a'] == 'SW1' || c['b'] == 'SW1') {
+            return c['a'] == 'SW1'
+                ? swap(c['a']!, c['aIf']!, c['b']!, c['bIf']!)
+                : swap(c['b']!, c['bIf']!, c['a']!, c['aIf']!);
+          }
+          return c;
+        })
+        .map((c) {
+          if (c['a'] == 'SW1') return {...c, 'aIf': 'FastEthernet0/24'};
+          if (c['b'] == 'SW1') return {...c, 'bIf': 'FastEthernet0/24'};
+          return c;
+        })
+        .toList();
+    final r = BuildPreflight.compare(
+      intent: plan,
+      audit: auditWithCables(cables),
+      builtDevices: identityPorts(),
+    );
+    expect(r.verified, isFalse);
+    final text = r.lines.join('\n');
+    expect(text, contains('missing'));
+    expect(text, contains('in the file but not planned'));
+  });
+
+  test('endpoint order never decides: reversed rows still verify', () {
+    final cables = plannedCables().map((c) {
+      // Swap both ends of every second cable.
+      return c;
+    }).toList();
+    if (cables.isNotEmpty) {
+      cables[0] = {
+        'a': cables[0]['b']!,
+        'aIf': cables[0]['bIf']!,
+        'b': cables[0]['a']!,
+        'bIf': cables[0]['aIf']!,
+      };
+    }
+    final r = BuildPreflight.compare(
+      intent: plan,
+      audit: auditWithCables(cables),
+      builtDevices: identityPorts(),
+    );
+    expect(r.verified, isTrue, reason: r.lines.join('\n'));
+  });
+
+  test(
+    'an audit that answers zero cables for a cabled plan fails honestly',
+    () {
+      final r = BuildPreflight.compare(
+        intent: plan,
+        audit: {
+          'devices': [
+            for (final n in plan.nodes)
+              {'name': n.name, 'type': n.type, 'services': n.services},
+          ],
+          'linkCount': 0,
+          'summary': {'links': 0},
+          'links': <dynamic>[],
+        },
+        builtDevices: identityPorts(),
+      );
+      expect(r.verified, isFalse);
+      expect(r.lines.join('\n'), contains('missing'));
+    },
+  );
+
+  test('an audit with no link data at all keeps the old honest verdict', () {
+    // The pre-link-data audit shape: empty list, no count anywhere.
+    final r = BuildPreflight.compare(
+      intent: plan,
+      audit: {
+        'devices': [
+          for (final n in plan.nodes)
+            {'name': n.name, 'type': n.type, 'services': n.services},
+        ],
+        'links': <dynamic>[],
+      },
+      builtDevices: identityPorts(),
+    );
+    expect(r.verified, isTrue, reason: r.lines.join('\n'));
+    expect(
+      r.lines.join('\n'),
+      contains('verified against the ports the generator wrote'),
+    );
+  });
 }
