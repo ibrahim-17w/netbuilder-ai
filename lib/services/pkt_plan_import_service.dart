@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import '../models/network_intent.dart';
 import 'network_math.dart';
+import 'network_tools.dart';
 import 'packet_tracer/catalog.dart';
 import 'pkt/pkt_codec.dart';
 import 'pkt/seed_library.dart';
@@ -15,9 +16,10 @@ import 'pkt/seed_library.dart';
 /// A structure-level conversion from a Packet Tracer save to the app's plan.
 ///
 /// The source file is never modified. The converted plan keeps recognized
-/// devices, model names, cable endpoints, and IOS interface addresses. Device
-/// GUI settings, scenario state, and unrecognized metadata may not be carried
-/// into a regenerated .pkt, so callers must show the fidelity note.
+/// devices, model names, cable endpoints, IOS interface addresses, and the
+/// DHCP pools and DNS records saved in device configs. Device GUI settings,
+/// scenario state, and unrecognized metadata may not be carried into a
+/// regenerated .pkt, so callers must show the fidelity note.
 class ImportedPktPlan {
   final NetworkIntent intent;
   final List<String> preservedDetails;
@@ -77,6 +79,14 @@ class PktPlanImportService {
           : source.model.trim();
       final type = _normalizedType(source.type, model);
       final modules = _installedModules(block);
+      final config = _runningConfig(block);
+      final rules = _configServiceRules(config);
+      final services = _enabledServices(block);
+      // Routers keep DHCP/DNS in IOS lines instead of a GUI panel, so a
+      // parsed pool or record promotes the matching role into services.
+      for (final role in rules.keys) {
+        if (!services.contains(role)) services.add(role);
+      }
       final node = NetNode(
         name: name,
         type: type,
@@ -85,12 +95,13 @@ class PktPlanImportService {
         // can explain when the installed build library lacks this exact model.
         exactModel: model.isNotEmpty,
         modules: modules,
-        services: _enabledServices(block),
+        services: services,
+        serviceRules: rules,
       );
       nodes.add(node);
       final position = _logicalPosition(block);
       if (position != null) layout[name] = position;
-      configByName[name] = _runningConfig(block);
+      configByName[name] = config;
       final ref = RegExp(
         r'<SAVE_REF_ID>save-ref-id:([^<]+)</SAVE_REF_ID>',
       ).firstMatch(block)?.group(1);
@@ -250,14 +261,35 @@ class PktPlanImportService {
         'The original .pkt remains unchanged; generated copies may omit settings the editor cannot represent.',
       ],
     );
+    final preserved = <String>[
+      'Device names and exact model names for ${nodes.length} recognized devices.',
+      'Installed hardware modules and saved canvas positions where present.',
+      'Cable type, exact port endpoints, serial clock side, and IOS IPv4/IPv6 addresses where saved.',
+      'Recognized VLAN IDs, routing protocol, and enabled server-service roles.',
+    ];
+    for (final node in nodes) {
+      final dhcp = node.serviceRules['dhcp'];
+      if (dhcp is Map) {
+        final pools = (dhcp['pools'] as List?) ?? const [];
+        if (pools.isNotEmpty) {
+          preserved.add(
+            'DHCP pools retained on ${node.name}: ${pools.length} pool(s).',
+          );
+        }
+      }
+      final dns = node.serviceRules['dns'];
+      if (dns is Map) {
+        final records = (dns['records'] as List?) ?? const [];
+        if (records.isNotEmpty) {
+          preserved.add(
+            'DNS records retained on ${node.name}: ${records.length} record(s).',
+          );
+        }
+      }
+    }
     return ImportedPktPlan(
       intent: intent,
-      preservedDetails: [
-        'Device names and exact model names for ${nodes.length} recognized devices.',
-        'Installed hardware modules and saved canvas positions where present.',
-        'Cable type, exact port endpoints, serial clock side, and IOS IPv4/IPv6 addresses where saved.',
-        'Recognized VLAN IDs, routing protocol, and enabled server-service roles.',
-      ],
+      preservedDetails: preserved,
       limitations: const [
         'Service-pool records, account contents, and per-device GUI settings are summarized only when the editable plan has a matching field.',
         'Simulation scenarios, event lists, and unknown Packet Tracer save metadata are not editable in this plan.',
@@ -501,6 +533,122 @@ class PktPlanImportService {
       .replaceAll('&apos;', "'")
       .replaceAll('&#39;', "'")
       .replaceAll('&amp;', '&');
+
+  /// DHCP pools and DNS records saved in a device's IOS config, mapped onto
+  /// the plan's service-rule shape (`{'pools': [...]}` / `{'records': [...]}`)
+  /// with the same pool keys the build path consumes (`poolName`, `startIp`,
+  /// `mask`/`prefixLength`, `gateway`, `dnsServer`, `maxUsers`). Routers keep
+  /// these services in config lines rather than a GUI panel, so parsed
+  /// content is what promotes the matching role into [NetNode.services].
+  static Map<String, dynamic> _configServiceRules(List<String> config) {
+    final pools = <Map<String, String>>[];
+    final records = <Map<String, String>>[];
+    var dnsConfigured = false;
+    Map<String, String>? pool;
+    for (final raw in config) {
+      final clean = raw.trim();
+      final poolStart = RegExp(
+        r'^ip\s+dhcp\s+pool\s+(\S+)',
+        caseSensitive: false,
+      ).firstMatch(clean);
+      if (poolStart != null) {
+        pool = {'poolName': poolStart.group(1)!};
+        pools.add(pool);
+        continue;
+      }
+      if (pool != null) {
+        if (clean == '!' || clean == 'exit') {
+          pool = null;
+        } else if (_poolField(pool, clean)) {
+          continue;
+        } else if (!raw.startsWith(' ') && !raw.startsWith('\t')) {
+          // An unindented command outside the pool's subcommands starts a
+          // new config section, so the pool block has ended.
+          pool = null;
+        } else {
+          // An indented subcommand we do not map still belongs to the pool.
+          continue;
+        }
+      }
+      if (RegExp(
+        r'^ip\s+dns\s+server\b',
+        caseSensitive: false,
+      ).hasMatch(clean)) {
+        dnsConfigured = true;
+      }
+      final host = RegExp(
+        r'^ip\s+host\s+(\S+)\s+(\d{1,3}(?:\.\d{1,3}){3})\s*$',
+        caseSensitive: false,
+      ).firstMatch(clean);
+      if (host != null) {
+        records.add({'name': host.group(1)!, 'address': host.group(2)!});
+        dnsConfigured = true;
+      }
+      if (RegExp(
+        r'^ip\s+domain-name\s+\S+',
+        caseSensitive: false,
+      ).hasMatch(clean)) {
+        dnsConfigured = true;
+      }
+    }
+    final rules = <String, dynamic>{};
+    if (pools.isNotEmpty) rules['dhcp'] = {'pools': pools};
+    if (dnsConfigured) rules['dns'] = {'records': records};
+    return rules;
+  }
+
+  /// One `ip dhcp pool` subcommand into the plan's pool keys. `maxUsers` is
+  /// left out unless the source carries it; `domain-name` belongs to the pool
+  /// block but has no matching field, so it is consumed without a key.
+  /// Returns false when the line is not one of the pool's fields.
+  static bool _poolField(Map<String, String> pool, String clean) {
+    final network = RegExp(
+      r'^network\s+(\d{1,3}(?:\.\d{1,3}){3})(?:\s+(\S+))?$',
+      caseSensitive: false,
+    ).firstMatch(clean);
+    if (network != null) {
+      final address = network.group(1)!;
+      final raw = network.group(2)?.trim() ?? '';
+      final prefix = raw.startsWith('/')
+          ? int.tryParse(raw.substring(1))
+          : raw.isEmpty
+          ? null
+          : NetworkMath.prefixFromMask(raw);
+      // The lease range starts at the first usable host of the network,
+      // falling back to the saved network field when the mask cannot be
+      // applied.
+      final firstHost = prefix == null
+          ? null
+          : NetworkTools.subnet('$address/$prefix')?.firstHost;
+      pool['startIp'] = firstHost ?? address;
+      if (raw.startsWith('/')) {
+        if (prefix != null) pool['prefixLength'] = '$prefix';
+      } else if (raw.isNotEmpty) {
+        pool['mask'] = raw;
+      }
+      return true;
+    }
+    final gateway = RegExp(
+      r'^default-router\s+(\S+)',
+      caseSensitive: false,
+    ).firstMatch(clean);
+    if (gateway != null) {
+      pool['gateway'] = gateway.group(1)!;
+      return true;
+    }
+    final dns = RegExp(
+      r'^dns-server\s+(\S+)',
+      caseSensitive: false,
+    ).firstMatch(clean);
+    if (dns != null) {
+      pool['dnsServer'] = dns.group(1)!;
+      return true;
+    }
+    if (RegExp(r'^domain-name\s+\S+', caseSensitive: false).hasMatch(clean)) {
+      return true;
+    }
+    return false;
+  }
 }
 
 /// One cancellable background import. A task instance is single-use.

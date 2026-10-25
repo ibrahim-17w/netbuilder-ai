@@ -463,17 +463,31 @@ class ValidatorService {
 
     // Services are only executable on Server-PT nodes. Unknown roles are
     // retained as warnings so the planner can still show the user's intent.
+    //
+    // A ROUTER is the exception for two roles: IOS routers serve DHCP and
+    // DNS from their own config lines (`ip dhcp pool`, `ip dns server`) -
+    // no Services tab exists for them. An imported router carrying saved
+    // pools or records is a working design, not a mistake, so the check is
+    // the RULES being present, not the device class.
+    bool roleExecutableOn(NetNode node, String role) {
+      if (node.type == 'server') return true;
+      if (node.type != 'router') return false;
+      if (role != 'dhcp' && role != 'dns') return false;
+      return (node.serviceRules[role] is Map) &&
+          (node.serviceRules[role] as Map).isNotEmpty;
+    }
+
     for (final node in intent.nodes) {
       for (final service in node.services) {
         final normalized = service.trim().toLowerCase();
-        if (node.type != 'server') {
+        if (!roleExecutableOn(node, normalized)) {
           issues.add(
             ValidationIssue(
               'error',
               '${node.name} requests $service service but is not a server.',
             ),
           );
-        } else if (!_serviceNames.contains(normalized)) {
+        } else if (node.type == 'server' && !_serviceNames.contains(normalized)) {
           issues.add(
             ValidationIssue(
               'warning',
