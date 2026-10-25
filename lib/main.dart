@@ -761,7 +761,10 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
                               onSelect: _go,
                               onHub: _showHub,
                               onToolkit: () => _push(
-                                NetworkToolkitScreen(intent: _openIntent),
+                                NetworkToolkitScreen(
+                                  intent: _openIntent,
+                                  onSavePlan: _savePlanEdit,
+                                ),
                               ),
                               planProject: _openIntent == null
                                   ? ''
@@ -783,7 +786,10 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
                               onSelect: _go,
                               onHub: _showHub,
                               onToolkit: () => _push(
-                                NetworkToolkitScreen(intent: _openIntent),
+                                NetworkToolkitScreen(
+                                  intent: _openIntent,
+                                  onSavePlan: _savePlanEdit,
+                                ),
                               ),
                               hasPlan: _openIntent != null,
                             ),

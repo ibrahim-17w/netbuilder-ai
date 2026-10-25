@@ -1,12 +1,14 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/network_intent.dart';
 import '../services/adapters/cisco_adapter.dart';
 import '../services/adapters/gns3_adapter.dart';
 import '../services/adapters/packet_tracer_adapter.dart';
 import '../services/adapters/terraform_adapter.dart';
+import '../services/address_table.dart';
 import '../services/diagnostics_service.dart';
 import '../services/network_math.dart';
 import '../services/network_tools.dart';
@@ -85,10 +87,16 @@ class NetworkToolkitScreen extends StatefulWidget {
   final ToolkitSection initialSection;
   final NetworkIntent? intent;
 
+  /// The existing plan-save path, when the host can version an edit. The
+  /// address table's edits go through it, so a table change is a versioned
+  /// plan edit like any other - never a side channel around history.
+  final ValueChanged<NetworkIntent>? onSavePlan;
+
   const NetworkToolkitScreen({
     super.key,
     this.initialSection = ToolkitSection.subnet,
     this.intent,
+    this.onSavePlan,
   });
 
   @override
@@ -239,7 +247,10 @@ class _NetworkToolkitScreenState extends State<NetworkToolkitScreen> {
       ToolkitSection.subnet => const _SubnetTool(),
       ToolkitSection.vlsm => const _VlsmTool(),
       ToolkitSection.summarize => const _SummarizeTool(),
-      ToolkitSection.addressing => _AddressingTool(intent: intent),
+      ToolkitSection.addressing => _AddressingTool(
+        intent: intent,
+        onSavePlan: widget.onSavePlan,
+      ),
       ToolkitSection.acl => const _AclTool(),
       ToolkitSection.diagnostics => const _DiagnosticsTool(),
       ToolkitSection.local => const _LocalTool(),
@@ -926,8 +937,9 @@ class _SummarizeToolState extends State<_SummarizeTool> {
 
 class _AddressingTool extends StatefulWidget {
   final NetworkIntent? intent;
+  final ValueChanged<NetworkIntent>? onSavePlan;
 
-  const _AddressingTool({this.intent});
+  const _AddressingTool({this.intent, this.onSavePlan});
 
   @override
   State<_AddressingTool> createState() => _AddressingToolState();
@@ -999,6 +1011,9 @@ class _AddressingToolState extends State<_AddressingTool> {
                 '${intent.addressing.length} addressed interfaces, '
                 'routing ${intent.routing}.',
           ),
+          const SizedBox(height: AppTheme.s12),
+          _AddressTablePanel(intent: intent, onSavePlan: widget.onSavePlan),
+          const SizedBox(height: AppTheme.s12),
           const SizedBox(height: AppTheme.s12),
           _Result(
             title: duplicates.isEmpty
@@ -1672,6 +1687,245 @@ class _ExportTile extends StatelessWidget {
               label: const Text('Generate'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- project address table --------------------------------------------------
+
+/// The plan's addresses in one editable table: device, interface, IPv4,
+/// IPv6 and the VLAN a dot1Q sub-interface carries. Filter as you type,
+/// export the filtered rows as CSV, and edit an address in place - the edit
+/// goes through the host's plan-save path when one is wired, so history
+/// sees a versioned plan change and the validator re-runs on it.
+class _AddressTablePanel extends StatefulWidget {
+  final NetworkIntent intent;
+  final ValueChanged<NetworkIntent>? onSavePlan;
+
+  const _AddressTablePanel({required this.intent, this.onSavePlan});
+
+  @override
+  State<_AddressTablePanel> createState() => _AddressTablePanelState();
+}
+
+class _AddressTablePanelState extends State<_AddressTablePanel> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final all = AddressTable.rows(widget.intent);
+    final rows = AddressTable.filter(all, _query);
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.s12),
+      decoration: BoxDecoration(
+        color: AppPalette.panelAlt(theme.colorScheme),
+        borderRadius: BorderRadius.circular(AppTheme.rMd),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  decoration: const InputDecoration(
+                    hintText: 'Filter: device, interface, address, VLAN',
+                    prefixIcon: Icon(Icons.search, size: 18),
+                    isDense: true,
+                  ),
+                  onChanged: (value) => setState(() => _query = value),
+                ),
+              ),
+              const SizedBox(width: AppTheme.s8),
+              OutlinedButton.icon(
+                onPressed: rows.isEmpty
+                    ? null
+                    : () async {
+                        final csv = AddressTable.toCsv(rows);
+                        await Clipboard.setData(ClipboardData(text: csv));
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '${rows.length} row(s) copied as CSV - paste '
+                              'into any spreadsheet.',
+                            ),
+                          ),
+                        );
+                      },
+                icon: const Icon(Icons.table_view, size: 17),
+                label: const Text('Copy CSV'),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.s8),
+          if (all.isEmpty)
+            Text(
+              'No addresses in this plan yet. Address the devices in the '
+              'brief ("PCs in 192.168.1.0/24 with gateway .1") and the table '
+              'fills.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            )
+          else if (rows.isEmpty)
+            Text(
+              'Nothing matches "$_query".',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columnSpacing: AppTheme.s16,
+                headingRowHeight: 34,
+                dataRowMinHeight: 34,
+                dataRowMaxHeight: 40,
+                columns: const [
+                  DataColumn(label: Text('Device')),
+                  DataColumn(label: Text('Interface')),
+                  DataColumn(label: Text('IPv4')),
+                  DataColumn(label: Text('IPv6')),
+                  DataColumn(label: Text('VLAN')),
+                ],
+                rows: [
+                  for (final row in rows)
+                    DataRow(
+                      onSelectChanged: (_) => _edit(row),
+                      cells: [
+                        DataCell(Text(row.device)),
+                        DataCell(Text(row.iface)),
+                        DataCell(Text(row.ipv4)),
+                        DataCell(
+                          Text(
+                            row.ipv6.isEmpty ? '-' : row.ipv6,
+                            style: TextStyle(
+                              color: row.ipv6.isEmpty
+                                  ? theme.colorScheme.onSurfaceVariant
+                                  : null,
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            row.vlan.isEmpty ? '-' : row.vlan,
+                            style: TextStyle(
+                              color: row.vlan.isEmpty
+                                  ? theme.colorScheme.onSurfaceVariant
+                                  : null,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+          if (all.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: AppTheme.s8),
+              child: Text(
+                widget.onSavePlan == null
+                    ? 'Tap a row to edit its addresses; the change applies to '
+                          'the open plan (saving it into history needs an open '
+                          'project screen).'
+                    : 'Tap a row to edit its addresses - the change is saved '
+                          'as a new plan version and re-validated.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _edit(AddressRow row) async {
+    final v4 = TextEditingController(text: row.ipv4);
+    final v6 = TextEditingController(text: row.ipv6);
+    String? v4Error;
+    String? v6Error;
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('${row.device} ${row.iface}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: v4,
+                decoration: InputDecoration(
+                  labelText: 'IPv4 address/prefix',
+                  errorText: v4Error,
+                  hintText: '192.168.1.10/24',
+                ),
+                onChanged: (_) => setDialogState(() => v4Error = null),
+              ),
+              const SizedBox(height: AppTheme.s8),
+              TextField(
+                controller: v6,
+                decoration: InputDecoration(
+                  labelText: 'IPv6 address/prefix (optional)',
+                  errorText: v6Error,
+                  hintText: '2001:db8:1::10/64',
+                ),
+                onChanged: (_) => setDialogState(() => v6Error = null),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final v4Bad = AddressTable.validateAddress(
+                  v4.text,
+                  isV6: false,
+                );
+                final v6Bad = AddressTable.validateAddress(v6.text, isV6: true);
+                setDialogState(() {
+                  v4Error = v4Bad;
+                  v6Error = v6Bad;
+                });
+                if (v4Bad != null || v6Bad != null) return;
+                Navigator.of(dialogContext).pop(true);
+              },
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (saved != true) return;
+    final updated = AddressTable.applyEdit(
+      widget.intent,
+      row.device,
+      row.iface,
+      ipv4: v4.text,
+      ipv6: v6.text,
+    );
+    if (updated == null) return;
+    // The host's plan-save path takes it from here: history, validation and
+    // the build gate all see the same edited plan. Without a host callback
+    // the edit still lands on the open plan object.
+    widget.onSavePlan?.call(updated);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          widget.onSavePlan == null
+              ? '${row.device} ${row.iface} updated on the open plan.'
+              : '${row.device} ${row.iface} updated and saved as a new plan '
+                    'version.',
         ),
       ),
     );
