@@ -51,6 +51,7 @@ import threading
 import time
 import zipfile
 from dataclasses import dataclass, field
+from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 try:
@@ -13372,8 +13373,19 @@ PKT_BACKUP_DIR = os.path.join(os.path.dirname(__file__), "pkt_backups")
 
 
 def _pkt_path(raw: str, must_exist: bool = True) -> str:
-    """Resolve a user-selected .pkt path without changing the file."""
-    value = os.path.abspath(os.path.expanduser(str(raw or "").strip()))
+    """Resolve a user-selected .pkt path without changing the file.
+
+    The path arrives over HTTP when the engine serves another device, so a
+    plain `..` segment is rejected even after normalization: a legitimate
+    client always names a real file outright, and one that games the
+    resolver is probing, not auditing.
+    """
+    raw_value = str(raw or "").strip()
+    # The raw check comes first: abspath collapses `..` before the parts
+    # ever see it, so only the caller's own segments prove the probe.
+    if ".." in Path(raw_value.replace("\\", "/")).parts:
+        raise ValueError("The path must not contain '..' segments.")
+    value = os.path.abspath(os.path.expanduser(raw_value))
     if not value.lower().endswith(".pkt"):
         raise ValueError("Only Packet Tracer .pkt files are supported here.")
     if must_exist and not os.path.isfile(value):
