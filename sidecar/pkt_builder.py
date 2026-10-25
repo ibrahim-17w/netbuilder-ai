@@ -43,6 +43,7 @@ import xml.etree.ElementTree as ET
 import pkt_codec
 import pt_hardware as hardware
 import pkt_template_build as template_build
+import xml_guard
 
 __all__ = [
     "BuildError",
@@ -483,7 +484,7 @@ def _template_identity_mismatch(library: dict, entry: dict) -> str:
     if not block:
         return "template block is missing"
     try:
-        device = ET.fromstring(block)
+        device = xml_guard.fromstring(block)
     except ET.ParseError:
         return "template block is not valid XML"
     device_type = device.find("./ENGINE/TYPE")
@@ -1439,7 +1440,7 @@ def _rebuild_physical_workspace(skeleton: bytes, device_blocks: list[bytes],
         raise BuildError("device report does not match the generated devices")
 
     try:
-        workspace = ET.fromstring(match.group(0))
+        workspace = xml_guard.fromstring(match.group(0))
     except ET.ParseError as exc:
         raise BuildError(f"invalid PHYSICALWORKSPACE template: {exc}") from exc
 
@@ -3092,7 +3093,7 @@ def _dedupe(messages: list) -> list:
 
 def _validate(xml: bytes, refs: dict) -> None:
     try:
-        ET.fromstring(xml)
+        xml_guard.fromstring(xml)
     except ET.ParseError as exc:
         raise BuildError(f"generated XML does not parse: {exc}") from exc
     ids = re.findall(rb"<SAVE_REF_ID>save-ref-id:(\d+)</SAVE_REF_ID>", xml)
@@ -3113,7 +3114,7 @@ def _validate(xml: bytes, refs: dict) -> None:
 def _validate_physical_workspace(xml: bytes) -> None:
     """Reject device/workspace UUID paths Packet Tracer cannot resolve."""
     try:
-        root = ET.fromstring(xml)
+        root = xml_guard.fromstring(xml)
     except ET.ParseError as exc:
         raise BuildError(f"generated XML does not parse: {exc}") from exc
     workspace = root.find(".//PHYSICALWORKSPACE")

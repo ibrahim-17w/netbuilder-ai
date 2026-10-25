@@ -456,7 +456,8 @@ def skeleton_from(xml: bytes) -> bytes:
     out = re.sub(rb"<COMMAND_LOGS>.*?</COMMAND_LOGS>",
                  b"<COMMAND_LOGS>\n </COMMAND_LOGS>", out, flags=re.S)
     try:
-        ET.fromstring(out)
+        import xml_guard
+        xml_guard.fromstring(out)
     except ET.ParseError as exc:
         raise TemplateError(f"emptied skeleton is not valid XML: {exc}")
     return out
