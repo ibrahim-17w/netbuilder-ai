@@ -800,8 +800,8 @@ class ValidatorService {
           ValidationIssue(
             'info',
             '${offlineOnly.join(', ')} will be in the offline .pkt; the live '
-            'Packet Tracer autopilot does not place '
-            '${offlineOnly.length == 1 ? 'it' : 'them'} yet.',
+                'Packet Tracer autopilot does not place '
+                '${offlineOnly.length == 1 ? 'it' : 'them'} yet.',
           ),
         );
       }
@@ -874,10 +874,14 @@ class ValidatorService {
   /// * `intent.revision` - recomputed on every call, because it is cheap
   ///   relative to the pass it saves (see the gate in
   ///   `test/dart_perf_gates_test.dart`), and it moves on any real edit. It is
-  ///   NOT a sufficient key on its own either: `revision` deliberately does
-  ///   not hash `serviceRules`, `users` or `security.records` (they are the
-  ///   fields the parser fills in as prose, and hashing them made a canvas
-  ///   drag look like an edit) - and [validate] DOES read all three.
+  ///   NOT a sufficient key on its own either: `revision` does not hash the
+  ///   parser's prose fields (notes) or canvas positions, because hashing
+  ///   those made a canvas drag look like an edit - and [validate] DOES read
+  ///   the service rules, management addresses and IPv6 assignments, which
+  ///   is why `revision` hashes all three (through the sanitized,
+  ///   key-sorted copy, so no credential ever enters the identifier). Every
+  ///   input [validate] reads is therefore part of the cache key, and an
+  ///   in-place edit of any of them is a miss by construction.
   /// * `target` - the findings are target-specific.
   ///
   /// The returned list is a copy: a caller appending to it must not be able

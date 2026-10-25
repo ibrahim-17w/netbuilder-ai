@@ -962,11 +962,21 @@ class NetworkIntent {
 
   /// A short, stable identity for THIS version of the plan.
   ///
-  /// Two plans with the same devices, links, addressing, routing and requested
-  /// services share a revision; any real edit changes it. Canvas drag
-  /// positions and the parser's prose fields are deliberately left out, so
-  /// nudging a box or re-reading the same brief never makes a build card look
-  /// stale.
+  /// Two plans with the same devices, links, addressing (IPv4 AND IPv6),
+  /// management addresses, service settings, routing and requested security
+  /// share a revision; any real edit changes it. Canvas drag positions and
+  /// the parser's prose fields are deliberately left out, so nudging a box
+  /// or re-reading the same brief never makes a build card look stale.
+  ///
+  /// The service rules ARE hashed - through the same sanitized copy the
+  /// planner export uses, so a password, PSK or token key never enters the
+  /// identifier - because the validator reads them: a DHCP pool, a DNS
+  /// record or an AAA account edited in place must move the revision, or
+  /// the memoized validation keeps serving the previous answer (the cache
+  /// is keyed on identity + revision, and identity does not change when the
+  /// SAME plan object is edited in place). Keys are sorted recursively, so
+  /// two plans carrying the same rules hash the same however they were
+  /// built.
   ///
   /// The project name is left out for the same reason: the chat plans the same
   /// brief as `chat` on the model path and as `offline-chat` on the keyless
@@ -996,9 +1006,19 @@ class NetworkIntent {
         ..write(n.model ?? '')
         ..write('/')
         ..write(services.join(','));
+      if (n.mgmtIp != null && n.mgmtIp!.trim().isNotEmpty) {
+        b.write('|mgmt:${n.mgmtIp}');
+      }
       if (n.exactModel || n.modules.isNotEmpty) {
         b.write(
           '|hardware:${n.exactModel}:${(n.modules.toList()..sort()).join(',')}',
+        );
+      }
+      if (n.serviceRules.isNotEmpty) {
+        // Sanitized exactly like the planner export: credential keys never
+        // reach the identifier.
+        b.write(
+          '|rules:${_stableJson(_copyServiceValue(n.serviceRules, false))}',
         );
       }
     }
@@ -1022,9 +1042,25 @@ class NetworkIntent {
         ..write(a.iface)
         ..write('=')
         ..write(a.ipCidr);
+      if (a.ip6Cidr != null && a.ip6Cidr!.trim().isNotEmpty) {
+        b.write('|v6:${a.ip6Cidr}');
+      }
     }
     b.write('|sec:${jsonEncode(security.toJson(includeSecrets: false))}');
     return _shortHash(b.toString());
+  }
+
+  /// JSON with map keys sorted at every depth, so two plans carrying the
+  /// same service settings hash the same however the rules were assembled.
+  static String _stableJson(dynamic value) {
+    if (value is Map) {
+      final keys = value.keys.map((k) => '$k').toList()..sort();
+      return '{${keys.map((k) => '${jsonEncode(k)}:${_stableJson(value[k])}').join(',')}}';
+    }
+    if (value is List) {
+      return '[${value.map(_stableJson).join(',')}]';
+    }
+    return jsonEncode(value);
   }
 
   /// A plan version a person can read: "17 device(s), 16 link(s), rev 3f9a1c02".

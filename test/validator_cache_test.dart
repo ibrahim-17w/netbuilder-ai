@@ -15,13 +15,14 @@
 // must answer for the target it was asked for. A caller that mutates the list
 // it handed must not be able to poison the next read.
 //
-// The one thing the cache deliberately does NOT do: `NetworkIntent.revision`
-// does not hash `serviceRules`, `users` or `security.records`, so an in-place
-// edit that touches only those and nothing else can be served stale. That is
-// the documented trade of the double key - identity catches a different
-// object, revision catches a real edit - and the fix for that gap is a cheaper
-// complete hash, not a caller that guesses when the cache is valid. Anything
-// that has just edited a plan in place should call `validate` directly.
+// The one thing the cache used to deliberately miss: `NetworkIntent.revision`
+// did not hash `serviceRules`, management addresses or IPv6 assignments, so
+// an in-place edit touching only those was served stale. That gap is closed -
+// the revision now hashes every input `validate` reads, through the
+// sanitized key-sorted copy, so no credential ever enters the identifier -
+// and the tests below pin both directions: a configuration-only edit is a
+// cache miss with fresh findings, and a canvas-shaped edit (notes, layout)
+// is NOT an edit at all.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:net_builder/models/network_intent.dart';
 import 'package:net_builder/services/validator_service.dart';
@@ -275,6 +276,177 @@ void main() {
       expect(poisoned, isEmpty);
 
       expect(shape(ValidatorService.validateCached(plan)), shape(original));
+    });
+  });
+
+  group('a configuration-only edit is a cache miss, not a stale answer', () {
+    /// The same object edited in place - the shape a canvas-backed plan has:
+    /// identity does not move, so only the revision can catch the edit.
+    NetworkIntent editablePlan() {
+      final plan = NetworkIntent.parseSimple(
+        'cache',
+        '1 router 1 switch 1 dns server and 2 pcs',
+      );
+      return plan;
+    }
+
+    test('editing only the DNS records moves the revision', () {
+      final plan = editablePlan();
+      final server = plan.nodes.firstWhere((n) => n.type == 'server');
+      final before = plan.revision;
+      // The parsed rules map is unmodifiable, so the edit rebuilds the
+      // node - the same shape every in-place rule edit takes.
+      plan.nodes[plan.nodes.indexOf(server)] = NetNode(
+        name: server.name,
+        type: server.type,
+        model: server.model,
+        services: server.services,
+        serviceRules: {
+          'dns': {
+            'records': [
+              {'name': 'web.lab', 'address': '192.168.1.53'},
+            ],
+          },
+        },
+      );
+      expect(
+        plan.revision,
+        isNot(before),
+        reason: 'the validator reads DNS records, so the revision must move',
+      );
+    });
+
+    test(
+      'editing a DHCP pool moves the revision, and credentials never enter it',
+      () {
+        final plan = editablePlan();
+        final server = plan.nodes.firstWhere((n) => n.type == 'server');
+        // NetNode fields are final, so a service change rebuilds the node -
+        // the same thing the planner's follow-up paths do.
+        NetNode rebuilt(Map<String, dynamic> rules) => NetNode(
+          name: server.name,
+          type: server.type,
+          model: server.model,
+          services: [...server.services, 'dhcp', 'aaa'],
+          serviceRules: rules,
+        );
+        plan.nodes[plan.nodes.indexOf(server)] = rebuilt({
+          'dhcp': {
+            'pools': [
+              {'poolName': 'staff', 'startIp': '192.168.1.10', 'maxUsers': 20},
+            ],
+          },
+          'aaa': {
+            'users': [
+              {'username': 'admin', 'password': 'super-secret-9'},
+            ],
+          },
+        });
+        final withSecret = plan.revision;
+
+        // The password VALUE changes in place: the sanitized copy the
+        // revision hashes strips credential keys entirely, so the identifier
+        // cannot distinguish the two - and no credential ever reaches a log,
+        // a card or an export through it.
+        final live = plan.nodes.firstWhere((n) => n.type == 'server');
+        ((live.serviceRules['aaa']['users'] as List)[0] as Map)['password'] =
+            'other-secret-7';
+        expect(
+          plan.revision,
+          withSecret,
+          reason: 'the password key is stripped before hashing',
+        );
+
+        // The non-credential part of the same rule still moves it.
+        ((live.serviceRules['aaa']['users'] as List)[0] as Map)['username'] =
+            'root';
+        expect(plan.revision, isNot(withSecret));
+      },
+    );
+
+    test('editing only an IPv6 assignment moves the revision', () {
+      final plan = editablePlan();
+      final router = plan.nodes.firstWhere((n) => n.type == 'router');
+      final iface = plan.addressing
+          .firstWhere((a) => a.node == router.name)
+          .iface;
+      plan.addressing.removeWhere((a) => a.node == router.name);
+      plan.addressing.add(
+        InterfaceAddr(node: router.name, iface: iface, ipCidr: '10.0.0.1/30'),
+      );
+      final before = plan.revision;
+      plan.addressing[plan.addressing.indexWhere(
+        (a) => a.node == router.name,
+      )] = InterfaceAddr(
+        node: router.name,
+        iface: iface,
+        ipCidr: '10.0.0.1/30',
+        ip6Cidr: '2001:db8:1::1/64',
+      );
+      expect(plan.revision, isNot(before));
+    });
+
+    test('editing only the management address moves the revision', () {
+      final plan = editablePlan();
+      final router = plan.nodes.firstWhere((n) => n.type == 'router');
+      final before = plan.revision;
+      final edited = NetNode(
+        name: router.name,
+        type: router.type,
+        model: router.model,
+        mgmtIp: '10.0.0.9',
+        services: router.services,
+        serviceRules: router.serviceRules,
+      );
+      plan.nodes[plan.nodes.indexOf(router)] = edited;
+      expect(plan.revision, isNot(before));
+    });
+
+    test('each of those edits refreshes the memoized validation', () {
+      final plan = editablePlan();
+      final server = plan.nodes.firstWhere((n) => n.type == 'server');
+      final before = shape(ValidatorService.validateCached(plan));
+
+      plan.nodes[plan.nodes.indexOf(server)] = NetNode(
+        name: server.name,
+        type: server.type,
+        model: server.model,
+        services: server.services,
+        serviceRules: {
+          'dns': {
+            'records': [
+              {'name': 'not-a-valid-record', 'address': 'nope'},
+            ],
+          },
+        },
+      );
+      final after = shape(ValidatorService.validateCached(plan));
+      // The edit introduced an invalid DNS record the validator flags; a
+      // stale cache would have answered with the previous findings.
+      expect(after, isNot(before), reason: 'the memo must miss on rules');
+      expect(
+        after.join('\n'),
+        contains('invalid DNS record'),
+        reason: 'the new findings reflect the edited rules, not the old',
+      );
+    });
+  });
+
+  group('a canvas-shaped edit is not an edit at all', () {
+    test('changing only the notes keeps the revision', () {
+      final plan = lab();
+      final before = plan.revision;
+      final moved = plan.copyWith(
+        notes: [...plan.notes, 'layout: dragged PC7 to the side'],
+      );
+      expect(moved.revision, before);
+    });
+
+    test('a notes-only edit is still answered fresh and identically', () {
+      final plan = lab();
+      final first = shape(ValidatorService.validateCached(plan));
+      final moved = plan.copyWith(notes: [...plan.notes, 'layout: moved']);
+      expect(shape(ValidatorService.validateCached(moved)), first);
     });
   });
 }
