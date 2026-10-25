@@ -34,6 +34,8 @@ import re
 import threading
 import time
 
+import path_guard
+
 SCHEMA = 1
 
 # Bounds.  Every store is trimmed on write so a long-lived install cannot
@@ -91,7 +93,7 @@ def _atomic_write(path: str, data) -> bool:
     try:
         directory = os.path.dirname(os.path.abspath(path))
         os.makedirs(directory, exist_ok=True)
-        temp = f"{path}.tmp"
+        temp = path_guard.ensure_no_traversal(path) + ".tmp"
         with open(temp, "w", encoding="utf-8") as stream:
             json.dump(data, stream, indent=2, sort_keys=True)
         os.replace(temp, path)

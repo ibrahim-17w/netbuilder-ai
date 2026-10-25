@@ -26,10 +26,11 @@ import threading
 import time
 
 try:
+    import path_guard
     import pkt_codec
     import pkt_builder
 except ImportError:  # pragma: no cover - package import fallback
-    from . import pkt_codec, pkt_builder
+    from . import path_guard, pkt_codec, pkt_builder
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.join(HERE, "pkt_output")
@@ -429,7 +430,10 @@ def _resolve_out_dir(out_dir: str) -> str:
     wanted = str(out_dir or "").strip()
     if not wanted:
         return _out_dir()
-    path = os.path.abspath(os.path.expanduser(wanted))
+    # out_dir is the user's designated folder (HTTP body); a raw '..' is
+    # refused before abspath can fold it away.
+    path = os.path.abspath(os.path.expanduser(
+        path_guard.ensure_no_traversal(wanted)))
     if os.path.exists(path) and not os.path.isdir(path):
         raise FixError(f"`{path}` is a file, not a folder")
     try:
@@ -447,7 +451,10 @@ def apply_fixes(source: str, fixes: list[dict], *, out_name: str = "",
                 project: str = "", allow_undo: bool = True,
                 out_dir: str = "") -> dict:
     """Apply ONLY the approved fixes, then encrypt a valid .pkt again."""
-    source = os.path.abspath(str(source or "").strip())
+    # source arrives over HTTP (the fix endpoint serves another device);
+    # refuse a raw '..' before abspath folds it away.
+    source = os.path.abspath(path_guard.ensure_no_traversal(
+        str(source or "").strip()))
     if not source or not os.path.isfile(source):
         raise FixError(f"capture not found: {source or '(none given)'}")
     size = os.path.getsize(source)
@@ -613,11 +620,11 @@ def apply_fixes(source: str, fixes: list[dict], *, out_name: str = "",
     out_path = os.path.join(out_dir, f"{stem}-fixed.pkt")
     if os.path.abspath(out_path) == os.path.abspath(source):
         out_path = os.path.join(out_dir, f"{stem}-fixed-{stamp}.pkt")
-    with open(out_path, "wb") as handle:
+    with path_guard.open_state(out_path, "wb") as handle:
         handle.write(payload)
 
     version_path = os.path.join(versions_dir, f"{entry_id}.pkt")
-    with open(version_path, "wb") as handle:
+    with path_guard.open_state(version_path, "wb") as handle:
         handle.write(raw)
 
     manifest = {
@@ -635,7 +642,7 @@ def apply_fixes(source: str, fixes: list[dict], *, out_name: str = "",
         "note": "companion record: what changed, never a credential value",
     }
     manifest_path = out_path + ".netbuilder.json"
-    with open(manifest_path, "w", encoding="utf-8") as handle:
+    with path_guard.open_state(manifest_path, "w", encoding="utf-8") as handle:
         json.dump(manifest, handle, indent=2, sort_keys=True)
 
     ledger_entry = {
@@ -723,7 +730,7 @@ def undo(entry_id: str = "") -> dict:
     os.makedirs(out_dir, exist_ok=True)
     stem = os.path.splitext(os.path.basename(str(target.get("result") or "x")))[0]
     out_path = os.path.join(out_dir, f"{stem}-undone.pkt")
-    with open(out_path, "wb") as handle:
+    with path_guard.open_state(out_path, "wb") as handle:
         handle.write(raw)
     row = {
         "event": "undone",

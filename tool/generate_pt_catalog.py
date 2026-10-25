@@ -6,10 +6,14 @@ Installed template names add recognized entries, never a claim of build support.
 import argparse
 import json
 import re
+import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'sidecar'))
+from path_guard import ensure_no_traversal
+
 SOURCE = ROOT / 'assets/packet_tracer/catalog.json'
 OUTPUT = ROOT / 'lib/services/packet_tracer/catalog_data.dart'
 PYTHON_OUTPUT = ROOT / 'sidecar/pt_catalog_data.py'
@@ -38,7 +42,10 @@ def refresh():
         item = grouped.setdefault(model, dict(model=model,
             type=KINDS.get(device['kind'], device['kind'].lower()),
             kind=device['kind'], aliases=[], variants=[]))
-        block = ROOT / 'sidecar/pkt_templates' / device['file']
+        # The manifest is machine-local but rebuilt from user .pkt saves, so
+        # the per-device file name is refused a '..' segment like any other
+        # path that did not originate here.
+        block = ROOT / 'sidecar/pkt_templates' / ensure_no_traversal(device['file'])
         valid = False
         try:
             xml = ET.fromstring(re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', block.read_text(encoding='utf-8')))

@@ -65,6 +65,11 @@ except Exception as exc:  # sidecar still serves /health without RPA deps
     RPA_IMPORT_ERROR = str(exc)
 
 try:
+    import path_guard
+except ImportError:  # pragma: no cover - package import fallback
+    from . import path_guard
+
+try:
     from learning_controller import SessionLearningController, StrategyStore
 except ImportError:  # pragma: no cover - package import fallback
     from .learning_controller import SessionLearningController, StrategyStore
@@ -746,7 +751,7 @@ def _promote_teach_override(store: str, key: str, dev: str,
         PC_LEARNED[scoped] = {"fx": round(float(fx), 4),
                               "fy": round(float(fy), 4), **meta}
         try:
-            with open(PC_LEARNED_FILE, "w") as f:
+            with path_guard.open_state(PC_LEARNED_FILE, "w") as f:
                 json.dump(PC_LEARNED, f, indent=2)
         except Exception as e:
             log(f"pc_tiles save failed on promotion: {e}")
@@ -826,7 +831,7 @@ def _undo_promotion(row: dict) -> dict:
         removed = PC_LEARNED.pop(key, None) is not None
         if removed:
             try:
-                with open(PC_LEARNED_FILE, "w") as f:
+                with path_guard.open_state(PC_LEARNED_FILE, "w") as f:
                     json.dump(PC_LEARNED, f, indent=2)
             except Exception as exc:
                 log(f"pc_tiles save failed on revert: {exc}")
@@ -959,7 +964,7 @@ def save_cal():
                for k, v in CAL.items()}
         if CAL_GEOM:
             out["geom"] = CAL_GEOM
-        with open(CAL_FILE, "w") as f:
+        with path_guard.open_state(CAL_FILE, "w") as f:
             json.dump(out, f, indent=2)
     except Exception as e:
         log(f"cal save failed: {e}")
@@ -1116,7 +1121,7 @@ except Exception as e:
 
 def save_cfg_mem():
     try:
-        with open(CFG_MEM_FILE, "w") as f:
+        with path_guard.open_state(CFG_MEM_FILE, "w") as f:
             json.dump(CFG_MEM, f, indent=2)
     except Exception as e:
         log(f"config memory save failed: {e}")
@@ -1185,7 +1190,7 @@ except Exception as e:
 
 def save_cmd_mem():
     try:
-        with open(CMD_MEM_FILE, "w") as f:
+        with path_guard.open_state(CMD_MEM_FILE, "w") as f:
             json.dump(BAD_CMD_MEM, f, indent=2)
     except Exception as e:
         log(f"command memory save failed: {e}")
@@ -3056,7 +3061,7 @@ def _journal_agg_trim_locked():
 def _journal_agg_save_locked():
     """Persist the aggregate (best-effort; a miss just forces a rebuild)."""
     try:
-        temp = JOURNAL_AGG_FILE + ".tmp"
+        temp = path_guard.ensure_no_traversal(JOURNAL_AGG_FILE) + ".tmp"
         with open(temp, "w", encoding="utf-8") as stream:
             json.dump(JOURNAL_AGG, stream, separators=(",", ":"))
         os.replace(temp, JOURNAL_AGG_FILE)
@@ -3309,7 +3314,7 @@ def _trim_experience_entries():
         if len(lines) <= EXPERIENCE_MAX_ENTRIES:
             return
         keep = lines[-EXPERIENCE_MAX_ENTRIES:]
-        temp = EXPERIENCE_FILE + ".tmp"
+        temp = path_guard.ensure_no_traversal(EXPERIENCE_FILE) + ".tmp"
         with open(temp, "w", encoding="utf-8") as f:
             f.writelines(keep)
         os.replace(temp, EXPERIENCE_FILE)
@@ -5667,7 +5672,7 @@ except Exception as e:
 
 def save_hw_mem():
     try:
-        with open(HW_MEM_FILE, "w") as f:
+        with path_guard.open_state(HW_MEM_FILE, "w") as f:
             json.dump(HW_MEM, f, indent=2)
     except Exception as e:
         log(f"hardware memory save failed: {e}")
@@ -9978,7 +9983,7 @@ except Exception as e:
 # _resolve_pc_field_rows) and only exact label rows are ever learned.
 if isinstance(PC_LEARNED.pop("fields", None), dict):
     try:
-        with open(PC_LEARNED_FILE, "w") as f:
+        with path_guard.open_state(PC_LEARNED_FILE, "w") as f:
             json.dump(PC_LEARNED, f, indent=2)
     except Exception as e:
         print(f"pc_tiles migration save failed: {e}")
@@ -9995,7 +10000,7 @@ if not PC_LEARNED.get("tile_spots_reset_v2"):
         PC_LEARNED.pop(k, None)
     PC_LEARNED["tile_spots_reset_v2"] = True
     try:
-        with open(PC_LEARNED_FILE, "w") as f:
+        with path_guard.open_state(PC_LEARNED_FILE, "w") as f:
             json.dump(PC_LEARNED, f, indent=2)
     except Exception as e:
         print(f"pc_tiles migration save failed: {e}")
@@ -10013,7 +10018,7 @@ if not PC_LEARNED.get("field_rows_reset_v3"):
         print("pc_tiles migration: dropped width-biased field_rows")
     PC_LEARNED["field_rows_reset_v3"] = True
     try:
-        with open(PC_LEARNED_FILE, "w") as f:
+        with path_guard.open_state(PC_LEARNED_FILE, "w") as f:
             json.dump(PC_LEARNED, f, indent=2)
     except Exception as e:
         print(f"pc_tiles migration save failed: {e}")
@@ -10029,7 +10034,7 @@ if not PC_LEARNED.get("tile_spots_scoped_v4"):
         PC_LEARNED.pop(_stale, None)
     PC_LEARNED["tile_spots_scoped_v4"] = True
     try:
-        with open(PC_LEARNED_FILE, "w") as f:
+        with path_guard.open_state(PC_LEARNED_FILE, "w") as f:
             json.dump(PC_LEARNED, f, indent=2)
     except Exception as e:
         print(f"pc_tiles scope migration save failed: {e}")
@@ -10087,7 +10092,7 @@ def _learn_spot(key: str, fx: float, fy: float, dev: str = ""):  # noqa: C901
     old = PC_LEARNED.get(scoped)
     PC_LEARNED[scoped] = {"fx": round(fx, 4), "fy": round(fy, 4)}
     try:
-        with open(PC_LEARNED_FILE, "w") as f:
+        with path_guard.open_state(PC_LEARNED_FILE, "w") as f:
             json.dump(PC_LEARNED, f, indent=2)
     except Exception as e:
         log(f"pc_tiles save failed: {e}")
@@ -10357,7 +10362,7 @@ def _pc_open_desktop_app(win, dev: str, tile_key: str, tile_names: list,
             # future run. The working strategy below re-learns.
             if PC_LEARNED.pop(tile_key, None) is not None:
                 try:
-                    with open(PC_LEARNED_FILE, "w") as f:
+                    with path_guard.open_state(PC_LEARNED_FILE, "w") as f:
                         json.dump(PC_LEARNED, f, indent=2)
                 except Exception as e:
                     log(f"pc_tiles evict save failed: {e}")
@@ -10457,7 +10462,7 @@ def _learn_field_rows(rows: dict, dev: str = ""):
     PC_LEARNED.pop("fields", None)  # drop legacy poisoned data
     PC_LEARNED["field_rows"] = {k: round(v, 4) for k, v in rows.items()}
     try:
-        with open(PC_LEARNED_FILE, "w") as f:
+        with path_guard.open_state(PC_LEARNED_FILE, "w") as f:
             json.dump(PC_LEARNED, f, indent=2)
     except Exception as e:
         log(f"pc_rows save failed: {e}")
@@ -10843,7 +10848,7 @@ def _config_pc_desktop(rect, dev: str, slot: int, ipcfg: dict,
                 # the next run re-detects instead of repeating the miss.
                 PC_LEARNED.pop("field_rows", None)
                 try:
-                    with open(PC_LEARNED_FILE, "w") as f:
+                    with path_guard.open_state(PC_LEARNED_FILE, "w") as f:
                         json.dump(PC_LEARNED, f, indent=2)
                 except Exception as e:
                     log(f"pc_rows evict save failed: {e}")
@@ -11655,7 +11660,7 @@ except Exception as e:
 
 def _save_srv_mem():
     try:
-        with open(SRV_MEM_FILE, "w") as f:
+        with path_guard.open_state(SRV_MEM_FILE, "w") as f:
             json.dump(SRV_MEM, f, indent=2)
     except Exception as e:
         log(f"srv memory save failed: {e}")
@@ -13440,7 +13445,7 @@ def _pkt_manifest(path: str) -> dict | None:
     if not os.path.isfile(companion):
         return None
     try:
-        with open(companion, encoding="utf-8") as stream:
+        with path_guard.open_state(companion, encoding="utf-8") as stream:
             value = json.load(stream)
         return value if isinstance(value, dict) else None
     except Exception as exc:
@@ -13454,7 +13459,7 @@ def _pkt_write_manifest(path: str, manifest: dict) -> str:
     payload["schema"] = 1
     payload["pkt"] = _pkt_info(path)
     payload["generated"] = time.strftime("%Y-%m-%d %H:%M:%S")
-    temp = companion + ".tmp"
+    temp = path_guard.ensure_no_traversal(companion) + ".tmp"
     with open(temp, "w", encoding="utf-8") as stream:
         json.dump(payload, stream, indent=2)
     os.replace(temp, companion)

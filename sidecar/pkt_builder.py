@@ -41,6 +41,7 @@ import uuid
 import xml.etree.ElementTree as ET
 
 import pkt_codec
+import path_guard
 import pt_hardware as hardware
 import pkt_template_build as template_build
 import xml_guard
@@ -3255,7 +3256,11 @@ def generate_pkt_file(plan: dict, out_path: str, *, project: str = "",
                       log=None) -> dict:
     """Build the topology and write it as a .pkt.  Returns the report."""
     say = log or (lambda *_: None)
-    target = os.path.abspath(os.path.expanduser(str(out_path or "").strip()))
+    # out_path arrives as a CLI arg (offline tool) or from the engine's
+    # generate endpoint; a raw '..' segment is refused before abspath can
+    # fold it away - the engine can serve another device.
+    target = os.path.abspath(os.path.expanduser(
+        path_guard.ensure_no_traversal(str(out_path or "").strip())))
     if not target.lower().endswith(".pkt"):
         raise BuildError("the output path must end in .pkt")
     if os.path.exists(target) and not replace:

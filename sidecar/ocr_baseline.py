@@ -43,6 +43,7 @@ import statistics
 import sys
 import time
 
+import path_guard
 import pt_autopilot as pt
 
 BASELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -232,7 +233,7 @@ def _load_baseline() -> dict:
 
 
 def _write_baseline(payload: dict) -> None:
-    with open(BASELINE, "w", encoding="utf-8") as stream:
+    with path_guard.open_state(BASELINE, "w", encoding="utf-8") as stream:
         json.dump(payload, stream, indent=1, sort_keys=True)
         stream.write("\n")
 

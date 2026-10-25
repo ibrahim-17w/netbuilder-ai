@@ -17,6 +17,8 @@ import time
 import uuid
 from copy import deepcopy
 
+import path_guard
+
 
 # v2 split a strategy's key into transferable identity + volatile metadata.
 # v1 hashed the whole context, so a spot verified on SRV1/office-net became
@@ -112,7 +114,7 @@ class StrategyStore:
     def _flush_locked(self):
         directory = os.path.dirname(os.path.abspath(self.path))
         os.makedirs(directory, exist_ok=True)
-        temp = self.path + ".tmp"
+        temp = path_guard.ensure_no_traversal(self.path) + ".tmp"
         with open(temp, "w", encoding="utf-8") as stream:
             json.dump(self._data, stream, indent=2, sort_keys=True)
         os.replace(temp, self.path)

@@ -36,6 +36,7 @@ import time
 import xml.etree.ElementTree as ET
 
 import pkt_codec
+import path_guard
 
 def user_data_dir() -> str:
     """A per-user folder the app may write to without admin rights."""
@@ -608,7 +609,10 @@ def harvest_templates(roots=None, out_dir: str = "", *, log=None,
     the harvest only ever *adds* models.
     """
     say = log or (lambda *_: None)
-    directory = os.path.abspath(out_dir or TEMPLATE_DIR)
+    # out_dir is user-designated (harvest CLI / HTTP); a raw '..' segment is
+    # refused before abspath can fold it away.
+    directory = os.path.abspath(path_guard.ensure_no_traversal(
+        out_dir or TEMPLATE_DIR))
     existing = []
     if include_existing:
         manifest_path = os.path.join(directory, MANIFEST_FILE)
@@ -662,7 +666,9 @@ def harvest_templates(roots=None, out_dir: str = "", *, log=None,
 def extract_templates(paths, out_dir: str = "", *, log=None) -> dict:
     """Read .pkt files and write (or refresh) the template library."""
     say = log or (lambda *_: None)
-    directory = os.path.abspath(out_dir or TEMPLATE_DIR)
+    # Same entry gate as harvest_templates: out_dir may be user-designated.
+    directory = os.path.abspath(path_guard.ensure_no_traversal(
+        out_dir or TEMPLATE_DIR))
     library = {"devices": [], "links": [], "warnings": [], "_blocks": {},
                "sources": [], "version": ""}
     used = []
@@ -691,14 +697,16 @@ def extract_templates(paths, out_dir: str = "", *, log=None) -> dict:
     os.makedirs(directory, exist_ok=True)
     os.makedirs(os.path.join(directory, "devices"), exist_ok=True)
     os.makedirs(os.path.join(directory, "links"), exist_ok=True)
-    with open(os.path.join(directory, SKELETON_FILE), "wb") as stream:
+    with path_guard.open_state(os.path.join(directory, SKELETON_FILE),
+                               "wb") as stream:
         stream.write(library["skeleton"].encode("utf-8"))
     for relative, block in blocks.items():
         # One choke point for what lands on disk: a control character Packet
         # Tracer tolerates inside its own save ( in a banner) is not
         # valid XML, and would make the block unusable to everything that
         # reads the library back.
-        with open(os.path.join(directory, relative), "wb") as stream:
+        with path_guard.open_state(os.path.join(directory, relative),
+                                   "wb") as stream:
             stream.write(pkt_codec.xml_safe(block))
     manifest = {
         "schema": 1,
@@ -710,8 +718,8 @@ def extract_templates(paths, out_dir: str = "", *, log=None) -> dict:
         "sources": library["sources"],
         "warnings": library["warnings"],
     }
-    with open(os.path.join(directory, MANIFEST_FILE), "w",
-              encoding="utf-8") as stream:
+    with path_guard.open_state(os.path.join(directory, MANIFEST_FILE), "w",
+                               encoding="utf-8") as stream:
         json.dump(manifest, stream, indent=2)
     say(f"templates: wrote {len(manifest['devices'])} device models and "
         f"{len(manifest['links'])} link kinds to {directory}")

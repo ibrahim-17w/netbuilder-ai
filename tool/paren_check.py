@@ -2,10 +2,14 @@
 negative or what depth remains. Used to locate bracket bugs the analyzer
 only points at with a confusing line number."""
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'sidecar'))
+from path_guard import ensure_no_traversal
 
 
 def scan(path, start_marker, span):
-    src = open(path, encoding='utf-8').read()
+    src = open(ensure_no_traversal(path), encoding='utf-8').read()
     lines = src.split('\n')
     start = next(
         i for i, l in enumerate(lines) if start_marker in l
