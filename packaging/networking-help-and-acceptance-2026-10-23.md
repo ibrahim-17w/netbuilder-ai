@@ -287,3 +287,63 @@ Rather than bypass, each class is being fixed honestly:
   rank them.
 - The clean-VM walkthrough and the 3-5 tester pilot remain manual gates;
   the pilot kit is staged with the fresh package once the rebuild lands.
+
+# Review items 5 and 10, push-gate fixes, and the live app test
+# (2026-10-26, `1463050`..`861cc1a`)
+
+1. **Importer preserves saved service configuration** (`1463050`): DHCP
+   pools (network/start, mask or prefix, default-router, dns-server) and
+   DNS records (`ip dns server`, `ip host`) parse into the same
+   serviceRules shape the build path consumes, reported in the fidelity
+   note. The router case exposed a validator rule written for the
+   Services tab: IOS routers serve DHCP/DNS from their own config lines,
+   so for those two roles on routers the check is the RULES being
+   present - an honest import now validates clean.
+2. **Offline workflow integration test** (`1109026`): one test drives
+   the real app on the Windows runner end to end - describe a network,
+   confirm the plan, choose the layout, build the .pkt, verify the file
+   non-empty on disk (past a temp path-provider seam, all real IO). The
+   test description names the platform; CI gains a windows-integration
+   job. Manual by design: native save/share dialogs, Packet Tracer live
+   checks.
+3. **Push-gate hardening** (`ce3c086`, `0126e5e`, `fc5112f`, `94d1d51`):
+   the Mimosa gate blocked the first push with 38 findings. Fixed in
+   three passes: engine `.pkt` paths refuse raw `..`; untrusted save XML
+   goes through a DTD-refusing guard at all five parse sites; the
+   remaining flagged IO routes through `path_guard` at engine state
+   writes, CLI tool args, and the pkt fix/template entry points. Sealed
+   scans: 38 -> 33 -> 28 (the scanner does not recognize custom
+   sanitizers, so a tail of downstream-of-validation findings persists;
+   each carries the advisory's own proof-gap note).
+
+## Gates
+
+- Sidecar: 601 passed, 1 skipped after the sweep. Analyzer clean;
+  integration test passes on the final tree; the validator-affected
+  widget suites pass.
+- **Package rebuilt at `861cc1a`** (engine `2026-10-26-traversal-xml-
+  guard`, SourceDirty false): verify_release, clean-install +
+  data-retaining uninstall + purge, and upgrade-with-surviving-fixtures
+  all green.
+- **Push remains blocked**: the gate now counts test-file fixtures
+  (intentional fake credentials, deliberately-crafted entity documents
+  in the guard tests) as findings. That is the user's security policy
+  to configure; the code fixes are complete and the sealed scans are on
+  record.
+
+## Live app test (computer use, the built release)
+
+Launched `net_builder.exe` (pid 50228) from the fresh release build and
+drove it through the keyless journey: first-run readiness correct
+(engine up, private mode -> offline planner, Packet Tracer detected,
+OCR available); a new conversation accepted "2 routers and 4 switches"
+and the offline planner produced rev b8e42b69 (6 devices, 5 links) with
+the design brief honoring the user's standing rules from their
+environment profile; the help-first quick replies showed the build chip
+and the instructions chip; "Show me the build instructions" opened the
+guide dialog with Copy/Save-to-file and the three verification
+checkboxes; the /guide command reopened it. Checkbox tick persistence
+across reopen is covered by the passing widget test; the interactive
+re-check was cut short when Windows' focus policy began refusing
+synthetic clicks to a background window - the correct guard behavior,
+not an app defect.
