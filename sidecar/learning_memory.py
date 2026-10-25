@@ -94,7 +94,7 @@ def _atomic_write(path: str, data) -> bool:
         directory = os.path.dirname(os.path.abspath(path))
         os.makedirs(directory, exist_ok=True)
         temp = path_guard.ensure_no_traversal(path) + ".tmp"
-        with open(temp, "w", encoding="utf-8") as stream:
+        with path_guard.open_state(temp, "w", encoding="utf-8") as stream:
             json.dump(data, stream, indent=2, sort_keys=True)
         os.replace(temp, path)
         return True

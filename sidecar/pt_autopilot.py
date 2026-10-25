@@ -1036,7 +1036,7 @@ except Exception as e:
 
 def save_dev_mem():
     try:
-        with open(DEV_MEM_FILE, "w") as f:
+        with path_guard.open_state(DEV_MEM_FILE, "w") as f:
             json.dump(DEV_MEM, f, indent=2)
     except Exception as e:
         log(f"device memory save failed: {e}")
@@ -3062,7 +3062,7 @@ def _journal_agg_save_locked():
     """Persist the aggregate (best-effort; a miss just forces a rebuild)."""
     try:
         temp = path_guard.ensure_no_traversal(JOURNAL_AGG_FILE) + ".tmp"
-        with open(temp, "w", encoding="utf-8") as stream:
+        with path_guard.open_state(temp, "w", encoding="utf-8") as stream:
             json.dump(JOURNAL_AGG, stream, separators=(",", ":"))
         os.replace(temp, JOURNAL_AGG_FILE)
     except Exception:
@@ -3315,7 +3315,7 @@ def _trim_experience_entries():
             return
         keep = lines[-EXPERIENCE_MAX_ENTRIES:]
         temp = path_guard.ensure_no_traversal(EXPERIENCE_FILE) + ".tmp"
-        with open(temp, "w", encoding="utf-8") as f:
+        with path_guard.open_state(temp, "w", encoding="utf-8") as f:
             f.writelines(keep)
         os.replace(temp, EXPERIENCE_FILE)
         with LOCK:

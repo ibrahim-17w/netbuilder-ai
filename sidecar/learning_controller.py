@@ -115,7 +115,7 @@ class StrategyStore:
         directory = os.path.dirname(os.path.abspath(self.path))
         os.makedirs(directory, exist_ok=True)
         temp = path_guard.ensure_no_traversal(self.path) + ".tmp"
-        with open(temp, "w", encoding="utf-8") as stream:
+        with path_guard.open_state(temp, "w", encoding="utf-8") as stream:
             json.dump(self._data, stream, indent=2, sort_keys=True)
         os.replace(temp, self.path)
         self._dirty = False
