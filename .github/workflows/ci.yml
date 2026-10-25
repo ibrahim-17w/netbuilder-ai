@@ -100,6 +100,35 @@ jobs:
       - name: Packaged Windows smoke test
         run: powershell -ExecutionPolicy Bypass -File tool/windows_smoke_test.ps1 -ExePath build/windows/x64/runner/Release/net_builder.exe
 
+  windows-integration:
+    name: offline workflow integration test (windows)
+    timeout-minutes: 30
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Log tool versions
+        run: |
+          flutter --version
+          dart --version
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      # Compiles and launches the real Windows runner and drives the offline
+      # workflow inside it (describe a network, confirm the layout, build the
+      # .pkt, check the file on disk), so the result is platform evidence the
+      # widget harness cannot produce. The test name in the output names the
+      # platform it ran on.
+      - name: Offline workflow integration test
+        run: flutter test integration_test -d windows
+
   windows-package:
     name: signed Windows package (tags)
     if: startsWith(github.ref, 'refs/tags/v')
