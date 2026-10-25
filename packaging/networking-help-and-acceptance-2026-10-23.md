@@ -166,7 +166,58 @@ the full suite.
    remedy per open step. Progress survives a reopen via the session
    state; the grade is always recomputed, never replayed.
 
-# Backlog, report and checklist (2026-10-24, `aec68b5`..`8a42067`)
+# Correctness batch: revision, cables, history, addresses (2026-10-24,
+# `d38acd6`..`1012f46`)
+
+Four items from the external reliability review, each inspected first,
+implemented as the smallest working slice, and committed after its own
+focused checks; the final tree passes the combined regression.
+
+1. **Plan revision covers every validator input** — the revision now
+   hashes the service rules (through the sanitized, key-sorted planner
+   copy, so no password/PSK/token ever enters the identifier), management
+   addresses and IPv6 assignments. A configuration-only edit on the SAME
+   plan object therefore invalidates the memoized validation by
+   construction; a canvas-shaped edit (notes) still does not move it.
+   Regression tests pin each direction; the perf gates still pass.
+2. **Saved cables verified** — the build verification reads the audit's
+   LINK rows back out of the save and compares endpoint pairs against the
+   plan (shorthand normalized, order ignored). A removed or miswired
+   cable fails verification even when device and cable counts match.
+   Link data is only comparable when the audit states its count; older
+   audits keep the ports-based verdict with the honest note.
+3. **Plan version history** — every version shares a stable projectKey
+   and names its parent (schema v12; nullable for legacy rows, whose
+   timelines fall back to the project name). A pure PlanVersionDiff
+   (devices, cables, addresses, routing, VLANs, services; secrets
+   stripped) replaces the home screen's inline compare, and the row menu
+   gains Restore: the old plan becomes a NEW version parented to the
+   project's newest row - originals retained.
+4. **Project address table** — the toolkit's addressing section shows
+   the plan's addresses as one table (device, interface, IPv4, IPv6,
+   dot1Q-derived VLAN) with live filtering, RFC-4180 CSV copy, and tap-
+   to-edit: dialog-side validation, then a new plan through the pure
+   applyEdit saved via the host's plan-save path (the same versioned
+   chain as any edit).
+
+Also fixed en route: `_addColumnIfMissing` compared camelCase arguments
+against a lowercased readout, so any non-lowercase column was re-ALTERed
+on every launch - latent since the helper was written, exposed by the
+first camelCase column. The recovery tests cover it.
+
+## Batch gates (2026-10-24, final state `1012f46`)
+
+- `flutter analyze --fatal-infos` clean; `flutter test` 2659 passed
+  (combined regression after the batch, per the process).
+
+## What is still not verified here
+
+- Items 5-10 of the review (importer DHCP/DNS fidelity, user checks,
+  unified labs, blueprints, project packages, the offline workflow
+  integration test) are not started.
+- The 2026-10-23 tester package predates all of today's work.
+- The clean-VM walkthrough, the 3-5 tester pilot and live Packet Tracer
+  acceptance remain manual gates.
 
 1. **Unanswered-questions loop** (`aec68b5`): a keyless miss (the
    guided near-miss reply) is recorded in a local backlog - one row per
