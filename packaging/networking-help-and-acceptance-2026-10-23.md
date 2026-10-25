@@ -259,3 +259,31 @@ ran out on a loaded machine (the behavior itself was and is correct).
 - Live Packet Tracer checks (industrial palette rows, DHCP/HTTP probes)
   remain recorded manual acceptance runs.
 
+# Security hardening under the push gate (2026-10-25/26, `ce3c086`..)
+
+The project's Mimosa security gate blocked the first push with 38 sealed
+findings (31 path-traversal, 6 XML entity expansion, 1 CLI-arg taint).
+Rather than bypass, each class is being fixed honestly:
+
+1. **Engine-supplied .pkt paths refuse traversal** (`ce3c086`): `_pkt_path`
+   checks the RAW input for `..` segments before abspath folds them away
+   (post-resolution parts can never show the probe) - the engine can serve
+   another device, and a client sending `..` is probing, not auditing.
+2. **Untrusted save XML cannot expand entities** (`0126e5e`): a shared
+   `xml_guard` refuses any document declaring a DOCTYPE or ENTITY before
+   ElementTree parses it - a billion-laughs save could pin the engine
+   during an audit or build, and Packet Tracer saves never declare either.
+   All five `fromstring` sites in the builder/template-builder route
+   through it.
+3. **Path sweep** (in flight): the remaining flagged IO sites - the
+   engine's own state files (journals, learned memory, OCR temp) and the
+   CLI tools' user-arg paths - route through a shared
+   `path_guard.ensure_no_traversal` / `open_state`.
+
+## What is still not verified here
+
+- Items 6-9 of the review (user checks, unified labs, blueprints,
+  packages) are not started - deliberately: the pilot's findings should
+  rank them.
+- The clean-VM walkthrough and the 3-5 tester pilot remain manual gates;
+  the pilot kit is staged with the fresh package once the rebuild lands.
