@@ -167,7 +167,7 @@ the full suite.
    state; the grade is always recomputed, never replayed.
 
 # Correctness batch: revision, cables, history, addresses (2026-10-24,
-# `d38acd6`..`1012f46`)
+# `a1b2f6d`..`1012f46`)
 
 Four items from the external reliability review, each inspected first,
 implemented as the smallest working slice, and committed after its own
@@ -208,7 +208,9 @@ first camelCase column. The recovery tests cover it.
 ## Batch gates (2026-10-24, final state `1012f46`)
 
 - `flutter analyze --fatal-infos` clean; `flutter test` 2659 passed
-  (combined regression after the batch, per the process).
+  (combined regression after the batch, per the process; item 1's commit
+  landed after that run, and its own focused checks - cache tests, perf
+  gates, the revision-sensitive chat suites - all passed).
 
 ## What is still not verified here
 
