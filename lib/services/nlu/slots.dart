@@ -255,7 +255,12 @@ class BriefSlotPipeline {
       pcCount = 1;
     }
     var serverCount = _quantityTotal(records, 'server') ?? 0;
-    if (serverCount == 0 && _mentionedBeyondHowMany(lower, const ['server'])) {
+    if (serverCount == 0 &&
+        _mentionedBeyondHowMany(lower, const [
+          'server',
+          'nas',
+          'network attached storage',
+        ])) {
       serverCount = 1;
     }
     // An AAA/TACACS+/RADIUS ask with no server named still means an AAA
@@ -535,7 +540,8 @@ class BriefSlotPipeline {
 
   static final _serverQty = RegExp(
     r'\b(\d+|a|an)\s*(?:(?:more|extra|additional|further)\s+)?'
-    r'((?:(?:second|web|http|https|dhcp|dns|tacacs\+?|aaa|radius|ftp|mail|email|ntp|syslog)\s+)*)servers?(?:-pt)?\b',
+    r'((?:(?:second|web|http|https|dhcp|dns|tacacs\+?|aaa|radius|ftp|mail|email|ntp|syslog)\s+)*)'
+    r'(?:servers?(?:-pt)?|nas|network attached storage)\b',
   );
 
   static final Map<String, RegExp> _keywordQty = {

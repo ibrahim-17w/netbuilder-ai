@@ -129,6 +129,10 @@ OFFLINE_ONLY_DEVICE_KINDS = {
     "wireless-end-device",
     "analog-phone",
     "voip-adapter",
+    "mcu",
+    "sbc",
+    "cell-tower",
+    "central-office",
 }
 
 # Kinds the planner can name but neither builder can place yet. They are kept
@@ -138,10 +142,6 @@ OFFLINE_ONLY_DEVICE_KINDS = {
 UNSUPPORTED_DEVICE_KINDS = {
     "bridge",
     "repeater",
-    "mcu",
-    "sbc",
-    "cell-tower",
-    "central-office",
 }
 
 

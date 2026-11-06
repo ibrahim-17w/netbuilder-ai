@@ -84,6 +84,11 @@ String _bridgeMasks(String s) => s.replaceAllMapped(_maskPair, (m) {
 /// table is applied longest-first, so 'جهاز التوجيه' (router) wins before
 /// the bare 'جهاز' (pc) underneath it.
 const List<List<String>> _phraseBridge = [
+  // Multi-word names must survive the spelled-out-number bridge: "single" is
+  // also the number one, so "single board computer" became "1 1 board
+  // computer" and lost its SBC meaning before the lexicon saw it.
+  ['single board computer', 'SBC'],
+  ['single-board computer', 'SBC'],
   // devices
   ['عالفرع التاني', 'at the second branch'],
   ['عالفرع الثاني', 'at the second branch'],
@@ -410,7 +415,11 @@ Map<String, int>? perSiteCounts(String text) {
   };
   counts['switch'] = countOf(['switch']);
   counts['pc'] = countOf(['pc', 'workstation', 'desktop']);
-  counts['server'] = countOf(['server']);
+  counts['server'] = countOf([
+    'server',
+    'nas',
+    'network attached storage',
+  ]);
   for (final kind in deviceKinds) {
     if (const ['router', 'switch', 'pc', 'server'].contains(kind.type)) {
       continue;

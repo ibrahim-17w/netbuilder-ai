@@ -55,14 +55,19 @@ const List<DeviceKind> deviceKinds = [
   ),
   DeviceKind(
     type: 'server',
-    keywords: ['server'],
+    keywords: ['server', 'nas', 'network attached storage'],
     models: ['Server-PT'],
     port: 'f0',
     ipConfig: true,
   ),
   DeviceKind(
     type: 'printer',
-    keywords: ['printer'],
+    keywords: [
+      'printer',
+      'mfp',
+      'multifunction printer',
+      'network printer',
+    ],
     models: ['Printer-PT'],
     port: 'f0',
     ipConfig: true,
@@ -81,13 +86,20 @@ const List<DeviceKind> deviceKinds = [
     // ASA-5506/5505 are Firewall-PT devices with ASA syntax, not IOS: they
     // are placed and cabled, and their config is deliberately left to the
     // user rather than filled with wrong `hostname`/`interface` lines.
-    keywords: ['firewall', 'asa'],
+    keywords: ['firewall', 'asa', 'ngfw', 'utm', 'security appliance'],
     models: ['5506', '5505', 'ASA5505'],
     port: 'g1/1',
   ),
   DeviceKind(
     type: 'wireless',
-    keywords: ['wireless access point', 'access point', 'wireless ap', 'ap'],
+    keywords: [
+      'wireless access point',
+      'wifi access point',
+      'wi-fi access point',
+      'access point',
+      'wireless ap',
+      'ap',
+    ],
     models: ['AccessPoint-PT', 'AccessPoint-PT-A', 'AccessPoint-PT-N'],
     // The AP's Ethernet port: Packet Tracer names it from the host module and
     // never writes it into a save, so the manifest recorded it empty and every
@@ -104,7 +116,7 @@ const List<DeviceKind> deviceKinds = [
   ),
   DeviceKind(
     type: 'phone',
-    keywords: ['ip phone', 'voip phone', 'phone'],
+    keywords: ['ip phone', 'voip phone', 'phone', 'telephone', 'desk phone'],
     models: ['7960', '7961', '7962'],
     // Same shape as the access point: the port is named from the host module,
     // so the library's FastEthernet0 is the name a real save uses.
@@ -124,19 +136,24 @@ const List<DeviceKind> deviceKinds = [
   ),
   DeviceKind(
     type: 'tv',
-    keywords: ['smart tv', 'tv'],
+    keywords: ['smart tv', 'television', 'tv'],
     models: ['TV-PT'],
     wireless: true,
   ),
   DeviceKind(
     type: 'wired-end-device',
-    keywords: ['wired end device', 'wired endpoint'],
+    keywords: ['wired end device', 'wired endpoint', 'wired client'],
     models: ['WiredEndDevice-PT'],
     port: 'f0',
   ),
   DeviceKind(
     type: 'wireless-end-device',
-    keywords: ['wireless end device', 'wireless endpoint'],
+    keywords: [
+      'wireless end device',
+      'wireless endpoint',
+      'wireless client',
+      'wifi client',
+    ],
     models: ['WirelessEndDevice-PT'],
     wireless: true,
   ),
@@ -148,7 +165,16 @@ const List<DeviceKind> deviceKinds = [
   ),
   DeviceKind(
     type: 'modem',
-    keywords: ['cable modem', 'dsl modem', 'modem'],
+    keywords: [
+      'cable modem',
+      'dsl modem',
+      'broadband modem',
+      'fibre modem',
+      'fiber modem',
+      'modem',
+      'ont',
+      'onu',
+    ],
     models: ['DSL Modem-PT', 'Cable Modem-PT', 'Modem-PT'],
     port: 'port1',
   ),
@@ -201,12 +227,12 @@ const List<DeviceKind> deviceKinds = [
   ),
   DeviceKind(
     type: 'mcu',
-    keywords: ['mcu', 'microcontroller', 'mcu'],
+    keywords: ['mcu', 'microcontroller'],
     models: ['MCU-PT'],
   ),
   DeviceKind(
     type: 'sbc',
-    keywords: ['sbc', 'single board computer', 'sbc'],
+    keywords: ['sbc', 'single board computer'],
     models: ['SBC-PT'],
   ),
   DeviceKind(
@@ -232,7 +258,7 @@ const List<DeviceKind> deviceKinds = [
   ),
   DeviceKind(
     type: 'central-office',
-    keywords: ['central-office', 'central office server'],
+    keywords: ['central-office', 'central office', 'central office server'],
     models: ['Central-Office-Server'],
   ),
   DeviceKind(
@@ -246,7 +272,12 @@ const List<DeviceKind> deviceKinds = [
   ),
   DeviceKind(
     type: 'sniffer',
-    keywords: ['sniffer', 'packet sniffer'],
+    keywords: [
+      'sniffer',
+      'packet sniffer',
+      'protocol analyzer',
+      'packet capture',
+    ],
     models: ['Sniffer'],
     port: 'ethernet0',
   ),
@@ -268,6 +299,8 @@ const List<DeviceKind> deviceKinds = [
       'power-distribution',
       'power distribution',
       'power distribution device',
+      'pdu',
+      'ups',
     ],
     models: ['Power Distribution Device'],
   ),
@@ -282,15 +315,18 @@ const List<DeviceKind> deviceKinds = [
 /// device shape; see `OFFLINE_ONLY_DEVICE_KINDS` in `sidecar/catalog.py`
 /// (`sidecar/test_device_palette.py` keeps the two lists equal).
 ///
-/// Empty since the seven industrial/control kinds were taught live palette
-/// paths (they build offline AND place live now). The set stays as the
-/// landing place for the next offline-buildable kind with no click-path.
+/// The set is not empty: these nine real templates still have no live
+/// click-path. Remove a kind only after its palette and executor exist.
 const Set<String> offlineOnlyDeviceKinds = {
   'meraki-server',
   'wired-end-device',
   'wireless-end-device',
   'analog-phone',
   'voip-adapter',
+  'mcu',
+  'sbc',
+  'cell-tower',
+  'central-office',
 };
 
 /// Kinds the planner can recognize but neither builder can place yet.
@@ -304,10 +340,6 @@ const Set<String> offlineOnlyDeviceKinds = {
 const Set<String> unsupportedDeviceKinds = {
   'bridge',
   'repeater',
-  'mcu',
-  'sbc',
-  'cell-tower',
-  'central-office',
 };
 
 /// The device kinds a Packet Tracer build can actually place today.
@@ -341,6 +373,10 @@ const Map<String, String> devicePrefixes = {
   'meraki-server': 'MERAKI',
   'wired-end-device': 'WED',
   'wireless-end-device': 'WLD',
+  'mcu': 'MCU',
+  'sbc': 'SBC',
+  'cell-tower': 'CELL',
+  'central-office': 'CO',
 };
 
 /// Spelled-out numbers, bridged to digits before anything reads them.

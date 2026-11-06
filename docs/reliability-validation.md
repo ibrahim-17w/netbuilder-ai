@@ -57,6 +57,13 @@ the original path is not committed. The generated catalog
 `pt_catalog_data.py`) was refreshed, so `Printer-PT` now has a real variant
 instead of an empty one.
 
+Cable audit: 298 saved `.pkt` files were scanned for link templates (18 were
+unreadable). The only media present are `eCopper`, `eSerial`, `ePhoneLine`,
+`eCoaxial`, `eOctal`, `eCustomIOLink`, `eUsb` and `eFiber`. None defines a
+console, wireless-association or additional coaxial link template, so the
+library keeps its 10 real templates and a request for an unavailable medium
+still fails explicitly rather than being silently dropped.
+
 ### Newly usable device kinds
 
 - `printer` - supported offline and in the Dart builder (real template).
@@ -65,20 +72,30 @@ instead of an empty one.
 - `wired-end-device`, `wireless-end-device` - generic PT endpoints.
 - `analog-phone`, `voip-adapter` - moved out of the unsupported list; real
   templates, offline build only.
+- `mcu`, `sbc` - control and single-board computers; real templates, offline
+  build only.
+- `cell-tower`, `central-office` - telecom templates, offline build only.
 
-`meraki-server`, the two end devices, `analog-phone` and `voip-adapter` are
-in `offlineOnlyDeviceKinds` / `OFFLINE_ONLY_DEVICE_KINDS`: they compile into
-offline `.pkt` files, and a live Packet Tracer run reports `offline_only`
+Nine kinds are in `offlineOnlyDeviceKinds` / `OFFLINE_ONLY_DEVICE_KINDS`:
+`meraki-server`, `wired-end-device`, `wireless-end-device`, `analog-phone`,
+`voip-adapter`, `mcu`, `sbc`, `cell-tower` and `central-office`. They compile
+into offline `.pkt` files, and a live Packet Tracer run reports `offline_only`
 rather than substituting a different device.
+
+Everyday names were added for NAS/network-attached storage, multifunction
+printers, NGFW/UTM security appliances, ONT/broadband/fibre modems,
+televisions, protocol analyzers/packet captures, PDUs/UPS units, desk phones,
+wired/wireless clients and WiFi access points. Multi-word names survive the
+number-word bridge: `single board computer` is read as an SBC, not as a PC.
 
 ## 3. Test execution (this machine, 2026-11-06)
 
 ```
 cd sidecar && python -m pytest -q
-# 632 passed in 134.56s
+# 632 passed in 151.56s
 
 flutter test
-# 2888 passed, 0 failed
+# 2890 passed, 0 failed
 
 flutter analyze <changed Dart files>
 # No issues found!
@@ -92,7 +109,11 @@ New or changed coverage:
 - `sidecar/test_generation_scenarios.py` - all 20 scenarios; scenarios 15
   (printers) and 20 (complex 50 with printers) now complete.
 - `sidecar/test_device_palette.py` - all offline-only kinds, including the
-  five new ones, compile from real templates.
+  nine current ones, compile from real templates.
+- `test/device_vocabulary_coverage_test.dart` - each everyday equipment name
+  produces exactly one node of its kind, and the four new template-backed
+  kinds keep their real model names (`MCU-PT`, `SBC-PT`, `Cell-Tower`,
+  `Central-Office-Server`).
 - `test/harvested_device_kinds_test.dart` - the parser recognizes the new
   kinds; the bundled library contains `Printer-PT`; a router/switch/printer
   plan builds in the Dart compiler with 3 devices and 2 links.
@@ -132,9 +153,10 @@ New or changed coverage:
 2. **Wireless association is not buildable.** There is no wireless `LINK`
    template. `WirelessEndDevice-PT` and the TV template have unnamed wireless
    or coaxial ports, so they are placed but cannot be cabled.
-3. **Five kinds are offline-only.** The live executor has no taught palette
-   path for the Meraki server, either end device, the analog phone or the VoIP
-   adapter; a live run reports `offline_only`.
+3. **Nine kinds are offline-only.** The live executor has no taught palette
+   path for the Meraki server, either end device, the analog phone, the VoIP
+   adapter, the MCU, the SBC, the cell tower or the central office; a live run
+   reports `offline_only`.
 4. **The viewer still draws the plan.** It now says so; verified file counts
    are in the export report.
 5. **Configuration validation is structural.** `ValidatorService` keeps its

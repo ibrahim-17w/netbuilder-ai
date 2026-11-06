@@ -88,6 +88,10 @@ KIND_PATTERNS = {
     "wireless-end-device": ("wirelessenddevice", "wireless end device"),
     "analog-phone": ("analogphone", "analog phone"),
     "voip-adapter": ("homevoip", "voipadapter", "voip adapter"),
+    "mcu": ("mcu", "microcontroller"),
+    "sbc": ("sbc", "singleboardcomputer"),
+    "cell-tower": ("celltower", "cell tower"),
+    "central-office": ("centralofficeserver", "central office server"),
 }
 
 CLI_KINDS = ("router", "switch", "multilayer switch")
@@ -96,7 +100,8 @@ CLI_KINDS = ("router", "switch", "multilayer switch")
 # access, servers, then the hosts.  A device's band follows what it is FOR,
 # not just its raw type, so servers get their own row instead of sharing the
 # hosts'.
-CORE_TYPES = ("router", "firewall", "cloud", "modem", "wireless-router")
+CORE_TYPES = ("router", "firewall", "cloud", "modem", "wireless-router",
+              "cell-tower", "central-office")
 AGGREGATION_TYPES = ("multilayer switch", "wlc")
 ACCESS_TYPES = ("switch", "wireless", "accesspoint", "wireless access point",
                 "hub")

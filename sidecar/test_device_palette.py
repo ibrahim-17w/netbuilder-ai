@@ -314,6 +314,10 @@ def test_offline_only_kinds_compile_from_real_templates():
         "wireless-end-device": "WirelessEndDevice-PT",
         "analog-phone": "Analog-Phone-PT",
         "voip-adapter": "Home-VoIP-PT",
+        "mcu": "MCU-PT",
+        "sbc": "SBC-PT",
+        "cell-tower": "Cell-Tower",
+        "central-office": "Central-Office-Server",
     }
     nodes = [{"name": f"D{i}", "type": kind, "model": models[kind]}
              for i, kind in enumerate(offline)]
