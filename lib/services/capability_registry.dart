@@ -708,6 +708,20 @@ class CapabilityRegistry {
       keywords: ['subnet', 'mask', 'broadcast', 'wildcard', 'cidr', 'hosts'],
     ),
     _toolkitSection(
+      id: 'tools.ipv6',
+      label: 'IPv6 inspector',
+      section: ToolkitSection.ipv6,
+      keywords: [
+        'ipv6',
+        'eui-64',
+        'eui64',
+        'solicited-node',
+        'link-local',
+        'slaac',
+        'prefix',
+      ],
+    ),
+    _toolkitSection(
       id: 'tools.vlsm',
       label: 'VLSM and subnet splitting',
       section: ToolkitSection.vlsm,

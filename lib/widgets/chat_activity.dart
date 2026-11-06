@@ -435,3 +435,222 @@ class NetworkInspector extends StatelessWidget {
     ),
   );
 }
+
+// --- the agent-style to-do bar ---------------------------------------------
+
+/// The agent-app to-do bar: a slim strip PINNED above the composer, not a
+/// row inside the scrolling transcript.
+///
+/// Collapsed it is one line - spinner or check, a header, "done/total", and
+/// a chevron. Expanded it is the checklist of real work, bounded in height
+/// so a long list scrolls inside itself instead of pushing the composer off
+/// screen or overlapping it. The bar appears only when there is work to
+/// show; a turn with no engine steps produces no bar at all.
+class ActivityTodoBar extends StatelessWidget {
+  final List<ActivityEntry> entries;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final bool working;
+  final VoidCallback onDismiss;
+
+  const ActivityTodoBar({
+    super.key,
+    required this.entries,
+    required this.expanded,
+    required this.onToggle,
+    required this.onDismiss,
+    this.working = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final done = entries.where((e) => e.status == ActivityStatus.ok).length;
+    final failed = entries.any((e) => e.status == ActivityStatus.failed);
+    final header = working
+        ? (failed
+              ? 'Working - something failed'
+              : 'Working through the network...')
+        : 'To-do';
+    // The one thing a collapsed bar should say beyond the count: whatever is
+    // still open, so a user glancing at it sees where the work stands.
+    final current = working
+        ? entries.lastWhere(
+            (e) => e.status == ActivityStatus.running,
+            orElse: () => entries.last,
+          )
+        : null;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(AppTheme.s12, 0, AppTheme.s12, 0),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppTheme.rMd),
+        ),
+        border: Border(
+          top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+          left: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+          right: BorderSide(
+            color: scheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppTheme.rMd),
+            ),
+            onTap: onToggle,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.s12,
+                vertical: 7,
+              ),
+              child: Row(
+                children: [
+                  _leadingIcon(theme, size: 14),
+                  const SizedBox(width: AppTheme.s8),
+                  Expanded(
+                    child: Text(
+                      current == null ? header : '$header ${current.label}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '$done/${entries.length}',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: done == entries.length
+                          ? scheme.primary
+                          : scheme.onSurfaceVariant,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  const SizedBox(width: AppTheme.s6),
+                  // The chevron is the affordance the bar exists for.
+                  AnimatedRotation(
+                    turns: expanded ? 0.0 : 0.5,
+                    duration: const Duration(milliseconds: 150),
+                    child: Icon(
+                      Icons.keyboard_arrow_down,
+                      size: 19,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 30,
+                    height: 30,
+                    child: IconButton(
+                      tooltip: 'Hide this list',
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      iconSize: 14,
+                      icon: Icon(
+                        Icons.close,
+                        size: 14,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      onPressed: onDismiss,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (expanded)
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.s12,
+                  0,
+                  AppTheme.s12,
+                  AppTheme.s8,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final entry in entries) _todoRow(theme, entry),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _leadingIcon(ThemeData theme, {double size = 14}) {
+    final scheme = theme.colorScheme;
+    if (working) {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+    final failed = entries.any((e) => e.status == ActivityStatus.failed);
+    return Icon(
+      failed ? Icons.error_outline : Icons.check_circle,
+      size: size,
+      color: failed ? scheme.error : scheme.primary,
+    );
+  }
+
+  Widget _todoRow(ThemeData theme, ActivityEntry entry) {
+    final scheme = theme.colorScheme;
+    final (icon, color) = switch (entry.status) {
+      ActivityStatus.running => (Icons.more_horiz, scheme.onSurfaceVariant),
+      ActivityStatus.ok => (Icons.check, scheme.primary),
+      ActivityStatus.warning => (Icons.priority_high, scheme.tertiary),
+      ActivityStatus.failed => (Icons.close, scheme.error),
+    };
+    final struck = entry.status == ActivityStatus.ok;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1.5),
+            child: Icon(icon, size: 13, color: color),
+          ),
+          const SizedBox(width: AppTheme.s8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: struck ? scheme.onSurfaceVariant : scheme.onSurface,
+                    decoration: struck ? TextDecoration.lineThrough : null,
+                  ),
+                ),
+                if (entry.detail.trim().isNotEmpty)
+                  Text(
+                    entry.detail,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

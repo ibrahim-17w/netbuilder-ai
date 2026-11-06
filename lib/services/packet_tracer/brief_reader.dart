@@ -44,6 +44,25 @@ typedef _ConnectionMention = ({
   String? forcedCable,
 });
 
+/// The router model the brief named, before the hardware clauses were
+/// stripped out of the planner text. Null when the brief left it open.
+String? _routerModelHint(
+  List<_ModelMention> modelMentions,
+  Map<String, _Binding> bindings,
+) {
+  for (final mention in modelMentions) {
+    if (mention.device.type.toLowerCase() == 'router') {
+      return mention.device.model;
+    }
+  }
+  for (final b in bindings.values) {
+    if (b.type.toLowerCase() == 'router' && b.requestedModel != null) {
+      return b.requestedModel;
+    }
+  }
+  return null;
+}
+
 /// Reads hardware and connection clauses before the general network planner.
 /// Model numbers never become device counts, and original names survive.
 class PtBriefRequest {
@@ -52,12 +71,17 @@ class PtBriefRequest {
   final Map<String, _Binding> _bindings;
   final List<_ModelMention> _models;
   final List<NetLink> connections;
+
+  /// The router model the brief named, before the hardware clauses were
+  /// stripped out of [plannerText]. Null when the brief left the model open.
+  final String? routerModelHint;
   const PtBriefRequest._(
     this.raw,
     this.plannerText,
     this._bindings,
     this._models,
     this.connections,
+    this.routerModelHint,
   );
 
   static final _clauseBreak = RegExp(r'[;\n]|[.!?](?=\s+[A-Za-z])');
@@ -1105,6 +1129,7 @@ class PtBriefRequest {
       bindings,
       modelMentions,
       connections,
+      _routerModelHint(modelMentions, bindings),
     );
   }
 

@@ -24,28 +24,6 @@ void main() {
   // check passes and only the semantic half can fail the build.
   final plan = NetworkIntent.parseSimple('sem', '2 routers and a dns server');
 
-  /// An audit whose devices match the plan exactly, so the structural half
-  /// has nothing to complain about.
-  Map<String, dynamic> cleanAudit({
-    Map<String, List<String>>? services,
-    List<String> findings = const [],
-  }) {
-    // A sound file enables exactly the services the plan gave each device.
-    final svcs = services ?? {for (final n in plan.nodes) n.name: n.services};
-    return {
-      'devices': [
-        for (final n in plan.nodes)
-          {'name': n.name, 'type': n.type, 'services': svcs[n.name] ?? []},
-      ],
-      'links': <dynamic>[],
-      'findings': findings,
-    };
-  }
-
-  /// The generator's own report: every interface the plan names mapped to a
-  /// real port. This is what the structural half compares against, so
-  /// supplying it isolates the semantic half instead of letting "no interface
-  /// for R1:g0/0" mask the finding under test.
   List<dynamic> builtPorts() {
     final ports = <String, Map<String, String>>{};
     for (final l in plan.links) {
@@ -60,6 +38,41 @@ void main() {
     ];
   }
 
+  /// An audit whose devices match the plan exactly, so the structural half
+  /// has nothing to complain about.
+  Map<String, dynamic> cleanAudit({
+    Map<String, List<String>>? services,
+    List<String> findings = const [],
+  }) {
+    // A sound file enables exactly the services the plan gave each device.
+    final svcs = services ?? {for (final n in plan.nodes) n.name: n.services};
+    return {
+      'devices': [
+        for (final n in plan.nodes)
+          {'name': n.name, 'type': n.type, 'services': svcs[n.name] ?? []},
+      ],
+      'linkCount': plan.links.length,
+      'links': [
+        for (final l in plan.links)
+          {
+            'a': l.a,
+            'aIf': builtPorts().cast<Map>().firstWhere(
+              (d) => d['name'] == l.a,
+            )['ports'][l.aIf],
+            'b': l.b,
+            'bIf': builtPorts().cast<Map>().firstWhere(
+              (d) => d['name'] == l.b,
+            )['ports'][l.bIf],
+          },
+      ],
+      'findings': findings,
+    };
+  }
+
+  /// The generator's own report: every interface the plan names mapped to a
+  /// real port. This is what the structural half compares against, so
+  /// supplying it isolates the semantic half instead of letting "no interface
+  /// for R1:g0/0" mask the finding under test.
   test('a file that matches the plan and is sound verifies', () {
     final r = BuildPreflight.compare(
       intent: plan,
@@ -179,6 +192,16 @@ void main() {
     Map<String, dynamic> auditedRows(
       Map<String, List<Map<String, String>>> rowsPerDevice,
     ) => {
+      'linkCount': plan.links.length,
+      'links': [
+        for (final l in plan.links)
+          {
+            'a': l.a,
+            'aIf': _expanded(l.aIf),
+            'b': l.b,
+            'bIf': _expanded(l.bIf),
+          },
+      ],
       'devices': [
         for (final n in plan.nodes)
           {
@@ -500,7 +523,7 @@ void cableCheckTests() {
     },
   );
 
-  test('an audit with no link data at all keeps the old honest verdict', () {
+  test('an audit with no link data cannot verify saved cables', () {
     // The pre-link-data audit shape: empty list, no count anywhere.
     final r = BuildPreflight.compare(
       intent: plan,
@@ -513,10 +536,7 @@ void cableCheckTests() {
       },
       builtDevices: identityPorts(),
     );
-    expect(r.verified, isTrue, reason: r.lines.join('\n'));
-    expect(
-      r.lines.join('\n'),
-      contains('verified against the ports the generator wrote'),
-    );
+    expect(r.verified, isFalse, reason: r.lines.join('\n'));
+    expect(r.lines.join('\n'), contains('unverified'));
   });
 }

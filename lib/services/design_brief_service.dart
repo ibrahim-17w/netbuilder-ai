@@ -72,6 +72,7 @@ class DesignBriefService {
             display: '${profile.scale} users',
             source: 'from your environment profile',
             origin: BriefSource.profile,
+            quantityKind: QuantityKind.userLoad,
           ),
         );
       }
@@ -96,6 +97,7 @@ class DesignBriefService {
               display: '$n devices',
               source: 'from the lab you described',
               origin: BriefSource.plan,
+              quantityKind: QuantityKind.deviceInventory,
             ),
           );
         }
@@ -183,17 +185,20 @@ class DesignBriefService {
       final n = int.tryParse(count.group(1)!);
       if (n != null && n > 0 && n <= 5000) {
         final noun = (count.group(2) ?? '').trim();
-        final peopleish = RegExp(
+        final userLoad = RegExp(
           r'^(users?|employees?|people|staff|students?|patients?|clients?'
-          r'|guests?|customers?|seats?|workstations?|endpoints?)$',
+          r'|guests?|customers?|seats?)$',
         ).hasMatch(noun);
         brief = brief.withFact(
           DesignBrief.scale,
           BriefFact(
             value: '$n',
-            display: peopleish ? '$n users' : '$n devices',
+            display: userLoad ? '$n users' : '$n devices',
             source: source,
             origin: BriefSource.user,
+            quantityKind: userLoad
+                ? QuantityKind.userLoad
+                : QuantityKind.deviceInventory,
           ),
         );
       }

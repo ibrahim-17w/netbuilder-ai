@@ -329,9 +329,9 @@ class BuildPreflight {
           : '; $compared address(es) verified against the saved ports'
                 '${addressesNotComparable > 0 ? ' ($addressesNotComparable not comparable - no interface rows for that device)' : ''}';
       return (
-        verified: true,
+        verified: linksComparable || intent.links.isEmpty,
         lines: [
-          '- Verification: the file agrees with the plan '
+          '- Verification: ${linksComparable || intent.links.isEmpty ? 'the file agrees with the plan' : 'unverified - saved cable evidence was not collected'} '
               '(${foundNames.length} device(s); $links$addresses).',
         ],
       );

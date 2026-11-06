@@ -1,10 +1,80 @@
 import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:net_builder/main.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:sqflite/sqflite.dart' as mobile_db;
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:net_builder/services/memory_service.dart';
+import 'package:net_builder/services/settings_service.dart';
+import 'package:net_builder/services/secret_vault.dart';
+import 'package:net_builder/services/plan_version_service.dart';
+import 'package:net_builder/services/project_checks.dart';
+import 'package:net_builder/services/project_package.dart';
+import 'package:net_builder/services/pkt/pkt_codec.dart';
+import 'package:net_builder/models/network_intent.dart';
+import 'package:net_builder/models/build_record.dart';
+import 'package:net_builder/screens/home_screen.dart';
+
+class _TestSecrets extends FlutterSecureStorage {
+  final Map<String, String> values = {};
+  @override
+  Future<String?> read({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async => values[key];
+  @override
+  Future<void> write({
+    required String key,
+    required String? value,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (value == null) {
+      values.remove(key);
+    } else {
+      values[key] = value;
+    }
+  }
+
+  @override
+  Future<void> delete({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    values.remove(key);
+  }
+}
+
+Future<void> _drain(WidgetTester tester, {int frames = 24}) async {
+  for (var i = 0; i < frames; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
+  }
+}
 
 /// The offline workflow, end to end, in the REAL app on the REAL platform.
 ///
@@ -47,11 +117,27 @@ class _TempDocsPathProvider extends PathProviderPlatform {
   Future<String?> getApplicationDocumentsPath() async => root;
 }
 
-final _toolsButton = find.byTooltip('Tools: run, capture, and integrations');
+final _toolsButton = find.byWidgetPredicate(
+  (widget) =>
+      widget is IconButton &&
+      widget.tooltip == 'Tools: run, capture, and integrations',
+);
 
 /// An app-controlled sheet has entrance animations that settle; a busy turn
 /// does not, so only the sheet opens through this helper.
 Future<void> _openTools(WidgetTester tester) async {
+  for (var i = 0; i < 300; i++) {
+    if (_toolsButton.evaluate().isNotEmpty &&
+        tester.widget<IconButton>(_toolsButton).onPressed != null) {
+      break;
+    }
+    await _drain(tester, frames: 1);
+  }
+  expect(
+    tester.widget<IconButton>(_toolsButton).onPressed,
+    isNotNull,
+    reason: 'The offline turn finished before opening tools.',
+  );
   await tester.ensureVisible(_toolsButton);
   await tester.tap(_toolsButton);
   await tester.pumpAndSettle();
@@ -65,24 +151,53 @@ void main() {
   // runner prints test names verbatim but swallows the app's own output on
   // a passing run, so the platform rides in the description and the stderr
   // line is the copy that failure logs still show.
-  final where = 'platform=${Platform.operatingSystem} '
+  final where =
+      'platform=${Platform.operatingSystem} '
       '(${Platform.operatingSystemVersion})';
-  stderr.writeln(
-    'net_builder offline workflow integration test on $where',
-  );
+  stderr.writeln('net_builder offline workflow integration test on $where');
 
   testWidgets('a described network builds a real .pkt file on this device '
       '($where)', (tester) async {
     final docs = Directory.systemTemp.createTempSync('netbuilder-integration-');
     final realPathProvider = PathProviderPlatform.instance;
     PathProviderPlatform.instance = _TempDocsPathProvider(docs.path);
-    addTearDown(() {
+    SharedPreferences.setMockInitialValues({});
+    final realVault = SecretVault.storage;
+    final secrets = _TestSecrets();
+    SecretVault.storage = secrets;
+    late Database db;
+    await tester.runAsync(() async {
+      if (Platform.isWindows || Platform.isLinux) {
+        sqfliteFfiInit();
+        databaseFactory = databaseFactoryFfi;
+        db = await databaseFactoryFfi.openDatabase('${docs.path}/history.db');
+      } else {
+        db = await mobile_db.openDatabase('${docs.path}/history.db');
+      }
+      await MemoryService.createSchema(db);
+    });
+    final memory = MemoryService(injected: db);
+    final settings = SettingsService(secure: secrets);
+    await settings.setPreferOnDevicePkt(true);
+    expect(await settings.getApiKey(), anyOf(isNull, isEmpty));
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(db.close);
       PathProviderPlatform.instance = realPathProvider;
+      SecretVault.storage = realVault;
       if (docs.existsSync()) docs.deleteSync(recursive: true);
     });
 
-    await tester.pumpWidget(const NetBuilderApp());
-    await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: memory),
+          ChangeNotifierProvider.value(value: settings),
+        ],
+        child: const NetBuilderApp(monitorDetailSidecar: false),
+      ),
+    );
+    await _drain(tester);
 
     // Settings has text fields too, so the composer is addressed by its
     // label rather than by position.
@@ -95,9 +210,7 @@ void main() {
     // no-engine path: nothing below depends on a model, a network or a PC.
     await tester.enterText(composer, '2 routers and 4 switches');
     await tester.testTextInput.receiveAction(TextInputAction.send);
-    for (var i = 0; i < 12; i++) {
-      await tester.pump(const Duration(milliseconds: 250));
-    }
+    await _drain(tester);
     expect(find.textContaining('2 routers and 4 switches'), findsWidgets);
 
     // Building asks for an explicit design first. Confirm the preview, then
@@ -106,6 +219,14 @@ void main() {
     await tester.tap(find.text('Build a .pkt from the current plan'));
     await tester.pumpAndSettle();
     expect(find.text('Choose a layout'), findsOneWidget);
+    // Cancelling the gallery must not create a file or grant build approval.
+    await tester.pageBack();
+    await _drain(tester);
+    expect(find.text('Build .pkt'), findsNothing);
+    expect(Directory('${docs.path}/pkt').existsSync(), isFalse);
+    await _openTools(tester);
+    await tester.tap(find.text('Build a .pkt from the current plan'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Use this layout'));
     await tester.pumpAndSettle();
     expect(find.text('Build .pkt'), findsOneWidget);
@@ -145,5 +266,89 @@ void main() {
         .toList();
     expect(built, hasLength(1), reason: 'the built .pkt is on disk');
     expect(built.single.lengthSync(), greaterThan(0));
+    expect(
+      utf8.decode(decryptPkt(built.single.readAsBytesSync())),
+      contains('<PACKETTRACER5'),
+    );
+
+    // Reopen the actual disk store, then open an edited version in history.
+    // This covers persistence across fresh service instances and UI remounts.
+    late BuildRecord edited;
+    late Uint8List package;
+    await tester.runAsync(() async {
+      final saved = (await memory.recentBuilds()).first;
+      final original = NetworkIntent.fromJson(
+        Map<String, dynamic>.from(jsonDecode(saved.intentJson)),
+      );
+      edited = await PlanVersionService.saveEditedPlan(
+        memory: memory,
+        intent: original.copyWith(routing: 'ospf'),
+        previous: saved,
+      );
+      final check = ProjectChecks.create(
+        original,
+        original.nodes.first.name,
+        original.nodes.last.name,
+      );
+      await ProjectChecks(memory, edited.projectKey).save([check]);
+      package = await ProjectPackage.export(edited, memory);
+    });
+    await tester.pumpWidget(const SizedBox());
+    await _drain(tester, frames: 4);
+    await tester.runAsync(() async {
+      await db.close();
+      if (Platform.isWindows || Platform.isLinux) {
+        db = await databaseFactoryFfi.openDatabase('${docs.path}/history.db');
+      } else {
+        db = await mobile_db.openDatabase('${docs.path}/history.db');
+      }
+    });
+    final reopened = MemoryService(injected: db);
+    BuildRecord? opened;
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: reopened,
+        child: MaterialApp(
+          home: Scaffold(body: HomeScreen(onOpen: (r) => opened = r)),
+        ),
+      ),
+    );
+    await _drain(tester);
+    expect(find.text('Your blueprints'), findsOneWidget);
+    expect(find.text('Import project'), findsOneWidget);
+    // Opening the newest version uses its stored plan, never an older cache.
+    await tester.ensureVisible(find.text(edited.instruction));
+    await tester.tap(find.text(edited.instruction));
+    await tester.pump();
+    expect(opened, isNotNull);
+    expect(
+      NetworkIntent.fromJson(
+        Map<String, dynamic>.from(jsonDecode(opened!.intentJson)),
+      ).routing,
+      'ospf',
+    );
+    await tester.runAsync(() async {
+      expect(
+        await ProjectChecks(reopened, edited.projectKey).load(),
+        hasLength(1),
+      );
+      final imported = await ProjectPackage.import(package, reopened);
+      expect(imported.projectKey, isNot(edited.projectKey));
+      expect(imported.status, 'planned');
+      expect(
+        (await ProjectChecks(
+          reopened,
+          imported.projectKey,
+        ).load()).single.status,
+        'unverified',
+      );
+      expect(
+        await PlanVersionService.timeline(
+          reopened,
+          projectKey: edited.projectKey,
+        ),
+        hasLength(2),
+      );
+    });
   });
 }

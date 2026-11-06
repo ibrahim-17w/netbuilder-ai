@@ -101,4 +101,40 @@ void main() {
     expect(all, contains(journalAdvice));
     expect(all, contains(taughtRule));
   });
+
+  test(
+    'pasted diagnostics saved with target all never steer a plan',
+    () async {
+      final mem = await fresh();
+      // Verbatim shapes found steering a real brief: a failure narrative
+      // whose "base 2-device topology" set every later brief's scale to 2,
+      // a preflight dump, and a definitions paragraph.
+      await mem.addRule(
+        'The built file only generated a base 2-device topology (R1 and '
+        'SW1), missing SW2, the end-user PCs, and the subinterfaces for '
+        'VLAN routing. To complete the topology to match the full design, '
+        'perform these steps in Packet Tracer: 1.',
+        targets: 'all',
+      );
+      await mem.addRule(
+        '**Preflight (checked before compiling)** - Target: Packet Tracer '
+        '- offline compile; no Packet Tracer window is opened and nothing '
+        'is typed anywhere. - Plan: 50 device(s) (3 routers, 3 switches, '
+        '40 PCs, 4 servers); routing ospf; 49 link(s).',
+        targets: 'all',
+      );
+      await mem.addRule(
+        'An IP address (Internet Protocol address) is a unique numerical '
+        'label assigned to every device on a network to identify it and '
+        'allow data to be routed to and from it. Here is how IP addressing '
+        'works in practice.',
+        targets: 'all',
+      );
+      // A short directive the user actually taught still passes.
+      await mem.addRule('always add a DNS server', targets: 'all');
+
+      final rules = await mem.plannerRuleTexts();
+      expect(rules, ['always add a DNS server']);
+    },
+  );
 }

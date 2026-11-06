@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../services/adapters/gns3_adapter.dart';
 import '../services/app_version.dart';
 import '../services/autopilot_service.dart';
 import '../services/context_budget.dart';
@@ -58,6 +59,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _obscureOpenAi = true;
   bool _testingEngine = false;
   String? _engineTest;
+  bool _testingGns3 = false;
+  String? _gns3Test;
+
+  /// How [_gns3Test] is colored: a connected server must not read like an
+  /// error and a refused one must not read like a save.
+  AppTone _gns3TestTone = AppTone.info;
   String _status = '';
 
   /// What the last status line was: an error is red, a success green and a
@@ -725,6 +732,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // --- targets -------------------------------------------------------------
 
   Widget _targetsPanel(SettingsService s) {
+    final scheme = Theme.of(context).colorScheme;
     return AppSection(
       title: 'Where builds go',
       subtitle: 'Choose the builder and compatibility reference used by plans.',
@@ -957,6 +965,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: AppTheme.s8),
+              Wrap(
+                spacing: AppTheme.s8,
+                runSpacing: AppTheme.s8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _testingGns3 ? null : () => _saveAndTestGns3(s),
+                    icon: _testingGns3
+                        ? const SizedBox(
+                            width: 15,
+                            height: 15,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save_outlined, size: 17),
+                    label: const Text('Save and test GNS3'),
+                  ),
+                ],
+              ),
+              if (_gns3Test != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppTheme.s8),
+                  child: Text(
+                    _gns3Test!,
+                    style: TextStyle(
+                      color: switch (_gns3TestTone) {
+                        AppTone.success => AppPalette.success(scheme),
+                        AppTone.danger => AppPalette.danger(scheme),
+                        _ => scheme.onSurfaceVariant,
+                      },
+                    ),
+                  ),
+                ),
             ],
           ),
       ],
@@ -983,6 +1023,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _testingEngine = false;
       _engineTest = result;
+    });
+  }
+
+  /// Persist the GNS3 fields, then prove they work against the server.
+  ///
+  /// These fields used to be saved only as a side effect of the provider
+  /// save below, so configuring GNS3 alone (no model key) silently kept the
+  /// old credentials and every push answered 401.
+  Future<void> _saveAndTestGns3(SettingsService s) async {
+    setState(() {
+      _testingGns3 = true;
+      _gns3Test = 'Saving and testing ${_gns3.text.trim()}…';
+    });
+    String result;
+    var success = false;
+    try {
+      await s.setGns3Endpoint(_gns3.text);
+      await s.setGns3Credentials(_gns3User.text, _gns3Pass.text);
+      final version = await Gns3Adapter.testConnection(
+        s.gns3Endpoint,
+        user: s.gns3User,
+        pass: s.gns3Pass,
+      );
+      result = 'Connected to ${s.gns3Endpoint} (GNS3 $version).';
+      success = true;
+    } catch (error) {
+      result =
+          'Could not reach the GNS3 server: '
+          '${error.toString().replaceFirst('Exception: ', '')}';
+    }
+    if (!mounted) return;
+    setState(() {
+      _testingGns3 = false;
+      _gns3Test = result;
+      _gns3TestTone = success ? AppTone.success : AppTone.danger;
     });
   }
 
@@ -1195,6 +1270,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
       title: 'About and requirements',
       subtitle: 'Packet Tracer automation needs a specific setup.',
       children: [
+        AppPanel(
+          title: 'NetBuilder AI',
+          children: [
+            Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppTheme.s8),
+                  child: const Image(
+                    image: AssetImage('assets/app_icon.png'),
+                    width: 56,
+                    height: 56,
+                    filterQuality: FilterQuality.medium,
+                  ),
+                ),
+                const SizedBox(width: AppTheme.s12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Version ${AppVersion.full}',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: AppTheme.s4),
+                      Text(
+                        'Local-first network builder for Packet Tracer and GNS3.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
         AppPanel(
           icon: Icons.sports_esports_outlined,
           title: 'PT Autopilot requirements',

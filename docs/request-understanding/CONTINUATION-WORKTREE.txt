@@ -1,0 +1,92 @@
+ M .github/workflows/ci.yml
+ M CHANGELOG.md
+ M integration_test/offline_workflow_test.dart
+ M lib/models/design_brief.dart
+ M lib/models/network_intent.dart
+ M lib/screens/chat_screen.dart
+ M lib/screens/home_screen.dart
+ M lib/screens/labs_screen.dart
+ M lib/screens/network_toolkit_screen.dart
+ M lib/screens/settings_screen.dart
+ M lib/services/adapters/gns3_adapter.dart
+ M lib/services/adapters/packet_tracer_adapter.dart
+ M lib/services/address_table.dart
+ M lib/services/build_preflight.dart
+ M lib/services/capability_registry.dart
+ M lib/services/clarification_service.dart
+ M lib/services/conversation_titles.dart
+ M lib/services/design_brief_service.dart
+ M lib/services/lab_catalog.dart
+ M lib/services/lab_grading_service.dart
+ M lib/services/memory_service.dart
+ M lib/services/network_tools.dart
+ M lib/services/nlu/parser.dart
+ M lib/services/nlu/slots.dart
+ M lib/services/offline_assistant_service.dart
+ M lib/services/packet_tracer/brief_reader.dart
+ M lib/services/pkt_plan_import_service.dart
+ M lib/services/plan_repair_service.dart
+ M lib/services/plan_version_service.dart
+ M lib/services/planner_memory_service.dart
+ M lib/services/secret_vault.dart
+ M lib/services/session_state.dart
+ M lib/widgets/chat_activity.dart
+ M lib/widgets/chat_markdown.dart
+ M lib/widgets/readiness_panel.dart
+ M pubspec.yaml
+ M sidecar/pkt_audit.py
+ M sidecar/pkt_builder.py
+ M sidecar/pt_verify.py
+ M test/address_table_test.dart
+ M test/chat_ui_test.dart
+ M test/design_brief_service_test.dart
+ M test/lab_catalog_test.dart
+ M test/named_inventory_regression_test.dart
+ M test/plan_version_history_test.dart
+ M test/planner_rule_hygiene_test.dart
+ M test/readiness_panel_test.dart
+ M test/secret_vault_test.dart
+ M test/semantic_verification_test.dart
+ M test/voice_config_test.dart
+ M windows/runner/main.cpp
+ M windows/runner/resources/app_icon.ico
+?? .agents/skills/fc-nginx-website/.bundled-hash
+?? .agents/skills/fc-nginx-website/SKILL.md
+?? IDENTITY.md
+?? USER.md
+?? assets/app_icon.png
+?? docs/request-understanding/ACCEPTANCE.md
+?? docs/request-understanding/EXECUTION.md
+?? docs/request-understanding/IMPLEMENTATION-LOG.md
+?? docs/request-understanding/PLAN.md
+?? docs/roadmap-implementation.md
+?? lib/screens/blueprints_screen.dart
+?? lib/screens/project_checks_screen.dart
+?? lib/screens/project_package_actions.dart
+?? lib/services/ipv6_tools.dart
+?? lib/services/lab_objectives.dart
+?? lib/services/lab_progress_service.dart
+?? lib/services/project_checks.dart
+?? lib/services/project_package.dart
+?? lib/services/user_blueprints.dart
+?? sidecar/test_project_checks.py
+?? test/activity_todo_bar_test.dart
+?? test/address_table_save_test.dart
+?? test/addressing_no_duplicates_test.dart
+?? test/conversation_title_names_test.dart
+?? test/credential_followup_test.dart
+?? test/gns3_adapter_test.dart
+?? test/ipv6_tools_test.dart
+?? test/lab_progress_test.dart
+?? test/memory_migration_gate_test.dart
+?? test/pkt_service_fidelity_test.dart
+?? test/port_budget_test.dart
+?? test/project_checks_test.dart
+?? test/project_package_test.dart
+?? test/request_understanding/baseline_test.dart
+?? test/request_understanding/clarification_test.dart
+?? test/request_understanding/fixtures.dart
+?? test/request_understanding/pending_context_test.dart
+?? test/request_understanding/precedence_test.dart
+?? test/user_blueprints_test.dart
+?? tool/make_app_icon.py

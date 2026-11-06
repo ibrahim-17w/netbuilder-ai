@@ -45,6 +45,33 @@ class BriefSlots {
   int count(String type) => counts[type] ?? 0;
 }
 
+/// One quantity phrase read by the same rules that fill [BriefSlots].
+class ExtractedQuantity {
+  final String kind;
+  final int value;
+  final int start;
+  final int end;
+  final String? site;
+  final bool increment;
+  final bool correction;
+  final bool minimum;
+  final bool maximum;
+  final String? role;
+
+  const ExtractedQuantity({
+    required this.kind,
+    required this.value,
+    required this.start,
+    required this.end,
+    this.site,
+    this.increment = false,
+    this.correction = false,
+    this.minimum = false,
+    this.maximum = false,
+    this.role,
+  });
+}
+
 /// Slot pipeline: composed extractors instead of a pile of competing regexes.
 ///
 /// Each extractor reads the normalized lower-case text and contributes slots;
@@ -102,6 +129,71 @@ class BriefSlotPipeline {
       sites: sites,
       routing: routing,
     );
+  }
+
+  /// Quantity mentions with their normalized-text offsets. This exposes the
+  /// existing clause and negation rules to request interpretation without
+  /// reimplementing quantity parsing in a second reader.
+  static List<ExtractedQuantity> extractQuantities(String rawText) {
+    return _extractQuantitiesFromNormalized(NetworkIntent.bridgeBrief(rawText));
+  }
+
+  /// Read the result of [NetworkIntent.bridgeBriefWithMapping] directly so
+  /// offsets stay in the same normalized message as its source map.
+  static List<ExtractedQuantity> extractNormalizedQuantities(
+    String normalizedText,
+  ) => _extractQuantitiesFromNormalized(normalizedText);
+
+  static List<ExtractedQuantity> _extractQuantitiesFromNormalized(
+    String normalizedText,
+  ) {
+    final lower = normalizedText.toLowerCase();
+    final clauses = _clauses(lower);
+    return [
+      for (final quantity in _quantityRecords(lower))
+        if (quantity.end > quantity.at)
+          if (_clauseOf(clauses, quantity.at) case final clause)
+            ExtractedQuantity(
+              kind: quantity.kind,
+              value: _strictUpperBoundValue(
+                quantity.value,
+                clause.text,
+                quantity.at - clause.start,
+              ),
+              start: quantity.at,
+              end: quantity.end,
+              site: quantity.site,
+              increment:
+                  RegExp(
+                    r'\b(?:more|extra|additional|further)\b',
+                  ).hasMatch(lower.substring(quantity.at, quantity.end)) ||
+                  RegExp(
+                    r'\b(?:add|include|create|introduce|insert)\s+(?:(?:another|more|an\s+additional)\s+)?$',
+                  ).hasMatch(
+                    clause.text.substring(0, quantity.at - clause.start),
+                  ),
+              correction: quantity.correction,
+              minimum: RegExp(
+                r'(?:at\s+least|no\s+fewer\s+than|not\s+less\s+than|more\s+than|over|minimum\s+of)\s*$',
+              ).hasMatch(clause.text.substring(0, quantity.at - clause.start)),
+              maximum: RegExp(
+                r'(?:at\s+most|no\s+more\s+than|not\s+more\s+than|up\s+to|under|below|fewer\s+than|less\s+than|maximum\s+of)\s*$',
+              ).hasMatch(clause.text.substring(0, quantity.at - clause.start)),
+              role: quantity.role,
+            ),
+    ];
+  }
+
+  static int _strictUpperBoundValue(int value, String clause, int localAt) {
+    if (value <= 0) return value;
+    final prefix = clause.substring(0, localAt.clamp(0, clause.length));
+    if (RegExp(
+      r'(?:under|below|fewer\s+than|less\s+than)\s*$',
+      caseSensitive: false,
+    ).hasMatch(prefix)) {
+      return value - 1;
+    }
+    return value;
   }
 
   static final _tacacsOrRadius = RegExp(r'\btacacs\+?\b|\bradius\b');
@@ -367,10 +459,54 @@ class BriefSlotPipeline {
     return out;
   }
 
+  /// Explicit per-site inventory counts, in the order the sites appear in the
+  /// brief. Repeated "each branch" clauses are expanded into stable IDs such
+  /// as `branch#1`; site ownership is never inferred from device numbering.
+  static Map<String, Map<String, int>> siteDeviceCounts(String rawText) {
+    final lower = NetworkIntent.bridgeBrief(rawText).toLowerCase();
+    final records = _quantityRecords(lower);
+    final siteOrder = <String>[];
+    for (final record in records) {
+      final site = record.site;
+      if (site != null && !siteOrder.contains(site)) siteOrder.add(site);
+    }
+    final result = <String, Map<String, int>>{};
+    for (final site in siteOrder) {
+      final counts = <String, int>{};
+      for (final kind in deviceKinds.map((item) => item.type)) {
+        final own = records
+            .where((record) => record.site == site && record.kind == kind)
+            .toList();
+        if (own.isEmpty) continue;
+        var total = 0;
+        final roles = <String>{};
+        for (final record in own) {
+          final role = record.role ?? '';
+          if (record.correction) {
+            total = record.value;
+            roles.clear();
+            if (role.isNotEmpty) roles.add(role);
+            continue;
+          }
+          final distinctRole =
+              role.isNotEmpty && roles.isNotEmpty && !roles.contains(role);
+          total = record.add || distinctRole
+              ? total + record.value
+              : (record.value > total ? record.value : total);
+          if (role.isNotEmpty) roles.add(role);
+        }
+        if (total > 0) counts[kind] = total;
+      }
+      if (counts.isNotEmpty) result[site] = counts;
+    }
+    return result;
+  }
+
   // --- quantities across clauses ------------------------------------------
 
   static final _routerQty = RegExp(
     r'\b(\d{1,3})\s*(?:(?:more|extra|additional|further)\s+)?'
+    r'((?:(?:core|edge|distribution|backbone|wan|hq|branch|main|central)\s+)*)'
     r'routers?\b',
   );
 
@@ -411,6 +547,10 @@ class BriefSlotPipeline {
     void scan(String type, RegExp pattern) {
       for (final m in pattern.allMatches(lower)) {
         final at = m.start;
+        // "VLAN 20 servers" names the VLAN - the 20 is an ID, not a count.
+        // Reading it inflated every later lab: "4 switches with VLAN 20
+        // servers" built twenty servers where the brief named none.
+        if (RegExp(r'vlan\s*$').hasMatch(lower.substring(0, at))) continue;
         final clause = _clauseOf(clauses, at);
         final local = at - clause.start;
         // "not 6 access points" states a number to REJECT, not a count.
@@ -423,7 +563,8 @@ class BriefSlotPipeline {
             kind: type,
             value: (int.tryParse(m.group(1)!) ?? 1) + (moreThan ? 1 : 0),
             at: at,
-            site: _siteAt(lower, anchors, at),
+            end: m.end,
+            site: _siteAt(lower, anchors, at, end: m.end),
             correction: _correctionBefore(clause.text, local),
             role: m.groupCount > 1 ? m.group(2)?.trim() : null,
           ),
@@ -485,6 +626,7 @@ class BriefSlotPipeline {
               kind: r.kind,
               value: r.value,
               at: r.at,
+              end: r.end,
               site: trailing.first.label,
               correction: r.correction,
               add: r.add,
@@ -505,6 +647,7 @@ class BriefSlotPipeline {
                 kind: r.kind,
                 value: r.value,
                 at: r.at,
+                end: r.end,
                 site: '${r.site ?? 'site'}#${i + 1}',
                 correction: r.correction,
                 role: r.role,
@@ -631,6 +774,7 @@ class BriefSlotPipeline {
             String kind,
             int value,
             int at,
+            int end,
             String? site,
             bool correction,
           })
@@ -652,6 +796,7 @@ class BriefSlotPipeline {
             kind: entry.key,
             value: int.parse(m.group(1)!) + (moreThan ? 1 : 0),
             at: at,
+            end: m.end,
             site: _siteAt(lower, _siteAnchors(lower), at),
             correction: _correctionBefore(clause.text, local),
           ));
@@ -686,6 +831,7 @@ class BriefSlotPipeline {
           kind: c.kind,
           value: c.value,
           at: c.at,
+          end: c.end,
           site: c.site,
           correction: c.correction,
         ),
@@ -885,13 +1031,35 @@ class BriefSlotPipeline {
   static String? _siteAt(
     String lower,
     List<({int at, String label})> anchors,
-    int at,
-  ) {
+    int at, {
+    int? end,
+  }) {
     for (var i = anchors.length - 1; i >= 0; i--) {
       final anchor = anchors[i];
       if (anchor.at > at) continue;
-      if (_sentenceBreak.hasMatch(lower.substring(anchor.at, at))) return null;
+      if (_sentenceBreak.hasMatch(lower.substring(anchor.at, at))) break;
       return anchor.label;
+    }
+    // A site qualifier can follow its quantity (for example, "add 3 PCs at
+    // the second branch"). Bind it only when a local preposition explicitly
+    // connects it to this quantity; a later unrelated site stays separate.
+    if (end != null) {
+      for (final anchor in anchors) {
+        if (anchor.at < end) continue;
+        if (anchor.at - end > 48) break;
+        final labelStart = anchor.at - anchor.label.length;
+        if (labelStart < end ||
+            lower.substring(labelStart, anchor.at) != anchor.label) {
+          continue;
+        }
+        final connector = lower.substring(end, labelStart);
+        if (_sentenceBreak.hasMatch(connector)) break;
+        if (RegExp(
+          r'\b(?:at|in|for|within|to)\s+(?:the\s+)?$',
+        ).hasMatch(connector)) {
+          return anchor.label;
+        }
+      }
     }
     return null;
   }
@@ -1063,6 +1231,11 @@ class BriefSlotPipeline {
   /// nearest few words, not across a clause break.
   static bool _negationBefore(String clause, int at) {
     final head = clause.substring(0, at.clamp(0, clause.length));
+    if (RegExp(
+      r'\b(?:at\s+least|at\s+most|no\s+more\s+than|no\s+fewer\s+than|not\s+more\s+than|not\s+less\s+than|up\s+to)\s*$',
+    ).hasMatch(head)) {
+      return false;
+    }
     return _negationTail.hasMatch(head);
   }
 
@@ -1167,6 +1340,7 @@ class _Qty {
   final String kind;
   final int value;
   final int at;
+  final int end;
   final String? site;
   final bool correction;
   final bool add;
@@ -1175,9 +1349,10 @@ class _Qty {
     required this.kind,
     required this.value,
     required this.at,
+    int? end,
     this.site,
     this.correction = false,
     this.add = false,
     this.role,
-  });
+  }) : end = end ?? at;
 }

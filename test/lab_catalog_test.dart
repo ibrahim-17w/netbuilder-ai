@@ -6,8 +6,8 @@ import 'package:net_builder/services/lab_catalog.dart';
 /// A guided lab grade is the app's own evidence: every check reads fields
 /// the planner actually writes, so a pass is earned, never guessed.
 void main() {
-  test('the catalog has three labs with unique ids', () {
-    expect(LabCatalog.all.length, 3);
+  test('the catalog has four labs with unique ids', () {
+    expect(LabCatalog.all.length, 4);
     expect(
       LabCatalog.all.map((l) => l.id).toSet().length,
       LabCatalog.all.length,
@@ -116,7 +116,7 @@ void main() {
     test('AAA server plus port security pass', () {
       final plan = NetworkIntent.parseSimple(
         'p',
-        '1 router 1 switch 2 pcs with a aaa server and port security',
+        '1 router 1 switch 2 pcs with a aaa server and port security and ssh',
       );
       final progress = LabGrader.grade(lab, plan);
       final failed = progress.results

@@ -1,4 +1,5 @@
 import '../models/network_intent.dart';
+import 'request_understanding/requirement_merger.dart';
 
 /// Applies the durable corrections the user has taught the app to a plan the
 /// local planner just produced.
@@ -36,8 +37,12 @@ class PlannerMemoryService {
     NetworkIntent intent, {
     List<String> rules = const [],
     Map<String, String> preferences = const {},
+    String instruction = '',
+    RequirementMemoryProtection? requirementProtection,
   }) {
-    if (rules.isEmpty && preferences.isEmpty) return intent;
+    if (rules.isEmpty && preferences.isEmpty && instruction.trim().isEmpty) {
+      return intent;
+    }
 
     final wanted = <String, String>{};
 
@@ -120,7 +125,54 @@ class PlannerMemoryService {
       }
     }
 
+    final explicitRouterModels = <String, String>{
+      ..._explicitModelsForNodes(
+        instruction,
+        intent.nodes.where((node) => node.type == 'router'),
+      ),
+      ...?requirementProtection?.routerModels,
+    };
+    final explicitSwitchModels = <String, String>{
+      ..._explicitModelsForNodes(
+        instruction,
+        intent.nodes.where((node) => node.type == 'switch'),
+      ),
+      ...?requirementProtection?.switchModels,
+    };
+    final explicitLanNetworks = <String>{
+      ..._explicitLanNetworks(instruction),
+      ...?requirementProtection?.protectedSubnets,
+    };
+
+    // A learned convention fills a blank; it must not rewrite a choice made
+    // in the instruction that produced this plan. The instruction is kept as
+    // evidence rather than guessing explicitness from the generated plan:
+    // a parser default and an explicit value can have the same field value.
+    final explicitlySpecified = {
+      ...explicitFieldsIn(instruction),
+      ...?requirementProtection?.protectedFields,
+    };
+    wanted.removeWhere((key, _) {
+      if (!explicitlySpecified.contains(key) &&
+          !(key == 'add_dns' && explicitlySpecified.contains('dns_excluded'))) {
+        return false;
+      }
+      if (key == 'router_model' && explicitRouterModels.isNotEmpty) {
+        return false;
+      }
+      if (key == 'switch_model' && explicitSwitchModels.isNotEmpty) {
+        return false;
+      }
+      if (key == 'base_subnet' && explicitLanNetworks.isNotEmpty) {
+        return false;
+      }
+      return true;
+    });
+
     var out = intent;
+    if (explicitlySpecified.contains('dns_excluded')) {
+      out = _withoutService(out, 'server', 'dns');
+    }
 
     // 1. Routing protocol.
     final routing = wanted['routing'];
@@ -134,11 +186,19 @@ class PlannerMemoryService {
     if ((routerModel ?? '').isNotEmpty || (switchModel ?? '').isNotEmpty) {
       out = out.copyWith(
         nodes: out.nodes.map((n) {
-          if (n.type == 'router' && (routerModel ?? '').isNotEmpty) {
-            return _withModel(n, routerModel!);
+          if (n.type == 'router') {
+            final explicit = explicitRouterModels[n.name];
+            if (explicit != null) return _withModel(n, explicit, exact: true);
+            if ((routerModel ?? '').isNotEmpty) {
+              return _withModel(n, routerModel!);
+            }
           }
-          if (n.type == 'switch' && (switchModel ?? '').isNotEmpty) {
-            return _withModel(n, switchModel!);
+          if (n.type == 'switch') {
+            final explicit = explicitSwitchModels[n.name];
+            if (explicit != null) return _withModel(n, explicit, exact: true);
+            if ((switchModel ?? '').isNotEmpty) {
+              return _withModel(n, switchModel!);
+            }
           }
           return n;
         }).toList(),
@@ -150,7 +210,13 @@ class PlannerMemoryService {
     //    and each LAN stays a distinct subnet. A /30 WAN is left untouched.
     final baseSubnet = wanted['base_subnet'];
     if (baseSubnet != null && _isCidr(baseSubnet)) {
-      out = out.copyWith(addressing: _rebased(out.addressing, baseSubnet));
+      out = out.copyWith(
+        addressing: _rebased(
+          out.addressing,
+          baseSubnet,
+          protectedNetworks: explicitLanNetworks,
+        ),
+      );
     }
 
     // 4. Default service, e.g. "always add a DNS server".
@@ -193,14 +259,142 @@ class PlannerMemoryService {
     return out;
   }
 
-  static NetNode _withModel(NetNode n, String model) => NetNode(
-    name: n.name,
-    type: n.type,
-    model: model,
-    mgmtIp: n.mgmtIp,
-    services: n.services,
-    serviceRules: n.serviceRules,
-  );
+  /// The planner fields this instruction addressed. These are deliberately
+  /// limited to the levers [apply] can change; unrelated mentions do not
+  /// prevent a different learned preference from filling its own blank.
+  ///
+  /// This is a precedence guard, not a replacement for the full brief parser.
+  static Set<String> explicitFieldsIn(String instruction) {
+    final text = instruction.toLowerCase();
+    final fields = <String>{};
+    if (NetworkIntent.resolveRouting(text) != null ||
+        RegExp(r'\b(?:ospf|eigrp|bgp|static)\b').hasMatch(text) ||
+        RegExp(r'\b(?:no|without)\s+(?:dynamic\s+)?routing\b').hasMatch(text)) {
+      fields.add('routing');
+    }
+
+    for (final match in RegExp(r'\b(\d{4})\b').allMatches(text)) {
+      final model = match.group(1)!;
+      final before = text.substring(
+        match.start > 32 ? match.start - 32 : 0,
+        match.start,
+      );
+      final after = text.substring(
+        match.end,
+        match.end + 32 < text.length ? match.end + 32 : text.length,
+      );
+      final context = '$before $after';
+      final namedDevice = RegExp(r'\b[a-z][a-z0-9_-]*\d+\b').hasMatch(context);
+      if (NetworkIntent.ptRouters.contains(model) &&
+          (RegExp(r'\brouters?\b').hasMatch(context) || namedDevice)) {
+        fields.add('router_model');
+      }
+      if (NetworkIntent.ptSwitches.contains(model) &&
+          (RegExp(r'\bswitch(?:es)?\b').hasMatch(context) || namedDevice)) {
+        fields.add('switch_model');
+      }
+    }
+
+    // The memory rule rebases every LAN /24. Any user-supplied subnet in the
+    // brief is therefore protected, since its intended per-link scope may
+    // not be expressible by the global preference.
+    if (RegExp(r'\b\d{1,3}(?:\.\d{1,3}){3}/\d{1,2}\b').hasMatch(text)) {
+      fields.add('base_subnet');
+    }
+    if (RegExp(r'\bdns\b').hasMatch(text)) fields.add('add_dns');
+    if (RegExp(
+      r"\b(?:no|without|never|avoid|do\s+not|don['’]?t)\b"
+      r'[^.;,!?\n]{0,32}\bdns\b',
+    ).hasMatch(text)) {
+      fields.add('dns_excluded');
+    }
+    if (RegExp(r'\b(transit|wan\s+link|point.to.point|p2p)\b').hasMatch(text)) {
+      fields.add('transit');
+    }
+    if (RegExp(r'\bmanagement\b[^.;!?]{0,28}\bvlan\b').hasMatch(text)) {
+      fields.add('management_vlan');
+    }
+    if (RegExp(r'\b(?:ospf\s+)?area\s+\d{1,4}\b').hasMatch(text)) {
+      fields.add('ospf_area');
+    }
+    if (RegExp(r'\b(?:rapid[- ]pvst|pvst|mst)\b').hasMatch(text)) {
+      fields.add('stp');
+    }
+    return fields;
+  }
+
+  static NetNode _withModel(NetNode n, String model, {bool exact = false}) =>
+      NetNode(
+        name: n.name,
+        type: n.type,
+        model: model,
+        exactModel: exact,
+        modules: n.model == model ? n.modules : const [],
+        mgmtIp: n.mgmtIp,
+        siteId: n.siteId,
+        services: n.services,
+        serviceRules: n.serviceRules,
+      );
+
+  static Map<String, String> _explicitModelsForNodes(
+    String instruction,
+    Iterable<NetNode> nodes,
+  ) {
+    final text = instruction.toLowerCase();
+    final capitalizedNames = {
+      for (final match in RegExp(
+        r'\b[A-Z][A-Za-z0-9_-]*\b',
+      ).allMatches(instruction))
+        match.group(0)!,
+    };
+    final result = <String, String>{};
+    for (final node in nodes) {
+      final likelyDeviceName =
+          RegExp(r'\d').hasMatch(node.name) ||
+          capitalizedNames.contains(node.name);
+      if (!likelyDeviceName) continue;
+      final models = node.type == 'router'
+          ? NetworkIntent.ptRouters
+          : NetworkIntent.ptSwitches;
+      for (final model in models) {
+        final name = RegExp.escape(node.name.toLowerCase());
+        final pattern = RegExp(
+          '\\b$name\\b\\s+(?:with\\s+)?model\\s+$model\\b|'
+          '\\b$name\\b\\s+uses?\\s+$model\\b|'
+          '\\bmodel\\s+$model\\s+(?:for|on)\\s+$name\\b',
+        );
+        if (pattern.hasMatch(text)) {
+          result[node.name] = model;
+          break;
+        }
+      }
+    }
+    return result;
+  }
+
+  static Set<String> _explicitLanNetworks(String instruction) {
+    final networks = <String>{};
+    for (final match in RegExp(
+      r'\b(\d{1,3}(?:\.\d{1,3}){3})/24\b',
+    ).allMatches(instruction)) {
+      final before = instruction.substring(
+        match.start > 48 ? match.start - 48 : 0,
+        match.start,
+      );
+      // A per-device LAN mention scopes the explicit subnet. A generic
+      // "LANs in X" statement describes the whole design and blocks a
+      // project preference from rebasing the other segments too.
+      if (!RegExp(
+        r'\b[a-z][a-z0-9_-]*\d+\b',
+        caseSensitive: false,
+      ).hasMatch(before)) {
+        continue;
+      }
+      final octets = match.group(1)!.split('.');
+      networks.add('${octets[0]}.${octets[1]}.${octets[2]}.0/24');
+    }
+    return networks;
+  }
 
   static NetworkIntent _withService(
     NetworkIntent intent,
@@ -219,16 +413,51 @@ class PlannerMemoryService {
       exactModel: node.exactModel,
       modules: node.modules,
       mgmtIp: node.mgmtIp,
+      siteId: node.siteId,
       services: [...node.services, service],
       serviceRules: node.serviceRules,
     );
     return intent.copyWith(nodes: nodes);
   }
 
+  static NetworkIntent _withoutService(
+    NetworkIntent intent,
+    String type,
+    String service,
+  ) {
+    final nodes = intent.nodes.map((node) {
+      final hasServiceRule = node.serviceRules.keys.any(
+        (key) => key.toString().toLowerCase() == service,
+      );
+      if (node.type != type ||
+          (!node.services.any((value) => value.toLowerCase() == service) &&
+              !hasServiceRule)) {
+        return node;
+      }
+      final rules = Map<String, dynamic>.from(node.serviceRules)
+        ..removeWhere((key, _) => key.toString().toLowerCase() == service);
+      return NetNode(
+        name: node.name,
+        type: node.type,
+        model: node.model,
+        exactModel: node.exactModel,
+        modules: node.modules,
+        mgmtIp: node.mgmtIp,
+        siteId: node.siteId,
+        services: node.services
+            .where((value) => value.toLowerCase() != service)
+            .toList(),
+        serviceRules: rules,
+      );
+    }).toList();
+    return intent.copyWith(nodes: nodes);
+  }
+
   static List<InterfaceAddr> _rebased(
     List<InterfaceAddr> addresses,
-    String base,
-  ) {
+    String base, {
+    Set<String> protectedNetworks = const {},
+  }) {
     final octets = base.split('/').first.split('.').map(int.parse).toList();
     if (octets.length != 4) return addresses;
     return addresses.map((a) {
@@ -238,6 +467,8 @@ class PlannerMemoryService {
       if (ip.length != 4) return a;
       // Only LAN-sized networks move; a transit /30 keeps its addressing.
       if (parts[1] != '24') return a;
+      final network = '${ip[0]}.${ip[1]}.${ip[2]}.0/24';
+      if (protectedNetworks.contains(network)) return a;
       return InterfaceAddr(
         node: a.node,
         iface: a.iface,

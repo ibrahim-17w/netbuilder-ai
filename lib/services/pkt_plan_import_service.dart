@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui' show Offset;
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:xml/xml.dart';
 
 import '../models/network_intent.dart';
 import 'network_math.dart';
@@ -17,9 +18,9 @@ import 'pkt/seed_library.dart';
 ///
 /// The source file is never modified. The converted plan keeps recognized
 /// devices, model names, cable endpoints, IOS interface addresses, and the
-/// DHCP pools and DNS records saved in device configs. Device GUI settings,
-/// scenario state, and unrecognized metadata may not be carried into a
-/// regenerated .pkt, so callers must show the fidelity note.
+/// DHCP pools and DNS records saved in device configs or supported server
+/// panels. Other GUI settings, scenario state, and unrecognized metadata may
+/// not be carried into a regenerated .pkt, so callers must show the fidelity note.
 class ImportedPktPlan {
   final NetworkIntent intent;
   final List<String> preservedDetails;
@@ -80,7 +81,10 @@ class PktPlanImportService {
       final type = _normalizedType(source.type, model);
       final modules = _installedModules(block);
       final config = _runningConfig(block);
-      final rules = _configServiceRules(config);
+      final rules = {
+        ..._configServiceRules(config),
+        ..._guiServiceRules(block),
+      };
       final services = _enabledServices(block);
       // Routers keep DHCP/DNS in IOS lines instead of a GUI panel, so a
       // parsed pool or record promotes the matching role into services.
@@ -533,6 +537,51 @@ class PktPlanImportService {
       .replaceAll('&apos;', "'")
       .replaceAll('&#39;', "'")
       .replaceAll('&amp;', '&');
+
+  /// GUI server services are saved as XML, rather than IOS configuration.
+  static Map<String, dynamic> _guiServiceRules(String block) {
+    final root = XmlDocument.parse(block);
+    String value(XmlElement e, String tag) =>
+        e.getElement(tag)?.innerText.trim() ?? '';
+    final rules = <String, dynamic>{};
+    final pools = <Map<String, dynamic>>[];
+    for (final server in root.findAllElements('DHCP_SERVER')) {
+      if (value(server, 'ENABLED') != '1') continue;
+      for (final p in server.findAllElements('POOL')) {
+        final start = value(p, 'START_IP');
+        final mask = value(p, 'MASK');
+        if (NetworkTools.ipToInt(start) == null ||
+            NetworkMath.prefixFromMask(mask) == null) {
+          continue;
+        }
+        pools.add({
+          'poolName': value(p, 'NAME'),
+          'startIp': start,
+          'mask': mask,
+          'gateway': value(p, 'DEFAULT_ROUTER'),
+          'dnsServer': value(p, 'DNS_SERVER'),
+          if (int.tryParse(value(p, 'MAX_USERS')) case final int count
+              when count > 0)
+            'maxUsers': count,
+        });
+      }
+    }
+    if (pools.isNotEmpty) rules['dhcp'] = {'pools': pools};
+    final records = <Map<String, String>>[];
+    for (final server in root.findAllElements('DNS_SERVER')) {
+      if (value(server, 'ENABLED') != '1') continue;
+      for (final r in server.findAllElements('RESOURCE-RECORD')) {
+        if (value(r, 'TYPE') != 'A-REC') continue;
+        final name = value(r, 'NAME');
+        final address = value(r, 'IPADDRESS');
+        if (name.isNotEmpty && NetworkTools.ipToInt(address) != null) {
+          records.add({'name': name, 'address': address});
+        }
+      }
+    }
+    if (records.isNotEmpty) rules['dns'] = {'records': records};
+    return rules;
+  }
 
   /// DHCP pools and DNS records saved in a device's IOS config, mapped onto
   /// the plan's service-rule shape (`{'pools': [...]}` / `{'records': [...]}`)

@@ -38,6 +38,10 @@ class MemoryService extends ChangeNotifier {
   bool get ready => _db != null || injected != null;
   Database? get _active => injected ?? _db;
 
+  /// The live store, for tests that assert on rows behind the service.
+  @visibleForTesting
+  Database? get databaseForTest => _active;
+
   /// The file the store was recovered FROM, when a launch found the existing
   /// database unopenable. Non-null means history was preserved on disk under
   /// this name rather than lost - the app says so instead of opening an empty
@@ -619,6 +623,41 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
     return id;
   }
 
+  Future<BuildRecord?> latestBuildNamed(String name) async {
+    final db = _active;
+    if (db == null) return null;
+    final rows = await db.query(
+      'builds',
+      where: 'projectName=?',
+      whereArgs: [name],
+      orderBy: 'createdAt DESC, id DESC',
+      limit: 1,
+    );
+    return rows.isEmpty ? null : BuildRecord.fromMap(rows.single);
+  }
+
+  /// Import one project and its local companion data as one indivisible save.
+  Future<int> saveProjectWithPrefs(
+    BuildRecord record,
+    Map<String, String> prefs,
+  ) async {
+    final db = _active;
+    if (db == null) throw StateError('Local history is unavailable.');
+    final safeRow = StoredPrivacy.row(record.toMap());
+    final id = await db.transaction((txn) async {
+      final id = await txn.insert('builds', safeRow);
+      for (final entry in prefs.entries) {
+        await txn.insert('prefs', {
+          'k': entry.key,
+          'v': StoredPrivacy.redact(entry.value),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+      return id;
+    });
+    notifyListeners();
+    return id;
+  }
+
   /// Save a layout choice onto the plan that is still awaiting its first
   /// build. The matching planned attempt is updated in the same transaction,
   /// so reopening history does not fall back to the unreviewed drawing.
@@ -879,6 +918,19 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
     return rows.map(BuildRecord.fromMap).toList();
   }
 
+  Future<List<BuildRecord>> projectVersions(String key) async {
+    final db = _active;
+    if (db == null) return const [];
+    final rows = await db.query(
+      'builds',
+      where:
+          'projectKey = ? OR ((projectKey IS NULL OR projectKey = ?) AND projectName = ?)',
+      whereArgs: [key, '', key],
+      orderBy: 'createdAt ASC, id ASC',
+    );
+    return rows.map(BuildRecord.fromMap).toList();
+  }
+
   /// Naive keyword search for similar past builds (offline, no vectors v1).
   Future<List<BuildRecord>> searchSimilar(
     String instruction, {
@@ -938,7 +990,29 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
         .split(',')
         .map((t) => t.trim())
         .where((t) => t.isNotEmpty);
-    return !targets.contains('autopilot');
+    if (targets.contains('autopilot')) return false;
+    return _isInstructionLike(rule.ruleText);
+  }
+
+  /// A rule steers every future plan, so only instruction-shaped text
+  /// qualifies. Pasted diagnostics - a failure report, a preflight dump, a
+  /// definitions paragraph - were saved as rules with target `all`, and one
+  /// of them ("...base 2-device topology...") set every later brief's scale
+  /// to 2. An instruction is short, plain and directive; a report is long,
+  /// markdown-heavy or self-describing as a failure.
+  static bool _isInstructionLike(String text) {
+    final t = text.trim();
+    if (t.isEmpty || t.length > 200) return false;
+    if (RegExp(r'\*\*|^\s*[-*]\s|^\s*\d+\.\s|`').hasMatch(t)) return false;
+    if (RegExp(
+      r'\bunrecovered\b|\brecurr(?:ing|ed)\b|\bpreflight\b|\bstack trace\b'
+      r'|\bmismatch\b|\bdebug\b|\bledger\b|\bmissing\b'
+      r'|\bfail(?:ed|ure)s?\b',
+      caseSensitive: false,
+    ).hasMatch(t)) {
+      return false;
+    }
+    return true;
   }
 
   /// Rule texts safe to steer a plan or a model prompt: user-taught rules
@@ -974,6 +1048,19 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
     if (db == null) return const {};
     final rows = await db.query('prefs', limit: 200);
     return {for (final r in rows) (r['k'] as String): (r['v'] as String)};
+  }
+
+  Future<String?> readPref(String key) async {
+    final db = _active;
+    if (db == null) return null;
+    final rows = await db.query(
+      'prefs',
+      columns: ['v'],
+      where: 'k=?',
+      whereArgs: [key],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.single['v'] as String?;
   }
 
   // --- environment profile -------------------------------------------------
@@ -2292,6 +2379,24 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
     final db = _active;
     if (db == null) return;
     await db.rawQuery('PRAGMA secure_delete = ON');
+    // The migration is a ONE-TIME upgrade of pre-redaction rows: everything
+    // the app writes today is already sanitized on the way in. Re-walking
+    // every table on every launch cost seconds on a real history (hundreds
+    // of builds, transcripts thousands of characters long) and blew the
+    // startup deadline - "using safe defaults" - on machines whose store was
+    // exactly the one this pass exists to protect. A completed run records
+    // itself in user_version; a future upgrade that needs the walk again
+    // bumps past 1 and re-runs.
+    final version = (await db.rawQuery('PRAGMA user_version'))
+        .single
+        .values
+        .single as int? ?? 0;
+    if (version >= 1) return;
+    await _migrateStoredPrivacyOnce(db);
+    await db.rawQuery('PRAGMA user_version = 1');
+  }
+
+  Future<void> _migrateStoredPrivacyOnce(Database db) async {
     final projects = await db.rawQuery(
       'SELECT projectName FROM builds UNION SELECT projectName FROM attempts',
     );
@@ -2339,6 +2444,15 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
       }
     }
     await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
+    // Stores written before the brief accumulator was bounded may still hold
+    // megabyte paragraphs in the keystore; trim them once, here, where the
+    // migration is already the place that touches every project.
+    try {
+      await SecretVault.normalizeBriefs();
+    } catch (_) {
+      // The keystore being unreadable is reported by the loaders that need
+      // it; trimming is an optimization, never a startup blocker.
+    }
     privacyError = '';
     for (final group in groups.values.where((g) => g.length > 1)) {
       if (!await SecretVault.hasLegacyCredentials(group.first)) continue;

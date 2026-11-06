@@ -16,6 +16,40 @@ import 'memory_service.dart';
 class PlanVersionService {
   const PlanVersionService._();
 
+  /// Chat builds join saved-project history before compilation. A repeat build
+  /// reuses the unchanged version; a changed design appends a new version.
+  static Future<int?> captureBuildPlan({
+    required MemoryService? memory,
+    required NetworkIntent intent,
+    required String target,
+    required String instruction,
+  }) async {
+    if (memory == null || !memory.ready) return null;
+    final previous = await memory.latestBuildNamed(intent.projectName);
+    if (previous != null &&
+        previous.target == target &&
+        NetworkIntent.fromJson(
+              Map<String, dynamic>.from(jsonDecode(previous.intentJson)),
+            ).revision ==
+            intent.revision) {
+      return previous.id;
+    }
+    return memory.logBuild(
+      BuildRecord(
+        projectName: intent.projectName,
+        instruction: instruction,
+        // MemoryService moves secrets to the vault and redacts the stored row.
+        intentJson: jsonEncode(intent.toJson()),
+        target: target,
+        success: false,
+        status: 'planned',
+        createdAt: DateTime.now(),
+        projectKey: projectKeyOf(previous, intent.projectName),
+        parentVersionId: previous?.id,
+      ),
+    );
+  }
+
   /// The key a project's versions share: the parent's key when it has one,
   /// else the parent's project name (a legacy row's implicit identity).
   static String projectKeyOf(BuildRecord? previous, [String fallback = '']) {
@@ -75,7 +109,7 @@ class PlanVersionService {
   }) async {
     final key = projectKey.trim();
     if (key.isEmpty) return const [];
-    final all = await memory.recentBuilds(limit: 500);
+    final all = await memory.projectVersions(key);
     final rows =
         all
             .where(

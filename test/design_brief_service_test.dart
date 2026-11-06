@@ -43,6 +43,10 @@ void main() {
       );
       expect(turn.brief.value(DesignBrief.scale), '40');
       expect(turn.brief.fact(DesignBrief.scale)!.display, '40 users');
+      expect(
+        turn.brief.fact(DesignBrief.scale)!.quantityKind,
+        QuantityKind.userLoad,
+      );
     });
 
     test('a device count reads as devices, not people', () {
@@ -51,6 +55,10 @@ void main() {
       );
       expect(turn.brief.value(DesignBrief.scale), '50');
       expect(turn.brief.fact(DesignBrief.scale)!.display, '50 devices');
+      expect(
+        turn.brief.fact(DesignBrief.scale)!.quantityKind,
+        QuantityKind.deviceInventory,
+      );
     });
 
     test('"no vlans" and "one flat network" fill segmentation none', () {
@@ -302,7 +310,7 @@ void main() {
 
     testWidgets('a ready brief says so', (tester) async {
       final brief = DesignBriefService.briefForTurn(
-        normalizedText: 'ospf for 40 users',
+        normalizedText: 'ospf for 40 devices',
       ).brief;
       expect(brief.ready, isTrue);
       await tester.pumpWidget(

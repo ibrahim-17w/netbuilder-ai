@@ -9,6 +9,7 @@ class NetworkingHelpReader {
     r'walk\s+me\s+through|step[\s-]*by[\s-]*step|'
     r'(?:give|show)\s+me\s+(?:an?\s+)?(?:example|instructions|steps))\b',
   );
+
   /// A whole-message WH question ("what is ospf?"). Anchored both ends so a
   /// question riding behind a device inventory is NOT swallowed.
   static final _whQuestion = RegExp(
@@ -39,6 +40,17 @@ class NetworkingHelpReader {
   );
 
   static bool isFollowup(String text) => _followup.hasMatch(_normalize(text));
+
+  /// True for wording that asks the assistant to explain or diagnose. A bare
+  /// networking topic can still be an answer to an open clarification, so it
+  /// is intentionally excluded even though [matches] can answer it as help.
+  static bool asksForExplanation(String text) {
+    final t = _normalize(text);
+    return _instruction.hasMatch(t) ||
+        _whQuestion.hasMatch(t) ||
+        _symptom.hasMatch(t) ||
+        _followup.hasMatch(t);
+  }
 
   static final _deviceCount = RegExp(
     r'\b\d{1,3}\s*(?:routers?|switches|switch|pcs?|servers?|laptops?|'

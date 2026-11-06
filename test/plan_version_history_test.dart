@@ -106,6 +106,57 @@ void main() {
     });
   });
 
+  test(
+    'a timeline is not truncated by hundreds of unrelated newer builds',
+    () async {
+      final mem = await fresh();
+      final batch = mem.injected!.batch();
+      for (var i = 0; i < 3; i++) {
+        batch.insert(
+          'builds',
+          record('old-project', '$i routers 1 switch').toMap(),
+        );
+      }
+      for (var i = 0; i < 505; i++) {
+        batch.insert('builds', record('other-$i', '1 router').toMap());
+      }
+      await batch.commit(noResult: true);
+      expect(
+        await PlanVersionService.timeline(mem, projectKey: 'old-project'),
+        hasLength(3),
+      );
+    },
+  );
+
+  test(
+    'chat build snapshots reuse an unchanged version and append edits',
+    () async {
+      final mem = await fresh();
+      final plan = NetworkIntent.parseSimple('chat-build', '1 router 1 switch');
+      Future<int?> capture(NetworkIntent p) =>
+          PlanVersionService.captureBuildPlan(
+            memory: mem,
+            intent: p,
+            target: 'packet-tracer',
+            instruction: 'Chat build',
+          );
+      final id = await capture(plan);
+      expect(await capture(plan), id);
+      final edited = await capture(plan.copyWith(routing: 'ospf'));
+      expect(edited, isNot(id));
+      final versions = await PlanVersionService.timeline(
+        mem,
+        projectKey: 'chat-build',
+      );
+      expect(versions, hasLength(2));
+      expect(versions.last.parentVersionId, id);
+      expect(
+        versions.every((r) => !r.success && r.status == 'planned'),
+        isTrue,
+      );
+    },
+  );
+
   group('the version chain', () {
     test('an edit carries the project key and its parent', () async {
       final mem = await fresh();

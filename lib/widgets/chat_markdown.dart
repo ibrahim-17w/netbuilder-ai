@@ -341,10 +341,15 @@ class ChatFilePathSpan extends StatelessWidget {
     return Semantics(
       button: true,
       label: 'Open $path',
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Text(path, style: style),
+      child: MouseRegion(
+        // A tappable file path must say so on hover: the arrow-to-hand
+        // switch is what makes "this opens something" true before the click.
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Text(path, style: style),
+        ),
       ),
     );
   }
@@ -627,10 +632,13 @@ class ChatLinkSpan extends StatelessWidget {
       link: true,
       button: true,
       label: '$label (copies the link address)',
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: copyUrl,
-        child: Text(label, style: style),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: copyUrl,
+          child: Text(label, style: style),
+        ),
       ),
     );
   }

@@ -79,6 +79,12 @@ class ConversationTitles {
     if (project != null) {
       return '$project Network Analysis';
     }
+    // The brief names the network the plan will carry: "Build the enterprise
+    // network for company Contoso", "a campus network named campus-core".
+    // Titled from those words, ten enterprise labs no longer all read as
+    // their first troubleshooting topic.
+    final named = _namedNetworkIn(lower);
+    if (named != null) return _title(named);
     if (topic != null && devices.isNotEmpty) {
       return '${devices.first} $topic Problem';
     }
@@ -89,6 +95,30 @@ class ConversationTitles {
           : '${devices.take(2).join(' and ')} Problem';
     }
     return _fallback(raw);
+  }
+
+  /// The network name in a brief: "network named X", "network for company
+  /// X", "lab named X". Null when the words carry no name.
+  static final RegExp _namedNetwork = RegExp(
+    r'(?:network|lab|project|topology)\s+'
+    r'(?:for\s+(?:company|client|customer|us|me)\s+|named\s+|called\s+)?'
+    r'([A-Za-z][A-Za-z0-9_. -]{1,38}?)(?:\.|,|;|\s+with\s+|\s+at\s+'
+    r'|\s+running\s+|\s+HQ\b|$)',
+    caseSensitive: false,
+  );
+
+  static String? _namedNetworkIn(String lower) {
+    for (final m in _namedNetwork.allMatches(lower)) {
+      final name = (m.group(1) ?? '').trim().replaceAll(RegExp(r'\s+'), ' ');
+      if (name.isEmpty) continue;
+      // Skip generic words the matcher can catch ("network at ...").
+      if (const ['the', 'a', 'an', 'this', 'that', 'company', 'client']
+          .contains(name.toLowerCase())) {
+        continue;
+      }
+      return name;
+    }
+    return null;
   }
 
   static String? _topicIn(String lower) {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import '../services/adapters/packet_tracer_adapter.dart';
 import '../services/adapters/terraform_adapter.dart';
 import '../services/address_table.dart';
 import '../services/diagnostics_service.dart';
+import '../services/ipv6_tools.dart';
 import '../services/network_math.dart';
 import '../services/network_tools.dart';
 import '../services/validator_service.dart';
@@ -24,6 +26,7 @@ import '../widgets/app_dialogs.dart';
 /// first.
 enum ToolkitSection {
   subnet,
+  ipv6,
   vlsm,
   summarize,
   addressing,
@@ -34,6 +37,7 @@ enum ToolkitSection {
 
   String get title => switch (this) {
     ToolkitSection.subnet => 'Subnet calculator',
+    ToolkitSection.ipv6 => 'IPv6 inspector',
     ToolkitSection.vlsm => 'VLSM and splitting',
     ToolkitSection.summarize => 'Summarization and ranges',
     ToolkitSection.addressing => 'Address plan checks',
@@ -46,6 +50,9 @@ enum ToolkitSection {
   String get blurb => switch (this) {
     ToolkitSection.subnet =>
       'Network, mask, wildcard, host range, scope and the binary view.',
+    ToolkitSection.ipv6 =>
+      'Canonical form, address type, EUI-64 from a MAC, solicited-node '
+          'multicast and prefix sizes.',
     ToolkitSection.vlsm =>
       'Allocate a block by host counts, or carve it into equal subnets.',
     ToolkitSection.summarize =>
@@ -64,6 +71,7 @@ enum ToolkitSection {
 
   IconData get icon => switch (this) {
     ToolkitSection.subnet => Icons.calculate_outlined,
+    ToolkitSection.ipv6 => Icons.looks_6_outlined,
     ToolkitSection.vlsm => Icons.call_split,
     ToolkitSection.summarize => Icons.compress,
     ToolkitSection.addressing => Icons.rule_folder_outlined,
@@ -90,7 +98,7 @@ class NetworkToolkitScreen extends StatefulWidget {
   /// The existing plan-save path, when the host can version an edit. The
   /// address table's edits go through it, so a table change is a versioned
   /// plan edit like any other - never a side channel around history.
-  final ValueChanged<NetworkIntent>? onSavePlan;
+  final FutureOr<void> Function(NetworkIntent)? onSavePlan;
 
   const NetworkToolkitScreen({
     super.key,
@@ -105,6 +113,7 @@ class NetworkToolkitScreen extends StatefulWidget {
 
 class _NetworkToolkitScreenState extends State<NetworkToolkitScreen> {
   late ToolkitSection _section = widget.initialSection;
+  late NetworkIntent? _intent = widget.intent;
 
   /// The toolkit is opened *at* a section by the hub, so being handed a
   /// different one has to actually move it - a screen that ignores its own
@@ -112,6 +121,7 @@ class _NetworkToolkitScreenState extends State<NetworkToolkitScreen> {
   @override
   void didUpdateWidget(covariant NetworkToolkitScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.intent != widget.intent) _intent = widget.intent;
     if (oldWidget.initialSection != widget.initialSection) {
       setState(() => _section = widget.initialSection);
     }
@@ -242,14 +252,20 @@ class _NetworkToolkitScreenState extends State<NetworkToolkitScreen> {
   }
 
   Widget _sectionBody() {
-    final intent = widget.intent;
+    final intent = _intent;
     return switch (_section) {
       ToolkitSection.subnet => const _SubnetTool(),
+      ToolkitSection.ipv6 => const _Ipv6Tool(),
       ToolkitSection.vlsm => const _VlsmTool(),
       ToolkitSection.summarize => const _SummarizeTool(),
       ToolkitSection.addressing => _AddressingTool(
         intent: intent,
-        onSavePlan: widget.onSavePlan,
+        onSavePlan: widget.onSavePlan == null
+            ? null
+            : (updated) async {
+                await widget.onSavePlan!(updated);
+                if (mounted) setState(() => _intent = updated);
+              },
       ),
       ToolkitSection.acl => const _AclTool(),
       ToolkitSection.diagnostics => const _DiagnosticsTool(),
@@ -626,6 +642,208 @@ class _SubnetToolState extends State<_SubnetTool> {
 
 // --- VLSM ------------------------------------------------------------------
 
+/// The IPv6 inspector: what an address is, what it is called in its shortest
+/// form, what a host with this MAC gets on this prefix, and how big a prefix
+/// is. Everything is arithmetic ([Ipv6Tools]); nothing here reaches the net.
+class _Ipv6Tool extends StatefulWidget {
+  const _Ipv6Tool();
+
+  @override
+  State<_Ipv6Tool> createState() => _Ipv6ToolState();
+}
+
+class _Ipv6ToolState extends State<_Ipv6Tool> {
+  final _address = TextEditingController(text: '2001:db8:1:2::1');
+  final _mac = TextEditingController();
+  final _prefix = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _address.addListener(_recompute);
+    _mac.addListener(_recompute);
+    _prefix.addListener(_recompute);
+  }
+
+  @override
+  void dispose() {
+    _address.dispose();
+    _mac.dispose();
+    _prefix.dispose();
+    super.dispose();
+  }
+
+  void _recompute() => setState(() {});
+
+  @override
+  Widget build(BuildContext context) {
+    final address = _address.text.trim();
+    final bytes = Ipv6Tools.parse(address);
+    final canonical = bytes == null ? null : Ipv6Tools.compress(address);
+    final kind = bytes == null ? null : Ipv6Tools.classify(address);
+    final mac = _mac.text.trim();
+    final hasMac = mac.isNotEmpty;
+    final eui64 = hasMac ? Ipv6Tools.eui64Address(mac, 'fe80::/64') : null;
+    final linkLocal = hasMac ? Ipv6Tools.linkLocalFromMac(mac) : null;
+    final onPrefix = hasMac && _prefix.text.trim().isNotEmpty
+        ? Ipv6Tools.eui64Address(mac, _prefix.text.trim())
+        : null;
+    final solicited = bytes == null ? null : Ipv6Tools.solicitedNode(address);
+    final prefixInfo = _prefix.text.trim().isEmpty
+        ? null
+        : Ipv6Tools.prefixInfo(_prefix.text.trim());
+    final prefixChildren = _prefix.text.trim().isEmpty
+        ? null
+        : Ipv6Tools.split(
+            _prefix.text.trim(),
+            (int.tryParse(_prefix.text.trim().split('/').last) ?? 0) + 16,
+            count: 4,
+          );
+
+    return _Section(
+      title: ToolkitSection.ipv6.title,
+      blurb: ToolkitSection.ipv6.blurb,
+      children: [
+        _Field(
+          label: 'IPv6 address',
+          controller: _address,
+          hint: '2001:db8::1 or fe80::1%12',
+          helper: 'Compressed, full, embedded IPv4 and zone forms all read.',
+          onChanged: (value) => _recompute(),
+        ),
+        Wrap(
+          spacing: AppTheme.s8,
+          runSpacing: AppTheme.s8,
+          children: [
+            for (final preset in const [
+              '2001:db8::1',
+              'fe80::1',
+              '::1',
+              '::ffff:192.168.1.1',
+              'fd00:ab:cd::7',
+              'ff02::1',
+            ])
+              ActionChip(
+                label: Text(preset),
+                onPressed: () {
+                  _address.text = preset;
+                  _recompute();
+                },
+              ),
+          ],
+        ),
+        const SizedBox(height: AppTheme.s8),
+        if (canonical == null)
+          _Result(
+            title: 'Not a valid IPv6 address',
+            body:
+                '"$address" did not parse. Expected something like '
+                '2001:db8::1.',
+            error: true,
+          )
+        else ...[
+          AppPanel(
+            icon: Icons.looks_6_outlined,
+            title: 'Address facts',
+            children: [
+              AppKeyValue(label: 'Canonical (RFC 5952)', value: canonical),
+              AppKeyValue(label: 'Fully expanded', value: Ipv6Tools.expand(address)!),
+              AppKeyValue(label: 'Type', value: kind!),
+              AppKeyValue(
+                label: 'Solicited-node multicast',
+                value: solicited!,
+              ),
+            ],
+          ),
+          AppPanel(
+            icon: Icons.settings_ethernet_outlined,
+            title: 'Prefix facts',
+            subtitle: 'Leave the prefix empty when only the address matters.',
+            children: [
+              _Field(
+                label: 'Prefix (CIDR)',
+                controller: _prefix,
+                hint: '2001:db8:1::/48',
+                helper: 'Size, first address and the first /64 children.',
+                onChanged: (value) => _recompute(),
+              ),
+              if (prefixInfo == null)
+                Text(
+                  _prefix.text.trim().isEmpty
+                      ? ''
+                      : '"${_prefix.text.trim()}" is not an IPv6 prefix.',
+                  style: TextStyle(
+                    color: AppPalette.danger(Theme.of(context).colorScheme),
+                  ),
+                )
+              else ...[
+                AppKeyValue(label: 'Network', value: prefixInfo['network']!),
+                AppKeyValue(label: 'Prefix', value: prefixInfo['prefix']!),
+                AppKeyValue(label: 'Host bits', value: prefixInfo['host bits']!),
+                AppKeyValue(
+                  label: 'Total addresses',
+                  value: prefixInfo['total addresses']!,
+                ),
+                AppKeyValue(
+                  label: '/64 subnets inside',
+                  value: prefixInfo['/64 subnets']!,
+                ),
+                if (prefixChildren != null)
+                  AppKeyValue(
+                    label: 'First /64 children',
+                    value: prefixChildren.join('\n'),
+                  ),
+              ],
+            ],
+          ),
+          AppPanel(
+            icon: Icons.settings_input_antenna_outlined,
+            title: 'SLAAC from a MAC (EUI-64)',
+            subtitle:
+                'What a host self-assigns: the MAC spliced with ff:fe and the '
+                'universal bit flipped.',
+            children: [
+              _Field(
+                label: 'MAC address',
+                controller: _mac,
+                hint: '00:1a:2b:3c:4d:5e',
+                helper:
+                    'Shows the link-local, the solicited-node group and the '
+                    'address inside your prefix when it is a /64.',
+                onChanged: (value) => _recompute(),
+              ),
+              if (hasMac && eui64 == null)
+                Text(
+                  '"$mac" is not a 48-bit MAC.',
+                  style: TextStyle(
+                    color: AppPalette.danger(Theme.of(context).colorScheme),
+                  ),
+                )
+              else if (hasMac) ...[
+                AppKeyValue(
+                  label: 'Link-local (fe80::/64)',
+                  value: linkLocal!,
+                ),
+                AppKeyValue(
+                  label: 'Solicited-node of the link-local',
+                  value: Ipv6Tools.solicitedNode(linkLocal)!,
+                ),
+                if (_prefix.text.trim().isNotEmpty)
+                  AppKeyValue(
+                    label: 'Inside ${_prefix.text.trim()}',
+                    value:
+                        onPrefix ??
+                        'the prefix is not a /64, so EUI-64 does not apply',
+                  ),
+              ],
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _VlsmTool extends StatefulWidget {
   const _VlsmTool();
 
@@ -935,9 +1153,45 @@ class _SummarizeToolState extends State<_SummarizeTool> {
 
 // --- address plan checks ---------------------------------------------------
 
-class _AddressingTool extends StatefulWidget {
-  final NetworkIntent? intent;
-  final ValueChanged<NetworkIntent>? onSavePlan;
+/// Per-switch port utilization of the open plan: cables against the ports
+/// the switch model really has, so an overfilled design is visible in the
+/// same breath as the address checks.
+class _PortBudgetPanel extends StatelessWidget {
+  final NetworkIntent intent;
+
+  const _PortBudgetPanel({required this.intent});
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = NetworkTools.portBudget(intent);
+    if (rows.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final over = rows.where((r) => r['overCapacity'] == true).toList();
+    return AppPanel(
+      icon: Icons.settings_ethernet_outlined,
+      title: 'Port budget',
+      tone: over.isEmpty ? AppTone.success : AppTone.warning,
+      filled: over.isNotEmpty,
+      subtitle: over.isEmpty
+          ? 'Every switch is within the ports its model has.'
+          : '${over.length} switch(es) carry more cables than their model '
+                'has ports - the build would skip the extras.',
+      children: [
+        for (final r in rows)
+          AppKeyValue(
+            label:
+                '${r['name']} (${r['model']}${r['known'] == true ? '' : ', '
+                    'unknown model'})',
+            value: "${r['used']} of ${r['total']} ports used",
+          ),
+      ],
+    );
+  }
+}
+
+class _AddressingTool extends StatefulWidget {  final NetworkIntent? intent;
+  final FutureOr<void> Function(NetworkIntent)? onSavePlan;
 
   const _AddressingTool({this.intent, this.onSavePlan});
 
@@ -1011,6 +1265,8 @@ class _AddressingToolState extends State<_AddressingTool> {
                 '${intent.addressing.length} addressed interfaces, '
                 'routing ${intent.routing}.',
           ),
+          const SizedBox(height: AppTheme.s12),
+          _PortBudgetPanel(intent: intent),
           const SizedBox(height: AppTheme.s12),
           _AddressTablePanel(intent: intent, onSavePlan: widget.onSavePlan),
           const SizedBox(height: AppTheme.s12),
@@ -1702,7 +1958,7 @@ class _ExportTile extends StatelessWidget {
 /// sees a versioned plan change and the validator re-runs on it.
 class _AddressTablePanel extends StatefulWidget {
   final NetworkIntent intent;
-  final ValueChanged<NetworkIntent>? onSavePlan;
+  final FutureOr<void> Function(NetworkIntent)? onSavePlan;
 
   const _AddressTablePanel({required this.intent, this.onSavePlan});
 
@@ -1796,7 +2052,9 @@ class _AddressTablePanelState extends State<_AddressTablePanel> {
                 rows: [
                   for (final row in rows)
                     DataRow(
-                      onSelectChanged: (_) => _edit(row),
+                      onSelectChanged: widget.onSavePlan == null
+                          ? null
+                          : (_) => _edit(row),
                       cells: [
                         DataCell(Text(row.device)),
                         DataCell(Text(row.iface)),
@@ -1831,9 +2089,7 @@ class _AddressTablePanelState extends State<_AddressTablePanel> {
               padding: const EdgeInsets.only(top: AppTheme.s8),
               child: Text(
                 widget.onSavePlan == null
-                    ? 'Tap a row to edit its addresses; the change applies to '
-                          'the open plan (saving it into history needs an open '
-                          'project screen).'
+                    ? 'Open the toolkit from a project to save address edits.'
                     : 'Tap a row to edit its addresses - the change is saved '
                           'as a new plan version and re-validated.',
                 style: theme.textTheme.bodySmall?.copyWith(
@@ -1914,10 +2170,20 @@ class _AddressTablePanelState extends State<_AddressTablePanel> {
       ipv6: v6.text,
     );
     if (updated == null) return;
-    // The host's plan-save path takes it from here: history, validation and
-    // the build gate all see the same edited plan. Without a host callback
-    // the edit still lands on the open plan object.
-    widget.onSavePlan?.call(updated);
+    // The host must persist the edit before the displayed plan changes, so
+    // history, validation and the build gate all see the same saved plan.
+    try {
+      await widget.onSavePlan?.call(updated);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('The address change could not be saved.'),
+          ),
+        );
+      }
+      return;
+    }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

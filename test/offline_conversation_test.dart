@@ -169,6 +169,20 @@ void main() {
       );
     });
 
+    test('"change routing to ospf" switches without re-planning', () {
+      final statics = NetworkIntent.parseSimple('p', '2 routers 4 pcs');
+      final changed = NetworkIntent.applyFollowUpChange(
+        previous: statics,
+        brief: 'change routing to ospf',
+      );
+      expect(changed, isNotNull);
+      expect(changed!.routing, 'ospf');
+      expect(
+        changed.nodes.map((node) => node.toJson()),
+        statics.nodes.map((node) => node.toJson()),
+      );
+    });
+
     test('the offline advice and the offline action agree', () {
       // The build answer tells the user to say "use ospf" to switch. That
       // sentence is a promise, so the same words have to switch it.

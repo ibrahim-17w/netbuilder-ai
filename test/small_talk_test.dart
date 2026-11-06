@@ -11,6 +11,13 @@ import 'package:net_builder/main.dart';
 import 'package:net_builder/models/network_intent.dart';
 import 'package:net_builder/services/scope_gate.dart';
 
+void _wide(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1500, 950);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
 void main() {
   group('small talk is recognised as small talk', () {
     test('greetings, thanks and shrugs are small talk', () {
@@ -110,6 +117,7 @@ void main() {
   testWidgets('a greeting leaves the app with NO plan to describe', (
     tester,
   ) async {
+    _wide(tester);
     await tester.pumpWidget(const NetBuilderApp());
     await tester.pumpAndSettle();
 

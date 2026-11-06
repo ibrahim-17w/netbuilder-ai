@@ -45,6 +45,7 @@ class TopologyEditService {
                   exactModel: n.exactModel,
                   modules: n.modules,
                   mgmtIp: n.mgmtIp,
+                  siteId: n.siteId,
                   services: n.services,
                   serviceRules: n.serviceRules,
                 ),

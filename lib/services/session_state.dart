@@ -3,6 +3,39 @@ import 'dart:convert';
 import '../models/chat_message.dart';
 import '../models/network_intent.dart';
 
+/// The project revision and brief property an open clarification belongs to.
+/// Empty project/revision values indicate a legacy ID-only session that will
+/// be rebound to the current plan on its next successful save.
+class PendingQuestionContext {
+  final String questionId;
+  final String project;
+  final String baseRevision;
+  final String property;
+
+  const PendingQuestionContext({
+    required this.questionId,
+    this.project = '',
+    this.baseRevision = '',
+    this.property = '',
+  });
+
+  factory PendingQuestionContext.fromJson(Map<String, dynamic> json) =>
+      PendingQuestionContext(
+        questionId: (json['questionId'] ?? json['id'] ?? '').toString(),
+        project: (json['project'] ?? '').toString(),
+        baseRevision: (json['baseRevision'] ?? '').toString(),
+        property: (json['property'] ?? json['questionId'] ?? json['id'] ?? '')
+            .toString(),
+      );
+
+  Map<String, String> toJson() => {
+    'questionId': questionId,
+    'project': project,
+    'baseRevision': baseRevision,
+    'property': property,
+  };
+}
+
 /// Layer 2 of the memory: what this conversation is ABOUT, kept as data.
 ///
 /// The point is that conversational continuity must not depend on the model
@@ -92,6 +125,10 @@ class SessionState {
   /// message is still read as its answer.
   List<String> pendingQuestionIds;
 
+  /// The project, plan revision and brief property associated with each
+  /// pending clarification. [pendingQuestionIds] remains for older readers.
+  List<PendingQuestionContext> pendingQuestionContexts;
+
   /// Snapshot from the last offline Packet Tracer review in this chat. This
   /// allows follow-up questions to be answered from the exact saved evidence
   /// even after the conversation is reopened.
@@ -115,6 +152,19 @@ class SessionState {
   /// stored.
   String labJson;
 
+  /// The words the standing plan was parsed from (the user's own brief, as
+  /// the conversation last held it). This is what makes a follow-up that
+  /// MERGES against the standing brief - a count correction ("make it 60
+  /// PCs"), an addition ("add a branch") - work after a reopen: without it
+  /// the merge declines (nothing to re-read) and the correction's fragment
+  /// replaced the whole lab.
+  String lastBrief;
+
+  /// Versioned typed request interpretation and change decision for the most
+  /// recent turn. The plan itself remains in [intentJson]; keeping both in
+  /// this existing session record makes a reopen see one consistent snapshot.
+  String requestOutcomeJson;
+
   SessionState({
     this.project = '',
     List<String>? focus,
@@ -135,11 +185,14 @@ class SessionState {
     Map<String, dynamic>? flowState,
     this.briefJson = '',
     List<String>? pendingQuestionIds,
+    List<PendingQuestionContext>? pendingQuestionContexts,
     this.capturePath = '',
     this.captureName = '',
     this.captureAnalysisJson = '',
     this.labJson = '',
     this.guideChecksJson = '',
+    this.lastBrief = '',
+    this.requestOutcomeJson = '',
   }) : focus = focus ?? <String>[],
        confirmedFindings = confirmedFindings ?? <String>[],
        openFindings = openFindings ?? <String>[],
@@ -147,7 +200,15 @@ class SessionState {
        proposedChanges = proposedChanges ?? <Map<String, dynamic>>[],
        artifacts = artifacts ?? <Map<String, String>>[],
        flowState = flowState ?? <String, dynamic>{},
-       pendingQuestionIds = pendingQuestionIds ?? <String>[];
+       pendingQuestionIds = pendingQuestionIds ?? <String>[],
+       pendingQuestionContexts =
+           pendingQuestionContexts ?? <PendingQuestionContext>[];
+
+  /// Set the compatibility IDs and their richer anchors together.
+  void setPendingQuestions(List<PendingQuestionContext> contexts) {
+    pendingQuestionContexts = List<PendingQuestionContext>.from(contexts);
+    pendingQuestionIds = [for (final context in contexts) context.questionId];
+  }
 
   static const int maxFocus = 6;
   static const int maxFindings = 8;
@@ -356,6 +417,13 @@ class SessionState {
     return list;
   }
 
+  /// Records the words the standing plan was parsed from, chained with
+  /// [withIntentJson] so both survive a reopen together.
+  SessionState withLastBrief(String brief) {
+    lastBrief = brief;
+    return this;
+  }
+
   SessionState withIntentJson(String json) {
     intentJson = json;
     return this;
@@ -545,6 +613,10 @@ class SessionState {
     'intentJson': intentJson,
     if (briefJson.isNotEmpty) 'briefJson': briefJson,
     if (pendingQuestionIds.isNotEmpty) 'pendingQuestionIds': pendingQuestionIds,
+    if (pendingQuestionContexts.isNotEmpty)
+      'pendingQuestionContexts': pendingQuestionContexts
+          .map((context) => context.toJson())
+          .toList(),
     if (flowState.isNotEmpty) 'flowState': flowState,
     if (capturePath.isNotEmpty) 'capturePath': capturePath,
     if (captureName.isNotEmpty) 'captureName': captureName,
@@ -552,6 +624,8 @@ class SessionState {
       'captureAnalysisJson': captureAnalysisJson,
     if (labJson.isNotEmpty) 'labJson': labJson,
     if (guideChecksJson.isNotEmpty) 'guideChecksJson': guideChecksJson,
+    if (lastBrief.isNotEmpty) 'lastBrief': lastBrief,
+    if (requestOutcomeJson.isNotEmpty) 'requestOutcomeJson': requestOutcomeJson,
   };
 
   String encode() => jsonEncode(toJson());
@@ -567,34 +641,61 @@ class SessionState {
     }
   }
 
-  factory SessionState.fromJson(Map<String, dynamic> j) => SessionState(
-    project: (j['project'] ?? '').toString(),
-    focus: _strings(j['focus']),
-    source: _textOrNull(j['source']),
-    destination: _textOrNull(j['destination']),
-    problem: (j['problem'] ?? '').toString(),
-    confirmedFindings: _strings(j['confirmedFindings']),
-    openFindings: _strings(j['openFindings']),
-    changesMade: _maps(j['changesMade']),
-    proposedChanges: _maps(j['proposedChanges']),
-    topic: (j['topic'] ?? '').toString(),
-    lastMessageId: (j['lastMessageId'] as num?)?.toInt() ?? 0,
-    artifactPath: (j['artifactPath'] ?? '').toString(),
-    artifactName: (j['artifactName'] ?? '').toString(),
-    artifactUpdatedAt: (j['artifactUpdatedAt'] ?? '').toString(),
-    artifacts: _stringMaps(j['artifacts']),
-    intentJson: (j['intentJson'] ?? '').toString(),
-    briefJson: (j['briefJson'] ?? '').toString(),
-    pendingQuestionIds: _strings(j['pendingQuestionIds']),
-    flowState: j['flowState'] is Map
-        ? Map<String, dynamic>.from(j['flowState'] as Map)
-        : <String, dynamic>{},
-    capturePath: (j['capturePath'] ?? '').toString(),
-    captureName: (j['captureName'] ?? '').toString(),
-    captureAnalysisJson: (j['captureAnalysisJson'] ?? '').toString(),
-    labJson: (j['labJson'] ?? '').toString(),
-    guideChecksJson: (j['guideChecksJson'] ?? '').toString(),
-  );
+  factory SessionState.fromJson(Map<String, dynamic> j) {
+    final pendingIds = _strings(j['pendingQuestionIds']);
+    return SessionState(
+      project: (j['project'] ?? '').toString(),
+      focus: _strings(j['focus']),
+      source: _textOrNull(j['source']),
+      destination: _textOrNull(j['destination']),
+      problem: (j['problem'] ?? '').toString(),
+      confirmedFindings: _strings(j['confirmedFindings']),
+      openFindings: _strings(j['openFindings']),
+      changesMade: _maps(j['changesMade']),
+      proposedChanges: _maps(j['proposedChanges']),
+      topic: (j['topic'] ?? '').toString(),
+      lastMessageId: (j['lastMessageId'] as num?)?.toInt() ?? 0,
+      artifactPath: (j['artifactPath'] ?? '').toString(),
+      artifactName: (j['artifactName'] ?? '').toString(),
+      artifactUpdatedAt: (j['artifactUpdatedAt'] ?? '').toString(),
+      artifacts: _stringMaps(j['artifacts']),
+      intentJson: (j['intentJson'] ?? '').toString(),
+      briefJson: (j['briefJson'] ?? '').toString(),
+      pendingQuestionIds: pendingIds,
+      pendingQuestionContexts: _pendingQuestionContexts(
+        j['pendingQuestionContexts'],
+        pendingIds,
+      ),
+      flowState: j['flowState'] is Map
+          ? Map<String, dynamic>.from(j['flowState'] as Map)
+          : <String, dynamic>{},
+      capturePath: (j['capturePath'] ?? '').toString(),
+      captureName: (j['captureName'] ?? '').toString(),
+      captureAnalysisJson: (j['captureAnalysisJson'] ?? '').toString(),
+      labJson: (j['labJson'] ?? '').toString(),
+      guideChecksJson: (j['guideChecksJson'] ?? '').toString(),
+      lastBrief: (j['lastBrief'] ?? '').toString(),
+      requestOutcomeJson: (j['requestOutcomeJson'] ?? '').toString(),
+    );
+  }
+
+  static List<PendingQuestionContext> _pendingQuestionContexts(
+    dynamic raw,
+    List<String> legacyIds,
+  ) {
+    if (raw is List) {
+      final contexts = [
+        for (final item in raw)
+          if (item is Map)
+            PendingQuestionContext.fromJson(Map<String, dynamic>.from(item)),
+      ].where((context) => context.questionId.isNotEmpty).toList();
+      if (contexts.isNotEmpty || legacyIds.isEmpty) return contexts;
+    }
+    return [
+      for (final id in legacyIds)
+        PendingQuestionContext(questionId: id, property: id),
+    ];
+  }
 
   // --- deterministic extraction -------------------------------------------
 

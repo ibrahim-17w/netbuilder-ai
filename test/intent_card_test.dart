@@ -19,6 +19,13 @@ Widget _app() => MultiProvider(
   child: const NetBuilderApp(),
 );
 
+void _wide(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1500, 950);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
 /// A busy turn can carry an animation that never settles.
 Future<void> _settle(WidgetTester tester) async {
   for (var i = 0; i < 12; i++) {
@@ -70,6 +77,7 @@ void main() {
   testWidgets('a question chip fills the composer and does not send', (
     tester,
   ) async {
+    _wide(tester);
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
@@ -77,6 +85,7 @@ void main() {
 
     const question = 'Should guests be blocked from the staff VLAN by an ACL?';
     expect(find.text(question), findsOneWidget);
+    await tester.ensureVisible(find.text(question));
     await tester.tap(find.text(question));
     // Bounded pumps, not pumpAndSettle: the turn is still "Thinking..."
     // and its indeterminate progress bar never stops animating.

@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -51,6 +54,16 @@ class _FakeStorage extends FlutterSecureStorage {
     deleted.add(key);
     values.remove(key);
   }
+
+  @override
+  Future<Map<String, String>> readAll({
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async => Map<String, String>.of(values);
 }
 
 void main() {
@@ -177,4 +190,69 @@ void main() {
       expect(await SecretVault.load('other'), {'aaaPassword': 'keep'});
     });
   });
+
+  group('the brief accumulator stays bounded', () {
+    test('protectText keeps appending while under the cap', () async {
+      await SecretVault.protectText('lab', 'first source');
+      await SecretVault.protectText('lab', 'second source');
+      final brief = await SecretVault.storage.read(
+        key: _briefKey('lab'),
+      );
+      expect(brief, contains('first source'));
+      expect(brief, contains('second source'));
+    });
+
+    test('a text already stored is not stored twice', () async {
+      await SecretVault.protectText('lab', 'same text');
+      await SecretVault.protectText('lab', 'same text');
+      final brief = await SecretVault.storage.read(
+        key: _briefKey('lab'),
+      );
+      expect('same text same text'.allMatches(brief!), isEmpty);
+      expect(brief.split('\n\n'), ['same text']);
+    });
+
+    test('an overgrown accumulator drops its OLDEST sources, not the newest', ()
+        async {
+      final old = List.generate(20, (i) => 'old-$i ${'x' * 4000}').join('\n\n');
+      await SecretVault.protectText('lab', old);
+      // The next source is what a current build would recover secrets from.
+      await SecretVault.protectText('lab', 'newest credential aaaPassword=hunter2');
+
+      final brief = (await SecretVault.storage.read(key: _briefKey('lab'))) ?? '';
+      expect(brief.length, lessThanOrEqualTo(SecretVault.maxBriefChars));
+      expect(brief, contains('newest credential'));
+      expect(brief, isNot(contains('old-0 ')));
+    });
+
+    test('normalizeBriefs trims a store written before the cap', () async {
+      const key = 'project_secret_v2_abcdef_brief';
+      await storage.write(key: key, value: 'y' * (SecretVault.maxBriefChars + 5000));
+      final trimmed = await SecretVault.normalizeBriefs();
+      expect(trimmed, 1);
+      final brief = (await storage.read(key: key)) ?? '';
+      expect(brief.length, lessThanOrEqualTo(SecretVault.maxBriefChars));
+      // A second pass has nothing left to do.
+      expect(await SecretVault.normalizeBriefs(), 0);
+    });
+
+    test('normalizeBriefs leaves small briefs and non-brief keys alone', ()
+        async {
+      const key = 'project_secret_v2_abcdef_brief';
+      const other = 'project_secret_v2_abcdef_aaaPassword';
+      await storage.write(key: key, value: 'small');
+      await storage.write(key: other, value: 'z' * (SecretVault.maxBriefChars + 10));
+      expect(await SecretVault.normalizeBriefs(), 0);
+      expect(await storage.read(key: key), 'small');
+      final otherValue = (await storage.read(key: other)) ?? '';
+      expect(otherValue.length, SecretVault.maxBriefChars + 10);
+    });
+  });
 }
+
+/// The same key shape [SecretVault] derives: `project_secret_v2_<sha256>`.
+String _briefKey(String project) =>
+    'project_secret_v2_'
+    '${sha256.convert(utf8.encode(project.trim().toLowerCase())).toString()}'
+    '_brief';
+

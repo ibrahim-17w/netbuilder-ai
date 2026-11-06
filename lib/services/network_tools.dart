@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import '../models/network_intent.dart';
+import 'packet_tracer/catalog.dart';
+
 /// Deterministic networking facts. Spec §5: the app decides the technical
 /// truth, the model only decides what to look at.
 ///
@@ -187,6 +190,43 @@ class NetworkTools {
 
   /// Spec §6: one clean representation for the model - never raw .pkt bytes.
   /// [maxChars] keeps a huge capture from flooding the context window.
+
+/// Per-switch port utilization for the open plan: how many cables each
+/// switch carries against the ports its Packet Tracer model actually has.
+///
+/// This is the arithmetic the planner's capacity pass enforces while laying
+/// out cables, shown after the fact so a plan edited by hand (or imported)
+/// gets the same scrutiny.
+static List<Map<String, dynamic>> portBudget(NetworkIntent intent) {
+  final used = <String, int>{};
+  for (final l in intent.links) {
+    used.update(l.a, (v) => v + 1, ifAbsent: () => 1);
+    used.update(l.b, (v) => v + 1, ifAbsent: () => 1);
+  }
+  final rows = <Map<String, dynamic>>[];
+  for (final n in intent.nodes) {
+    if (n.type != 'switch') continue;
+    final device = PacketTracerCatalog.instance.device(n.model ?? '2960');
+    // The planner cables switch access on FastEthernet only (f0/x, uplink on
+    // f0/1), so the budget counts THAT family - a 2960-24TT also carries two
+    // Gigabit uplink slots the planner never uses, and counting them would
+    // call an overfilled switch "within budget".
+    final ports = device == null
+        ? 0
+        : device.ports.where((p) => p.family == 'fastethernet').length;
+    final cables = used[n.name] ?? 0;
+    rows.add({
+      'name': n.name,
+      'model': n.model ?? '2960',
+      'used': cables,
+      'total': ports,
+      'known': ports > 0,
+      'overCapacity': ports > 0 && cables > ports,
+    });
+  }
+  return rows;
+}
+
   static Map<String, dynamic> buildContext(
     Map<String, dynamic> audit, {
     int maxChars = 12000,

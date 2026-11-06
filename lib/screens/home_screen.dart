@@ -10,6 +10,9 @@ import '../models/network_intent.dart';
 import '../services/memory_service.dart';
 import '../services/plan_version_diff.dart';
 import '../services/plan_version_service.dart';
+import 'project_checks_screen.dart';
+import 'blueprints_screen.dart';
+import 'project_package_actions.dart';
 import '../theme/app_kit.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
@@ -114,6 +117,34 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
+  Future<void> _blueprints() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => BlueprintsScreen(onOpen: widget.onOpen),
+      ),
+    );
+    if (mounted) await _refresh();
+  }
+
+  Future<void> _importPackage() async {
+    final record = await ProjectPackageActions.import(context);
+    if (record == null || !mounted) return;
+    await _refresh();
+    widget.onOpen(record);
+  }
+
+  Widget _importPackageButton() => OutlinedButton.icon(
+    onPressed: _importPackage,
+    icon: const Icon(Icons.file_open_outlined),
+    label: const Text('Import project'),
+  );
+
+  Widget _blueprintButton() => OutlinedButton.icon(
+    onPressed: _blueprints,
+    icon: const Icon(Icons.copy_all_outlined),
+    label: const Text('Your blueprints'),
+  );
+
   List<BuildRecord> get _visible {
     final q = _query.trim().toLowerCase();
     bool matches(BuildRecord item) {
@@ -197,6 +228,8 @@ class _HomeScreenState extends State<HomeScreen> {
         maxWidth: 1000,
         children: [
           PktBuildHistoryPanel(onOpenPlan: widget.onOpen),
+          _blueprintButton(),
+          _importPackageButton(),
           AppEmptyState(
             icon: Icons.hub_outlined,
             title: 'No saved plans yet',
@@ -232,6 +265,8 @@ class _HomeScreenState extends State<HomeScreen> {
             onChanged: (value) => setState(() => _query = value),
           ),
           filters: [
+            _blueprintButton(),
+            _importPackageButton(),
             _StatusFilter(
               value: _statusFilter,
               statuses: _statuses,
@@ -438,6 +473,22 @@ class _HomeScreenState extends State<HomeScreen> {
                     onSelected: (value) => _rowAction(value, record),
                     itemBuilder: (context) => const [
                       PopupMenuItem(
+                        value: 'export-package',
+                        child: Text('Export project package'),
+                      ),
+                      PopupMenuItem(
+                        value: 'attachments',
+                        child: Text('Imported attachments'),
+                      ),
+                      PopupMenuItem(
+                        value: 'blueprint',
+                        child: Text('Save as blueprint'),
+                      ),
+                      PopupMenuItem(
+                        value: 'checks',
+                        child: Text('Project checks'),
+                      ),
+                      PopupMenuItem(
                         value: 'checkpoint',
                         child: Text('Save named checkpoint'),
                       ),
@@ -467,6 +518,29 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _rowAction(String action, BuildRecord record) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
     switch (action) {
+      case 'export-package':
+        await ProjectPackageActions.export(context, record);
+      case 'attachments':
+        await ProjectPackageActions.attachments(context, record);
+      case 'blueprint':
+        try {
+          await BlueprintsScreen.savePlan(
+            context,
+            NetworkIntent.fromJson(
+              Map<String, dynamic>.from(jsonDecode(record.intentJson)),
+            ),
+          );
+        } catch (e) {
+          messenger?.showSnackBar(
+            SnackBar(content: Text('Could not save blueprint: $e')),
+          );
+        }
+      case 'checks':
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ProjectChecksScreen(record: record),
+          ),
+        );
       case 'restore-version':
         // RESTORE IS AN EDIT: a new version is written parented to the
         // project's newest row, and it opens for review. History keeps both

@@ -1,19 +1,33 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:net_builder/models/build_record.dart';
 import 'package:net_builder/models/chat_message.dart';
+import 'package:net_builder/models/design_brief.dart';
+import 'package:net_builder/models/environment_profile.dart';
 import 'package:net_builder/models/network_intent.dart';
+import 'package:net_builder/models/request_interpretation.dart';
+import 'package:net_builder/models/request_requirement.dart';
 import 'package:net_builder/screens/chat_screen.dart';
 import 'package:net_builder/screens/layout_gallery_screen.dart';
+import 'package:net_builder/services/ai_provider.dart';
 import 'package:net_builder/services/layout_intent.dart';
 import 'package:net_builder/services/memory_service.dart';
+import 'package:net_builder/services/provider_chat_service.dart';
+import 'package:net_builder/services/request_understanding/request_route_selector.dart';
 import 'package:net_builder/services/session_state.dart';
 import 'package:net_builder/services/settings_service.dart';
 import 'package:net_builder/services/validator_service.dart';
 import 'package:net_builder/widgets/chat_activity.dart';
 import 'package:net_builder/widgets/conversation_sidebar.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'request_understanding/fixtures.dart';
 
 /// The chat surface, at the level a person sees it: a list of conversations
 /// beside the chat, a welcome screen instead of a blank box, real activity, and
@@ -23,8 +37,12 @@ import 'package:provider/provider.dart';
 /// test drives the tree, and the storage itself (titles, summaries, the change
 /// log) is covered against the real schema in conversation_store_test.dart.
 class _FakeSettings extends SettingsService {
+  _FakeSettings({this.geminiKey = ''});
+
+  final String geminiKey;
+
   @override
-  Future<String?> getApiKey() async => '';
+  Future<String?> getApiKey() async => geminiKey;
   @override
   Future<String?> getOpenAiKey() async => '';
 
@@ -45,6 +63,61 @@ class _FakeSettings extends SettingsService {
 
   @override
   bool get privateMode => _privateModeOverride ?? super.privateMode;
+}
+
+class _FixedPathProvider extends PathProviderPlatform {
+  _FixedPathProvider(this.documentsDirectory);
+
+  final String documentsDirectory;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => documentsDirectory;
+}
+
+class _DeterministicProviderChatService extends ProviderChatService {
+  _DeterministicProviderChatService({
+    this.fail = false,
+    this.failure,
+    this.started = const [],
+    this.release = const [],
+  }) : super(
+         config: const AiProviderConfig(
+           kind: AiProviderKind.gemini,
+           model: AiProviderConfig.defaultGeminiModel,
+         ),
+       );
+
+  final bool fail;
+  final Object? failure;
+  final List<Completer<void>> started;
+  final List<Completer<void>> release;
+  int calls = 0;
+
+  @override
+  Stream<String> stream({
+    required List<ChatMessage> history,
+    required String text,
+    required String systemContext,
+    List<ChatImage> attachments = const [],
+    String networkContext = '',
+    String sessionState = '',
+    String memories = '',
+    String storedSummary = '',
+    Future<void>? abortTrigger,
+    bool Function()? abortProbe,
+  }) async* {
+    final callIndex = calls++;
+    if (callIndex < started.length && !started[callIndex].isCompleted) {
+      started[callIndex].complete();
+    }
+    if (callIndex < release.length) await release[callIndex].future;
+    if (fail || failure != null) {
+      throw failure ?? StateError('synthetic provider failure');
+    }
+    yield callIndex == 0
+        ? 'The deterministic provider answered.'
+        : 'The deterministic provider answered call ${callIndex + 1}.';
+  }
 }
 
 class _FakeStore extends MemoryService {
@@ -134,12 +207,33 @@ class _FakeStore extends MemoryService {
   /// Everything the screen has written down. The offline path used to keep its
   /// answers on screen only, so this is what catches that coming back.
   final List<ChatMessage> logged = <ChatMessage>[];
+  Completer<void>? userLogStarted;
+  Completer<int>? delayedUserLog;
+  bool failNextUserLogSave = false;
+  bool failNextModelLogSave = false;
 
   @override
   Future<int> logChat(
     ChatMessage message, {
     String conversation = 'default',
   }) async {
+    if (message.role == 'user' && failNextUserLogSave) {
+      failNextUserLogSave = false;
+      throw StateError('synthetic user transcript failure');
+    }
+    if (message.role == 'model' && failNextModelLogSave) {
+      failNextModelLogSave = false;
+      throw StateError('synthetic model transcript failure');
+    }
+    final gate = delayedUserLog;
+    if (message.role == 'user' && gate != null) {
+      delayedUserLog = null;
+      final started = userLogStarted;
+      if (started != null && !started.isCompleted) started.complete();
+      final id = await gate.future;
+      logged.add(message);
+      return id;
+    }
     logged.add(message);
     return logged.length;
   }
@@ -151,11 +245,101 @@ class _FakeStore extends MemoryService {
     String title = '',
   }) async {}
 
+  @override
+  Future<BuildRecord?> latestBuildNamed(String name) async => null;
+
+  @override
+  Future<int> logBuild(BuildRecord record) async => 1;
+
   String? savedState;
+  bool failNextSessionStateSave = false;
+  int? failSessionStateOnAttempt;
+  int sessionStateSaveAttempts = 0;
+  bool failRoutingOspfTransitionSave = false;
+  Completer<void>? sessionStateSaveStarted;
+  Completer<void>? delayedSessionStateSave;
+  int sessionStateWrites = 0;
+  int rememberedClarificationWrites = 0;
+  final rememberedClarifications =
+      <({String questionId, String answer, String venue, int scale})>[];
+  EnvironmentProfile? rememberedProfile;
 
   @override
   Future<void> setSessionState(String id, String stateJson) async {
+    sessionStateSaveAttempts++;
+    if (failNextSessionStateSave) {
+      failNextSessionStateSave = false;
+      throw StateError('synthetic state save failure');
+    }
+    if (failSessionStateOnAttempt == sessionStateSaveAttempts) {
+      failSessionStateOnAttempt = null;
+      throw StateError('synthetic state save failure on selected attempt');
+    }
+    if (failRoutingOspfTransitionSave) {
+      final candidate = SessionState.decode(stateJson);
+      final candidatePlan = NetworkIntent.fromJson(
+        jsonDecode(candidate.intentJson),
+      );
+      if (candidatePlan.routing.toLowerCase() == 'ospf' &&
+          !candidate.pendingQuestionIds.contains('routing')) {
+        failRoutingOspfTransitionSave = false;
+        throw StateError('synthetic candidate state save failure');
+      }
+    }
+    sessionStateWrites++;
+    final gate = delayedSessionStateSave;
+    if (gate != null) {
+      delayedSessionStateSave = null;
+      final started = sessionStateSaveStarted;
+      if (started != null && !started.isCompleted) started.complete();
+      await gate.future;
+    }
     savedState = stateJson;
+  }
+
+  @override
+  Future<void> rememberClarification(
+    String questionId,
+    String answer, {
+    String venue = '',
+    int scale = 0,
+  }) async {
+    rememberedClarificationWrites++;
+    rememberedClarifications.add((
+      questionId: questionId,
+      answer: answer,
+      venue: venue,
+      scale: scale,
+    ));
+  }
+
+  @override
+  Future<EnvironmentProfile?> environmentProfile() async => rememberedProfile;
+
+  @override
+  Future<List<Map<String, dynamic>>> clarificationAnswers() async => [
+    for (final answer in rememberedClarifications)
+      {
+        'question_id': answer.questionId,
+        'answer': answer.answer,
+        'venue': answer.venue,
+        'scale': answer.scale,
+      },
+  ];
+
+  @override
+  Future<String?> answerForClarification(
+    String questionId,
+    EnvironmentProfile? profile,
+  ) async {
+    final venue = profile?.venue ?? '';
+    String? global;
+    for (final answer in rememberedClarifications.reversed) {
+      if (answer.questionId != questionId) continue;
+      if (venue.isNotEmpty && answer.venue == venue) return answer.answer;
+      if (answer.venue.isEmpty) global ??= answer.answer;
+    }
+    return global;
   }
 
   @override
@@ -253,6 +437,35 @@ ChatMessage _turn(String role, String text, {DateTime? at}) => ChatMessage(
   createdAt: (at ?? DateTime.now()).toIso8601String(),
 );
 
+String _baseOutcomeWithExplicitStaticRouting(NetworkIntent plan) {
+  final requirement = Requirement(
+    id: 'req-static-routing',
+    subject: 'routing',
+    property: 'protocol',
+    value: 'static',
+    scope: RequirementScope.project(plan.projectName),
+    origin: RequirementOrigin.currentExplicit,
+    sourceTurnId: 'base-fixture',
+    strength: RequirementStrength.explicit,
+  );
+  return jsonEncode(
+    RequestOutcome(
+      interpretation: RequestInterpretation(
+        turnId: 'base-fixture',
+        conversationId: plan.projectName,
+        projectId: plan.projectName,
+        basePlanRevision: plan.revision,
+        mode: RequestMode.create,
+        requirements: [requirement],
+        mutationPolicy: MutationPolicy.none,
+        reliability: const {ReliabilityLabel.exactExtraction},
+      ),
+      candidatePlan: plan,
+      disposition: RequestDisposition.commit,
+    ).toJson(),
+  );
+}
+
 _FakeStore _seeded() => _FakeStore(
   transcripts: {
     'trunk-lab': [
@@ -271,14 +484,29 @@ _FakeStore _seeded() => _FakeStore(
   titles: {'trunk-lab': 'Trunk Problem'},
 );
 
-Widget _chat(MemoryService mem, {SettingsService? settings}) => MultiProvider(
+Widget _chat(
+  MemoryService mem, {
+  SettingsService? settings,
+  ProviderChatService? providerChatServiceOverride,
+  ConfigurationExportPathChooser? configurationExportPathChooserOverride,
+  String initialProject = '',
+}) => MultiProvider(
   providers: [
     ChangeNotifierProvider<SettingsService>.value(
       value: settings ?? _FakeSettings(),
     ),
     ChangeNotifierProvider<MemoryService>.value(value: mem),
   ],
-  child: const MaterialApp(home: Scaffold(body: ChatScreen())),
+  child: MaterialApp(
+    home: Scaffold(
+      body: ChatScreen(
+        initialProject: initialProject,
+        providerChatServiceOverride: providerChatServiceOverride,
+        configurationExportPathChooserOverride:
+            configurationExportPathChooserOverride,
+      ),
+    ),
+  ),
 );
 
 /// The message field, found by its label rather than by position: the composer
@@ -355,6 +583,77 @@ void main() {
       expect(changed.notes.map(LayoutRequest.styleFromNote), contains('rows'));
     },
   );
+
+  testWidgets('A26 show me the layout previews the current drawing only', (
+    tester,
+  ) async {
+    _wide(tester);
+    final base = basePlan(project: 'P1');
+    final plan = base.copyWith(
+      notes: [...base.notes, LayoutRequest.noteFor('rows')],
+    );
+    final state = SessionState(
+      project: 'P1',
+      intentJson: jsonEncode(plan.toJson(includeSecrets: false)),
+      lastBrief: '2 routers, 2 switches, 10 PCs; use static routing',
+      requestOutcomeJson: _baseOutcomeWithExplicitStaticRouting(plan),
+    );
+    final store = _FakeStore(
+      transcripts: const {'P1': []},
+      stateJson: state.encode(),
+    );
+    await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_composer(), 'show me the layout');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LayoutGalleryScreen), findsOneWidget);
+    final preview = tester.widget<LayoutGalleryScreen>(
+      find.byType(LayoutGalleryScreen),
+    );
+    expect(preview.currentStyle, 'rows');
+    expect(preview.intent.toPlannerJson(), plan.toPlannerJson());
+    expect(store.savedState, isNull);
+    expect(store.sessionStateWrites, 0);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(store.savedState, isNull);
+    expect(store.sessionStateWrites, 0);
+  });
+
+  testWidgets('A30 build it with no plan asks what network to build', (
+    tester,
+  ) async {
+    _wide(tester);
+    final initial = SessionState(project: 'P1');
+    final store = _FakeStore(
+      transcripts: const {'P1': []},
+      stateJson: initial.encode(),
+    );
+    await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_composer(), 'build it');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Describe the network first'), findsOneWidget);
+    expect(find.text('Build .pkt'), findsNothing);
+    final saved = SessionState.decode(store.savedState ?? '{}');
+    expect(saved.intentJson, isEmpty, reason: 'no default lab was invented');
+    final outcome = RequestOutcome.fromJson(
+      jsonDecode(saved.requestOutcomeJson),
+    );
+    expect(outcome.disposition, RequestDisposition.ask);
+    expect(outcome.candidatePlan, isNull);
+    expect(
+      outcome.interpretation.issues.map((issue) => issue.code),
+      contains('no_plan_for_requested_output'),
+    );
+  });
 
   group('the conversation sidebar', () {
     testWidgets('lists the saved conversations, grouped by time', (
@@ -807,6 +1106,868 @@ void main() {
       expect(find.textContaining('Devices: 1,'), findsNothing);
     });
 
+    testWidgets('a polite direct action question adds the requested devices', (
+      tester,
+    ) async {
+      _wide(tester);
+      final plan = basePlan(project: 'P1');
+      final saved = SessionState(
+        project: 'P1',
+        intentJson: jsonEncode(plan.toJson(includeSecrets: false)),
+        lastBrief: '2 routers, 2 switches, 10 PCs; use static routing',
+      );
+      final store = _FakeStore(
+        transcripts: const {'P1': []},
+        stateJson: saved.encode(),
+      );
+      await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), 'can you add 2 PCs?');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      final committed = SessionState.decode(store.savedState!);
+      final after = NetworkIntent.fromJson(jsonDecode(committed.intentJson));
+      expect(after.nodes.where((node) => node.type == 'pc').length, 12);
+      expect(after.nodes.map((node) => node.name), contains('PC10'));
+      expect(after.routing, 'static');
+    });
+
+    testWidgets(
+      'A29 build it compiles the exact committed plan and requirements',
+      (tester) async {
+        _wide(tester);
+        final documentPath = Directory('build/requested-action-a29');
+        if (documentPath.existsSync()) {
+          documentPath.deleteSync(recursive: true);
+        }
+        documentPath.createSync(recursive: true);
+        SharedPreferences.setMockInitialValues({});
+        final previousPathProvider = PathProviderPlatform.instance;
+        PathProviderPlatform.instance = _FixedPathProvider(documentPath.path);
+        addTearDown(() => PathProviderPlatform.instance = previousPathProvider);
+        addTearDown(() {
+          if (documentPath.existsSync()) {
+            documentPath.deleteSync(recursive: true);
+          }
+        });
+
+        final base = basePlan(project: 'P1').copyWith(
+          notes: [
+            ...basePlan(project: 'P1').notes,
+            'layout: tree',
+          ],
+        );
+        final initial = SessionState(
+          project: 'P1',
+          intentJson: jsonEncode(base.toJson(includeSecrets: false)),
+          lastBrief: '2 routers, 2 switches, 10 PCs; use static routing',
+          requestOutcomeJson: _baseOutcomeWithExplicitStaticRouting(base),
+        );
+        final store = _FakeStore(
+          transcripts: const {'P1': []},
+          stateJson: initial.encode(),
+        );
+        await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(_composer(), 'build it');
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        for (
+          var i = 0;
+          i < 300 &&
+              find
+                  .textContaining('Packet Tracer file: built')
+                  .evaluate()
+                  .isEmpty;
+          i++
+        ) {
+          await tester.pump(const Duration(milliseconds: 100));
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 1)),
+          );
+        }
+
+        expect(
+          find.textContaining('Packet Tracer file: built'),
+          findsOneWidget,
+          reason: store.logged
+              .map((message) => '${message.role}: ${message.text}')
+              .join('\n'),
+        );
+        final committed = SessionState.decode(store.savedState!);
+        final savedPlan = NetworkIntent.fromJson(
+          jsonDecode(committed.intentJson),
+        );
+        expect(savedPlan.toPlannerJson(), base.toPlannerJson());
+        expect(committed.artifactPath, isNotEmpty);
+        expect(File(committed.artifactPath).existsSync(), isTrue);
+        final outcome = RequestOutcome.fromJson(
+          jsonDecode(committed.requestOutcomeJson),
+        );
+        expect(outcome.disposition, RequestDisposition.answerOnly);
+        expect(outcome.candidatePlan?.revision, base.revision);
+        expect(outcome.changeSet, isNull);
+        expect(
+          outcome.interpretation.requirements.any(
+            (requirement) =>
+                requirement.property == 'protocol' &&
+                requirement.value == 'static',
+          ),
+          isTrue,
+          reason: 'build it keeps the established explicit routing choice',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'A31 commits one routing edit before building that exact revision',
+      (tester) async {
+        _wide(tester);
+        final documentPath = Directory('build/requested-action-a31');
+        if (documentPath.existsSync()) {
+          documentPath.deleteSync(recursive: true);
+        }
+        documentPath.createSync(recursive: true);
+        SharedPreferences.setMockInitialValues({});
+        final previousPathProvider = PathProviderPlatform.instance;
+        PathProviderPlatform.instance = _FixedPathProvider(documentPath.path);
+        addTearDown(() => PathProviderPlatform.instance = previousPathProvider);
+        addTearDown(() {
+          if (documentPath.existsSync()) {
+            documentPath.deleteSync(recursive: true);
+          }
+        });
+
+        final base = basePlan(project: 'P1').copyWith(
+          notes: [
+            ...basePlan(project: 'P1').notes,
+            'layout: tree',
+          ],
+        );
+        final initial = SessionState(
+          project: 'P1',
+          intentJson: jsonEncode(base.toJson(includeSecrets: false)),
+          lastBrief: '2 routers, 2 switches, 10 PCs; use static routing',
+          requestOutcomeJson: _baseOutcomeWithExplicitStaticRouting(base),
+        );
+        final store = _FakeStore(
+          transcripts: const {'P1': []},
+          stateJson: initial.encode(),
+        );
+        await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(
+          _composer(),
+          'change routing to OSPF and build it',
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        for (
+          var i = 0;
+          i < 300 &&
+              find
+                  .textContaining('Packet Tracer file: built')
+                  .evaluate()
+                  .isEmpty;
+          i++
+        ) {
+          await tester.pump(const Duration(milliseconds: 100));
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 1)),
+          );
+        }
+
+        expect(
+          find.textContaining('Packet Tracer file: built'),
+          findsOneWidget,
+          reason: store.logged
+              .map((message) => '${message.role}: ${message.text}')
+              .join('\n'),
+        );
+        expect(
+          find.text('Choose network design'),
+          findsNothing,
+          reason: store.logged
+              .map((message) => '${message.role}: ${message.text}')
+              .join('\n'),
+        );
+        final committed = SessionState.decode(store.savedState!);
+        final savedPlan = NetworkIntent.fromJson(
+          jsonDecode(committed.intentJson),
+        );
+        final outcome = RequestOutcome.fromJson(
+          jsonDecode(committed.requestOutcomeJson),
+        );
+        expect(savedPlan.routing, 'ospf');
+        expect(outcome.disposition, RequestDisposition.commit);
+        expect(outcome.candidatePlan?.revision, savedPlan.revision);
+        expect(outcome.changeSet?.operations, hasLength(1));
+        expect(outcome.changeSet?.operations.single.kind.name, 'setRouting');
+        expect(outcome.interpretation.requestedActions, hasLength(1));
+        expect(
+          outcome.interpretation.requestedActions.single.kind.name,
+          'build',
+        );
+        expect(File(committed.artifactPath).existsSync(), isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('A15 lowers the saved PC total using the stable removal order', (
+      tester,
+    ) async {
+      _wide(tester);
+      const brief = '2 routers, 2 switches, 10 PCs, 2 servers';
+      final base = NetworkIntent.parseSimple('P1', brief);
+      final store = _FakeStore(
+        transcripts: const {'P1': []},
+        stateJson: SessionState(
+          project: 'P1',
+          intentJson: jsonEncode(base.toJson(includeSecrets: false)),
+          lastBrief: brief,
+        ).encode(),
+      );
+      await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), 'make it 5 PCs');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      final saved = SessionState.decode(store.savedState!);
+      final plan = NetworkIntent.fromJson(jsonDecode(saved.intentJson));
+      final outcome = RequestOutcome.fromJson(
+        jsonDecode(saved.requestOutcomeJson),
+      );
+      expect(
+        plan.nodes.where((node) => node.type == 'pc').map((node) => node.name),
+        ['PC1', 'PC2', 'PC3', 'PC4', 'PC5'],
+        reason:
+            '${outcome.disposition}: ${outcome.interpretation.issues.map((issue) => issue.code)}',
+      );
+      expect(outcome.disposition, RequestDisposition.commit);
+      expect(outcome.changeSet?.operations.single.kind.name, 'setDeviceCount');
+      expect(
+        plan.links.every(
+          (link) =>
+              plan.nodes.any((node) => node.name == link.a) &&
+              plan.nodes.any((node) => node.name == link.b),
+        ),
+        isTrue,
+      );
+    });
+
+    testWidgets('A41 exact service assignments use two existing servers', (
+      tester,
+    ) async {
+      _wide(tester);
+      const brief = '2 routers, 2 switches, 10 PCs, 2 servers';
+      final parsed = NetworkIntent.parseSimple('P1', brief);
+      final base = parsed.copyWith(
+        nodes: [
+          for (final node in parsed.nodes)
+            if (node.type == 'server')
+              NetNode(
+                name: node.name,
+                type: node.type,
+                model: node.model,
+                exactModel: node.exactModel,
+                modules: node.modules,
+              )
+            else
+              node,
+        ],
+      );
+      final store = _FakeStore(
+        transcripts: const {'P1': []},
+        stateJson: SessionState(
+          project: 'P1',
+          intentJson: jsonEncode(base.toJson(includeSecrets: false)),
+          lastBrief: brief,
+        ).encode(),
+      );
+      await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        _composer(),
+        'make SRV1 DHCP and another server DNS',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      final saved = SessionState.decode(store.savedState!);
+      final plan = NetworkIntent.fromJson(jsonDecode(saved.intentJson));
+      expect(plan.nodes.where((node) => node.type == 'server'), hasLength(2));
+      expect(plan.nodes.singleWhere((node) => node.name == 'SRV1').services, [
+        'dhcp',
+      ]);
+      expect(plan.nodes.singleWhere((node) => node.name == 'SRV2').services, [
+        'dns',
+      ]);
+      expect(
+        RequestOutcome.fromJson(
+          jsonDecode(saved.requestOutcomeJson),
+        ).disposition,
+        RequestDisposition.commit,
+      );
+    });
+
+    testWidgets('A42 a named rename updates references through chat', (
+      tester,
+    ) async {
+      _wide(tester);
+      const brief = '2 routers, 2 switches, 10 PCs, 2 servers';
+      final base = NetworkIntent.parseSimple('P1', brief);
+      final store = _FakeStore(
+        transcripts: const {'P1': []},
+        stateJson: SessionState(
+          project: 'P1',
+          intentJson: jsonEncode(base.toJson(includeSecrets: false)),
+          lastBrief: brief,
+        ).encode(),
+      );
+      await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), 'rename R1 to Edge1');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      final saved = SessionState.decode(store.savedState!);
+      final plan = NetworkIntent.fromJson(jsonDecode(saved.intentJson));
+      expect(plan.nodes.any((node) => node.name == 'Edge1'), isTrue);
+      expect(plan.nodes.any((node) => node.name == 'R1'), isFalse);
+      expect(
+        plan.links.any((link) => link.a == 'Edge1' || link.b == 'Edge1'),
+        isTrue,
+      );
+      expect(plan.addressing.any((row) => row.node == 'Edge1'), isTrue);
+      expect(
+        RequestOutcome.fromJson(
+          jsonDecode(saved.requestOutcomeJson),
+        ).disposition,
+        RequestDisposition.commit,
+      );
+    });
+
+    testWidgets('A50 a missing named server holds the whole mixed edit', (
+      tester,
+    ) async {
+      _wide(tester);
+      const brief = '2 routers, 2 switches, 10 PCs, 2 servers';
+      final base = NetworkIntent.parseSimple('P1', brief);
+      final initial = SessionState(
+        project: 'P1',
+        intentJson: jsonEncode(base.toJson(includeSecrets: false)),
+        lastBrief: brief,
+      );
+      final store = _FakeStore(
+        transcripts: const {'P1': []},
+        stateJson: initial.encode(),
+      );
+      await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        _composer(),
+        'add a printer and change only SRV9 to DNS',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('No device named'),
+        findsOneWidget,
+        reason: store.logged
+            .map((message) => '${message.role}: ${message.text}')
+            .join('\n'),
+      );
+      final saved = SessionState.decode(store.savedState!);
+      expect(saved.intentJson, initial.intentJson);
+      expect(
+        NetworkIntent.fromJson(
+          jsonDecode(saved.intentJson),
+        ).nodes.where((node) => node.type == 'printer'),
+        isEmpty,
+      );
+      final outcome = RequestOutcome.fromJson(
+        jsonDecode(saved.requestOutcomeJson),
+      );
+      expect(outcome.disposition, RequestDisposition.ask);
+      expect(outcome.candidatePlan, isNull);
+      expect(outcome.changeSet, isNull);
+    });
+
+    testWidgets('A32 an old build card stays inert after the plan changes', (
+      tester,
+    ) async {
+      _wide(tester);
+      final plan = basePlan(project: 'P1');
+      final saved = SessionState(
+        project: 'P1',
+        intentJson: jsonEncode(plan.toJson(includeSecrets: false)),
+        lastBrief: '2 routers, 2 switches, 10 PCs; use static routing',
+      );
+      final oldUserTurn = _turn('user', '2 routers, 2 switches, 10 PCs');
+      final oldBuildCard = ChatMessage(
+        role: 'model',
+        text: 'Plan ready.',
+        actions: [
+          ChatAction(
+            kind: 'pkt_generate',
+            payload: {
+              'revision': plan.revision,
+              'buildRevision': plan.buildRevision,
+              'devices': plan.nodes.length,
+              'links': plan.links.length,
+              'target': 'packet-tracer',
+            },
+          ),
+        ],
+      );
+      final store = _FakeStore(
+        transcripts: {
+          'P1': [oldUserTurn, oldBuildCard],
+        },
+        stateJson: saved.encode(),
+      );
+      await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+      await tester.pumpAndSettle();
+      expect(find.text('Plan ready.'), findsOneWidget);
+
+      await tester.enterText(_composer(), 'can you add 2 PCs?');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      final changedState = SessionState.decode(store.savedState!);
+      final changedPlan = NetworkIntent.fromJson(
+        jsonDecode(changedState.intentJson),
+      );
+      expect(changedPlan.revision, isNot(plan.revision));
+      expect(
+        changedPlan.nodes.where((node) => node.type == 'pc'),
+        hasLength(12),
+      );
+      // The transcript pins the newest turn to the bottom. Scroll the old
+      // action into view so ListView.builder constructs its stale warning.
+      final scrollables = find.byType(Scrollable);
+      final chatScrollable =
+          List.generate(
+            scrollables.evaluate().length,
+            scrollables.at,
+          ).firstWhere(
+            (finder) =>
+                tester.state<ScrollableState>(finder).position.maxScrollExtent >
+                0,
+          );
+      await tester.drag(chatScrollable, const Offset(0, 5000));
+      await tester.pumpAndSettle();
+      expect(find.text('Plan ready.'), findsOneWidget);
+      expect(find.text('Expired build card'), findsOneWidget);
+      expect(find.text('Expired'), findsOneWidget);
+      expect(find.text('Choose network design'), findsNothing);
+      expect(
+        find.textContaining('this card was written for plan rev'),
+        findsOneWidget,
+      );
+
+      final beforeStaleTap = SessionState.decode(store.savedState!);
+      final modelRepliesBeforeTap = store.logged
+          .where((message) => message.role == 'model')
+          .length;
+      await tester.tap(find.text('Expired build card'));
+      await tester.pumpAndSettle();
+
+      final afterStaleTap = SessionState.decode(store.savedState!);
+      expect(afterStaleTap.intentJson, beforeStaleTap.intentJson);
+      expect(afterStaleTap.artifactPath, isEmpty);
+      expect(
+        store.logged.where((message) => message.role == 'model'),
+        hasLength(modelRepliesBeforeTap),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('A32 a layout-only edit expires an older build card', (
+      tester,
+    ) async {
+      _wide(tester);
+      final plan = basePlan(project: 'P1');
+      final saved = SessionState(
+        project: 'P1',
+        intentJson: jsonEncode(plan.toJson(includeSecrets: false)),
+        lastBrief: '2 routers, 2 switches, 10 PCs; use static routing',
+        requestOutcomeJson: _baseOutcomeWithExplicitStaticRouting(plan),
+      );
+      final oldUserTurn = _turn('user', '2 routers, 2 switches, 10 PCs');
+      final oldBuildCard = ChatMessage(
+        role: 'model',
+        text: 'Plan ready.',
+        actions: [
+          ChatAction(
+            kind: 'pkt_generate',
+            payload: {
+              'revision': plan.revision,
+              'buildRevision': plan.buildRevision,
+              'devices': plan.nodes.length,
+              'links': plan.links.length,
+              'target': 'packet-tracer',
+            },
+          ),
+        ],
+      );
+      final store = _FakeStore(
+        transcripts: {
+          'P1': [oldUserTurn, oldBuildCard],
+        },
+        stateJson: saved.encode(),
+      );
+      await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        _composer(),
+        'only rearrange the layout; keep all IPs and cables',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      final afterLayoutEdit = SessionState.decode(store.savedState!);
+      final changedPlan = NetworkIntent.fromJson(
+        jsonDecode(afterLayoutEdit.intentJson),
+      );
+      expect(changedPlan.revision, plan.revision);
+      expect(changedPlan.buildRevision, isNot(plan.buildRevision));
+      expect(afterLayoutEdit.artifactPath, isEmpty);
+
+      final scrollables = find.byType(Scrollable);
+      final chatScrollable =
+          List.generate(
+            scrollables.evaluate().length,
+            scrollables.at,
+          ).firstWhere(
+            (finder) =>
+                tester.state<ScrollableState>(finder).position.maxScrollExtent >
+                0,
+          );
+      await tester.drag(chatScrollable, const Offset(0, 5000));
+      await tester.pumpAndSettle();
+      expect(find.text('Expired build card'), findsOneWidget);
+      expect(
+        find.textContaining('drawing or device positions have since changed'),
+        findsOneWidget,
+      );
+
+      final beforeStaleTap = SessionState.decode(store.savedState!);
+      final modelRepliesBeforeTap = store.logged
+          .where((message) => message.role == 'model')
+          .length;
+      await tester.tap(find.text('Expired build card'));
+      await tester.pumpAndSettle();
+      final afterStaleTap = SessionState.decode(store.savedState!);
+      expect(afterStaleTap.intentJson, beforeStaleTap.intentJson);
+      expect(afterStaleTap.artifactPath, isEmpty);
+      expect(
+        store.logged.where((message) => message.role == 'model'),
+        hasLength(modelRepliesBeforeTap),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'a plan change reports build success when the later config export fails',
+      (tester) async {
+        _wide(tester);
+        final documentPath = Directory('build/requested-action-documents');
+        if (documentPath.existsSync()) {
+          documentPath.deleteSync(recursive: true);
+        }
+        documentPath.createSync(recursive: true);
+        SharedPreferences.setMockInitialValues({});
+        final previousPathProvider = PathProviderPlatform.instance;
+        PathProviderPlatform.instance = _FixedPathProvider(documentPath.path);
+        addTearDown(() => PathProviderPlatform.instance = previousPathProvider);
+        addTearDown(() {
+          if (documentPath.existsSync()) {
+            documentPath.deleteSync(recursive: true);
+          }
+        });
+
+        final base = NetworkIntent.parseSimple(
+          'P1',
+          '2 routers and 4 switches',
+        );
+        final plan = base.copyWith(notes: [...base.notes, 'layout: tree']);
+        final saved = SessionState(
+          project: 'P1',
+          intentJson: jsonEncode(plan.toJson(includeSecrets: false)),
+          lastBrief: '2 routers, 2 switches, 10 PCs; use OSPF routing',
+        );
+        final store = _FakeStore(
+          transcripts: const {'P1': []},
+          stateJson: saved.encode(),
+        );
+        await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(
+          _composer(),
+          'change to OSPF, build the .pkt, and export the configurations',
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        for (
+          var i = 0;
+          i < 240 &&
+              find.textContaining('Configurations: export').evaluate().isEmpty;
+          i++
+        ) {
+          await tester.pump(const Duration(milliseconds: 100));
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 1)),
+          );
+        }
+
+        expect(
+          find.textContaining('Packet Tracer file: built'),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Configurations: export failed'),
+          findsOneWidget,
+        );
+        final report = store.logged.lastWhere(
+          (message) => message.role == 'model',
+        );
+        final buildStatus = report.text.indexOf('Packet Tracer file: built');
+        final exportStatus = report.text.indexOf(
+          'Configurations: export failed',
+        );
+        expect(buildStatus, greaterThanOrEqualTo(0));
+        expect(exportStatus, greaterThan(buildStatus));
+
+        final committed = SessionState.decode(store.savedState!);
+        final committedPlan = NetworkIntent.fromJson(
+          jsonDecode(committed.intentJson),
+        );
+        expect(committedPlan.routing, 'ospf');
+        expect(committed.artifactPath, isNotEmpty);
+        expect(File(committed.artifactPath).existsSync(), isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'a cancelled build still exports configurations and reports both outcomes in order',
+      (tester) async {
+        _wide(tester);
+        final documentPath = Directory(
+          'build/requested-action-cancelled-build',
+        );
+        if (documentPath.existsSync()) {
+          documentPath.deleteSync(recursive: true);
+        }
+        documentPath.createSync(recursive: true);
+        SharedPreferences.setMockInitialValues({});
+        final previousPathProvider = PathProviderPlatform.instance;
+        PathProviderPlatform.instance = _FixedPathProvider(documentPath.path);
+        addTearDown(() => PathProviderPlatform.instance = previousPathProvider);
+        addTearDown(() {
+          if (documentPath.existsSync()) {
+            documentPath.deleteSync(recursive: true);
+          }
+        });
+
+        String? exportedPath;
+        Future<String?> chooseConfigurationPath({
+          required String fileName,
+        }) async {
+          exportedPath = '${documentPath.path}/$fileName';
+          return exportedPath;
+        }
+
+        final plan = NetworkIntent.parseSimple(
+          'P1',
+          '2 routers and 4 switches',
+        );
+        final saved = SessionState(
+          project: 'P1',
+          intentJson: jsonEncode(plan.toJson(includeSecrets: false)),
+          lastBrief: '2 routers and 4 switches; use static routing',
+        );
+        final store = _FakeStore(
+          transcripts: const {'P1': []},
+          stateJson: saved.encode(),
+        );
+        await tester.pumpWidget(
+          _chat(
+            store,
+            initialProject: 'P1',
+            configurationExportPathChooserOverride: chooseConfigurationPath,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.enterText(
+          _composer(),
+          'change to OSPF, build the .pkt, and export the configurations',
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        for (
+          var i = 0;
+          i < 120 && find.text('Choose a layout').evaluate().isEmpty;
+          i++
+        ) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        expect(find.text('Choose a layout'), findsOneWidget);
+
+        // Backing out of the layout choice cancels only the build output.
+        // The ordered configuration export must still run against the saved
+        // OSPF candidate.
+        await tester.pageBack();
+        for (
+          var i = 0;
+          i < 120 &&
+              find
+                  .textContaining('Configurations: saved to')
+                  .evaluate()
+                  .isEmpty;
+          i++
+        ) {
+          await tester.pump(const Duration(milliseconds: 100));
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 1)),
+          );
+        }
+
+        expect(
+          find.textContaining('Packet Tracer file: not completed'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Configurations: saved to'), findsOneWidget);
+        expect(exportedPath, isNotNull);
+        final configurationFile = File(exportedPath!);
+        expect(configurationFile.existsSync(), isTrue);
+        expect(configurationFile.readAsStringSync(), contains('hostname R1'));
+
+        final report = store.logged.lastWhere(
+          (message) => message.role == 'model',
+        );
+        final buildStatus = report.text.indexOf(
+          'Packet Tracer file: not completed',
+        );
+        final exportStatus = report.text.indexOf('Configurations: saved to');
+        expect(buildStatus, greaterThanOrEqualTo(0));
+        expect(exportStatus, greaterThan(buildStatus));
+
+        final committed = SessionState.decode(store.savedState!);
+        final committedPlan = NetworkIntent.fromJson(
+          jsonDecode(committed.intentJson),
+        );
+        expect(committedPlan.routing, 'ospf');
+        expect(committed.artifactPath, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('an explicit remembered routing choice is venue scoped', (
+      tester,
+    ) async {
+      _wide(tester);
+      final plan = basePlan(project: 'P2');
+      final saved =
+          SessionState(
+            project: 'P2',
+            intentJson: jsonEncode(plan.toJson(includeSecrets: false)),
+            lastBrief: '2 routers, 2 switches, 10 PCs',
+          )..setPendingQuestions([
+            PendingQuestionContext(
+              questionId: 'routing',
+              project: 'P2',
+              baseRevision: plan.revision,
+              property: 'routing',
+            ),
+          ]);
+      final store = _FakeStore(
+        transcripts: const {'P2': []},
+        stateJson: saved.encode(),
+      );
+      await tester.pumpWidget(_chat(store, initialProject: 'P2'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), 'OSPF');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      final afterLocalAnswer = SessionState.decode(store.savedState!);
+      expect(
+        NetworkIntent.fromJson(jsonDecode(afterLocalAnswer.intentJson)).routing,
+        'ospf',
+      );
+      expect(store.rememberedClarificationWrites, 0);
+
+      await tester.enterText(
+        _composer(),
+        'remember OSPF for future office labs',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      final after = SessionState.decode(store.savedState!);
+      expect(after.intentJson, afterLocalAnswer.intentJson);
+      expect(store.rememberedClarifications, [
+        (questionId: 'routing', answer: 'ospf', venue: 'office', scale: 0),
+      ]);
+      expect(
+        find.textContaining('Saved OSPF for future office labs'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('an office memory fills a new lab with visible provenance', (
+      tester,
+    ) async {
+      _wide(tester);
+      final store =
+          _FakeStore(
+              transcripts: const {'P2': []},
+              stateJson: SessionState(project: 'P2').encode(),
+            )
+            ..rememberedProfile = const EnvironmentProfile(venue: 'office')
+            ..rememberedClarifications.add((
+              questionId: 'routing',
+              answer: 'ospf',
+              venue: 'office',
+              scale: 0,
+            ));
+      await tester.pumpWidget(_chat(store, initialProject: 'P2'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        _composer(),
+        '2 routers, 2 switches, 4 PCs for the office',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      final saved = SessionState.decode(store.savedState!);
+      final plan = NetworkIntent.fromJson(jsonDecode(saved.intentJson));
+      final brief = DesignBrief.fromJson(jsonDecode(saved.briefJson));
+      expect(plan.routing, 'ospf');
+      expect(brief.fact(DesignBrief.routing)?.origin, BriefSource.remembered);
+      expect(
+        brief.fact(DesignBrief.routing)?.source,
+        'remembered from an earlier answer',
+      );
+      expect(
+        find.textContaining('remembered from an earlier answer'),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('an answer is a real turn, and it fills the brief', (
       tester,
     ) async {
@@ -822,8 +1983,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // The ask offered answers as taps; an answer sent as a message (typed
-      // or tapped - same path) is confirmed, remembered, and the scale
-      // answer grows the lab to serve it.
+      // or tapped - same path) is confirmed and recorded in this chat, and the scale
+      // answer sets the requested device total.
       await tester.enterText(_composer(), '25');
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pumpAndSettle();
@@ -832,8 +1993,13 @@ void main() {
         store.logged.where((m) => m.role == 'user'),
         contains(predicate((ChatMessage m) => m.text.trim() == '25')),
       );
-      expect(find.textContaining('Scale: 25 users'), findsWidgets);
+      expect(find.textContaining('Scale: 25 devices'), findsWidgets);
       expect(find.byKey(const ValueKey('brief-card')), findsWidgets);
+      final savedAfterScale = SessionState.decode(store.savedState!);
+      final scaledPlan = NetworkIntent.fromJson(
+        jsonDecode(savedAfterScale.intentJson),
+      );
+      expect(scaledPlan.nodes.where((node) => node.type == 'pc').length, 25);
       // Routing is still open: the conversation continues with the next
       // question rather than a plan.
       expect(find.textContaining('How should the routers route'), findsWidgets);
@@ -846,6 +2012,392 @@ void main() {
       expect(find.textContaining('Routing: OSPF'), findsWidgets);
       expect(find.textContaining('everything I need'), findsWidgets);
       expect(find.text('Build the .pkt'), findsOneWidget);
+      final savedAfterRouting = SessionState.decode(store.savedState!);
+      final finalPlan = NetworkIntent.fromJson(
+        jsonDecode(savedAfterRouting.intentJson),
+      );
+      expect(finalPlan.nodes.where((node) => node.type == 'pc').length, 25);
+      expect(finalPlan.routing, 'ospf');
+      expect(savedAfterRouting.pendingQuestionIds, isEmpty);
+    });
+
+    testWidgets('a failed answer save commits neither brief nor plan', (
+      tester,
+    ) async {
+      _wide(tester);
+      final store = _seeded();
+      await tester.pumpWidget(_chat(store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('New chat').first);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), '2 routers and 4 switches');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      final before = SessionState.decode(store.savedState!);
+      expect(before.pendingQuestionIds, contains('routing'));
+      final routingContext = before.pendingQuestionContexts.singleWhere(
+        (context) => context.questionId == 'routing',
+      );
+      expect(routingContext.baseRevision, isNotEmpty);
+      expect(
+        routingContext.baseRevision,
+        NetworkIntent.fromJson(jsonDecode(before.intentJson)).revision,
+      );
+
+      store.failRoutingOspfTransitionSave = true;
+      await tester.enterText(_composer(), 'OSPF');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('could not save it'), findsOneWidget);
+      expect(store.failRoutingOspfTransitionSave, isFalse);
+      final after = SessionState.decode(store.savedState!);
+      expect(after.intentJson, before.intentJson);
+      expect(after.briefJson, before.briefJson);
+      expect(after.pendingQuestionIds, before.pendingQuestionIds);
+      expect(store.rememberedClarificationWrites, 0);
+    });
+
+    testWidgets('a failed plan snapshot save keeps the prior plan', (
+      tester,
+    ) async {
+      _wide(tester);
+      final priorPlan = basePlan(project: 'P1');
+      final priorState = SessionState(
+        project: 'P1',
+        intentJson: jsonEncode(priorPlan.toJson(includeSecrets: false)),
+        lastBrief: '2 routers, 2 switches, 10 PCs; use static routing',
+      );
+      final store = _FakeStore(
+        transcripts: const {'P1': []},
+        stateJson: priorState.encode(),
+      );
+      await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+      await tester.pumpAndSettle();
+      expect(store.sessionStateWrites, 0);
+
+      store.failNextSessionStateSave = true;
+      await tester.enterText(_composer(), 'can you add 2 PCs?');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('I could not save this change'),
+        findsOneWidget,
+      );
+      expect(store.sessionStateWrites, 0);
+      final persisted = SessionState.decode(
+        store.savedState ?? priorState.encode(),
+      );
+      expect(persisted.intentJson, priorState.intentJson);
+      expect(persisted.lastBrief, priorState.lastBrief);
+      expect(persisted.briefJson, priorState.briefJson);
+      expect(persisted.requestOutcomeJson, priorState.requestOutcomeJson);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'an unsaved user turn does not reach planning or the provider',
+      (tester) async {
+        _wide(tester);
+        final priorPlan = basePlan(project: 'P1');
+        final priorState = SessionState(
+          project: 'P1',
+          intentJson: jsonEncode(priorPlan.toJson(includeSecrets: false)),
+          lastBrief: '2 routers, 2 switches, 10 PCs; use static routing',
+        );
+        final store = _FakeStore(
+          transcripts: const {'P1': []},
+          stateJson: priorState.encode(),
+        )..failNextUserLogSave = true;
+        final provider = _DeterministicProviderChatService();
+        await tester.pumpWidget(
+          _chat(
+            store,
+            initialProject: 'P1',
+            settings: _FakeSettings(geminiKey: 'test-key'),
+            providerChatServiceOverride: provider,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.enterText(_composer(), 'can you add 2 PCs?');
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        await tester.pumpAndSettle();
+
+        expect(provider.calls, 0);
+        expect(store.sessionStateWrites, 0);
+        expect(
+          find.textContaining('I could not save your message'),
+          findsOneWidget,
+        );
+        expect(
+          SessionState.decode(
+            store.savedState ?? priorState.encode(),
+          ).intentJson,
+          priorState.intentJson,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('a user-load answer keeps the saved device inventory', (
+      tester,
+    ) async {
+      _wide(tester);
+      final store = _seeded();
+      await tester.pumpWidget(_chat(store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('New chat').first);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), '2 routers and 4 switches');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      final before = SessionState.decode(store.savedState!);
+      final beforePlan = NetworkIntent.fromJson(jsonDecode(before.intentJson));
+      final beforePcs = beforePlan.nodes
+          .where((node) => node.type == 'pc')
+          .length;
+      expect(before.pendingQuestionIds, contains('scale'));
+
+      await tester.enterText(_composer(), '40 users');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      final after = SessionState.decode(store.savedState!);
+      final afterPlan = NetworkIntent.fromJson(jsonDecode(after.intentJson));
+      final brief = DesignBrief.fromJson(jsonDecode(after.briefJson));
+      expect(
+        afterPlan.nodes.where((node) => node.type == 'pc').length,
+        beforePcs,
+      );
+      expect(
+        brief.fact(DesignBrief.scale)?.quantityKind,
+        QuantityKind.userLoad,
+      );
+      expect(brief.fact(DesignBrief.scale)?.value, '40');
+      expect(after.pendingQuestionIds, contains('scale'));
+      expect(store.rememberedClarificationWrites, 0);
+      expect(
+        find.textContaining('physical device inventory is unchanged'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('I have not verified capacity for 40 users'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Should I keep this inventory fixed or resize it?'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('one reply applies all matching pending answers together', (
+      tester,
+    ) async {
+      _wide(tester);
+      final plan = basePlan(project: 'P1');
+      final saved =
+          SessionState(
+            project: 'P1',
+            intentJson: jsonEncode(plan.toJson(includeSecrets: false)),
+            lastBrief: '2 routers, 2 switches, 10 PCs',
+          )..setPendingQuestions([
+            for (final id in ['scale', 'routing', 'segmentation'])
+              PendingQuestionContext(
+                questionId: id,
+                project: 'P1',
+                baseRevision: plan.revision,
+                property: id,
+              ),
+          ]);
+      final store = _FakeStore(
+        transcripts: const {'P1': []},
+        stateJson: saved.encode(),
+      );
+      await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), '40 devices, OSPF, one flat LAN');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      final reopened = SessionState.decode(store.savedState!);
+      final committed = NetworkIntent.fromJson(jsonDecode(reopened.intentJson));
+      final brief = DesignBrief.fromJson(jsonDecode(reopened.briefJson));
+      expect(committed.nodes.where((node) => node.type == 'pc').length, 40);
+      expect(committed.routing, 'ospf');
+      expect(reopened.pendingQuestionIds, isEmpty);
+      expect(brief.value(DesignBrief.scale), '40');
+      expect(brief.value(DesignBrief.routing), 'ospf');
+      expect(brief.value(DesignBrief.segmentation), 'none');
+      expect(store.rememberedClarificationWrites, 0);
+      expect(find.textContaining('one flat network'), findsWidgets);
+    });
+
+    testWidgets('an unsupported answer holds the whole clarification turn', (
+      tester,
+    ) async {
+      _wide(tester);
+      final plan = basePlan(project: 'P1');
+      final saved =
+          SessionState(
+            project: 'P1',
+            intentJson: jsonEncode(plan.toJson(includeSecrets: false)),
+            lastBrief: '2 routers, 2 switches, 10 PCs',
+          )..setPendingQuestions([
+            for (final id in ['scale', 'routing', 'segmentation'])
+              PendingQuestionContext(
+                questionId: id,
+                project: 'P1',
+                baseRevision: plan.revision,
+                property: id,
+              ),
+          ]);
+      final store = _FakeStore(
+        transcripts: const {'P1': []},
+        stateJson: saved.encode(),
+      );
+      await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), '40 devices, OSPF, VLANs');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('No answers from that message were committed'),
+        findsOneWidget,
+      );
+      final after = SessionState.decode(store.savedState!);
+      expect(after.intentJson, saved.intentJson);
+      expect(after.briefJson, saved.briefJson);
+      expect(after.pendingQuestionIds, saved.pendingQuestionIds);
+      expect(store.rememberedClarificationWrites, 0);
+      expect(
+        store.logged.any(
+          (message) =>
+              message.role == 'model' &&
+              message.text.contains(
+                'No answers from that message were committed',
+              ),
+        ),
+        isTrue,
+      );
+    });
+
+    testWidgets('reopening resumes unanswered pending clarification', (
+      tester,
+    ) async {
+      _wide(tester);
+      final plan = basePlan(project: 'P1');
+      final saved =
+          SessionState(
+            project: 'P1',
+            intentJson: jsonEncode(plan.toJson(includeSecrets: false)),
+            lastBrief: '2 routers, 2 switches, 10 PCs',
+          )..setPendingQuestions([
+            for (final id in ['scale', 'routing'])
+              PendingQuestionContext(
+                questionId: id,
+                project: 'P1',
+                baseRevision: plan.revision,
+                property: id,
+              ),
+          ]);
+      final store = _FakeStore(
+        transcripts: const {'P1': []},
+        stateJson: saved.encode(),
+      );
+      await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), 'OSPF');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      final afterRouting = SessionState.decode(store.savedState!);
+      expect(
+        afterRouting.pendingQuestionIds,
+        containsAll(['scale', 'segmentation']),
+      );
+      expect(
+        NetworkIntent.fromJson(jsonDecode(afterRouting.intentJson)).routing,
+        'ospf',
+      );
+      expect(
+        afterRouting.pendingQuestionContexts.every(
+          (context) =>
+              context.baseRevision ==
+              NetworkIntent.fromJson(
+                jsonDecode(afterRouting.intentJson),
+              ).revision,
+        ),
+        isTrue,
+      );
+
+      final reopenedStore = _FakeStore(
+        transcripts: const {'P1': []},
+        stateJson: afterRouting.encode(),
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(_chat(reopenedStore, initialProject: 'P1'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), '40 devices, one flat LAN');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      final finalState = SessionState.decode(reopenedStore.savedState!);
+      final finalPlan = NetworkIntent.fromJson(
+        jsonDecode(finalState.intentJson),
+      );
+      expect(finalPlan.nodes.where((node) => node.type == 'pc').length, 40);
+      expect(finalPlan.routing, 'ospf');
+      expect(finalState.pendingQuestionIds, isEmpty);
+    });
+
+    testWidgets('a pending answer cannot cross project or plan revision', (
+      tester,
+    ) async {
+      _wide(tester);
+      final originalPlan = basePlan(project: 'P1');
+      final activePlan = originalPlan.copyWith(routing: 'eigrp');
+      final saved =
+          SessionState(
+            project: 'P2',
+            intentJson: jsonEncode(activePlan.toJson(includeSecrets: false)),
+            lastBrief: '2 routers, 2 switches, 10 PCs, 2 servers; use EIGRP',
+          )..setPendingQuestions([
+            PendingQuestionContext(
+              questionId: 'routing',
+              project: 'P1',
+              baseRevision: originalPlan.revision,
+              property: 'routing',
+            ),
+          ]);
+      final store = _FakeStore(
+        transcripts: const {'P2': []},
+        stateJson: saved.encode(),
+      );
+      await tester.pumpWidget(_chat(store, initialProject: 'P2'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), 'OSPF');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('I did not apply that answer'),
+        findsOneWidget,
+      );
+      expect(store.rememberedClarificationWrites, 0);
+      final reopened = SessionState.decode(store.savedState!);
+      expect(reopened.pendingQuestionIds, isEmpty);
+      expect(
+        NetworkIntent.fromJson(jsonDecode(reopened.intentJson)).routing,
+        'eigrp',
+      );
     });
 
     testWidgets('a what-if about the lab does not change the lab', (
@@ -899,7 +2451,37 @@ void main() {
       await tester.enterText(_composer(), '25');
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pumpAndSettle();
-      expect(find.textContaining('Scale: 25 users'), findsWidgets);
+      expect(find.textContaining('Scale: 25 devices'), findsWidgets);
+    });
+
+    testWidgets('A25 could we do it with 40 PCs stays exploratory', (
+      tester,
+    ) async {
+      _wide(tester);
+      final plan = basePlan(project: 'P1');
+      final state = SessionState(
+        project: 'P1',
+        intentJson: jsonEncode(plan.toJson(includeSecrets: false)),
+        lastBrief: '2 routers, 2 switches, 10 PCs; use static routing',
+        requestOutcomeJson: _baseOutcomeWithExplicitStaticRouting(plan),
+      );
+      final store = _FakeStore(
+        transcripts: const {'P1': []},
+        stateJson: state.encode(),
+      );
+      await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), 'could we do it with 40 PCs?');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Nothing in your lab changed'), findsWidgets);
+      expect(find.textContaining('Scale: 40'), findsNothing);
+      final after = SessionState.decode(store.savedState!);
+      expect(after.intentJson, state.intentJson);
+      expect(after.requestOutcomeJson, state.requestOutcomeJson);
+      expect(after.knownArtifacts, isEmpty);
     });
 
     testWidgets('a what-if does not answer the open question either', (
@@ -938,12 +2520,238 @@ void main() {
       await tester.enterText(_composer(), '25');
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pumpAndSettle();
-      expect(find.textContaining('Scale: 25 users'), findsWidgets);
+      expect(find.textContaining('Scale: 25 devices'), findsWidgets);
       expect(
         find.textContaining('How should the routers route'),
         findsWidgets,
         reason: 'routing is still open - the what-if did not answer it',
       );
+    });
+
+    testWidgets('an explanation question does not consume a pending answer', (
+      tester,
+    ) async {
+      _wide(tester);
+      final store = _seeded();
+      await tester.pumpWidget(_chat(store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('New chat').first);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), '2 routers and 4 switches');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      final before = SessionState.decode(store.savedState!);
+
+      await tester.enterText(
+        _composer(),
+        'why is OSPF better than static routing?',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      final after = SessionState.decode(store.savedState!);
+      expect(after.intentJson, before.intentJson);
+      expect(after.briefJson, before.briefJson);
+      expect(after.pendingQuestionIds, before.pendingQuestionIds);
+      expect(store.rememberedClarificationWrites, 0);
+    });
+
+    testWidgets(
+      'A24 OSPF advice leaves the BASE plan and requirements intact',
+      (tester) async {
+        _wide(tester);
+        final plan = basePlan(project: 'P1');
+        final state = SessionState(
+          project: 'P1',
+          intentJson: jsonEncode(plan.toJson(includeSecrets: false)),
+          lastBrief: '2 routers, 2 switches, 10 PCs; use static routing',
+          requestOutcomeJson: _baseOutcomeWithExplicitStaticRouting(plan),
+        );
+        final store = _FakeStore(
+          transcripts: const {'P1': []},
+          stateJson: state.encode(),
+        );
+        await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(
+          _composer(),
+          'why is OSPF better than static routing?',
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        await tester.pumpAndSettle();
+
+        final answer = store.logged.lastWhere(
+          (message) => message.role == 'model',
+        );
+        expect(answer.text.toLowerCase(), contains('ospf'));
+        expect(answer.text.toLowerCase(), contains('static'));
+        final after = SessionState.decode(store.savedState!);
+        expect(after.intentJson, state.intentJson);
+        expect(after.requestOutcomeJson, state.requestOutcomeJson);
+        expect(after.knownArtifacts, isEmpty);
+      },
+    );
+
+    testWidgets(
+      'A27 rearranging the layout preserves IPs and cable endpoints',
+      (tester) async {
+        _wide(tester);
+        final plan = basePlan(project: 'P1');
+        final state = SessionState(
+          project: 'P1',
+          intentJson: jsonEncode(plan.toJson(includeSecrets: false)),
+          lastBrief: '2 routers, 2 switches, 10 PCs; use static routing',
+          requestOutcomeJson: _baseOutcomeWithExplicitStaticRouting(plan),
+        );
+        final store = _FakeStore(
+          transcripts: const {'P1': []},
+          stateJson: state.encode(),
+        );
+        await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+        await tester.pumpAndSettle();
+
+        const request = 'only rearrange the layout; keep all IPs and cables';
+        expect(LayoutRequest.read(request), isNotNull);
+        expect(RequestRouteSelector.isHelpOnly(request), isFalse);
+        await tester.enterText(_composer(), request);
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        await tester.pumpAndSettle();
+
+        final after = SessionState.decode(store.savedState!);
+        final changed = NetworkIntent.fromJson(jsonDecode(after.intentJson));
+        expect(
+          changed.nodes.map((node) => node.toJson(includeSecrets: false)),
+          plan.nodes.map((node) => node.toJson(includeSecrets: false)),
+        );
+        expect(
+          changed.links.map((link) => link.toJson()),
+          plan.links.map((link) => link.toJson()),
+        );
+        expect(
+          changed.addressing.map((address) => address.toJson()),
+          plan.addressing.map((address) => address.toJson()),
+        );
+        expect(changed.routing, plan.routing);
+        expect(changed.vlans, plan.vlans);
+        expect(
+          changed.security.toJson(includeSecrets: false),
+          plan.security.toJson(includeSecrets: false),
+        );
+        expect(
+          changed.notes
+              .map(LayoutRequest.styleFromNote)
+              .where((style) => style.isNotEmpty),
+          isNotEmpty,
+        );
+        expect(find.textContaining('There is no .pkt yet'), findsOneWidget);
+        expect(
+          find.textContaining('Build a .pkt from this plan'),
+          findsNothing,
+        );
+        expect(after.knownArtifacts, isEmpty);
+      },
+    );
+
+    testWidgets('A27 a failed layout save keeps the previous plan', (
+      tester,
+    ) async {
+      _wide(tester);
+      final plan = basePlan(project: 'P1');
+      final state = SessionState(
+        project: 'P1',
+        intentJson: jsonEncode(plan.toJson(includeSecrets: false)),
+        lastBrief: '2 routers, 2 switches, 10 PCs; use static routing',
+        requestOutcomeJson: _baseOutcomeWithExplicitStaticRouting(plan),
+      );
+      final store = _FakeStore(
+        transcripts: const {'P1': []},
+        stateJson: state.encode(),
+      )..failNextSessionStateSave = true;
+      await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        _composer(),
+        'only rearrange the layout; keep all IPs and cables',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('I could not save that drawing choice'),
+        findsOneWidget,
+      );
+      final after = SessionState.decode(store.savedState!);
+      expect(after.intentJson, state.intentJson);
+      expect(after.requestOutcomeJson, state.requestOutcomeJson);
+      expect(after.knownArtifacts, isEmpty);
+      final restored = NetworkIntent.fromJson(jsonDecode(after.intentJson));
+      expect(
+        restored.notes
+            .map(LayoutRequest.styleFromNote)
+            .where((style) => style.isNotEmpty),
+        isEmpty,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('offline reply persistence failures', () {
+    testWidgets('a failed final state save is reported and keeps the plan', (
+      tester,
+    ) async {
+      _wide(tester);
+      final store = _FakeStore(transcripts: {})..failSessionStateOnAttempt = 2;
+      await tester.pumpWidget(_chat(store));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), '2 routers and 4 switches');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('final conversation state could not be saved'),
+        findsOneWidget,
+      );
+      expect(store.sessionStateWrites, 1);
+      expect(
+        store.logged.where((message) => message.role == 'model'),
+        hasLength(1),
+      );
+      final state = SessionState.decode(store.savedState ?? '{}');
+      final plan = NetworkIntent.fromJson(jsonDecode(state.intentJson));
+      final outcome = RequestOutcome.fromJson(
+        jsonDecode(state.requestOutcomeJson),
+      );
+      expect(outcome.candidatePlan?.revision, plan.revision);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a failed offline transcript save is reported', (tester) async {
+      _wide(tester);
+      final store = _FakeStore(transcripts: {})..failNextModelLogSave = true;
+      await tester.pumpWidget(_chat(store));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), '2 routers and 4 switches');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('could not be saved in the transcript'),
+        findsOneWidget,
+      );
+      expect(store.sessionStateWrites, 2);
+      expect(store.logged.where((message) => message.role == 'model'), isEmpty);
+      final state = SessionState.decode(store.savedState ?? '{}');
+      final plan = NetworkIntent.fromJson(jsonDecode(state.intentJson));
+      final outcome = RequestOutcome.fromJson(
+        jsonDecode(state.requestOutcomeJson),
+      );
+      expect(outcome.candidatePlan?.revision, plan.revision);
+      expect(tester.takeException(), isNull);
     });
   });
 
@@ -1114,6 +2922,585 @@ void main() {
       // The plan is still parsed and offered, so offline work keeps working.
       expect(find.textContaining('10 PC(s)'), findsNothing);
       expect(store.logged.where((m) => m.role == 'user'), hasLength(1));
+    });
+  });
+
+  group('provider and offline turns share the coordinated outcome', () {
+    testWidgets('provider success keeps the exact coordinated candidate', (
+      tester,
+    ) async {
+      _wide(tester);
+      final store = _FakeStore(transcripts: {});
+      final provider = _DeterministicProviderChatService();
+      await tester.pumpWidget(
+        _chat(
+          store,
+          settings: _FakeSettings(geminiKey: 'test-key'),
+          providerChatServiceOverride: provider,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), '2 routers and 4 switches');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(provider.calls, 1);
+      expect(find.text('The deterministic provider answered.'), findsOneWidget);
+      final state = SessionState.decode(store.savedState ?? '{}');
+      final plan = NetworkIntent.fromJson(
+        Map<String, dynamic>.from(jsonDecode(state.intentJson) as Map),
+      );
+      final outcome = RequestOutcome.fromJson(
+        jsonDecode(state.requestOutcomeJson),
+      );
+      expect(outcome.disposition, RequestDisposition.commit);
+      expect(outcome.candidatePlan?.revision, plan.revision);
+      expect(plan.nodes.where((node) => node.type == 'router'), hasLength(2));
+      expect(plan.nodes.where((node) => node.type == 'switch'), hasLength(4));
+    });
+
+    testWidgets('provider failure falls back without changing the candidate', (
+      tester,
+    ) async {
+      _wide(tester);
+      final store = _FakeStore(transcripts: {});
+      final provider = _DeterministicProviderChatService(fail: true);
+      await tester.pumpWidget(
+        _chat(
+          store,
+          settings: _FakeSettings(geminiKey: 'test-key'),
+          providerChatServiceOverride: provider,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), '2 routers and 4 switches');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(provider.calls, 1);
+      expect(
+        store.logged.where((message) => message.role == 'model'),
+        isNotEmpty,
+      );
+      final state = SessionState.decode(store.savedState ?? '{}');
+      final plan = NetworkIntent.fromJson(
+        Map<String, dynamic>.from(jsonDecode(state.intentJson) as Map),
+      );
+      final outcome = RequestOutcome.fromJson(
+        jsonDecode(state.requestOutcomeJson),
+      );
+      expect(outcome.disposition, RequestDisposition.commit);
+      expect(outcome.candidatePlan?.revision, plan.revision);
+      expect(plan.nodes.where((node) => node.type == 'router'), hasLength(2));
+      expect(plan.nodes.where((node) => node.type == 'switch'), hasLength(4));
+    });
+
+    testWidgets(
+      'T08 one edit has identical offline, provider, and fallback plans',
+      (tester) async {
+        _wide(tester);
+        final base = basePlan(project: 'P1');
+        final initial = SessionState(
+          project: 'P1',
+          intentJson: jsonEncode(base.toJson(includeSecrets: false)),
+          lastBrief: '2 routers, 2 switches, 10 PCs; use static routing',
+          requestOutcomeJson: _baseOutcomeWithExplicitStaticRouting(base),
+        );
+
+        Future<({NetworkIntent plan, RequestOutcome outcome})> runTurn({
+          bool providerEnabled = false,
+          bool providerFails = false,
+        }) async {
+          final store = _FakeStore(
+            transcripts: const {'P1': []},
+            stateJson: initial.encode(),
+          );
+          final provider = providerEnabled
+              ? _DeterministicProviderChatService(fail: providerFails)
+              : null;
+          await tester.pumpWidget(
+            _chat(
+              store,
+              initialProject: 'P1',
+              settings: _FakeSettings(
+                geminiKey: providerEnabled ? 'test-key' : '',
+              ),
+              providerChatServiceOverride: provider,
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.enterText(_composer(), 'can you add 2 PCs?');
+          await tester.testTextInput.receiveAction(TextInputAction.send);
+          await tester.pumpAndSettle();
+
+          if (providerEnabled) expect(provider!.calls, 1);
+          final saved = SessionState.decode(store.savedState ?? '{}');
+          final plan = NetworkIntent.fromJson(jsonDecode(saved.intentJson));
+          final outcome = RequestOutcome.fromJson(
+            jsonDecode(saved.requestOutcomeJson),
+          );
+          expect(outcome.disposition, RequestDisposition.commit);
+          expect(outcome.candidatePlan?.revision, plan.revision);
+          expect(
+            outcome.changeSet?.operations,
+            hasLength(1),
+            reason: 'one user edit is committed once in every mode',
+          );
+          expect(
+            outcome.interpretation.requirements.any(
+              (requirement) =>
+                  requirement.property == 'protocol' &&
+                  requirement.value == 'static',
+            ),
+            isTrue,
+            reason: 'the original explicit requirement survives the edit',
+          );
+          await tester.pumpWidget(const SizedBox.shrink());
+          return (plan: plan, outcome: outcome);
+        }
+
+        final offline = await runTurn();
+        final providerSuccess = await runTurn(providerEnabled: true);
+        final providerFallback = await runTurn(
+          providerEnabled: true,
+          providerFails: true,
+        );
+
+        expect(
+          providerSuccess.plan.toPlannerJson(),
+          offline.plan.toPlannerJson(),
+        );
+        expect(
+          providerFallback.plan.toPlannerJson(),
+          offline.plan.toPlannerJson(),
+        );
+        expect(
+          offline.plan.nodes.where((node) => node.type == 'pc'),
+          hasLength(12),
+        );
+        expect(offline.plan.routing, 'static');
+      },
+    );
+
+    testWidgets(
+      'A43 provider timeout on an edit applies the supported change once',
+      (tester) async {
+        _wide(tester);
+        final plan = basePlan(project: 'P1');
+        final originalState = SessionState(
+          project: 'P1',
+          intentJson: jsonEncode(plan.toJson(includeSecrets: false)),
+          lastBrief: '2 routers, 2 switches, 10 PCs; use static routing',
+          requestOutcomeJson: _baseOutcomeWithExplicitStaticRouting(plan),
+        );
+        final store = _FakeStore(
+          transcripts: const {'P1': []},
+          stateJson: originalState.encode(),
+        );
+        final provider = _DeterministicProviderChatService(
+          failure: TimeoutException('synthetic provider timeout'),
+        );
+        await tester.pumpWidget(
+          _chat(
+            store,
+            initialProject: 'P1',
+            settings: _FakeSettings(geminiKey: 'test-key'),
+            providerChatServiceOverride: provider,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.enterText(_composer(), 'can you add 2 PCs?');
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        await tester.pumpAndSettle();
+
+        expect(provider.calls, 1);
+        expect(find.text('The deterministic provider answered.'), findsNothing);
+        final persisted = SessionState.decode(store.savedState ?? '{}');
+        final committed = NetworkIntent.fromJson(
+          jsonDecode(persisted.intentJson),
+        );
+        final outcome = RequestOutcome.fromJson(
+          jsonDecode(persisted.requestOutcomeJson),
+        );
+        expect(outcome.disposition, RequestDisposition.commit);
+        expect(outcome.candidatePlan?.revision, committed.revision);
+        expect(
+          committed.nodes.where((node) => node.type == 'pc'),
+          hasLength(12),
+        );
+        expect(
+          committed.nodes.where((node) => node.type == 'router'),
+          hasLength(2),
+        );
+        expect(
+          committed.nodes.where((node) => node.type == 'switch'),
+          hasLength(2),
+        );
+        expect(committed.routing, 'static');
+        expect(
+          outcome.changeSet?.operations,
+          hasLength(1),
+          reason: 'the provider failure must not cause a second plan edit',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('memory unavailable labels a plan outcome as temporary', (
+      tester,
+    ) async {
+      _wide(tester);
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<SettingsService>.value(
+              value: _FakeSettings(),
+            ),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(body: ChatScreen(initialProject: 'P1')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      const request = '2 routers and 4 switches';
+      await tester.enterText(_composer(), request);
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('2 routers and 4 switches'), findsWidgets);
+      expect(
+        find.textContaining('temporary because local storage is unavailable'),
+        findsOneWidget,
+        reason: tester
+            .widgetList<Text>(find.byType(Text))
+            .map((widget) => widget.data)
+            .whereType<String>()
+            .join(' | '),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'a failed final session save is reported after provider success',
+      (tester) async {
+        _wide(tester);
+        final store = _FakeStore(transcripts: {});
+        final providerStarted = Completer<void>();
+        final releaseProvider = Completer<void>();
+        final provider = _DeterministicProviderChatService(
+          started: [providerStarted],
+          release: [releaseProvider],
+        );
+        await tester.pumpWidget(
+          _chat(
+            store,
+            settings: _FakeSettings(geminiKey: 'test-key'),
+            providerChatServiceOverride: provider,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.enterText(_composer(), '2 routers and 4 switches');
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        for (var i = 0; i < 120 && !providerStarted.isCompleted; i++) {
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        expect(providerStarted.isCompleted, isTrue);
+        expect(store.sessionStateWrites, 1);
+
+        store.failNextSessionStateSave = true;
+        releaseProvider.complete();
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('The deterministic provider answered.'),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('final conversation state could not be saved'),
+          findsOneWidget,
+        );
+        expect(
+          store.logged.where((message) => message.role == 'model'),
+          hasLength(1),
+        );
+        expect(store.sessionStateWrites, 1);
+        final state = SessionState.decode(store.savedState ?? '{}');
+        final plan = NetworkIntent.fromJson(jsonDecode(state.intentJson));
+        final outcome = RequestOutcome.fromJson(
+          jsonDecode(state.requestOutcomeJson),
+        );
+        expect(outcome.candidatePlan?.revision, plan.revision);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'a failed model transcript save is reported and state is saved',
+      (tester) async {
+        _wide(tester);
+        final store = _FakeStore(transcripts: {});
+        final providerStarted = Completer<void>();
+        final releaseProvider = Completer<void>();
+        final provider = _DeterministicProviderChatService(
+          started: [providerStarted],
+          release: [releaseProvider],
+        );
+        await tester.pumpWidget(
+          _chat(
+            store,
+            settings: _FakeSettings(geminiKey: 'test-key'),
+            providerChatServiceOverride: provider,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.enterText(_composer(), '2 routers and 4 switches');
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        for (var i = 0; i < 120 && !providerStarted.isCompleted; i++) {
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        expect(providerStarted.isCompleted, isTrue);
+        store.failNextModelLogSave = true;
+        releaseProvider.complete();
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('The deterministic provider answered.'),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('could not be saved in the transcript'),
+          findsOneWidget,
+        );
+        expect(
+          store.logged.where((message) => message.role == 'model'),
+          isEmpty,
+        );
+        expect(store.sessionStateWrites, 2);
+        final state = SessionState.decode(store.savedState ?? '{}');
+        final plan = NetworkIntent.fromJson(jsonDecode(state.intentJson));
+        final outcome = RequestOutcome.fromJson(
+          jsonDecode(state.requestOutcomeJson),
+        );
+        expect(outcome.candidatePlan?.revision, plan.revision);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('stopping before the plan snapshot commits rolls it back', (
+      tester,
+    ) async {
+      _wide(tester);
+      final store = _FakeStore(transcripts: {});
+      final userLogStarted = Completer<void>();
+      final releaseUserLog = Completer<int>();
+      store
+        ..userLogStarted = userLogStarted
+        ..delayedUserLog = releaseUserLog;
+      final provider = _DeterministicProviderChatService();
+      await tester.pumpWidget(
+        _chat(
+          store,
+          settings: _FakeSettings(geminiKey: 'test-key'),
+          providerChatServiceOverride: provider,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_composer(), '2 routers and 4 switches');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      for (var i = 0; i < 120 && !userLogStarted.isCompleted; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(userLogStarted.isCompleted, isTrue);
+      expect(provider.calls, 0);
+      expect(store.sessionStateWrites, 0);
+
+      await tester.tap(find.byIcon(Icons.stop));
+      await tester.pump();
+      releaseUserLog.complete(1);
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+
+      expect(provider.calls, 0);
+      expect(store.savedState, isNull);
+      expect(store.sessionStateWrites, 0);
+      expect(store.logged.where((message) => message.role == 'model'), isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'a stopped turn holds the composer until its plan save settles',
+      (tester) async {
+        _wide(tester);
+        final store = _FakeStore(transcripts: {});
+        final sessionSaveStarted = Completer<void>();
+        final releaseSessionSave = Completer<void>();
+        store
+          ..sessionStateSaveStarted = sessionSaveStarted
+          ..delayedSessionStateSave = releaseSessionSave;
+        final provider = _DeterministicProviderChatService();
+        await tester.pumpWidget(
+          _chat(
+            store,
+            settings: _FakeSettings(geminiKey: 'test-key'),
+            providerChatServiceOverride: provider,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.enterText(_composer(), '2 routers and 4 switches');
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        for (var i = 0; i < 120 && !sessionSaveStarted.isCompleted; i++) {
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        expect(sessionSaveStarted.isCompleted, isTrue);
+        expect(provider.calls, 0);
+        expect(store.sessionStateWrites, 1);
+
+        await tester.tap(find.byIcon(Icons.stop));
+        await tester.pump();
+        expect(find.byTooltip('Saving requested change'), findsOneWidget);
+
+        // A second request can be typed, but cannot enter persistence while the
+        // first turn's snapshot is unresolved.
+        await tester.enterText(_composer(), '2 routers and 4 switches');
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        await tester.pump();
+        expect(store.sessionStateWrites, 1);
+        expect(provider.calls, 0);
+
+        releaseSessionSave.complete();
+        await tester.pumpAndSettle();
+        expect(provider.calls, 0);
+        expect(store.sessionStateWrites, 1);
+        final firstState = SessionState.decode(store.savedState ?? '{}');
+        final firstPlan = NetworkIntent.fromJson(
+          Map<String, dynamic>.from(jsonDecode(firstState.intentJson) as Map),
+        );
+        expect(
+          firstPlan.nodes.where((node) => node.type == 'router'),
+          hasLength(2),
+        );
+        expect(
+          firstPlan.nodes.where((node) => node.type == 'switch'),
+          hasLength(4),
+        );
+        expect(
+          store.logged.where((message) => message.role == 'model'),
+          isEmpty,
+        );
+
+        // The second request stayed in the composer and can be sent after the
+        // first snapshot has settled.
+        expect(
+          tester.widget<TextField>(_composer()).controller!.text,
+          '2 routers and 4 switches',
+        );
+        expect(find.byTooltip('Send'), findsOneWidget);
+        await tester.tap(find.byTooltip('Send'));
+        await tester.pumpAndSettle();
+        expect(provider.calls, 1);
+        expect(store.sessionStateWrites, 3);
+        expect(
+          find.text('The deterministic provider answered.'),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('a late stopped stream cannot finish or reset a newer turn', (
+      tester,
+    ) async {
+      _wide(tester);
+      final store = _FakeStore(transcripts: {});
+      final firstStarted = Completer<void>();
+      final secondStarted = Completer<void>();
+      final releaseFirst = Completer<void>();
+      final releaseSecond = Completer<void>();
+      final provider = _DeterministicProviderChatService(
+        started: [firstStarted, secondStarted],
+        release: [releaseFirst, releaseSecond],
+      );
+      await tester.pumpWidget(
+        _chat(
+          store,
+          settings: _FakeSettings(geminiKey: 'test-key'),
+          providerChatServiceOverride: provider,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      const firstRequest = '2 routers and 4 switches';
+      const secondRequest = '2 routers and 6 switches';
+      await tester.enterText(_composer(), firstRequest);
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      for (var i = 0; i < 120 && !firstStarted.isCompleted; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(firstStarted.isCompleted, isTrue);
+      expect(store.sessionStateWrites, 1);
+
+      await tester.tap(find.byIcon(Icons.stop));
+      await tester.pump();
+
+      // Start a different edit while the old transport is still parked. The
+      // old result must not apply its inventory to the new request.
+      await tester.enterText(_composer(), secondRequest);
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      for (var i = 0; i < 120 && !secondStarted.isCompleted; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(secondStarted.isCompleted, isTrue);
+      expect(store.sessionStateWrites, 2);
+
+      releaseFirst.complete();
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(
+        find.byIcon(Icons.stop),
+        findsOneWidget,
+        reason: 'the stale turn must not clear the newer turn\'s busy state',
+      );
+      expect(store.sessionStateWrites, 2);
+      expect(
+        store.logged.where((message) => message.role == 'model'),
+        isEmpty,
+        reason: 'the stopped provider result must not be finalized or saved',
+      );
+
+      releaseSecond.complete();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('The deterministic provider answered call 2.'),
+        findsOneWidget,
+      );
+      expect(
+        store.logged.where((message) => message.role == 'model'),
+        hasLength(1),
+      );
+      expect(store.sessionStateWrites, 3);
+      final state = SessionState.decode(store.savedState ?? '{}');
+      final plan = NetworkIntent.fromJson(
+        Map<String, dynamic>.from(jsonDecode(state.intentJson) as Map),
+      );
+      final outcome = RequestOutcome.fromJson(
+        jsonDecode(state.requestOutcomeJson),
+      );
+      expect(outcome.candidatePlan?.revision, plan.revision);
+      expect(plan.nodes.where((node) => node.type == 'router'), hasLength(2));
+      expect(plan.nodes.where((node) => node.type == 'switch'), hasLength(6));
+      expect(find.textContaining('Packet Tracer file:'), findsNothing);
     });
   });
 
@@ -1597,12 +3984,12 @@ void main() {
       await tester.tap(find.text('Fix it'));
       await tester.pumpAndSettle();
 
-      expect(find.text('OSPF'), findsOneWidget);
+      expect(find.text('OSPF'), findsAtLeastNWidgets(1));
       expect(find.textContaining('Fixed: ospf'), findsOneWidget);
     });
   });
 
-  group('a pasted running-config is reviewed, not planned', () {
+  group('A52 a configuration review does not change the project', () {
     const paste = '''
 Building configuration...
 
@@ -1622,27 +4009,45 @@ line vty 0 4
 end
 ''';
 
-    testWidgets('the paste gets a config review and no devices are planned', (
-      tester,
-    ) async {
-      _wide(tester);
-      final store = _seeded();
-      await tester.pumpWidget(_chat(store));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('New chat').first);
-      await tester.pumpAndSettle();
+    testWidgets(
+      'the pasted config is explained and the saved lab is retained',
+      (tester) async {
+        _wide(tester);
+        final base = basePlan(project: 'P1');
+        final initial = SessionState(
+          project: 'P1',
+          intentJson: jsonEncode(base.toJson(includeSecrets: false)),
+          lastBrief: '2 routers, 2 switches, 10 PCs; use static routing',
+          requestOutcomeJson: _baseOutcomeWithExplicitStaticRouting(base),
+        );
+        final store = _FakeStore(
+          transcripts: const {'P1': []},
+          stateJson: initial.encode(),
+        );
+        await tester.pumpWidget(_chat(store, initialProject: 'P1'));
+        await tester.pumpAndSettle();
 
-      await tester.enterText(_composer(), paste);
-      await tester.testTextInput.receiveAction(TextInputAction.send);
-      await tester.pumpAndSettle();
+        await tester.enterText(
+          _composer(),
+          'explain this, do not change my project\n\n$paste',
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        await tester.pumpAndSettle();
 
-      // The review is the answer: device named, the telnet finding present.
-      expect(find.textContaining('Config review - R1'), findsOneWidget);
-      expect(find.textContaining('cleartext'), findsOneWidget);
-      // And the planner never ran: no build card, no device count.
-      expect(find.textContaining('device(s)'), findsNothing);
-      expect(find.byKey(const ValueKey('brief-card')), findsNothing);
-    });
+        // The review is the answer: device named, the telnet finding present.
+        expect(find.textContaining('Config review - R1'), findsOneWidget);
+        expect(find.textContaining('cleartext'), findsOneWidget);
+        final persisted = SessionState.decode(
+          store.savedState ?? initial.encode(),
+        );
+        final retained = NetworkIntent.fromJson(
+          jsonDecode(persisted.intentJson),
+        );
+        expect(semanticSnapshot(retained), semanticSnapshot(base));
+        expect(persisted.requestOutcomeJson, initial.requestOutcomeJson);
+        expect(find.text('Build .pkt'), findsNothing);
+      },
+    );
   });
 }
 

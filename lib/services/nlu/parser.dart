@@ -1,6 +1,7 @@
 import 'package:net_builder/services/phrasing_memory_service.dart';
 
 import '../../models/network_intent.dart';
+import '../../models/normalized_message.dart';
 import 'lexicon.dart';
 import '../packet_tracer/brief_reader.dart';
 import 'package:flutter/foundation.dart' show compute;
@@ -84,6 +85,19 @@ String _bridgeMasks(String s) => s.replaceAllMapped(_maskPair, (m) {
 /// the bare 'جهاز' (pc) underneath it.
 const List<List<String>> _phraseBridge = [
   // devices
+  ['عالفرع التاني', 'at the second branch'],
+  ['عالفرع الثاني', 'at the second branch'],
+  ['على الفرع التاني', 'at the second branch'],
+  ['على الفرع الثاني', 'at the second branch'],
+  ['الفرع التاني', 'the second branch'],
+  ['الفرع الثاني', 'the second branch'],
+  ['ضيف', 'add'],
+  ['شيل', 'remove'],
+  ['احذف', 'remove'],
+  ['بس', 'only'],
+  ['خلي', 'keep'],
+  ['متل ما هو', 'as it is'],
+  ['بدون', 'without'],
   ['اجهزه التوجيه', 'routers'],
   ['جهاز التوجيه', 'router'],
   ['الموجه الرئيسي', 'core router'],
@@ -341,8 +355,13 @@ final Set<String> _perSiteKeywords = {
 };
 
 final Map<String, RegExp> _countPatternByWord = {
+  // One role adjective may sit between the count and the noun - enterprise
+  // briefs say "2 core routers", not just "2 routers".
   for (final w in _perSiteKeywords)
-    w: RegExp('(\\d{1,3})\\s*${RegExp.escape(w)}s?\\b'),
+    w: RegExp(
+      '(\\d{1,3})\\s*(?:(?:core|edge|distribution|backbone|wan|hq|branch|'
+      'main|central)\\s+)?${RegExp.escape(w)}s?\\b',
+    ),
 };
 
 final Map<String, RegExp> _barePatternByWord = {
@@ -369,8 +388,16 @@ Map<String, int>? perSiteCounts(String text) {
   /// "3 pcs" and a bare "a switch" both mean something per site.
   int countOf(List<String> words) {
     for (final w in words) {
-      final m = _countPatternByWord[w]!.firstMatch(lower);
-      if (m != null) return int.parse(m.group(1)!);
+      final pattern = _countPatternByWord[w]!;
+      for (final m in pattern.allMatches(lower)) {
+        // "VLAN 20 servers" names the VLAN - the 20 is an ID, not a count.
+        // Taking it inflated every later lab: "4 switches with VLAN 20
+        // servers" built twenty servers where the brief named none.
+        if (RegExp(r'vlan\s*$').hasMatch(lower.substring(0, m.start))) {
+          continue;
+        }
+        return int.parse(m.group(1)!);
+      }
     }
     for (final w in words) {
       if (_barePatternByWord[w]!.hasMatch(lower)) return 1;
@@ -437,6 +464,306 @@ String bridgeBrief(String raw) {
   return _bridgeNumberWords(s).replaceAll(_extraSpaces, ' ');
 }
 
+/// The same bridge pass as [bridgeBrief], retaining UTF-16 source offsets.
+/// Kept beside the legacy bridge so both readers use the same phrase table,
+/// masks, digit rules and number vocabulary.
+NormalizedMessage bridgeBriefWithMapping(String raw) {
+  final tracked = _TrackedText(raw);
+  tracked.replaceAll(_bidiControls, (_) => ' ');
+  tracked.replaceAll(_arabicDiacritics, (_) => '');
+  tracked.replaceAll(_hamzaForms, (_) => 'ا');
+  tracked.replaceAll(RegExp('ى'), (_) => 'ي');
+  tracked.replaceAll(RegExp('ة'), (_) => 'ه');
+  tracked.replaceAll(RegExp('،'), (_) => ',');
+  tracked.replaceAll(_arabicIndicDigits, (match) {
+    final code = match.group(0)!.codeUnitAt(0);
+    return '${code >= 0x06f0 ? code - 0x06f0 : code - 0x0660}';
+  });
+  tracked.replaceAll(_maskPair, (match) {
+    final prefix = _maskToPrefix(match.group(2)!);
+    if (prefix == null || prefix == 0) return match.group(0)!;
+    return '${match.group(1)!}/$prefix';
+  });
+  for (final entry in _phraseBridgeTable) {
+    final pattern = entry.pattern;
+    if (pattern != null) {
+      tracked.replaceAll(pattern, (_) => entry.to);
+    } else if (tracked.text.contains(entry.from)) {
+      tracked.replaceAll(RegExp(RegExp.escape(entry.from)), (_) => entry.to);
+    }
+  }
+  tracked.replaceAll(RegExp(r'[^ ]+'), (match) {
+    final token = match.group(0)!;
+    final bare = token.replaceAll(_nonWordChars, '').toLowerCase();
+    return numberWords[bare]?.toString() ?? token;
+  });
+  tracked.replaceAll(_extraSpaces, (_) => ' ');
+  return tracked.finish();
+}
+
+/// Applies whole-string bridge edits while keeping the source range of each
+/// UTF-16 code unit. A phrase replacement maps to its complete original
+/// phrase; removed text is retained as a zero-width deletion segment.
+class _TrackedText {
+  final String _original;
+  final List<(int, int)> _protected;
+  final List<(int, int)> _opaque;
+  String text;
+  List<int> _starts;
+  List<int> _ends;
+  List<({int at, int start, int end})> _deletions = [];
+
+  _TrackedText(this.text)
+    : _original = text,
+      _protected = _literalRanges(text),
+      _opaque = _opaqueValueRanges(text),
+      _starts = [for (var i = 0; i < text.length; i++) i],
+      _ends = [for (var i = 0; i < text.length; i++) i + 1];
+
+  void replaceAll(RegExp pattern, String Function(RegExpMatch) replacement) {
+    final matches = pattern.allMatches(text).toList(growable: false);
+    if (matches.isEmpty) return;
+    final oldText = text;
+    final oldStarts = _starts;
+    final oldEnds = _ends;
+    final oldDeletions = _deletions;
+    final buffer = StringBuffer();
+    final starts = <int>[];
+    final ends = <int>[];
+    final deletions = <({int at, int start, int end})>[];
+    final skipped = <RegExpMatch>{};
+    var cursor = 0;
+    var outputLength = 0;
+
+    void copyRange(int from, int to) {
+      if (from >= to) return;
+      buffer.write(oldText.substring(from, to));
+      starts.addAll(oldStarts.getRange(from, to));
+      ends.addAll(oldEnds.getRange(from, to));
+      outputLength += to - from;
+    }
+
+    for (final match in matches) {
+      copyRange(cursor, match.start);
+      if (_isProtected(match.start, match.end)) {
+        skipped.add(match);
+        copyRange(match.start, match.end);
+        cursor = match.end;
+        continue;
+      }
+      final outputStart = outputLength;
+      var sourceStart = oldText.length;
+      var sourceEnd = 0;
+      for (var i = match.start; i < match.end; i++) {
+        if (oldStarts[i] < sourceStart) sourceStart = oldStarts[i];
+        if (oldEnds[i] > sourceEnd) sourceEnd = oldEnds[i];
+      }
+      for (final removed in oldDeletions) {
+        if (removed.at < match.start || removed.at > match.end) continue;
+        if (removed.start < sourceStart) sourceStart = removed.start;
+        if (removed.end > sourceEnd) sourceEnd = removed.end;
+      }
+      final value = replacement(match);
+      buffer.write(value);
+      if (value.isNotEmpty) {
+        if (sourceStart == oldText.length && sourceEnd == 0) {
+          sourceStart = match.start;
+          sourceEnd = match.end;
+        }
+        for (var i = 0; i < value.length; i++) {
+          starts.add(sourceStart);
+          ends.add(sourceEnd);
+        }
+      } else if (sourceEnd > sourceStart) {
+        deletions.add((at: outputStart, start: sourceStart, end: sourceEnd));
+      }
+      outputLength += value.length;
+      cursor = match.end;
+    }
+    copyRange(cursor, oldText.length);
+
+    int moveBoundary(int boundary) {
+      var delta = 0;
+      for (final match in matches) {
+        if (skipped.contains(match)) continue;
+        if (boundary < match.start) break;
+        final nextValue = replacement(match);
+        if (boundary <= match.end) {
+          return match.start + delta + nextValue.length;
+        }
+        delta += nextValue.length - (match.end - match.start);
+      }
+      return boundary + delta;
+    }
+
+    for (final removed in oldDeletions) {
+      if (matches.any(
+        (m) =>
+            !skipped.contains(m) &&
+            removed.at >= m.start &&
+            removed.at <= m.end,
+      )) {
+        continue;
+      }
+      deletions.add((
+        at: moveBoundary(removed.at),
+        start: removed.start,
+        end: removed.end,
+      ));
+    }
+    text = buffer.toString();
+    _starts = starts;
+    _ends = ends;
+    _deletions = deletions;
+  }
+
+  bool _isProtected(int start, int end) {
+    var sourceStart = _original.length;
+    var sourceEnd = 0;
+    for (var i = start; i < end; i++) {
+      if (_starts[i] < sourceStart) sourceStart = _starts[i];
+      if (_ends[i] > sourceEnd) sourceEnd = _ends[i];
+    }
+    return _protected.any(
+      (range) => range.$1 < sourceEnd && range.$2 > sourceStart,
+    );
+  }
+
+  static List<(int, int)> _literalRanges(String text) {
+    final ranges = <(int, int)>[];
+    final patterns = <RegExp>[
+      RegExp(r'`[^`\n]*`'),
+      RegExp(r'"[^"\n]*[\\/][^"\n]*"|\x27[^\x27\n]*[\\/][^\x27\n]*\x27'),
+      RegExp(r'(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]|\\\\|/)[^\s,;]+'),
+      RegExp(r'\b(?:\d{1,3}\.){3}\d{1,3}(?:/\d{1,3})?\b'),
+      RegExp(r'\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b', caseSensitive: false),
+      RegExp(
+        r'(?<![A-Za-z0-9])(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}(?:/\d{1,3})?(?![A-Za-z0-9])',
+        caseSensitive: false,
+      ),
+      RegExp(r'\b(?:R|SW|PC|SRV)\d{1,3}\b', caseSensitive: false),
+      RegExp(
+        r'\b(?:FastEthernet|GigabitEthernet|TenGigabitEthernet|TwentyFiveGigE|HundredGigE|Ethernet|Serial|Async|Fa|Gi|Te|Eth|Se|F|G|S|Vlan|Console|Aux(?:iliary)?|USB|Coax(?:ial)?|Port)\s*\d+(?:/\d+){0,3}\b',
+        caseSensitive: false,
+      ),
+      RegExp(r'\b(?:GPIO|D|A)\d+\b', caseSensitive: false),
+    ];
+    for (final pattern in patterns) {
+      for (final match in pattern.allMatches(text)) {
+        ranges.add((match.start, match.end));
+      }
+    }
+    final valuePatterns = <RegExp>[
+      RegExp(
+        r'\b(?:ssid|network\s+name)\s*(?::|=|\bis\b)?\s*[`"\x27]?([^\r\n,;`"\x27]+)',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'\b(?:password|passphrase|psk|pre-shared\s+key)\s*(?::|=|\bis\b)?\s*[`"\x27]?([^\s,;`"\x27]+)',
+        caseSensitive: false,
+      ),
+    ];
+    for (final pattern in valuePatterns) {
+      for (final match in pattern.allMatches(text)) {
+        final rawGroup = match.group(1);
+        if (rawGroup == null || rawGroup.trim().isEmpty) continue;
+        final group = rawGroup.trim();
+        final start = match.start + match[0]!.lastIndexOf(group);
+        ranges.add((start, start + group.length));
+      }
+    }
+    ranges.sort((a, b) => a.$1.compareTo(b.$1));
+    return ranges;
+  }
+
+  static List<(int, int)> _opaqueValueRanges(String text) {
+    final ranges = <(int, int)>[];
+    final patterns = <RegExp>[
+      RegExp(
+        r'\b(?:ssid|network\s+name)\s*(?::|=|\bis\b)?\s*[`"\x27]?([^\r\n,;`"\x27]+)',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'\b(?:password|passphrase|psk|pre-shared\s+key)\s*(?::|=|\bis\b)?\s*[`"\x27]?([^\s,;`"\x27]+)',
+        caseSensitive: false,
+      ),
+    ];
+    for (final pattern in patterns) {
+      for (final match in pattern.allMatches(text)) {
+        final rawValue = match.group(1);
+        if (rawValue == null || rawValue.trim().isEmpty) continue;
+        final value = rawValue.trim();
+        final start = match.start + match[0]!.lastIndexOf(value);
+        ranges.add((start, start + value.length));
+      }
+    }
+    return ranges;
+  }
+
+  NormalizedMessage finish() {
+    final segments = <NormalizationSegment>[];
+    var i = 0;
+    while (i < text.length) {
+      final begin = i;
+      final sourceStart = _starts[i];
+      var sourceEnd = _ends[i];
+      final copied = sourceEnd == sourceStart + 1;
+      i++;
+      while (i < text.length) {
+        final previousStart = _starts[i - 1];
+        final currentStart = _starts[i];
+        final currentEnd = _ends[i];
+        final joinsCopy =
+            copied &&
+            currentEnd == currentStart + 1 &&
+            currentStart == previousStart + 1;
+        final joinsReplacement =
+            !copied && currentStart == sourceStart && currentEnd == sourceEnd;
+        if (!joinsCopy && !joinsReplacement) break;
+        if (joinsCopy) sourceEnd = currentEnd;
+        i++;
+      }
+      final normalizedLength = i - begin;
+      final sourceLength = sourceEnd - sourceStart;
+      final kind = copied && normalizedLength == sourceLength
+          ? NormalizationSegmentKind.copied
+          : normalizedLength > sourceLength
+          ? NormalizationSegmentKind.expansion
+          : NormalizationSegmentKind.replacement;
+      segments.add(
+        NormalizationSegment(
+          normalizedStart: begin,
+          normalizedEnd: i,
+          originalStart: sourceStart,
+          originalEnd: sourceEnd,
+          kind: kind,
+        ),
+      );
+    }
+    segments.addAll(
+      _deletions.map(
+        (item) => NormalizationSegment(
+          normalizedStart: item.at,
+          normalizedEnd: item.at,
+          originalStart: item.start,
+          originalEnd: item.end,
+          kind: NormalizationSegmentKind.deletion,
+        ),
+      ),
+    );
+    segments.sort((a, b) {
+      final offset = a.normalizedStart.compareTo(b.normalizedStart);
+      return offset != 0 ? offset : a.originalStart.compareTo(b.originalStart);
+    });
+    return NormalizedMessage(
+      originalText: _original,
+      normalizedText: text,
+      segments: segments,
+      opaqueSourceRanges: _opaque,
+    );
+  }
+}
+
 /// Does this brief name a device kind (or an explicit device label like
 /// R1/PC3) anywhere? Derived from [deviceKinds] so it cannot drift from the
 /// parser's own vocabulary.
@@ -454,7 +781,10 @@ final RegExp namesAnyDevice = RegExp(
   ')\\b)',
 );
 
-final RegExp _deviceLabel = RegExp(r'\b(?:R|SW|PC|SRV)\d{1,2}\b');
+final RegExp _deviceLabel = RegExp(
+  r'\b(?:R|SW|PC|SRV)\d{1,2}\b',
+  caseSensitive: false,
+);
 
 /// True when [lower] mentions a device kind or a label like R1 / SW2 /
 /// PC3 / SRV1. Pure; see [namesAnyDevice].
@@ -467,7 +797,13 @@ bool namesAnyDeviceIn(String lower) =>
 /// The learned-phrasing hop, run once at the top of every parse.
 NetworkIntent parseBrief(String projectName, String rawText) {
   final request = PtBriefRequest.read(rawText);
-  return request.apply(_parseGeneralBrief(projectName, request.plannerText));
+  return request.apply(
+    _parseGeneralBrief(
+      projectName,
+      request.plannerText,
+      request.routerModelHint,
+    ),
+  );
 }
 
 Map<String, dynamic> _parseInBackground(List<String> request) =>
@@ -488,7 +824,11 @@ Future<NetworkIntent> parseBriefAsync(
   );
 }
 
-NetworkIntent _parseGeneralBrief(String projectName, String rawText) {
+NetworkIntent _parseGeneralBrief(
+  String projectName,
+  String rawText,
+  String? routerModelHint,
+) {
   final bridged = bridgeBrief(rawText);
   // Learned phrasing: when this exact wording was clarified before, the
   // resolved brief replays - the parser reads it as if the user had typed
@@ -541,5 +881,10 @@ NetworkIntent _parseGeneralBrief(String projectName, String rawText) {
       confidence: (intent.confidence - 0.1).clamp(0.0, 1.0),
     );
   }
-  return NetworkIntent.parseBridged(projectName, bridged, rawText);
+  return NetworkIntent.parseBridged(
+    projectName,
+    bridged,
+    rawText,
+    routerModelHint,
+  );
 }

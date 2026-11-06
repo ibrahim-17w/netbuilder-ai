@@ -70,11 +70,51 @@ class Gns3Adapter {
     }
   }
 
+  /// The id key a template carries. GNS3 2.x names it `template_id`; the
+  /// adapter used to read `id`, which every 2.2 server answers with null -
+  /// the push then created the project and POSTed every node to
+  /// `/templates/null` (404), leaving an empty project behind.
+  static String _templateId(dynamic tpl) =>
+      ((tpl is Map ? tpl['template_id'] : null) ??
+              (tpl is Map ? tpl['id'] : null) ??
+              '')
+          .toString();
+
   /// 'g0/0' -> (adapter 0, port 0); 'f0/2' -> (0, 2); 's1/0' -> (1, 0).
   static (int, int) portOf(String iface) {
     final m = RegExp(r'(\d+)\s*/\s*(\d+)').firstMatch(iface);
     if (m == null) return (0, 0);
     return (int.parse(m.group(1)!), int.parse(m.group(2)!));
+  }
+
+  /// Verify the server answers with these credentials, for the Settings
+  /// panel's Save + test. Returns the server version string; throws
+  /// [Gns3ApiException] (401 etc.) or a SocketException when unreachable.
+  static Future<String> testConnection(
+    String endpoint, {
+    String user = '',
+    String pass = '',
+    http.Client? client,
+  }) async {
+    final c = client ?? http.Client();
+    final base = endpoint.endsWith('/')
+        ? endpoint.substring(0, endpoint.length - 1)
+        : endpoint;
+    final raw = base64Encode(utf8.encode('$user:$pass'));
+    final res = await c
+        .get(
+          Uri.parse('$base/v2/version'),
+          headers: {
+            'Authorization': 'Basic $raw',
+            'Content-Type': 'application/json',
+          },
+        )
+        .timeout(const Duration(seconds: 10));
+    if (res.statusCode >= 400) {
+      throw Gns3ApiException(res.statusCode, res.body);
+    }
+    final body = res.body.isEmpty ? null : jsonDecode(res.body);
+    return body is Map ? '${body['version'] ?? 'unknown'}' : 'unknown';
   }
 
   /// Push the whole topology to a GNS3 2.x server.
@@ -166,10 +206,20 @@ class Gns3Adapter {
         continue;
       }
       try {
+        // GNS3 2.2 refuses a template instantiation without an explicit
+        // compute id: the body's omission reaches the server as null and
+        // every node answers 404 "Compute ID None doesn't exist". The
+        // template's own compute id is the right default; a null there
+        // means the local compute.
         final node = await call(
           'POST',
-          '/projects/$pid/templates/${tpl['id']}',
-          body: {'name': n.name, 'x': 0, 'y': 0},
+          '/projects/$pid/templates/${_templateId(tpl)}',
+          body: {
+            'name': n.name,
+            'x': 0,
+            'y': 0,
+            'compute_id': (tpl['compute_id'] ?? 'local').toString(),
+          },
         );
         nodeIds[n.name] = node['node_id'] as String;
         report.writeln('OK node ${n.name} from template "${tpl['name']}"');

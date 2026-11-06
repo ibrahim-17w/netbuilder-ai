@@ -212,6 +212,23 @@ def derive_tests(plan: dict) -> List[dict]:
         if isinstance(t, str) and t.strip():
             tests.append({"src": "", "dst": "", "kind": "custom", "detail": t.strip()})
 
+    # User checks retain their IDs through result shaping. A failed ping is
+    # never accepted as evidence of an intended blocking policy.
+    custom_rows = []
+    for check in (plan.get("customChecks") or [])[:40]:
+        if not isinstance(check, dict):
+            continue
+        src, dst = str(check.get("source") or ""), str(check.get("destination") or "")
+        if src not in by_name or dst not in by_name or src == dst:
+            continue
+        automated = (check.get("allow") is True and check.get("kind") == "ping"
+                     and str(by_name[src].get("type") or "").lower() in _ENDPOINT_TYPES)
+        custom_rows.append({"src": src, "dst": dst, "checkId": str(check.get("id") or ""),
+                            "kind": "ping" if automated else "manual",
+                            "detail": "Expected response" if automated else
+                            "Review allowed and denied flows; timeout alone proves no blocking policy."})
+    tests = custom_rows + tests
+
     # Keep the interactive checklist visible even for large topologies; a
     # long list of pings must not push every service/security check off the end.
     manual_all = [t for t in tests if t.get("kind") in ("manual", "custom")]

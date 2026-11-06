@@ -104,6 +104,22 @@ void main() {
   });
 
   group('applyEdit', () {
+    test('refuses malformed IPv4, IPv6 and out-of-range prefixes', () {
+      for (final v in ['-1.2.3.4/24', '1.2.3.4/33', '', '1.2.3.4/24/1']) {
+        expect(
+          AddressTable.validateAddress(v, isV6: false),
+          isNotNull,
+          reason: v,
+        );
+      }
+      for (final v in [':::/64', '1:2:3/64', '::1/129', '::1/-1']) {
+        expect(
+          AddressTable.validateAddress(v, isV6: true),
+          isNotNull,
+          reason: v,
+        );
+      }
+    });
     test('one interface changes and everything else is untouched', () {
       final target = plan.addressing.first;
       final edited = AddressTable.applyEdit(
@@ -168,7 +184,7 @@ void main() {
         AddressTable.validateAddress('192.168.1.1', isV6: true),
         contains('IPv6'),
       );
-      expect(AddressTable.validateAddress('   ', isV6: false), isNull);
+      expect(AddressTable.validateAddress('   ', isV6: false), isNotNull);
     });
   });
 }

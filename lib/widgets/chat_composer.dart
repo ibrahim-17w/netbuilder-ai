@@ -14,6 +14,7 @@ import '../theme/app_theme.dart';
 /// composer reach back into it for every action.
 class ChatComposer extends StatelessWidget {
   final bool busy;
+  final bool canCancelWhileBusy;
   final bool editing;
   final TextEditingController input;
   final FocusNode focusNode;
@@ -52,6 +53,7 @@ class ChatComposer extends StatelessWidget {
     required this.onPaste,
     this.skillMenu,
     this.planPrompt,
+    this.canCancelWhileBusy = true,
   });
 
   @override
@@ -337,7 +339,9 @@ class ChatComposer extends StatelessWidget {
                             ),
                             child: IconButton.filled(
                               tooltip: busy
-                                  ? 'Stop generating'
+                                  ? canCancelWhileBusy
+                                        ? 'Stop generating'
+                                        : 'Saving requested change'
                                   : editing
                                   ? 'Update message'
                                   : 'Send',
@@ -349,10 +353,20 @@ class ChatComposer extends StatelessWidget {
                                 elevation: 0,
                               ),
                               icon: busy
-                                  ? const Icon(Icons.stop)
+                                  ? canCancelWhileBusy
+                                        ? const Icon(Icons.stop)
+                                        : const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
                                   : const Icon(Icons.send),
                               onPressed: busy
-                                  ? onCancelGeneration
+                                  ? canCancelWhileBusy
+                                        ? onCancelGeneration
+                                        : null
                                   : (input.text.trim().isEmpty ? null : onSend),
                             ),
                           );

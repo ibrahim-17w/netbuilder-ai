@@ -29,8 +29,76 @@ class SecretVault {
 
   /// Swapped for an in-memory stand-in in tests; the app uses
   /// [_defaultStorage].
+  ///
+  /// A setter, not a bare field: reassigning must invalidate the snapshot
+  /// below. `const FlutterSecureStorage()` is canonicalized, so tests that
+  /// reassign the same const instance never change its identity and the
+  /// identity check in [_ensureCache] would keep serving the previous
+  /// backend's keys.
+  static FlutterSecureStorage _storage = _defaultStorage;
   @visibleForTesting
-  static FlutterSecureStorage storage = _defaultStorage;
+  static FlutterSecureStorage get storage => _storage;
+  @visibleForTesting
+  static set storage(FlutterSecureStorage value) {
+    _storage = value;
+    _cacheOwner = null;
+    _cache = const {};
+  }
+
+  /// One decrypted snapshot of the keystore, shared per [storage] instance.
+  ///
+  /// The Windows backend keeps the WHOLE key map in a single DPAPI blob that
+  /// is decrypted on every read and re-encrypted on every write, so a start
+  /// up that reads a few hundred keys (migration walks every project and
+  /// slot) costs one full-file decrypt each - seconds, once the map has any
+  /// size to it. The app is the only writer of this file, so a per-process
+  /// snapshot read once and maintained on write is exact. Swapping [storage]
+  /// (tests) changes the identity, which reloads it.
+  static FlutterSecureStorage? _cacheOwner;
+  static Map<String, String?> _cache = const {};
+
+  static Future<Map<String, String?>?> _ensureCache() async {
+    if (identical(_cacheOwner, storage)) return _cache;
+    try {
+      // A mutable copy with nullable values: a delete records a null
+      // tombstone instead of removing the entry, so the snapshot keeps the
+      // distinction between "absent" and "deleted this session".
+      _cache = Map<String, String?>.from(await _storage.readAll());
+    } catch (_) {
+      // A backend without readAll (or a failed one) still works, just
+      // without the shared snapshot: reads go to the plugin per key.
+      _cache = const {};
+      _cacheOwner = storage;
+      return null;
+    }
+    _cacheOwner = storage;
+    return _cache;
+  }
+
+  static Future<String?> _read(String key) async {
+    final cache = await _ensureCache();
+    if (cache == null) return _storage.read(key: key);
+    return cache[key];
+  }
+
+  /// Read straight from the backend, skipping the snapshot. The write
+  /// verification in [store], [protectText] and [migrateLegacy] must use
+  /// this: the snapshot records a write before the backend confirms it, so
+  /// a cache hit would make every failed write look persisted - exactly
+  /// the failure the verification exists to catch.
+  static Future<String?> _readBackend(String key) => _storage.read(key: key);
+
+  static Future<void> _write(String key, String value) async {
+    final cache = await _ensureCache();
+    await _storage.write(key: key, value: value);
+    cache?[key] = value;
+  }
+
+  static Future<void> _delete(String key) async {
+    final cache = await _ensureCache();
+    await _storage.delete(key: key);
+    cache?[key] = null;
+  }
 
   /// Write the project's COMPLETE secret set: every slot in [_slots] is either
   /// written or removed, whatever [secrets] contains.
@@ -45,10 +113,10 @@ class SecretVault {
     for (final slot in _slots) {
       final value = secrets[slot] ?? '';
       if (value.isEmpty) {
-        await storage.delete(key: '${key}_$slot');
+        await _delete('${key}_$slot');
       } else {
-        await storage.write(key: '${key}_$slot', value: value);
-        if (await storage.read(key: '${key}_$slot') != value) {
+        await _write('${key}_$slot', value);
+        if (await _readBackend('${key}_$slot') != value) {
           throw StateError('Project credentials could not be saved securely.');
         }
       }
@@ -62,7 +130,7 @@ class SecretVault {
     final out = <String, String>{};
     final key = _projectKey(project);
     for (final slot in _slots) {
-      final value = await storage.read(key: '${key}_$slot');
+      final value = await _read('${key}_$slot');
       if (value != null && value.isNotEmpty) out[slot] = value;
     }
     return out;
@@ -72,7 +140,7 @@ class SecretVault {
   static Future<void> purge(String project) async {
     final key = _projectKey(project);
     for (final slot in _slots) {
-      await storage.delete(key: '${key}_$slot');
+      await _delete('${key}_$slot');
     }
   }
 
@@ -148,8 +216,7 @@ class SecretVault {
 
   static Future<bool> hasLegacyCredentials(String project) async {
     for (final slot in _slots) {
-      if ((await storage.read(key: '${_legacyKey(project)}_$slot') ?? '')
-          .isNotEmpty) {
+      if ((await _read('${_legacyKey(project)}_$slot') ?? '').isNotEmpty) {
         return true;
       }
     }
@@ -158,15 +225,58 @@ class SecretVault {
 
   /// Preserve a secret-bearing source in the keychain before redacting it.
   /// This also recovers credentials from legacy transcripts safely.
+  ///
+  /// The accumulator is bounded on purpose. It used to append forever, and a
+  /// project that had been rebuilt across months accumulated a megabyte of
+  /// pasted transcripts - which the single-blob keystore then decrypted on
+  /// every one of the hundreds of reads a startup performs, timing out the
+  /// memory loader. Newest wins: [recoverRedactedSecrets] searches this text
+  /// for a credential's value, and the credential a current build carries is
+  /// the one its newest source described.
   static Future<void> protectText(String project, String text) async {
     final key = '${_projectKey(project)}_brief';
-    final previous = await storage.read(key: key) ?? '';
+    final previous = await _read(key) ?? '';
     if (previous.split('\n\n').contains(text)) return;
-    final value = previous.isEmpty ? text : '$previous\n\n$text';
-    await storage.write(key: key, value: value);
-    if (await storage.read(key: key) != value) {
+    var value = previous.isEmpty ? text : '$previous\n\n$text';
+    value = _capBrief(value);
+    await _write(key, value);
+    if (await _readBackend(key) != value) {
       throw StateError('Credentials could not be saved securely.');
     }
+  }
+
+  /// Trim an overgrown accumulator from the FRONT (the oldest sources) and
+  /// back to a paragraph boundary, so what survives is whole texts.
+  static String _capBrief(String value) {
+    if (value.length <= maxBriefChars) return value;
+    var capped = value.substring(value.length - maxBriefChars);
+    final cut = capped.indexOf('\n\n');
+    if (cut >= 0 && cut < capped.length - 2) capped = capped.substring(cut + 2);
+    return capped;
+  }
+
+  /// A stored brief may not exceed this many characters. 64k holds many
+  /// complete briefs side by side; the megabyte-plus blobs the unbounded
+  /// version produced held nothing a current build could still recover.
+  static const int maxBriefChars = 65536;
+
+  /// Rewrite every stored brief that outgrew [maxBriefChars] (stores written
+  /// before the cap existed). Returns how many were trimmed. Called once per
+  /// startup from the memory migration.
+  static Future<int> normalizeBriefs() async {
+    await _ensureCache();
+    final oversized = [
+      for (final entry in _cache.entries)
+        if (entry.key.endsWith('_brief') &&
+            entry.value != null &&
+            entry.value!.length > maxBriefChars)
+          entry.key,
+    ];
+    for (final key in oversized) {
+      final capped = _capBrief(_cache[key]!);
+      await _write(key, capped);
+    }
+    return oversized.length;
   }
 
   /// Only the database can establish whether a legacy name was unambiguous.
@@ -174,11 +284,11 @@ class SecretVault {
     final legacy = _legacyKey(project);
     final current = _projectKey(project);
     for (final slot in _slots) {
-      final existing = await storage.read(key: '${current}_$slot');
-      final old = await storage.read(key: '${legacy}_$slot');
+      final existing = await _read('${current}_$slot');
+      final old = await _read('${legacy}_$slot');
       if (existing == null && old != null) {
-        await storage.write(key: '${current}_$slot', value: old);
-        if (await storage.read(key: '${current}_$slot') != old) {
+        await _write('${current}_$slot', old);
+        if (await _readBackend('${current}_$slot') != old) {
           throw StateError(
             'Project credentials could not be migrated securely.',
           );

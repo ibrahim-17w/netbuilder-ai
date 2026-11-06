@@ -67,68 +67,100 @@ void main() {
     expect(find.textContaining('No API key is needed'), findsOneWidget);
   });
 
-  testWidgets('a described network builds a .pkt with no engine and no key', (
-    tester,
-  ) async {
-    PathProviderPlatform.instance = _FakePathProvider();
-    addTearDown(
-      () => PathProviderPlatform.instance = MethodChannelPathProvider(),
-    );
-    await tester.pumpWidget(const NetBuilderApp());
-    await tester.pumpAndSettle();
-
-    // Settings has text fields too, so the composer is addressed
-    // by its label rather than by position.
-    final composer = find.byWidgetPredicate(
-      (w) => w is TextField && w.decoration?.labelText == 'Message',
-    );
-    expect(composer, findsOneWidget);
-
-    // Describe a network the offline planner can parse - this is the no-key,
-    // no-engine path, so nothing here depends on a model, a network or a PC.
-    await tester.enterText(composer, '2 routers and 4 switches');
-    await tester.testTextInput.receiveAction(TextInputAction.send);
-    await _settle(tester);
-    expect(find.textContaining('2 routers and 4 switches'), findsWidgets);
-
-    // Building now asks for an explicit design first. Confirm the preview
-    // without writing a file, then use the build action created for that
-    // selected plan revision.
-    await _openTools(tester);
-    await tester.tap(_buildTile);
-    await tester.pumpAndSettle();
-    expect(find.text('Choose a layout'), findsOneWidget);
-    await tester.tap(find.text('Use this layout'));
-    await tester.pumpAndSettle();
-    expect(find.text('Build .pkt'), findsOneWidget);
-
-    // Now the action has something to compile. The sidecar is not running in
-    // a test, and it does not need to be: the build runs on this device from
-    // the bundled template library, and says so. The build is real CPU work
-    // (the library, the save XML, the physical workspace), so the pumps keep
-    // going until the answer lands. The build loads its library over the
-    // asset channel, which inside a fake-async test only progresses when
-    // real time is given back between pumps.
-    await tester.tap(find.text('Build .pkt'));
-    for (
-      var i = 0;
-      i < 120 &&
-          find.textContaining('Built a .pkt on this device').evaluate().isEmpty;
-      i++
-    ) {
-      await tester.pump(const Duration(milliseconds: 250));
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 1)),
+  testWidgets(
+    'A33 one double-click build runs once and later rebuild stays available',
+    (tester) async {
+      PathProviderPlatform.instance = _FakePathProvider();
+      addTearDown(
+        () => PathProviderPlatform.instance = MethodChannelPathProvider(),
       );
-    }
+      await tester.pumpWidget(const NetBuilderApp());
+      await tester.pumpAndSettle();
 
-    expect(find.textContaining('Built a .pkt on this device'), findsOneWidget);
-    // THE FILE IS NAMED FOR THE NETWORK: the brief's own words, not a
-    // timestamp - "2 routers and 4 switches" saves as routers-switches.pkt.
-    expect(find.textContaining('routers-switches.pkt'), findsWidgets);
-    expect(find.textContaining('Devices:'), findsOneWidget);
-    expect(find.textContaining('Cables:'), findsOneWidget);
-  });
+      // Settings has text fields too, so the composer is addressed
+      // by its label rather than by position.
+      final composer = find.byWidgetPredicate(
+        (w) => w is TextField && w.decoration?.labelText == 'Message',
+      );
+      expect(composer, findsOneWidget);
+
+      // Describe a network the offline planner can parse - this is the no-key,
+      // no-engine path, so nothing here depends on a model, a network or a PC.
+      await tester.enterText(composer, '2 routers and 4 switches');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await _settle(tester);
+      expect(find.textContaining('2 routers and 4 switches'), findsWidgets);
+
+      // Building now asks for an explicit design first. Confirm the preview
+      // without writing a file, then use the build action created for that
+      // selected plan revision.
+      await _openTools(tester);
+      await tester.tap(_buildTile);
+      await tester.pumpAndSettle();
+      expect(find.text('Choose a layout'), findsOneWidget);
+      await tester.tap(find.text('Use this layout'));
+      await tester.pumpAndSettle();
+      expect(find.text('Build .pkt'), findsOneWidget);
+
+      // Now the action has something to compile. Deliver two callbacks before
+      // Flutter gets a chance to repaint the disabled button, matching the
+      // fastest possible double-click. The second callback must be rejected by
+      // the action's busy guard, not merely hidden by the next frame.
+      final buildButton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Build .pkt'),
+      );
+      final startBuild = buildButton.onPressed!;
+      startBuild();
+      startBuild();
+
+      // The sidecar is not running in a test, and it does not need to be: the
+      // build runs on this device from the bundled template library, and says
+      // so. The build is real CPU work (the library, the save XML, the physical
+      // workspace), so the pumps keep going until the answer lands. The build
+      // loads its library over the asset channel, which inside a fake-async test
+      // only progresses when real time is given back between pumps.
+      for (
+        var i = 0;
+        i < 120 &&
+            find
+                .textContaining('Built a .pkt on this device')
+                .evaluate()
+                .isEmpty;
+        i++
+      ) {
+        await tester.pump(const Duration(milliseconds: 250));
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 1)),
+        );
+      }
+
+      expect(
+        find.textContaining('Built a .pkt on this device'),
+        findsOneWidget,
+      );
+      // THE FILE IS NAMED FOR THE NETWORK: the brief's own words, not a
+      // timestamp - "2 routers and 4 switches" saves as routers-switches.pkt.
+      expect(find.textContaining('routers-switches.pkt'), findsWidgets);
+      expect(find.textContaining('Devices:'), findsOneWidget);
+      expect(find.textContaining('Cables:'), findsOneWidget);
+      expect(
+        find.textContaining('Built a .pkt on this device'),
+        findsOneWidget,
+        reason: 'one active request creates exactly one build result',
+      );
+      await _settle(tester);
+      await _openTools(tester);
+      expect(_buildTile, findsOneWidget);
+      final rebuild = tester.widget<ListTile>(
+        find.ancestor(of: _buildTile, matching: find.byType(ListTile)),
+      );
+      expect(
+        rebuild.onTap,
+        isNotNull,
+        reason: 'the tools sheet still offers a later explicit rebuild',
+      );
+    },
+  );
 
   testWidgets(
     'an unreachable engine is stated up front, with a way to fix it',

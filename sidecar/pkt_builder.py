@@ -1889,17 +1889,24 @@ def _pick_link_template(library: dict, cable: str) -> tuple[dict | None,
 ETHERNET_FAMILIES = ("fastethernet", "gigabitethernet", "ethernet")
 
 
-def _spare_ethernet_port(used: dict, device: str, ports: list) -> str:
-    """A free copper Ethernet port for `device`, or "".
+def _spare_ethernet_port(used: dict, device: str, ports: list,
+                         medium: str = "copper") -> str:
+    """A free Ethernet port of `medium` for `device`, or "".
 
     `used` maps (device, port) -> True for every port already claimed by a
     link or by a config interface.  Only link-capable families are offered
     (never a serial or wireless port for a copper link), in template order.
+    The medium check matters as much as the family check: a fiber module
+    port is family `gigabitethernet` but cannot take a copper cable, and
+    handing one out traded a clear "no free port" for a build the cable
+    check then refused.
     """
     taken = {port for (dev, port) in used if dev == device}
     for port in ports or []:
         name = str(port.get("name") or "")
         if not name or port.get("family") not in ETHERNET_FAMILIES:
+            continue
+        if hardware.port_medium(port) != medium:
             continue
         if name not in taken:
             return name
@@ -2051,6 +2058,47 @@ def _build_link(library: dict, link: dict, refs: dict, port_names: dict,
     actual_b=next((p for p in variant_b.get('ports',[]) if p.get('name')==port_b),None)
     if actual_a and actual_b:
         error=hardware.mismatch(hardware.cable_for(requested_cable),actual_a,actual_b,variant_a.get('modules',[]),variant_b.get('modules',[]))
+        if error and not link.get("exactPorts"):
+            # A spare-port remap or an unresolved interface name can land on
+            # a port whose MEDIUM cannot take the cable - the plan asked for
+            # nothing (the cable was this builder's own inference), so
+            # re-remap the offending end to a free port the cable can use
+            # before refusing the link. An explicitly cabled plan keeps its
+            # raise: the user asked for that cable by name.
+            families = hardware.cable_for(requested_cable)['families'] or []
+            for side_name, side_variant, side_if in (
+                    (name_a, variant_a, link.get('aIf')),
+                    (name_b, variant_b, link.get('bIf'))):
+                port_now = port_names.get((side_name, str(side_if or "")))
+                actual_now = next(
+                    (p for p in side_variant.get('ports', [])
+                     if p.get('name') == port_now), None)
+                if actual_now is None:
+                    continue
+                if hardware.port_medium(actual_now) in families:
+                    continue
+                spare = _spare_ethernet_port(used_ports or {}, side_name,
+                                             side_variant.get('ports', []))
+                if spare:
+                    key = (side_name, str(side_if or ""))
+                    port_names[key] = spare
+                    if used_ports is not None:
+                        used_ports[(side_name, spare)] = True
+                    if side_name == name_a:
+                        port_a = spare
+                        actual_a = next(
+                            (p for p in side_variant.get('ports', [])
+                             if p.get('name') == spare), actual_a)
+                    else:
+                        port_b = spare
+                        actual_b = next(
+                            (p for p in side_variant.get('ports', [])
+                             if p.get('name') == spare), actual_b)
+                    warnings.append(
+                        f"link {name_a}-{name_b}: {side_name} {side_if} is "
+                        f"{hardware.port_medium(actual_now)}; cabled on "
+                        f"{spare} (medium remap)")
+            error=hardware.mismatch(hardware.cable_for(requested_cable),actual_a,actual_b,variant_a.get('modules',[]),variant_b.get('modules',[]))
         if error:
             raise BuildError(
                 f'link {name_a}-{name_b}: {error} '

@@ -30,6 +30,10 @@ enum BriefSource {
   plan,
 }
 
+/// What a scale number counts. User load and physical inventory have
+/// different planning effects and must not be substituted for one another.
+enum QuantityKind { unspecified, userLoad, deviceInventory }
+
 /// One filled slot.
 class BriefFact {
   /// Canonical value: 'ospf', '40', 'none', 'yes', 'no', 'home', ...
@@ -44,6 +48,7 @@ class BriefFact {
 
   final BriefSource origin;
   final String setAt;
+  final QuantityKind quantityKind;
 
   const BriefFact({
     required this.value,
@@ -51,6 +56,7 @@ class BriefFact {
     this.source = '',
     this.origin = BriefSource.user,
     this.setAt = '',
+    this.quantityKind = QuantityKind.unspecified,
   });
 
   Map<String, dynamic> toJson() => {
@@ -59,6 +65,7 @@ class BriefFact {
     'source': source,
     'origin': origin.name,
     'setAt': setAt,
+    'quantityKind': quantityKind.name,
   };
 
   factory BriefFact.fromJson(Map<String, dynamic> json) => BriefFact(
@@ -70,6 +77,10 @@ class BriefFact {
       orElse: () => BriefSource.user,
     ),
     setAt: (json['setAt'] ?? '').toString(),
+    quantityKind: QuantityKind.values.firstWhere(
+      (kind) => kind.name == (json['quantityKind'] ?? 'unspecified'),
+      orElse: () => QuantityKind.unspecified,
+    ),
   );
 
   /// Precedence when two sources offer a value: the user's own words beat a
@@ -126,11 +137,16 @@ class DesignBrief {
   String value(String slotId) => facts[slotId]?.value ?? '';
 
   /// Slots with no value yet, in card order.
-  List<String> get missing => slotIds.where((id) => !has(id)).toList();
+  List<String> get missing => slotIds.where((id) {
+    if (!has(id)) return true;
+    return id == scale && fact(id)?.quantityKind == QuantityKind.userLoad;
+  }).toList();
 
   /// Critical slots with no value: the readiness gate.
-  List<String> get missingCritical =>
-      criticalSlots.where((id) => !has(id)).toList();
+  List<String> get missingCritical => criticalSlots.where((id) {
+    if (!has(id)) return true;
+    return id == scale && fact(id)?.quantityKind == QuantityKind.userLoad;
+  }).toList();
 
   /// True when every critical slot is filled. The chat offers a build when
   /// this holds (and the plan itself is sound); until then it talks.
@@ -153,7 +169,11 @@ class DesignBrief {
     if (facts.length != other.facts.length) return false;
     for (final entry in facts.entries) {
       final o = other.facts[entry.key];
-      if (o == null || o.value != entry.value.value) return false;
+      if (o == null ||
+          o.value != entry.value.value ||
+          o.quantityKind != entry.value.quantityKind) {
+        return false;
+      }
     }
     return true;
   }

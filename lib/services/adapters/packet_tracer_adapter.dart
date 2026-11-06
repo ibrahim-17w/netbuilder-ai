@@ -488,13 +488,26 @@ class PacketTracerAdapter {
           // Firewalls speak ASA, not IOS, so they are never typed at live -
           // but their generated config still travels in the plan and lands in
           // the saved device inside the .pkt (see CiscoAdapter.firewallConfigs).
-          'configs': {
-            ...deviceConfigs(intent),
-            ...CiscoAdapter.firewallConfigs(intent),
-            // CME telephony config lands on the voice gateway router when the
-            // plan carries phones + a cme-role server.
-            ...CiscoAdapter.voiceConfig(intent),
-          },
+          //
+          // The voice gateway's CME block APPENDS to that router's main
+          // config. Spreading the three maps naively let a later key
+          // (voiceConfig also names "R1") REPLACE the main config - the
+          // built file then shipped a router whose saved config was the
+          // 38-line telephony block alone: no addresses, no OSPF, no
+          // gateways. A plan with phones + a CME server built devices and
+          // cables correctly and still could not route.
+          'configs': () {
+            final configs = {
+              ...deviceConfigs(intent),
+              ...CiscoAdapter.firewallConfigs(intent),
+            };
+            CiscoAdapter.voiceConfig(intent).forEach((router, cme) {
+              configs[router] = configs.containsKey(router)
+                  ? '${configs[router]!}\n$cme'
+                  : cme;
+            });
+            return configs;
+          }(),
           'typing_delay_ms': 25,
           'verify_hostname': true,
         },

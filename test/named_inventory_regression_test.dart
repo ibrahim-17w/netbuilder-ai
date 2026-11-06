@@ -64,6 +64,7 @@ NetworkIntent _parse(String brief) =>
     NetworkIntent.parseSimple('tri-site-resilient-services', brief);
 
 void main() {
+  _enterpriseRouterCount();
   test(
     'near-limit explicit inventory retains counts, names and exact models',
     () {
@@ -350,4 +351,18 @@ void main() {
       expect(parsed.nodes.where((node) => node.type == 'printer'), isEmpty);
     },
   );
+}
+
+void _enterpriseRouterCount() {
+  test('a role adjective between count and noun still counts', () {
+    final plan = NetworkIntent.parseSimple(
+      'contoso',
+      'HQ: 2 firewalls at the internet edge, 2 core routers running OSPF, '
+          '2 distribution switches and 3 access switches. A branch office '
+          'with 1 router, 1 switch, 10 PCs and 1 printer.',
+    );
+    expect(plan.nodes.where((n) => n.type == 'router').length, 3);
+    expect(plan.nodes.where((n) => n.type == 'switch').length, 6);
+    expect(plan.nodes.where((n) => n.type == 'firewall').length, 2);
+  });
 }

@@ -1,4 +1,5 @@
 import '../models/network_intent.dart';
+import 'lab_objectives.dart';
 
 /// One check a lab step is graded by, interpreted against the STANDING PLAN.
 ///
@@ -175,14 +176,50 @@ class GuidedLab {
   final String id;
   final String title;
   final String blurb;
-  final List<LabStep> steps;
+  final List<LabStep> _steps;
+  final String brief;
+  final String level;
+  String get goal => blurb;
+  String get objectiveId => switch (id) {
+    'vlan-dhcp' => 'office-vlans-dhcp',
+    'ospf-wan' => 'two-routers-ospf',
+    'secure-mgmt' => 'secure-device-management',
+    _ => id,
+  };
+  List<LabStep> get steps => [
+    ..._steps,
+    for (final result in LabObjectives.grade(
+      objectiveId,
+      const NetworkIntent(projectName: 'rubric'),
+    ))
+      LabStep(
+        result.label,
+        result.hint,
+        _ObjectiveCheck(objectiveId, result.label),
+      ),
+  ];
 
   const GuidedLab({
     required this.id,
     required this.title,
     required this.blurb,
-    required this.steps,
+    required this._steps,
+    this.brief = '',
+    this.level = 'Beginner',
   });
+}
+
+class _ObjectiveCheck extends LabCheck {
+  final String id, label;
+  const _ObjectiveCheck(this.id, this.label);
+  @override
+  ({bool ok, String? remedy}) grade(NetworkIntent intent) {
+    final result = LabObjectives.grade(
+      id,
+      intent,
+    ).firstWhere((r) => r.label == label);
+    return (ok: result.passed, remedy: result.passed ? null : result.hint);
+  }
 }
 
 /// The three starter labs. Each is buildable with what the offline planner
@@ -191,8 +228,18 @@ class LabCatalog {
   const LabCatalog._();
 
   static final List<GuidedLab> all = [
+    const GuidedLab(
+      id: 'dns-web-services',
+      title: 'DNS and web services',
+      blurb:
+          'Connect clients to DNS and HTTP services with usable DNS records.',
+      brief: '1 switch, 2 PCs, and one server providing DNS and HTTP',
+      steps: [],
+    ),
     GuidedLab(
       id: 'vlan-dhcp',
+      brief:
+          '1 router 1 switch 2 PCs in VLAN 10 and VLAN 20 with a DHCP server',
       title: 'Two VLANs with DHCP',
       blurb:
           'Segment a small office into two VLANs and hand out addresses '
@@ -236,6 +283,9 @@ class LabCatalog {
     ),
     GuidedLab(
       id: 'ospf-wan',
+      brief:
+          'Connect 2 routers with OSPF; each router connects to a switch and one PC',
+      level: 'Intermediate',
       title: 'Two routers over a WAN with OSPF',
       blurb: 'Two sites, one serial transit link, OSPF advertising both LANs.',
       steps: [
@@ -269,6 +319,9 @@ class LabCatalog {
     ),
     GuidedLab(
       id: 'secure-mgmt',
+      brief:
+          '1 router 1 switch 2 PCs and an AAA server; SSH, AAA and port security',
+      level: 'Intermediate',
       title: 'Secure management',
       blurb:
           'A small LAN managed over SSH with AAA, port security, and no '
@@ -308,8 +361,15 @@ class LabCatalog {
     ),
   ];
 
-  static GuidedLab? byId(String id) =>
-      all.where((lab) => lab.id == id).firstOrNull;
+  static GuidedLab? byId(String id) {
+    final canonical = switch (id) {
+      'office-vlans-dhcp' => 'vlan-dhcp',
+      'two-routers-ospf' => 'ospf-wan',
+      'secure-device-management' => 'secure-mgmt',
+      _ => id,
+    };
+    return all.where((lab) => lab.id == canonical).firstOrNull;
+  }
 
   /// Resolve a spoken name: "the vlan lab", "ospf", "secure management".
   static GuidedLab? byName(String text) {
@@ -317,6 +377,7 @@ class LabCatalog {
     for (final lab in all) {
       if (t.contains(lab.id)) return lab;
     }
+    if (t.contains('dns') || t.contains('web')) return byId('dns-web-services');
     if (t.contains('vlan') || t.contains('dhcp')) return byId('vlan-dhcp');
     if (t.contains('ospf') || t.contains('wan')) return byId('ospf-wan');
     if (t.contains('secure') || t.contains('management') || t.contains('aaa')) {

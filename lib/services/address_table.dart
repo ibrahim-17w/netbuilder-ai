@@ -1,4 +1,5 @@
 import '../models/network_intent.dart';
+import 'network_math.dart';
 
 /// One row of the project address table: everything an address is, in one
 /// place. The VLAN is only ever DERIVED - from a dot1Q sub-interface (`g0/1
@@ -48,8 +49,10 @@ class AddressTable {
       ),
   ];
 
-  static List<AddressRow> filter(List<AddressRow> rows, String query) =>
-      [for (final row in rows) if (row.matches(query)) row];
+  static List<AddressRow> filter(List<AddressRow> rows, String query) => [
+    for (final row in rows)
+      if (row.matches(query)) row,
+  ];
 
   /// RFC 4180 CSV: quoted when the value carries a comma, quote or newline;
   /// a quote inside is doubled. The device and interface names come from the
@@ -57,8 +60,8 @@ class AddressTable {
   static String toCsv(List<AddressRow> rows) {
     String field(String v) =>
         v.contains(',') || v.contains('"') || v.contains('\n')
-            ? '"${v.replaceAll('"', '""')}"'
-            : v;
+        ? '"${v.replaceAll('"', '""')}"'
+        : v;
     return [
       'device,interface,ipv4,ipv6,vlan',
       ...[
@@ -108,9 +111,11 @@ class AddressTable {
   /// refused at the table instead of discovered at the build.
   static String? validateAddress(String value, {required bool isV6}) {
     final v = value.trim();
-    if (v.isEmpty) return null; // clearing is legal
+    if (v.isEmpty) {
+      return isV6 ? null : 'Enter an IPv4 address; it cannot be cleared here.';
+    }
     if (isV6) {
-      if (!RegExp(r'^[0-9a-fA-F:]+(/\d{1,3})?$').hasMatch(v) || !v.contains(':')) {
+      if (NetworkMath.ipv6Facts(v) == null) {
         return 'Use an IPv6 address with a prefix, e.g. 2001:db8:1::1/64';
       }
       return null;
@@ -119,7 +124,9 @@ class AddressTable {
     final ip = (slash < 0 ? v : v.substring(0, slash)).trim();
     final parts = ip.split('.');
     if (parts.length != 4 ||
-        parts.any((p) => int.tryParse(p) == null || int.parse(p) > 255)) {
+        parts.any(
+          (p) => !RegExp(r'^\d{1,3}$').hasMatch(p) || int.parse(p) > 255,
+        )) {
       return 'Use four 0-255 octets, e.g. 192.168.1.10';
     }
     if (slash >= 0) {

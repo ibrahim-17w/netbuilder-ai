@@ -213,14 +213,37 @@ void main() {
       updatedAt: '2026-09-27T10:00:00',
     );
     store.state['default'] = state.encode();
+    store.transcripts['default'] = [
+      ChatMessage(
+        role: 'user',
+        text: 'compare serial-lab.pkt and two-router-lab.pkt',
+      ),
+      ChatMessage(
+        role: 'model',
+        text: '**serial-lab -> two-router-lab**\nDevices added: PC11.',
+      ),
+    ];
+    final artifactPathsBefore = SessionState.decode(
+      store.state['default']!,
+    ).knownArtifacts.map((artifact) => artifact.path).toList();
     await tester.pumpWidget(_chat(store));
     await tester.pumpAndSettle();
 
     await _send(tester, 'edit it');
 
     expect(find.textContaining('which'), findsWidgets);
+    final choice = store.logged.lastWhere((message) => message.role == 'model');
+    expect(choice.text, contains('serial-lab.pkt'));
+    expect(choice.text, contains('two-router-lab.pkt'));
+    expect(choice.actions, isEmpty);
     expect(find.text('Create a new file instead'), findsOneWidget);
     expect(find.textContaining('Built a .pkt from your plan'), findsNothing);
+    expect(
+      SessionState.decode(
+        store.state['default']!,
+      ).knownArtifacts.map((artifact) => artifact.path).toList(),
+      artifactPathsBefore,
+    );
   });
 
   testWidgets('"a new file instead" is not a request to edit', (tester) async {

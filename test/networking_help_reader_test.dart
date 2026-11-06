@@ -78,6 +78,18 @@ void main() {
     });
   });
 
+  group('NetworkingHelpReader.asksForExplanation', () {
+    test('questions and explanations are distinct from a topic answer', () {
+      expect(
+        NetworkingHelpReader.asksForExplanation(
+          'why is OSPF better than static routing?',
+        ),
+        isTrue,
+      );
+      expect(NetworkingHelpReader.asksForExplanation('OSPF'), isFalse);
+    });
+  });
+
   group('classifyBrief treats help as howto', () {
     test('help-shaped briefs are classified howto', () {
       const howto = [

@@ -91,10 +91,53 @@ class PlanRepairService {
     '829',
   ];
 
+  /// The deterministic fix kind a finding message maps to, or null when no
+  /// offline repair covers it. Pure: the chat's per-finding "Apply this fix"
+  /// cards decide from this whether a finding can be acted on at all.
+  static String? fixKindFor(String message) {
+    final m = message.toLowerCase();
+    bool has(List<String> words) => words.any(m.contains);
+    if (has(['duplicate ip', 'duplicate address', 'shared address']) ||
+        (m.contains('two interfaces claim') && m.contains('address'))) {
+      return 'duplicate_lan_address';
+    }
+    if (m.contains('no device holds') ||
+        m.contains('0.0.0.0') ||
+        (m.contains('no usable address'))) {
+      return 'missing_ip_config';
+    }
+    if (m.contains('used by 2 links') ||
+        m.contains('already carries another cable') ||
+        m.contains('two cables landing on one') ||
+        m.contains('interface is used by')) {
+      return 'shared_port';
+    }
+    if (m.contains('would ship standing alone') ||
+        m.contains('no link in the plan')) {
+      return 'uncabled_device';
+    }
+    if (m.contains('has only') && m.contains('ports') ||
+        m.contains('is cabled to') && m.contains('devices but')) {
+      return 'switch_overflow';
+    }
+    if (m.contains('aaa server holds no account')) {
+      return 'aaa_account_missing';
+    }
+    if (m.contains('ipsec tunnel with no pre-shared key') ||
+        m.contains('pre-shared key')) {
+      return 'ipsec_psk_missing';
+    }
+    return null;
+  }
+
   static PlanRepair repair(
     NetworkIntent intent, {
     String target = 'packet-tracer',
+    Set<String>? only,
   }) {
+    // When [only] names fix kinds, every other pass stands down: the per-
+    // finding cards each promise ONE change, and a repair that ran everything
+    // behind a single-kind button would be a lie about what the tap did.
     // An oversized plan still has safe, local repairs. In particular, the
     // assistant may tell the user that "Fix the plan" will add a documented
     // placeholder AAA account. Do not make that promise a no-op just because
@@ -128,13 +171,20 @@ class PlanRepairService {
     var addressing = [...intent.addressing];
     final changes = <String>[];
     final fixes = <RepairFix>[];
+    // Per-finding cards each apply ONE class of fix: a kind outside the set
+    // stands down entirely, so a single-kind "Apply" tap can never drag the
+    // other repairs along with it. Null (or empty) means every pass runs -
+    // the whole-lab "fix the plan" reading.
+    bool allowed(String kind) =>
+        only == null || only.isEmpty || only.contains(kind);
 
     // 1. One address per interface: a second row on an interface is a parse
     //    artefact, never a second address a router can hold.
     final slots = <String>{};
+    final dedupeAddresses = allowed('duplicate_interface_address');
     addressing = addressing.where((a) {
       final key = '${a.node.toLowerCase()}|${a.iface.toLowerCase()}';
-      if (slots.add(key)) return true;
+      if (!dedupeAddresses || slots.add(key)) return true;
       changes.add(
         'removed the second address (${a.ipCidr}) from ${a.node} ${a.iface}',
       );
@@ -157,6 +207,7 @@ class PlanRepairService {
         ..add(l.b);
     }
     for (final node in nodes) {
+      if (!allowed('uncabled_device')) break;
       if (linked.contains(node.name)) continue;
       final uplink = _cableablePort(node, nodes, links);
       if (uplink == null) continue;
@@ -187,9 +238,10 @@ class PlanRepairService {
     //     it is a parse artefact - and the interface only holds one, so the
     //     second cable is dropped between the plan and the .pkt. Keep the
     //     first claim and move the rest to a free port on the same device.
+    final sharedPortsAllowed = allowed('shared_port');
     final claimed = <String, Set<String>>{};
     final rewired = <NetLink>[];
-    for (final link in links) {
+    for (final link in sharedPortsAllowed ? links : const <NetLink>[]) {
       var current = link;
       for (final end in [
         MapEntry(current.a, current.aIf),
@@ -229,7 +281,11 @@ class PlanRepairService {
     // 2c. A switch cannot hold more cables than it has ports. Move the
     //     overflow to a switch that does have room, and re-address whatever
     //     moved onto the LAN it now sits on.
-    for (final node in nodes.where((n) => n.type == 'switch')) {
+    final overflowAllowed =
+        allowed('switch_overflow') || allowed('stale_address_after_move');
+    for (final node in nodes.where(
+      (n) => n.type == 'switch' && overflowAllowed,
+    )) {
       final capacity = NetworkIntent.switchPortCapacity(node.model);
       final mine = [
         for (var i = 0; i < links.length; i++)
@@ -303,12 +359,15 @@ class PlanRepairService {
 
     // 3. Every device that needs Desktop > IP Configuration gets an address
     //    on the LAN it is plugged into.
+    final ipConfigAllowed = allowed('missing_ip_config');
     final used = <String>{
       for (final a in addressing)
         if (_ip(a.ipCidr).isNotEmpty) _ip(a.ipCidr),
     };
     for (final node in nodes) {
-      if (!(deviceKindOf(node.type)?.ipConfig ?? false)) continue;
+      if (!ipConfigAllowed || !(deviceKindOf(node.type)?.ipConfig ?? false)) {
+        continue;
+      }
       final rows = [
         for (final a in addressing)
           if (a.node.toLowerCase() == node.name.toLowerCase()) a,
@@ -349,10 +408,11 @@ class PlanRepairService {
     // 4. One address, one interface: the later holder moves. This runs LAST,
     //    after the passes above have finished adding addresses.
     final taken = <String>{};
+    final moveDuplicates = allowed('duplicate_lan_address');
     for (var i = 0; i < addressing.length; i++) {
       final a = addressing[i];
       final ip = _ip(a.ipCidr);
-      if (_toInt(ip) == null) continue;
+      if (!moveDuplicates || _toInt(ip) == null) continue;
       if (taken.add(ip)) continue;
       final isRouter = nodes.any((n) => n.name == a.node && n.type == 'router');
       final moved = _freeAddress(a, taken, router: isRouter);
@@ -378,10 +438,14 @@ class PlanRepairService {
     }
 
     final repaired = intent.copyWith(
-      nodes: _repairAccountRows(intent, changes, fixes),
+      nodes: allowed('account_row_incomplete')
+          ? _repairAccountRows(intent, changes, fixes)
+          : intent.nodes,
       links: links,
       addressing: addressing,
-      security: _repairSecurity(intent, changes, fixes),
+      security: allowed('aaa_account_missing') || allowed('ipsec_psk_missing')
+          ? _repairSecurity(intent, changes, fixes)
+          : intent.security,
     );
     // The same gate the build card uses (`ValidationIssue.blocks`), so this
     // pass can never call a plan clean when the card still refuses it - or
@@ -465,6 +529,7 @@ class PlanRepairService {
           exactModel: node.exactModel,
           modules: node.modules,
           mgmtIp: node.mgmtIp,
+          siteId: node.siteId,
           services: node.services,
           serviceRules: rebuilt,
         ),

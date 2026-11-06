@@ -88,6 +88,24 @@ void main() {
   });
 
   group('the lines it does not cross', () {
+    test('clarifications repeat the inventory already understood', () {
+      final r = ask(
+        '2 routers and 4 switches',
+        plan: NetworkIntent.parseSimple('chat', '2 routers and 4 switches'),
+        clarifying: const [
+          ClarificationQuestion(
+            id: 'scale',
+            question: 'How many PCs should this design include?',
+            quickReplies: ['10', '25', '50'],
+            quickReplyValues: ['10', '25', '50'],
+          ),
+        ],
+      );
+
+      expect(r.text, contains('I have noted 2 routers and 4 switches.'));
+      expect(r.text, contains('How many PCs should this design include?'));
+    });
+
     test('a plain build request still builds', () {
       final r = ask('2 routers and 4 switches for the lab', plan: lab);
       expect(r.intent, 'build');

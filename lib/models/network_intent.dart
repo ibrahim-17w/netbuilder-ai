@@ -2,11 +2,13 @@
 // Adapters compile this into GNS3 / Cisco / PT / Terraform.
 import '../services/nlu/lexicon.dart';
 import '../services/nlu/parser.dart' as brief_reader;
+import 'normalized_message.dart';
 import 'dart:convert';
 import 'dart:ui' show Offset;
 
 import '../services/nlu/slots.dart';
 import '../services/networking_help_reader.dart';
+import '../services/packet_tracer/catalog.dart';
 import '../services/sizing_service.dart';
 
 class NetNode {
@@ -16,6 +18,10 @@ class NetNode {
   final bool exactModel;
   final List<String> modules;
   final String? mgmtIp;
+
+  /// Explicit site ownership when the source brief scopes this device to a
+  /// named or repeated site. Null means the source did not identify a site.
+  final String? siteId;
 
   /// Server roles for Services-tab automation: dhcp, dns, http, aaa,
   /// email, ftp, ntp, tftp, syslog. Empty for all other types.
@@ -34,6 +40,7 @@ class NetNode {
     this.exactModel = false,
     this.modules = const [],
     this.mgmtIp,
+    this.siteId,
     this.services = const [],
     this.serviceRules = const {},
   });
@@ -45,6 +52,7 @@ class NetNode {
     if (exactModel) 'exactModel': true,
     if (modules.isNotEmpty) 'modules': modules,
     if (mgmtIp != null) 'mgmtIp': mgmtIp,
+    if (siteId != null) 'siteId': siteId,
     if (services.isNotEmpty) 'services': services,
     if (serviceRules.isNotEmpty)
       'serviceRules': _copyServiceValue(serviceRules, includeSecrets),
@@ -57,6 +65,7 @@ class NetNode {
     exactModel: j['exactModel'] == true,
     modules: List<String>.from(j['modules'] ?? const []),
     mgmtIp: j['mgmtIp'] as String?,
+    siteId: j['siteId'] as String?,
     services: ((j['services'] as List?) ?? [])
         .map((e) => e.toString())
         .toList(),
@@ -964,9 +973,9 @@ class NetworkIntent {
   ///
   /// Two plans with the same devices, links, addressing (IPv4 AND IPv6),
   /// management addresses, service settings, routing and requested security
-  /// share a revision; any real edit changes it. Canvas drag positions and
-  /// the parser's prose fields are deliberately left out, so nudging a box
-  /// or re-reading the same brief never makes a build card look stale.
+  /// share a revision; any semantic edit changes it. Canvas positions and
+  /// parser prose are deliberately left out of this identity. Build actions
+  /// also use [buildRevision], which includes the saved drawing and positions.
   ///
   /// The service rules ARE hashed - through the same sanitized copy the
   /// planner export uses, so a password, PSK or token key never enters the
@@ -986,9 +995,9 @@ class NetworkIntent {
   /// for a plan whose findings had not changed at all, and there was nothing
   /// the user could do about it.
   ///
-  /// Every display and every action reads this, which is what stops a build
-  /// card, the plan summary and the compiled file from describing three
-  /// different networks.
+  /// Semantic summaries and actions read this. Build actions additionally
+  /// check [buildRevision], so a drawing-only edit cannot leave an old build
+  /// card live against a different artifact layout.
   String get revision {
     final b = StringBuffer()
       ..write('|routing:')
@@ -1048,6 +1057,27 @@ class NetworkIntent {
     }
     b.write('|sec:${jsonEncode(security.toJson(includeSecrets: false))}');
     return _shortHash(b.toString());
+  }
+
+  /// Identity for a build action, including the drawing that the generated
+  /// artifact will use. The semantic [revision] intentionally ignores canvas
+  /// positions and descriptive notes; a build card cannot, because the saved
+  /// drawing style and explicit positions change the artifact.
+  String get buildRevision {
+    final layoutNotes = notes
+        .where((note) => note.trim().toLowerCase().startsWith('layout:'))
+        .map((note) => note.trim())
+        .toList();
+    final positions = <String, dynamic>{};
+    for (final name in layout.keys.toList()..sort()) {
+      final position = layout[name];
+      positions[name] = position == null
+          ? null
+          : {'x': position.dx, 'y': position.dy};
+    }
+    return _shortHash(
+      '$revision|build-layout:${_stableJson({'notes': layoutNotes, 'positions': positions})}',
+    );
   }
 
   /// JSON with map keys sorted at every depth, so two plans carrying the
@@ -1222,6 +1252,26 @@ class NetworkIntent {
     final n = int.tryParse(match.group(1)!);
     if (n == null || n <= 0) return 24;
     return n;
+  }
+
+  /// How many copper Ethernet ports a Packet Tracer ROUTER model actually
+  /// has. The planner assigns router interfaces the same way it assigns
+  /// switch ports - "2 core routers, 3 access switches and a firewall" asks
+  /// one router for a transit, two uplinks and the firewall on an ISR 4331,
+  /// which has three - and a plan that hands a router a fourth interface
+  /// builds a cable pointing at a port the device does not have. Counts come
+  /// from the bundled template catalogue (copper family only: the SFP
+  /// slots on an ISR are fiber, and a copper cable cannot land there); a
+  /// model the catalogue does not know is treated as 4, the classic ISR
+  /// layout, never as more.
+  static int routerPortCapacity(String? model) {
+    try {
+      final device = PacketTracerCatalog.instance.device(model ?? '');
+      if (device == null) return 4;
+      return device.ports.where((p) => ptPortMedium(p.type) == 'copper').length;
+    } catch (_) {
+      return 4;
+    }
   }
 
   /// Pick the best PT model for the job from instruction text.
@@ -1433,26 +1483,49 @@ class NetworkIntent {
       RegExp(r'\bkey\s*(?:is|:|=)\s*([^\s,.]+)', caseSensitive: false),
     );
     final nodes = <NetNode>[
-      NetNode(name: 'HQ_Router', type: 'router', model: routerModel),
-      NetNode(name: 'BR_Router', type: 'router', model: routerModel),
-      NetNode(name: 'HQ_Switch', type: 'switch', model: switchModel),
-      NetNode(name: 'BR_Switch', type: 'switch', model: switchModel),
+      NetNode(
+        name: 'HQ_Router',
+        type: 'router',
+        model: routerModel,
+        siteId: 'hq',
+      ),
+      NetNode(
+        name: 'BR_Router',
+        type: 'router',
+        model: routerModel,
+        siteId: 'branch',
+      ),
+      NetNode(
+        name: 'HQ_Switch',
+        type: 'switch',
+        model: switchModel,
+        siteId: 'hq',
+      ),
+      NetNode(
+        name: 'BR_Switch',
+        type: 'switch',
+        model: switchModel,
+        siteId: 'branch',
+      ),
       const NetNode(
         name: 'AAA1',
         type: 'server',
         model: 'Server-PT',
+        siteId: 'hq',
         services: ['aaa'],
       ),
       NetNode(
         name: 'DHCP1',
         type: 'server',
         model: 'Server-PT',
+        siteId: 'hq',
         services: isAllFeaturesLab ? const ['dhcp'] : const ['dhcp', 'dns'],
       ),
       NetNode(
         name: 'WEB1',
         type: 'server',
         model: 'Server-PT',
+        siteId: 'hq',
         services: ['http'],
         serviceRules: isAllFeaturesLab
             ? const {
@@ -1465,6 +1538,7 @@ class NetworkIntent {
           name: 'SRV1',
           type: 'server',
           model: 'Server-PT',
+          siteId: 'hq',
           services: const ['dns', 'ftp', 'email', 'ntp', 'tftp'],
           serviceRules: {
             'dns': {
@@ -1487,9 +1561,14 @@ class NetworkIntent {
             if (emailDomain != null) 'email': {'domain': emailDomain},
           },
         ),
-      const NetNode(name: 'MGR1', type: 'pc', model: 'PC-PT'),
-      const NetNode(name: 'HQ_PC1', type: 'pc', model: 'PC-PT'),
-      const NetNode(name: 'BR_PC1', type: 'pc', model: 'PC-PT'),
+      const NetNode(name: 'MGR1', type: 'pc', model: 'PC-PT', siteId: 'hq'),
+      const NetNode(name: 'HQ_PC1', type: 'pc', model: 'PC-PT', siteId: 'hq'),
+      const NetNode(
+        name: 'BR_PC1',
+        type: 'pc',
+        model: 'PC-PT',
+        siteId: 'branch',
+      ),
     ];
     final links = <NetLink>[
       const NetLink(
@@ -1786,7 +1865,7 @@ class NetworkIntent {
     // Naming devices is a re-plan, not a tweak: leave it to the parser.
     if (namesAnyDeviceIn(t)) return null;
     final asksToChange = RegExp(
-      r'\b(use|switch to|change to|change it to|set|go with|prefer|instead of|'
+      r'\b(use|switch to|change to|change it to|change\s+(?:the\s+)?routing(?:\s+protocol)?\s+to|set\s+(?:the\s+)?routing(?:\s+protocol)?\s+to|set|go with|prefer|instead of|'
       r'rather than|make it)\b',
     ).hasMatch(t);
     if (!asksToChange) return null;
@@ -2001,7 +2080,108 @@ class NetworkIntent {
       final base = previousBrief.trim();
       return (plan: changed, brief: base.isEmpty ? brief : '$base $brief');
     }
+    // A credential turn the standing lab has been waiting for: the
+    // validator's own remedy text says to type 'AAA client name admin
+    // password 123', and this fallthrough used to file that sentence under
+    // "no device named - keep the plan", dropping the credentials it
+    // carried so the finding could never clear.
+    final credMerged = _mergeStatedCredentials(
+      previous: previous,
+      parsed: parsed,
+    );
+    if (credMerged != null) {
+      final base = previousBrief.trim();
+      return (plan: credMerged, brief: base.isEmpty ? brief : '$base $brief');
+    }
     return (plan: previous, brief: previousBrief);
+  }
+
+  /// Land the credentials a short follow-up states onto the standing lab.
+  ///
+  /// Only what the lab LACKS: an account on a server that already has one,
+  /// or a key on a tunnel that has one, is left alone - re-stating a
+  /// credential must never overwrite one the user already gave.
+  static NetworkIntent? _mergeStatedCredentials({
+    required NetworkIntent previous,
+    required NetworkIntent parsed,
+  }) {
+    final user = (parsed.security.aaaUsername ?? '').trim();
+    final pass =
+        (parsed.security.aaaAccountPassword ?? parsed.security.aaaPassword)
+            ?.trim() ??
+        '';
+    final psk = (parsed.security.vpnPreSharedKey ?? '').trim();
+    if (user.isEmpty && psk.isEmpty) return null;
+
+    var security = previous.security;
+    var nodes = previous.nodes;
+    var changed = false;
+
+    if (user.isNotEmpty && pass.isNotEmpty) {
+      // The server the plan points at, else the node that already runs AAA,
+      // else the first server.
+      NetNode? server;
+      for (final n in nodes) {
+        if (n.name == security.aaaServer) {
+          server = n;
+          break;
+        }
+      }
+      server ??= nodes.cast<NetNode?>().firstWhere(
+        (n) =>
+            ((n!.serviceRules['aaa'] as Map?)?['users'] as List?)?.isNotEmpty ??
+            false ||
+                n.services.contains('aaa') ||
+                n.name.toUpperCase().startsWith('AAA'),
+        orElse: () => null,
+      );
+      final idx = server == null ? -1 : nodes.indexOf(server);
+      if (idx >= 0) {
+        final s = server!;
+        final rules = Map<String, dynamic>.from(s.serviceRules);
+        final aaa = Map<String, dynamic>.from(
+          (rules['aaa'] as Map?) ?? const {},
+        );
+        final users = [...((aaa['users'] as List?) ?? const [])];
+        final alreadyListed = users.any(
+          (u) => u is Map && '${u['username'] ?? ''}' == user,
+        );
+        if (!alreadyListed) {
+          aaa['users'] = [
+            ...users,
+            {'username': user, 'password': pass},
+          ];
+          rules['aaa'] = aaa;
+          nodes = [...nodes];
+          nodes[idx] = NetNode(
+            name: s.name,
+            type: s.type,
+            model: s.model,
+            exactModel: s.exactModel,
+            modules: s.modules,
+            mgmtIp: s.mgmtIp,
+            siteId: s.siteId,
+            services: s.services,
+            serviceRules: rules,
+          );
+          changed = true;
+        }
+        if ((security.aaaUsername ?? '').isEmpty) {
+          security = security.copyWith(
+            aaaUsername: user,
+            aaaAccountPassword: pass,
+          );
+        }
+      }
+    }
+
+    if (psk.isNotEmpty && (security.vpnPreSharedKey ?? '').trim().isEmpty) {
+      security = security.copyWith(vpnPreSharedKey: psk);
+      changed = true;
+    }
+
+    if (!changed) return null;
+    return previous.copyWith(security: security, nodes: nodes);
   }
 
   /// Wording that asks to ADD to what exists rather than to start again.
@@ -2203,6 +2383,25 @@ class NetworkIntent {
   /// sees) while the words of both sentences stay in the brief, because the
   /// roles, VLANs, routing and security come from the text, not from the
   /// counts.
+
+  /// The merged plan's links, with duplicate cables collapsed. Stacked
+  /// follow-up merges re-read the brief with its own earlier wording still
+  /// inside, and two reads of the same "connected over a serial WAN" landed
+  /// the same transit twice - the validator then reported the interface as
+  /// used by 2 links. Endpoint pair + interfaces is the identity; the first
+  /// cable wins.
+  static List<NetLink> dedupeLinks(List<NetLink> links) {
+    final seen = <String>{};
+    final out = <NetLink>[];
+    for (final l in links) {
+      final key = l.a.compareTo(l.b) <= 0
+          ? '${l.a}|${l.aIf.toLowerCase()}|${l.b}|${l.bIf.toLowerCase()}'
+          : '${l.b}|${l.bIf.toLowerCase()}|${l.a}|${l.aIf.toLowerCase()}';
+      if (seen.add(key)) out.add(l);
+    }
+    return out;
+  }
+
   static ({NetworkIntent plan, String brief})? _mergeAddition({
     required NetworkIntent previous,
     required String previousBrief,
@@ -2266,7 +2465,10 @@ class NetworkIntent {
     // but it must never shrink the lab: that is the bug this whole path exists
     // to prevent.
     if (merged.nodes.length < previous.nodes.length) return null;
-    return (plan: merged, brief: combined);
+    return (
+      plan: merged.copyWith(links: dedupeLinks(merged.links)),
+      brief: combined,
+    );
   }
 
   /// The original request and the new "we need more than ..." sentence, read
@@ -2316,7 +2518,10 @@ class NetworkIntent {
     // The floor may change configuration (security, routing) but it must
     // never make the lab smaller than it already was.
     if (merged.nodes.length < previous.nodes.length) return null;
-    return (plan: merged, brief: combined);
+    return (
+      plan: merged.copyWith(links: dedupeLinks(merged.links)),
+      brief: combined,
+    );
   }
 
   /// Wording that marks a number as a CORRECTION of something the
@@ -2357,8 +2562,44 @@ class NetworkIntent {
   /// pcs, actually" trails its count as an afterthought about the bound,
   /// and correcting the lab down to the count the cue follows would shrink
   /// the lab on a sentence that never asked for that.
+  /// Public for the chat's file-intent gate: a turn that reads as a count
+  /// correction targets the standing PLAN ("make it 60 PCs" while an
+  /// enterprise lab stands), never the .pkt artifact - "it" in that
+  /// sentence is the lab, not the file.
+  static bool readsAsCountCorrection(String brief) =>
+      _readsAsCountCorrection(brief);
+
+  /// "make it 60 PCs", "make them 8 routers" - the pronoun IS the standing
+  /// lab, and the count that follows corrects one of its kinds. Detected
+  /// separately from the cue words ("actually", "no wait") because this
+  /// natural phrasing carries none - and before this shape existed, the
+  /// file-edit reader claimed the sentence ("it" looked like the .pkt
+  /// artifact) and the correction's fragment replaced an entire enterprise
+  /// lab with sixty orphan PCs.
+  static final RegExp _makeItCountCorrection = RegExp(
+    r'\bmake\s+(?:it|them|the\s+lab|the\s+network)\s+'
+    r'\d{1,4}\s*(?:pcs?|computers?|routers?|switch(?:es)?|servers?|'
+    r'laptops?|printers?|firewalls?|phones?)\b',
+    caseSensitive: false,
+  );
+
   static bool _readsAsCountCorrection(String brief) {
     final lower = brief.toLowerCase();
+    final makeIt = _makeItCountCorrection.firstMatch(lower);
+    if (makeIt != null) {
+      if (_readsAsAddition(brief)) return false;
+      if (_additiveCountWording.hasMatch(lower)) return false;
+      // ONE kind corrected ("make it 60 pcs") is a correction of the
+      // standing lab. A multi-kind inventory ("make it 2 routers and 4
+      // pcs") is the documented RE-PLAN reading: the user is naming the
+      // whole new lab, not nudging one count.
+      final after = lower.substring(makeIt.end);
+      final secondCount = RegExp(
+        r'\b(?:and|,)\s*\d{1,4}\s*(?:pcs?|computers?|routers?|switch(?:es)?'
+        r'|servers?|laptops?|printers?|firewalls?|phones?)\b',
+      ).hasMatch(after);
+      if (!secondCount) return true;
+    }
     final cue = _countCorrectionCue.firstMatch(lower);
     if (cue == null) return false;
     if (_readsAsAddition(brief)) return false;
@@ -3091,6 +3332,7 @@ class NetworkIntent {
           exactModel: node.exactModel,
           modules: node.modules,
           mgmtIp: node.mgmtIp,
+          siteId: node.siteId,
           services: node.services,
           serviceRules: rebuilt,
         ),
@@ -3366,6 +3608,8 @@ class NetworkIntent {
   // member, so these one-liners are what keep the extraction invisible. They
   // are the second half of the seam: the behaviour is in parser.dart.
   static String bridgeBrief(String raw) => brief_reader.bridgeBrief(raw);
+  static NormalizedMessage bridgeBriefWithMapping(String raw) =>
+      brief_reader.bridgeBriefWithMapping(raw);
   static int? siteCount(String text) => brief_reader.siteCount(text);
   static Map<String, int>? perSiteCounts(String text) =>
       brief_reader.perSiteCounts(text);
@@ -3389,8 +3633,9 @@ class NetworkIntent {
   static NetworkIntent parseBridged(
     String projectName,
     String bridged,
-    String rawText,
-  ) {
+    String rawText, [
+    String? routerModelHint,
+  ]) {
     final lower = bridged.toLowerCase();
     // The sizing pack answers business briefs - "10 employees and two floors"
     // - before the parser proper runs. It is skipped for the two-site
@@ -3413,13 +3658,14 @@ class NetworkIntent {
     if (sized == null) {
       return _withHeadcountCheck(
         bridged,
-        _parseBridgedBrief(projectName, bridged, rawText),
+        _parseBridgedBrief(projectName, bridged, rawText, routerModelHint),
       );
     }
     final intent = _parseBridgedBrief(
       projectName,
       sized.expandedBrief,
       rawText,
+      routerModelHint,
     );
     return _withHeadcountCheck(
       bridged,
@@ -3441,8 +3687,9 @@ class NetworkIntent {
   static NetworkIntent _parseBridgedBrief(
     String projectName,
     String text,
-    String rawText,
-  ) {
+    String rawText, [
+    String? routerModelHint,
+  ]) {
     final lower = text.toLowerCase();
     if (_looksLikeSecurityBranchLab(lower)) {
       return _parseSecurityBranchLab(projectName, text);
@@ -3516,7 +3763,13 @@ class NetworkIntent {
         .map((m) => int.tryParse(m.group(1) ?? '') ?? 0)
         .fold(0, (max, value) => value > max ? value : max);
 
-    final routerModel = bestRouterModel(lower);
+    // The hardware clause was stripped from the planner text, so the model
+    // pick here cannot see "(2911)" - the reader passes what the brief named
+    // as the hint, and the layout plans interfaces against THAT model's
+    // real port count.
+    final routerModel = (routerModelHint?.trim().isNotEmpty ?? false)
+        ? routerModelHint!.trim()
+        : bestRouterModel(lower);
     final switchModel = bestSwitchModel(lower);
     for (var i = 1; i <= routerCount; i++) {
       nodes.add(NetNode(name: 'R$i', type: 'router', model: routerModel));
@@ -3550,6 +3803,32 @@ class NetworkIntent {
         nodes.add(
           NetNode(name: '$prefix$i', type: kind.type, model: kind.models.first),
         );
+      }
+    }
+
+    // Carry only site ownership that the source brief explicitly attached to
+    // inventory. Later site-scoped edits can then resolve from saved plan
+    // state without guessing from device names or a stale brief.
+    final explicitSiteCounts = BriefSlotPipeline.siteDeviceCounts(text);
+    for (final type in deviceKinds.map((kind) => kind.type)) {
+      final owned = nodes.where((node) => node.type == type).toList();
+      var cursor = 0;
+      for (final entry in explicitSiteCounts.entries) {
+        final count = entry.value[type] ?? 0;
+        for (var i = 0; i < count && cursor < owned.length; i++) {
+          final node = owned[cursor++];
+          nodes[nodes.indexOf(node)] = NetNode(
+            name: node.name,
+            type: node.type,
+            model: node.model,
+            exactModel: node.exactModel,
+            modules: node.modules,
+            mgmtIp: node.mgmtIp,
+            siteId: entry.key,
+            services: node.services,
+            serviceRules: node.serviceRules,
+          );
+        }
       }
     }
 
@@ -3928,12 +4207,13 @@ class NetworkIntent {
         ),
       );
     }
-    // One LAN uplink per switch, spread over the routers in order:
-    // SW1 -> R1, SW2 -> R2, SW3 -> R1, ...  A two-site brief therefore
-    // gets a LAN on each side of the WAN, and each router-switch link is
-    // its own subnet further down.  The port is the first one the router is
-    // not already using, so an uplink the brief cabled itself never has its
-    // interface handed out twice.
+    // One LAN uplink per switch, spread over the routers BY CAPACITY: a
+    // router can only carry as many copper ports as its model has, and the
+    // old round-robin handed a fourth interface to an ISR 4331, which has
+    // three - the build then either remapped the cable onto a wrong-medium
+    // port or refused it. Routers are visited round-robin but a full one is
+    // skipped; a switch that fits nowhere trunks to a cabled sibling, and
+    // the addressing pass puts its endpoints on that sibling's LAN.
     final routerUplinks = <String, int>{};
     String nextRouterIface(String router) {
       final used = <String>{
@@ -3949,22 +4229,67 @@ class NetworkIntent {
       return '${rIf}0/$n';
     }
 
+    // The copper ports of `router` already claimed by a link. Serial WAN
+    // ports count too: a port is a port, whichever family it is.
+    int routerPortsUsed(String router) => links
+        .expand((l) => [MapEntry(l.a, l.aIf), MapEntry(l.b, l.bIf)])
+        .where((e) => e.key == router)
+        .length;
+
+    NetNode? routerWithRoom(int startAt) {
+      for (var k = 0; k < routers.length; k++) {
+        final r = routers[(startAt + k) % routers.length];
+        if (routerPortsUsed(r.name) < routerPortCapacity(r.model)) return r;
+      }
+      return null;
+    }
+
+    // switch -> the cabled sibling it trunked to (empty when the switch got
+    // its own router uplink). The addressing pass reads this.
+    final trunkedFrom = <String, String>{};
     for (var i = 0; i < switches.length; i++) {
-      final r = routers.isEmpty ? null : routers[i % routers.length];
-      if (r == null) {
+      final r = routerWithRoom(i);
+      if (routers.isEmpty && i == 0) {
         // A plan with switches and no router at all - "two switches and
-        // three pcs" - is one layer-2 network: SW1 feeds the others on its
-        // last ports, so the access ports stay free for the devices.
-        if (i == 0) continue;
-        if (cabledTogether(switches.first.name, switches[i].name)) continue;
-        addLink(
-          NetLink(
-            a: switches.first.name,
-            aIf: 'f0/${25 - i}',
-            b: switches[i].name,
-            bIf: 'f0/24',
-          ),
-        );
+        // three pcs" - is one layer-2 network, and this first switch is its
+        // root: the others trunk to it below, its access ports stay free.
+        continue;
+      }
+      if (r == null) {
+        // Every router port is taken. A daisy-chained access switch keeps
+        // the design alive: its endpoints share the sibling's LAN, and the
+        // assumption below says so instead of leaving a floating device.
+        final name = switches[i].name;
+        String? host;
+        for (final s in switches) {
+          if (s.name == name) continue;
+          if (!linkedTo(s.name) &&
+              !trunkedFrom.containsKey(s.name) &&
+              !(routers.isEmpty && s.name == switches.first.name)) {
+            continue;
+          }
+          final capacity = switchPortCapacity(s.model);
+          final taken = {
+            for (final l in links)
+              for (final e in [MapEntry(l.a, l.aIf), MapEntry(l.b, l.bIf)])
+                if (e.key == s.name)
+                  if (RegExp(r'^f0/(\d+)$').hasMatch(e.value.toLowerCase()))
+                    int.parse(
+                      RegExp(
+                        r'^f0/(\d+)$',
+                      ).firstMatch(e.value.toLowerCase())!.group(1)!,
+                    ),
+          };
+          for (var port = capacity; port >= 23; port--) {
+            if (!taken.contains(port)) {
+              host = s.name;
+              trunkedFrom[name] = host;
+              addLink(NetLink(a: host, aIf: 'f0/$port', b: name, bIf: 'f0/24'));
+              break;
+            }
+          }
+          if (host != null) break;
+        }
         continue;
       }
       // A switch the brief already cabled keeps exactly the cable it was
@@ -4041,7 +4366,25 @@ class NetworkIntent {
         attach(switches[s].name, userDevices.sublist(taken, taken + count));
         taken += count;
       }
-      attach(switches.first.name, serverDevices);
+      // Servers fill the first switch's LAN, then overflow to the next
+      // switch with room. Pinning every server to SW1 while SW1 also
+      // carried its share of 30 PCs ran a 2960 past its 24 ports, and the
+      // validator refused the build with one finding per homeless cable.
+      const maxAccessPorts = 22; // f0/2..f0/22: the uplink keeps f0/1
+      var host = 0;
+      for (final srv in serverDevices) {
+        while (host < switches.length &&
+            (usedPorts[switches[host].name]?.length ?? 0) >= maxAccessPorts) {
+          host++;
+        }
+        // Every switch full: the last one takes it anyway, and the
+        // validator reports the port it does not have - inventing a switch
+        // is not this pass's call.
+        attach(
+          switches[host < switches.length ? host : switches.length - 1].name,
+          [srv],
+        );
+      }
     } else if (routers.isNotEmpty) {
       // No switch to hang them off: the routers themselves are the LAN.
       //
@@ -4178,53 +4521,88 @@ class NetworkIntent {
     // firewall belongs between the LAN and the internet, and a cloud that
     // hangs off nothing is not the device that was asked for.  A device the
     // brief already cabled is left exactly where the brief put it.
+    //
+    // The firewalls CHAIN between that router and the edge device:
+    // R1:<next free> - FW1 g1/1, FW1 g1/2 - FW2 g1/1, ... last - edge. The
+    // old version cabled only the FIRST firewall and hardcoded the router
+    // side to g0/2, which the switch pass had already handed to a switch -
+    // R1 answered "interface used by 2 links" and the second ASA shipped
+    // standing alone.
     final fwNodes = nodes.where((n) => n.type == 'firewall').toList();
     final edgeNodes = nodes
         .where((n) => n.type == 'cloud' || n.type == 'modem')
         .toList();
-    if (routers.isNotEmpty &&
-        fwNodes.isNotEmpty &&
-        !linkedTo(fwNodes.first.name)) {
-      links.add(
-        NetLink(
-          a: routers.first.name,
-          aIf: '${rIf}0/2',
-          b: fwNodes.first.name,
-          bIf: 'g1/1',
-        ),
-      );
-    }
-    if (edgeNodes.isNotEmpty && !linkedTo(edgeNodes.first.name)) {
-      final fwUp = fwNodes.isNotEmpty ? fwNodes.first.name : '';
+    var edgeUpstream = '';
+    var edgeUpstreamIf = '';
+    if (fwNodes.isNotEmpty) {
+      // The chain starts at a router with a free copper port - the edge
+      // competes with switch uplinks for the same ports, and a router the
+      // switch pass filled left the firewalls uncabled. When no router has
+      // room, the first switch takes the chain (the honest fallback the
+      // no-router briefs already used).
+      var prev = '';
+      var prevIf = '';
+      final fwHost = routerWithRoom(0);
+      if (fwHost != null) {
+        prev = fwHost.name;
+        prevIf = nextRouterIface(prev);
+      } else if (switches.isNotEmpty) {
+        prev = switches.first.name;
+        // The switch-only trunk pass already took f0/24, and the endpoint
+        // pass fills f0/2 upward - take the highest port still free.
+        final used = <String>{
+          for (final l in links)
+            for (final e in [MapEntry(l.a, l.aIf), MapEntry(l.b, l.bIf)])
+              if (e.key == prev) e.value.toLowerCase(),
+        };
+        var port = 24;
+        while (port > 2 && used.contains('f0/$port')) {
+          port--;
+        }
+        prevIf = 'f0/$port';
+      }
+      for (final fw in fwNodes) {
+        if (linkedTo(fw.name)) {
+          // The brief cabled this firewall itself: the chain continues from
+          // it, on the outside interface the edge link below already used.
+          prev = fw.name;
+          prevIf = 'g1/2';
+          continue;
+        }
+        if (prev.isEmpty) break;
+        links.add(NetLink(a: prev, aIf: prevIf, b: fw.name, bIf: 'g1/1'));
+        prev = fw.name;
+        prevIf = 'g1/2';
+      }
+      edgeUpstream = prev;
+      edgeUpstreamIf = prevIf;
+    } else if (edgeNodes.isNotEmpty) {
       // A brief that names ONLY an edge device ("should i use ... cloud
       // services?" parses to a Cloud-PT) has nothing to hang it off: this
       // used to call switches.first on an empty list and throw, which the
       // chat swallowed into "no plan". A device the brief never cabled is
       // handled by the uncabled-device pass below, so the link is skipped
       // rather than invented.
-      final upstream = fwUp.isNotEmpty
-          ? fwUp
-          : routers.isNotEmpty
-          ? routers.first.name
-          : switches.isNotEmpty
-          ? switches.first.name
-          : '';
-      if (upstream.isNotEmpty) {
-        final upstreamIf = fwUp.isNotEmpty
-            ? 'g1/2'
-            : routers.isNotEmpty
-            ? '${rIf}0/2'
-            : 'f0/24';
-        final kind = deviceKindOf(edgeNodes.first.type);
-        links.add(
-          NetLink(
-            a: upstream,
-            aIf: upstreamIf,
-            b: edgeNodes.first.name,
-            bIf: (kind != null && kind.port.isNotEmpty) ? kind.port : 'port1',
-          ),
-        );
+      if (routers.isNotEmpty) {
+        edgeUpstream = routers.first.name;
+        edgeUpstreamIf = nextRouterIface(edgeUpstream);
+      } else if (switches.isNotEmpty) {
+        edgeUpstream = switches.first.name;
+        edgeUpstreamIf = 'f0/24';
       }
+    }
+    if (edgeNodes.isNotEmpty &&
+        !linkedTo(edgeNodes.first.name) &&
+        edgeUpstream.isNotEmpty) {
+      final kind = deviceKindOf(edgeNodes.first.type);
+      links.add(
+        NetLink(
+          a: edgeUpstream,
+          aIf: edgeUpstreamIf,
+          b: edgeNodes.first.name,
+          bIf: (kind != null && kind.port.isNotEmpty) ? kind.port : 'port1',
+        ),
+      );
     }
 
     /// The interface an address belongs on for a device the plan never
@@ -4360,6 +4738,16 @@ class NetworkIntent {
     }
 
     final addressing = <InterfaceAddr>[];
+
+    // One host cursor per subnet. End devices sharing a subnet keep taking
+    // the next free host even when they hang off DIFFERENT switches: the old
+    // per-switch restart at .10 handed four PCs of "4 switches, 30 PCs, one
+    // VLAN" the same address and the validator blocked the build with a
+    // duplicate-IP finding per collision.
+    final nextHost = <String, int>{};
+    int takeHost(String subnet) =>
+        nextHost.update(subnet, (h) => h + 1, ifAbsent: () => 10);
+
     bool bothRouters(NetLink l) {
       final aNode = nodes.firstWhere((n) => n.name == l.a);
       final bNode = nodes.firstWhere((n) => n.name == l.b);
@@ -4405,6 +4793,21 @@ class NetworkIntent {
       final routerName = aNode.type == 'router' ? l.a : l.b;
       final routerIface = aNode.type == 'router' ? l.aIf : l.bIf;
       final switchName = aNode.type == 'router' ? l.b : l.a;
+      // Switches trunked to this one (the router port budget ran out and
+      // the layout daisy-chained them) share its LAN: their endpoints are
+      // addressed here too, transitively down the daisy chain.
+      final switchAndTrunked = <String>[switchName];
+      var grew = true;
+      while (grew) {
+        grew = false;
+        for (final e in trunkedFrom.entries) {
+          if (switchAndTrunked.contains(e.value) &&
+              !switchAndTrunked.contains(e.key)) {
+            switchAndTrunked.add(e.key);
+            grew = true;
+          }
+        }
+      }
       final endpointsOnSwitch = <(String, String)>[];
       for (final pl in links) {
         final aN = nodes.firstWhere((n) => n.name == pl.a);
@@ -4415,7 +4818,7 @@ class NetworkIntent {
         final epName = aIsEndpoint ? pl.a : pl.b;
         final epIf = aIsEndpoint ? pl.aIf : pl.bIf;
         final otherName = aIsEndpoint ? pl.b : pl.a;
-        if (otherName != switchName) continue;
+        if (!switchAndTrunked.contains(otherName)) continue;
         endpointsOnSwitch.add((epName, epIf));
       }
       if (wantsInterVlan) {
@@ -4425,6 +4828,13 @@ class NetworkIntent {
         // Which VLAN each endpoint joins: a kind the wording pinned lands
         // in that VLAN's subnet; every other endpoint keeps the round-robin
         // spread (e % vlans.length) so no VLAN is left empty.
+        //
+        // Every switch keeps its own router uplink, so a SECOND link
+        // carrying the same VLAN claims the next free /24 for it instead of
+        // repeating 192.168.<v>.0/24 - the repeat put two .1 gateways in
+        // one subnet and blocked the build with a duplicate-IP finding per
+        // collision. The first claim keeps the documentation-space mapping
+        // (VLAN 10 lives in 192.168.10.0/24).
         final endpointVlan = List<int>.filled(endpointsOnSwitch.length, -1);
         for (var e = 0; e < endpointsOnSwitch.length; e++) {
           final type = nodes
@@ -4437,7 +4847,9 @@ class NetworkIntent {
         }
         for (var i = 0; i < vlans.length; i++) {
           final v = vlans[i];
-          final subnet = _vlanSubnet(v);
+          final subnet = usedSubnets.add(_vlanSubnet(v))
+              ? _vlanSubnet(v)
+              : derivedLanSubnet();
           addressing.add(
             InterfaceAddr(
               node: routerName,
@@ -4445,17 +4857,14 @@ class NetworkIntent {
               ipCidr: hostIn(subnet, 1),
             ),
           );
-          final inThisVlan = <int>[
-            for (var e = 0; e < endpointsOnSwitch.length; e++)
-              if (endpointVlan[e] == v) e,
-          ];
-          for (var hostIdx = 0; hostIdx < inThisVlan.length; hostIdx++) {
-            final (epName, epIf) = endpointsOnSwitch[inThisVlan[hostIdx]];
+          for (var e = 0; e < endpointsOnSwitch.length; e++) {
+            if (endpointVlan[e] != v) continue;
+            final (epName, epIf) = endpointsOnSwitch[e];
             addressing.add(
               InterfaceAddr(
                 node: epName,
                 iface: epIf,
-                ipCidr: hostIn(subnet, 10 + hostIdx),
+                ipCidr: hostIn(subnet, takeHost(subnet)),
               ),
             );
           }
@@ -4469,16 +4878,14 @@ class NetworkIntent {
             ipCidr: hostIn(sub, 1),
           ),
         );
-        var hostIdx = 0;
         for (final (epName, epIf) in endpointsOnSwitch) {
           addressing.add(
             InterfaceAddr(
               node: epName,
               iface: epIf,
-              ipCidr: hostIn(sub, 10 + hostIdx),
+              ipCidr: hostIn(sub, takeHost(sub)),
             ),
           );
-          hostIdx++;
         }
       }
     } // A router cabled STRAIGHT to an endpoint - a lab with no switch at all -
@@ -4508,7 +4915,7 @@ class NetworkIntent {
         InterfaceAddr(
           node: routerIsA ? l.b : l.a,
           iface: routerIsA ? l.bIf : l.aIf,
-          ipCidr: hostIn(sub, 10),
+          ipCidr: hostIn(sub, takeHost(sub)),
         ),
       );
     }
@@ -4747,6 +5154,7 @@ class NetworkIntent {
       'aaa': 'aaa',
       'radius': 'aaa',
       'email': 'email',
+      'mail': 'email',
       'mail server': 'email',
       'ftp': 'ftp',
       'ntp': 'ntp',
@@ -4958,15 +5366,42 @@ class NetworkIntent {
               // exactly what "the other is AAA" asks for - it just counts it.
               // Without this every role landed on the first server and the
               // second one stayed with an empty Services tab.
-              numbered;
+              numbered ||
+              // "Server farm with 8 servers: DHCP, DNS, web..." - a count of
+              // servers followed by a colon, then several roles, reads as
+              // "spread these roles over those servers". Without this the
+              // colon-list shape fell through and every role landed on the
+              // first box, leaving SRV2+ with empty Services tabs.
+              RegExp(
+                r'\b\d{1,3}\s*(?:servers?|server-pt devices?)\s*:',
+                caseSensitive: false,
+              ).hasMatch(frag);
           final free = servers
               .map((s) => s.name)
               .where((name) => !(roles[name]?.isNotEmpty ?? false))
               .toList();
-          if (distributes && found.length > 1 && free.length >= found.length) {
-            // One role per server, in the order they were said.
+          if (distributes && found.length > 1) {
+            if (free.length >= found.length) {
+              // One role per server, in the order they were said.
+              for (var i = 0; i < found.length; i++) {
+                final target = free[i];
+                roles.putIfAbsent(target, () => []);
+                if (!roles[target]!.contains(found[i])) {
+                  roles[target]!.add(found[i]);
+                }
+              }
+              continue;
+            }
+            // More roles than free servers: spread them round-robin, so
+            // "8 servers: one DHCP, one DNS, one web, one mail, one FTP, one
+            // AAA, one syslog and NTP, one CME" gives every server a role
+            // instead of piling all nine onto the first box (which was the
+            // old reading - the built file then shipped seven empty server
+            // panels and one server doing everything).
             for (var i = 0; i < found.length; i++) {
-              final target = free[i];
+              final target = free.isEmpty
+                  ? servers.first.name
+                  : free[i % free.length];
               roles.putIfAbsent(target, () => []);
               if (!roles[target]!.contains(found[i])) {
                 roles[target]!.add(found[i]);
@@ -5201,6 +5636,7 @@ class NetworkIntent {
             exactModel: n.exactModel,
             modules: n.modules,
             mgmtIp: n.mgmtIp,
+            siteId: n.siteId,
             services: roles[n.name]!,
             serviceRules: serviceRules[n.name] ?? const {},
           );
@@ -5252,6 +5688,7 @@ class NetworkIntent {
             exactModel: n.exactModel,
             modules: n.modules,
             mgmtIp: n.mgmtIp,
+            siteId: n.siteId,
             services: n.services,
             serviceRules: {...n.serviceRules, 'wireless': rule},
           );
@@ -5330,6 +5767,7 @@ class NetworkIntent {
         exactModel: first.exactModel,
         modules: first.modules,
         mgmtIp: first.mgmtIp,
+        siteId: first.siteId,
         services: newServices,
         serviceRules: first.serviceRules,
       );
@@ -5665,7 +6103,7 @@ class NetworkIntent {
       'Unspecified links use the deterministic local topology layout.',
       'Unspecified router and switch models use the best-fit Packet Tracer models.',
       if (switches.length > 1)
-        'Layout: each switch is uplinked to a router in order (SW1 to R1, SW2 to R2, ...) and the PCs are split evenly across the switches; servers stay on the first switch LAN.',
+        'Layout: switches are uplinked to routers by free copper ports (a router never gets more interfaces than its model has), a switch that fits nowhere trunks to a cabled sibling and shares its LAN, and the PCs are split evenly across the switches; servers stay on the first switch LAN.',
       if (perSite != null)
         'The brief describes $sites sites, so the devices named after "each" were multiplied by $sites.',
       if (wantsSerialWan)

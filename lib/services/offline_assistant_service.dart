@@ -694,7 +694,7 @@ class OfflineAssistantService {
       // dumping a plan with a build button - the user said they want a
       // network, not that they want THIS network yet.
       if (clarifyingQuestions.isNotEmpty) {
-        return _clarifyReply(clarifyingQuestions, opening, arabic);
+        return _clarifyReply(clarifyingQuestions, opening, arabic, plan: plan);
       }
       // TWO ASKS, ONE ANSWER, NEITHER ANSWERED: a counted WH-question whose
       // topic has no offline coverage used to fall through to the plan dump,
@@ -790,10 +790,21 @@ class OfflineAssistantService {
   static AssistantReply _clarifyReply(
     List<ClarificationQuestion> questions,
     String opening,
-    bool arabic,
-  ) {
+    bool arabic, {
+    NetworkIntent? plan,
+  }) {
     final b = StringBuffer();
     if (opening.isNotEmpty) b.writeln('$opening\n\n');
+    if (plan != null && plan.nodes.isNotEmpty) {
+      final description = _naturalizeLastComma(_labLine(plan));
+      b
+        ..writeln(
+          arabic
+              ? 'سجّلت الأجهزة المذكورة: $description.'
+              : 'I have noted $description.',
+        )
+        ..writeln();
+    }
     b
       ..writeln(
         questions.length == 1
@@ -824,6 +835,12 @@ class OfflineAssistantService {
       ],
       intent: 'clarify',
     );
+  }
+
+  static String _naturalizeLastComma(String value) {
+    final separator = value.lastIndexOf(', ');
+    if (separator < 0) return value;
+    return '${value.substring(0, separator)} and ${value.substring(separator + 2)}';
   }
 
   /// Openers that are answered rather than planned - a full plan dump in reply
@@ -1088,6 +1105,11 @@ class OfflineAssistantService {
     /// The wording then promises what happens next instead of asking for the
     /// click that was already given.
     bool andBuild = false,
+
+    /// When named, the repair runs ONLY the passes for these fix kinds: the
+    /// per-finding "Apply this fix" cards each promise one change, and a
+    /// single-kind tap must not drag every other repair along with it.
+    Set<String>? only,
   }) {
     if (plan == null || plan.nodes.isEmpty) {
       return AssistantReply(

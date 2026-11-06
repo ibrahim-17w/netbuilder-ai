@@ -393,11 +393,22 @@ def audit(path: str, project: str = "") -> dict:
                         "router asks for AAA but no server has the AAA "
                         "panel enabled")
 
-    # gateways: every subnet present on a PC/server should have a router IP
+    # gateways: every subnet present on a PC/server should have a router IP.
+    # A dot1Q gateway (router-on-a-stick) lives on a SUB-INTERFACE: Packet
+    # Tracer stores its address in the running-config text, never in a port
+    # element, so the config lines are read here too - a plan whose gateway
+    # exists only as `interface g0/1.10 / ip address 192.168.10.1` built
+    # fine and routed fine, yet this audit reported every host gateway
+    # missing.
     router_ips = set()
     for d in devs:
         if "router" in d["kind"].lower() or "switch" in d["kind"].lower():
             router_ips.update(d["ips"])
+            for line in d["config"].splitlines():
+                m = re.search(r"ip address\s+(\d+\.\d+\.\d+\.\d+)", line,
+                              re.I)
+                if m:
+                    router_ips.add(m.group(1))
     for d in devs:
         if not (d["kind"].lower() in ("pc", "laptop", "server", "printer")
                 or "pc" in d["kind"].lower()):
