@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated": "2026-09-20 01:54:27",
+  "generated": "2026-11-06T19:37:09Z",
   "version": "9.0.0.0810",
   "skeleton": "skeleton.xml",
   "devices": [
@@ -5945,6 +5945,110 @@
       "sourceName": "ASA4",
       "hasConfig": true,
       "warnings": []
+    },
+    {
+      "key": "Printer-PT+PT-HOST-NM-1CFE",
+      "model": "Printer-PT",
+      "kind": "Printer",
+      "modules": [
+        "PT-HOST-NM-1CFE"
+      ],
+      "file": "devices/Printer-PT+PT-HOST-NM-1CFE.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0"
+        }
+      ],
+      "source": "test.pkt (user-supplied)",
+      "sourceName": "Printer0",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "TV-PT",
+      "model": "TV-PT",
+      "kind": "TV",
+      "modules": [],
+      "file": "devices/TV-PT.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperCoaxial",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "test.pkt (user-supplied)",
+      "sourceName": "TV0",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "WirelessEndDevice-PT+PT-WIRELESSENDDEVICE-NM-1W",
+      "model": "WirelessEndDevice-PT",
+      "kind": "WirelessEndDevice",
+      "modules": [
+        "PT-WIRELESSENDDEVICE-NM-1W"
+      ],
+      "file": "devices/WirelessEndDevice-PT+PT-WIRELESSENDDEVICE-NM-1W.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessG",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "test.pkt (user-supplied)",
+      "sourceName": "Wireless End Device0",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "WiredEndDevice-PT+PT-WIREDENDDEVICE-NM-1CFE",
+      "model": "WiredEndDevice-PT",
+      "kind": "WiredEndDevice",
+      "modules": [
+        "PT-WIREDENDDEVICE-NM-1CFE"
+      ],
+      "file": "devices/WiredEndDevice-PT+PT-WIREDENDDEVICE-NM-1CFE.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0"
+        }
+      ],
+      "source": "test.pkt (user-supplied)",
+      "sourceName": "Wired End Device0",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
     }
   ],
   "links": [
@@ -7934,6 +8038,13 @@
       "version": "9.0.0.0000",
       "devices": 36,
       "links": 32
+    },
+    {
+      "path": "test.pkt (user-supplied)",
+      "sha256": "ac774c0e4d02315a07171cebf4ec3a7a4d38a77a2b2a17f6fce69f38d1e2e2f2",
+      "version": "9.0.0.0810",
+      "devices": 17,
+      "links": 0
     }
   ],
   "warnings": [

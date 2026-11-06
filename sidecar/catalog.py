@@ -121,7 +121,15 @@ DEVICE_PALETTE = {
 # historian, cyber-observer, controller, power-distribution) were taught
 # DEVICE_PALETTE entries above; the set stays as the landing place for the
 # next offline-buildable kind that has no taught click-path yet.
-OFFLINE_ONLY_DEVICE_KINDS = set()
+OFFLINE_ONLY_DEVICE_KINDS = {
+    # Real templates, but no taught live palette path yet. They compile into
+    # offline .pkt files and are reported as offline_only on a live run.
+    "meraki-server",
+    "wired-end-device",
+    "wireless-end-device",
+    "analog-phone",
+    "voip-adapter",
+}
 
 # Kinds the planner can name but neither builder can place yet. They are kept
 # equal to `unsupportedDeviceKinds` in lib/services/nlu/lexicon.dart by
@@ -132,8 +140,6 @@ UNSUPPORTED_DEVICE_KINDS = {
     "repeater",
     "mcu",
     "sbc",
-    "analog-phone",
-    "voip-adapter",
     "cell-tower",
     "central-office",
 }

@@ -68,6 +68,15 @@ const List<DeviceKind> deviceKinds = [
     ipConfig: true,
   ),
   DeviceKind(
+    type: 'meraki-server',
+    // Packet Tracer's Meraki dashboard host, not a Cisco IOS controller.
+    // Its dashboard is configured in PT's GUI, so it is placed and cabled
+    // from its real template and deliberately given no CLI config.
+    keywords: ['meraki server', 'meraki dashboard', 'meraki'],
+    models: ['Meraki-Server'],
+    port: 'f0',
+  ),
+  DeviceKind(
     type: 'firewall',
     // ASA-5506/5505 are Firewall-PT devices with ASA syntax, not IOS: they
     // are placed and cabled, and their config is deliberately left to the
@@ -117,6 +126,18 @@ const List<DeviceKind> deviceKinds = [
     type: 'tv',
     keywords: ['smart tv', 'tv'],
     models: ['TV-PT'],
+    wireless: true,
+  ),
+  DeviceKind(
+    type: 'wired-end-device',
+    keywords: ['wired end device', 'wired endpoint'],
+    models: ['WiredEndDevice-PT'],
+    port: 'f0',
+  ),
+  DeviceKind(
+    type: 'wireless-end-device',
+    keywords: ['wireless end device', 'wireless endpoint'],
+    models: ['WirelessEndDevice-PT'],
     wireless: true,
   ),
   DeviceKind(
@@ -264,7 +285,13 @@ const List<DeviceKind> deviceKinds = [
 /// Empty since the seven industrial/control kinds were taught live palette
 /// paths (they build offline AND place live now). The set stays as the
 /// landing place for the next offline-buildable kind with no click-path.
-const Set<String> offlineOnlyDeviceKinds = {};
+const Set<String> offlineOnlyDeviceKinds = {
+  'meraki-server',
+  'wired-end-device',
+  'wireless-end-device',
+  'analog-phone',
+  'voip-adapter',
+};
 
 /// Kinds the planner can recognize but neither builder can place yet.
 ///
@@ -279,8 +306,6 @@ const Set<String> unsupportedDeviceKinds = {
   'repeater',
   'mcu',
   'sbc',
-  'analog-phone',
-  'voip-adapter',
   'cell-tower',
   'central-office',
 };
@@ -313,6 +338,9 @@ const Map<String, String> devicePrefixes = {
   'cyber-observer': 'CYBER',
   'controller': 'CTRL',
   'power-distribution': 'PDU',
+  'meraki-server': 'MERAKI',
+  'wired-end-device': 'WED',
+  'wireless-end-device': 'WLD',
 };
 
 /// Spelled-out numbers, bridged to digits before anything reads them.

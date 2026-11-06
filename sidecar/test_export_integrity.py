@@ -2,14 +2,16 @@
 
 These pin the failures from the field report:
 
-* a printer with no template was skipped while the build still claimed
+* a device with no template was skipped while the build still claimed
   success;
-* the skipped printer also silently dropped its cable;
+* the skipped device also silently dropped its cable;
 * the report could not distinguish planned from exported counts.
 
 They compile against the repository's real template library, so a model that
 exists there is expected to build and one that does not is expected to fail
-loudly, never be replaced by an unrelated device.
+loudly, never be replaced by an unrelated device. The user-supplied
+`test.pkt` supplied the real Printer-PT block, so the printer is now a
+positive case and a deliberately unknown model covers the negative one.
 """
 
 from __future__ import annotations
@@ -39,26 +41,54 @@ def _plan_with_printer() -> tuple[dict, list[dict], list[dict]]:
     return support.plan(nodes, links, project="printer-lab"), nodes, links
 
 
-def test_printer_without_template_is_explicit_not_silent():
-    payload, nodes, links = _plan_with_printer()
+def _plan_with_unknown_device() -> tuple[dict, list[dict], list[dict]]:
+    nodes = [
+        support.node("SW1", "switch", support.SWITCH),
+        support.node("HOLO1", "hologram", "Holo-PT"),
+    ]
+    links = [support.link("SW1", "f0/1", "HOLO1", "f0")]
+    return support.plan(nodes, links, project="unknown-device"), nodes, links
+
+
+def test_printer_with_real_template_builds_and_verifies(tmp_path):
+    payload, _, _ = _plan_with_printer()
+    target = tmp_path / "printer-lab.pkt"
+    report = pkt_builder.generate_pkt_file(
+        payload, str(target), library=LIBRARY, project="printer-lab")
+
+    assert report["status"] in ("VALID", "VALID_WITH_WARNINGS")
+    assert report["complete"] is True
+    assert report["plannedDevices"] == 3
+    assert report["deviceCount"] == 3
+    assert report["plannedLinks"] == 2
+    assert report["linkCount"] == 2
+    assert report["missingDevices"] == []
+    assert report["missingLinks"] == []
+    assert report["verification"]["ok"] is True
+    assert report["verification"]["missingNamesOnDisk"] == []
+    assert b"Printer-PT" in pkt_codec.decrypt_pkt(target.read_bytes())
+
+
+def test_unknown_device_is_explicit_not_silent():
+    payload, _, _ = _plan_with_unknown_device()
     built = pkt_builder.build_pkt(payload, LIBRARY)
 
     assert built["status"] == "EXPORT_INCOMPLETE"
     assert built["complete"] is False
-    assert built["plannedDevices"] == 3
-    assert built["deviceCount"] == 2
-    assert [entry["name"] for entry in built["missingDevices"]] == ["PRN1"]
-    assert "no printer" in built["missingDevices"][0]["reason"].lower()
-    # The printer's cable cannot survive a skipped endpoint either, and that
-    # must be reported as a missing link rather than a smaller successful build.
-    assert [entry["a"] for entry in built["missingLinks"]] == ["SW1"]
-    assert built["linkCount"] == 1
-    assert built["plannedLinks"] == 2
+    assert built["plannedDevices"] == 2
+    assert built["deviceCount"] == 1
+    assert [entry["name"] for entry in built["missingDevices"]] == ["HOLO1"]
+    assert "HOLO1" in built["missingDevices"][0]["reason"]
+    # The skipped device's cable must be reported as a missing link, not
+    # dropped from a smaller build that still calls itself successful.
+    assert [entry["b"] for entry in built["missingLinks"]] == ["HOLO1"]
+    assert built["linkCount"] == 0
+    assert built["plannedLinks"] == 1
 
 
 def test_generate_refuses_to_write_an_incomplete_export(tmp_path):
-    payload, _, _ = _plan_with_printer()
-    target = tmp_path / "printer-lab.pkt"
+    payload, _, _ = _plan_with_unknown_device()
+    target = tmp_path / "unknown-device.pkt"
 
     with pytest.raises(pkt_builder.BuildError) as error:
         pkt_builder.generate_pkt_file(
@@ -66,28 +96,28 @@ def test_generate_refuses_to_write_an_incomplete_export(tmp_path):
 
     message = str(error.value)
     assert "export incomplete" in message
-    assert "PRN1" in message
+    assert "HOLO1" in message
     assert "No file was written" in message
     assert not target.exists()
-    assert not (tmp_path / "printer-lab.pkt.tmp").exists()
+    assert not (tmp_path / "unknown-device.pkt.tmp").exists()
 
 
 def test_incomplete_export_can_be_requested_explicitly(tmp_path):
-    payload, _, _ = _plan_with_printer()
+    payload, _, _ = _plan_with_unknown_device()
     target = tmp_path / "partial.pkt"
 
     report = pkt_builder.generate_pkt_file(
-        payload, str(target), library=LIBRARY, project="printer-lab",
+        payload, str(target), library=LIBRARY, project="unknown-device",
         allow_incomplete=True)
 
     assert target.exists()
     assert report["status"] == "EXPORT_INCOMPLETE"
     assert report["complete"] is False
-    assert report["deviceCount"] == 2
-    assert [entry["name"] for entry in report["missingDevices"]] == ["PRN1"]
+    assert report["deviceCount"] == 1
+    assert [entry["name"] for entry in report["missingDevices"]] == ["HOLO1"]
     assert report["verification"]["ok"] is True
-    assert report["verification"]["deviceCountOnDisk"] == 2
-    assert report["verification"]["linkCountOnDisk"] == 1
+    assert report["verification"]["deviceCountOnDisk"] == 1
+    assert report["verification"]["linkCountOnDisk"] == 0
 
 
 def test_unknown_cable_is_a_precise_error():
@@ -229,16 +259,15 @@ def test_fifty_device_build_matches_plan_and_disk(tmp_path):
     assert names == {entry["name"] for entry in nodes}
 
 
-def test_fifty_device_complex_plan_with_printers_is_incomplete():
+def test_fifty_device_complex_plan_with_printers_is_complete():
     nodes, links = _mixed_fifty(include_printers=True)
     built = pkt_builder.build_pkt(
         support.plan(nodes, links, project="complex"), LIBRARY)
 
     assert built["plannedDevices"] == 50
-    assert built["deviceCount"] == 46
+    assert built["deviceCount"] == 50
     assert built["plannedLinks"] == len(links)
-    assert built["linkCount"] == len(links) - 4
-    assert built["status"] == "EXPORT_INCOMPLETE"
-    assert {entry["name"] for entry in built["missingDevices"]} == {
-        f"PRN{i}" for i in range(1, 5)
-    }
+    assert built["linkCount"] == len(links)
+    assert built["status"] in ("VALID", "VALID_WITH_WARNINGS")
+    assert built["missingDevices"] == []
+    assert built["missingLinks"] == []

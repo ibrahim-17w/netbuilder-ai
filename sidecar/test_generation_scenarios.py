@@ -302,18 +302,20 @@ def test_14_network_with_multiple_servers():
     assert built["linkCount"] == 6
 
 
-def test_15_network_with_printers_is_refused_explicitly():
+def test_15_network_with_printers_builds_completely():
     nodes, links = _lan(pc_count=2)
     for index in range(1, 3):
         nodes.append(support.node(f"PRN{index}", "printer", support.PRINTER))
         links.append(support.link(
             f"PRN{index}", "f0", "SW1", f"f0/{index + 2}"))
-    built = support.build(support.plan(nodes, links), template_dir=LIBRARY)
+    built = _run(nodes, links)
 
-    assert built["status"] == "EXPORT_INCOMPLETE"
-    assert built["deviceCount"] == built["plannedDevices"] - 2
-    assert {entry["name"] for entry in built["missingDevices"]} == {"PRN1", "PRN2"}
-    assert len(built["missingLinks"]) == 2
+    # The user-supplied test.pkt supplied the real Printer-PT block, so both
+    # printers and both cables must survive - no missing-device subtraction.
+    assert built["status"] in ("VALID", "VALID_WITH_WARNINGS")
+    assert built["deviceCount"] == 6
+    assert built["linkCount"] == 5
+    assert built["missingDevices"] == []
 
 
 def test_16_network_with_laptops():
@@ -423,18 +425,15 @@ def test_19_exactly_fifty_devices():
     assert built["linkCount"] == len(links)
 
 
-def test_20_complex_fifty_device_network_with_printers():
+def test_20_complex_fifty_device_network_with_printers_is_complete():
     nodes, links = _mixed_fifty(include_printers=True)
     assert len(nodes) == 50
-    built = support.build(support.plan(nodes, links), template_dir=LIBRARY)
+    built = _run(nodes, links)
 
-    # The printers are genuinely unsupported by this machine's template
-    # library. The correct result is an incomplete export that names them,
-    # not a 46-device file reported as a success.
-    assert built["status"] == "EXPORT_INCOMPLETE"
-    assert built["deviceCount"] == 46
+    assert built["status"] in ("VALID", "VALID_WITH_WARNINGS")
     assert built["plannedDevices"] == 50
-    assert {entry["name"] for entry in built["missingDevices"]} == {
-        f"PRN{i}" for i in range(1, 5)
-    }
-    assert len(built["missingLinks"]) == 4
+    assert built["deviceCount"] == 50
+    assert built["plannedLinks"] == len(links)
+    assert built["linkCount"] == len(links)
+    assert built["missingDevices"] == []
+    assert built["missingLinks"] == []

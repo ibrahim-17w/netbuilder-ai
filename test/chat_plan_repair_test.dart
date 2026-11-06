@@ -416,16 +416,17 @@ void main() {
       );
     });
 
-    test('repeated printer-template findings are grouped by model', () {
+    test('the harvested printer template is no longer a blocker', () {
       final findings = _blocking(plan);
-      expect(findings.length, lessThanOrEqualTo(4));
       expect(
-        findings.any(
-          (issue) =>
-              issue.message.contains('60 printer device(s)') &&
-              issue.message.contains('Printer-PT'),
-        ),
+        findings.any((issue) => issue.message.contains('Printer-PT')),
+        isFalse,
+        reason: 'the real Printer-PT template is in the bundled library',
+      );
+      expect(
+        findings.any((issue) => issue.message.contains('50')),
         isTrue,
+        reason: 'the oversized plan is still stopped by the size limit',
       );
     });
 
@@ -473,7 +474,8 @@ void main() {
       );
       expect(reply.text, contains('left this plan unchanged'));
       expect(reply.text, contains('50-device Packet Tracer build limit'));
-      expect(reply.text, contains('60 printer device(s)'));
+      expect(reply.text, contains('60 device'));
+      expect(reply.text, contains('50'));
       expect(reply.text, isNot(contains('Fixed ')));
     });
 
@@ -484,7 +486,8 @@ void main() {
       );
       expect(reply.text, contains('This plan has 60 devices'));
       expect(reply.text, contains('Packet Tracer builder is limited to 50'));
-      expect(reply.text, contains('60 printer device(s)'));
+      expect(reply.text, contains('60 device'));
+      expect(reply.text, contains('50'));
       expect(reply.repairedPlan, isNull);
       expect(reply.quickReplies, isEmpty);
     });

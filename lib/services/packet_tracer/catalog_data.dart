@@ -133,39 +133,6 @@ const ptCatalogJson = r'''{
       "aliases": [],
       "variants": [
         {
-          "key": "2811+WIC-2T",
-          "modules": [
-            "WIC-2T"
-          ],
-          "ports": [
-            {
-              "index": 0,
-              "type": "eSmartSerial",
-              "family": "serial",
-              "name": "Serial0/2/0"
-            },
-            {
-              "index": 1,
-              "type": "eSmartSerial",
-              "family": "serial",
-              "name": "Serial0/2/1"
-            },
-            {
-              "index": 2,
-              "type": "eCopperFastEthernet",
-              "family": "fastethernet",
-              "name": "FastEthernet0/0"
-            },
-            {
-              "index": 3,
-              "type": "eCopperFastEthernet",
-              "family": "fastethernet",
-              "name": "FastEthernet0/1"
-            }
-          ],
-          "hasConfig": true
-        },
-        {
           "key": "2811",
           "modules": [],
           "ports": [
@@ -213,6 +180,39 @@ const ptCatalogJson = r'''{
               "type": "eCopperEthernet",
               "family": "ethernet",
               "name": "Ethernet1/1"
+            }
+          ],
+          "hasConfig": true
+        },
+        {
+          "key": "2811+WIC-2T",
+          "modules": [
+            "WIC-2T"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eSmartSerial",
+              "family": "serial",
+              "name": "Serial0/2/0"
+            },
+            {
+              "index": 1,
+              "type": "eSmartSerial",
+              "family": "serial",
+              "name": "Serial0/2/1"
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0"
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
             }
           ],
           "hasConfig": true
@@ -2610,214 +2610,6 @@ const ptCatalogJson = r'''{
       "aliases": [],
       "variants": [
         {
-          "key": "IE-9320+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN+GLC-TE+GLC-LX-SM-RGD",
-          "modules": [
-            "9320-AC-POWER-SUPPLY",
-            "C9320-SFP-BUILTIN",
-            "GLC-TE",
-            "GLC-LX-SM-RGD"
-          ],
-          "ports": [
-            {
-              "index": 0,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/1",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 1,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/2",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 2,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/3",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 3,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/4",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 4,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/5",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 5,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/6",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 6,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/7",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 7,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/8",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 8,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/9",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 9,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/10",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 10,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/11",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 11,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/12",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 12,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/13",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 13,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/14",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 14,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/15",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 15,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/16",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 16,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/17",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 17,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/18",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 18,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/19",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 19,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/20",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 20,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/21",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 21,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/22",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 22,
-              "type": "eFiberGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/23",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 23,
-              "type": "eFiberGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/24",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 24,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/25",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 25,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/26",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 26,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/27",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            },
-            {
-              "index": 27,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/28",
-              "namingEvidence": "Bundled PT-authored interface configuration"
-            }
-          ],
-          "hasConfig": true
-        },
-        {
           "key": "IE-9320+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN+GLC-LX-SM-RGD+GLC-TE",
           "modules": [
             "9320-AC-POWER-SUPPLY",
@@ -3203,6 +2995,214 @@ const ptCatalogJson = r'''{
             }
           ],
           "hasConfig": true
+        },
+        {
+          "key": "IE-9320+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN+GLC-TE+GLC-LX-SM-RGD",
+          "modules": [
+            "9320-AC-POWER-SUPPLY",
+            "C9320-SFP-BUILTIN",
+            "GLC-TE",
+            "GLC-LX-SM-RGD"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/1",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/2",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/3",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/4",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 4,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/5",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 5,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/6",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 6,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/7",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 7,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/8",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 8,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/9",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 9,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/10",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 10,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/11",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 11,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/12",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 12,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/13",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 13,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/14",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 14,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/15",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 15,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/16",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 16,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/17",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 17,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/18",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 18,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/19",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 19,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/20",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 20,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/21",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 21,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/22",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 22,
+              "type": "eFiberGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/23",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 23,
+              "type": "eFiberGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/24",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 24,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/25",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 25,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/26",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 26,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/27",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 27,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/28",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            }
+          ],
+          "hasConfig": true
         }
       ]
     },
@@ -3213,11 +3213,10 @@ const ptCatalogJson = r'''{
       "aliases": [],
       "variants": [
         {
-          "key": "IE-9320-26S2C+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN+GLC-TE",
+          "key": "IE-9320-26S2C+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN",
           "modules": [
             "9320-AC-POWER-SUPPLY",
-            "C9320-SFP-BUILTIN",
-            "GLC-TE"
+            "C9320-SFP-BUILTIN"
           ],
           "ports": [
             {
@@ -3392,10 +3391,11 @@ const ptCatalogJson = r'''{
           "hasConfig": true
         },
         {
-          "key": "IE-9320-26S2C+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN",
+          "key": "IE-9320-26S2C+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN+GLC-TE",
           "modules": [
             "9320-AC-POWER-SUPPLY",
-            "C9320-SFP-BUILTIN"
+            "C9320-SFP-BUILTIN",
+            "GLC-TE"
           ],
           "ports": [
             {
@@ -3738,12 +3738,11 @@ const ptCatalogJson = r'''{
       "aliases": [],
       "variants": [
         {
-          "key": "ISA-3000+ISA-DC-POWER-ADAPTER-A+ISA-DC-POWER-ADAPTER-B+ISA3000-SFP-BUILTIN+GLC-LX-SM-RGD",
+          "key": "ISA-3000+ISA-DC-POWER-ADAPTER-A+ISA-DC-POWER-ADAPTER-B+ISA3000-SFP-BUILTIN",
           "modules": [
             "ISA-DC-POWER-ADAPTER-A",
             "ISA-DC-POWER-ADAPTER-B",
-            "ISA3000-SFP-BUILTIN",
-            "GLC-LX-SM-RGD"
+            "ISA3000-SFP-BUILTIN"
           ],
           "ports": [
             {
@@ -3784,11 +3783,12 @@ const ptCatalogJson = r'''{
           "hasConfig": true
         },
         {
-          "key": "ISA-3000+ISA-DC-POWER-ADAPTER-A+ISA-DC-POWER-ADAPTER-B+ISA3000-SFP-BUILTIN",
+          "key": "ISA-3000+ISA-DC-POWER-ADAPTER-A+ISA-DC-POWER-ADAPTER-B+ISA3000-SFP-BUILTIN+GLC-LX-SM-RGD",
           "modules": [
             "ISA-DC-POWER-ADAPTER-A",
             "ISA-DC-POWER-ADAPTER-B",
-            "ISA3000-SFP-BUILTIN"
+            "ISA3000-SFP-BUILTIN",
+            "GLC-LX-SM-RGD"
           ],
           "ports": [
             {
@@ -3937,10 +3937,8 @@ const ptCatalogJson = r'''{
       "aliases": [],
       "variants": [
         {
-          "key": "LAP-PT+ACCESS_POINT_POWER_ADAPTER",
-          "modules": [
-            "ACCESS_POINT_POWER_ADAPTER"
-          ],
+          "key": "LAP-PT",
+          "modules": [],
           "ports": [
             {
               "index": 0,
@@ -3958,8 +3956,10 @@ const ptCatalogJson = r'''{
           "hasConfig": false
         },
         {
-          "key": "LAP-PT",
-          "modules": [],
+          "key": "LAP-PT+ACCESS_POINT_POWER_ADAPTER",
+          "modules": [
+            "ACCESS_POINT_POWER_ADAPTER"
+          ],
           "ports": [
             {
               "index": 0,
@@ -4297,23 +4297,6 @@ const ptCatalogJson = r'''{
           "hasConfig": false
         },
         {
-          "key": "MCU-PT+PT-IOT-NM-1CGE+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER",
-          "modules": [
-            "PT-IOT-NM-1CGE",
-            "PT-IOT-CUSTOM-IO",
-            "PT-IOT-POWER-ADAPTER"
-          ],
-          "ports": [
-            {
-              "index": 0,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": ""
-            }
-          ],
-          "hasConfig": false
-        },
-        {
           "key": "MCU-PT+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER",
           "modules": [
             "PT-IOT-NM-1CFE",
@@ -4340,6 +4323,23 @@ const ptCatalogJson = r'''{
               "family": "io",
               "name": "D1",
               "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "MCU-PT+PT-IOT-NM-1CGE+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CGE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-IOT-POWER-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
             }
           ],
           "hasConfig": false
@@ -4468,7 +4468,7 @@ const ptCatalogJson = r'''{
     },
     {
       "model": "Meraki-Server",
-      "type": "controller",
+      "type": "meraki-server",
       "kind": "MerakiServer",
       "aliases": [],
       "variants": [
@@ -4611,27 +4611,6 @@ const ptCatalogJson = r'''{
       "aliases": [],
       "variants": [
         {
-          "key": "PC-PT+PT-HOST-NM-1CFE",
-          "modules": [
-            "PT-HOST-NM-1CFE"
-          ],
-          "ports": [
-            {
-              "index": 0,
-              "type": "eCopperFastEthernet",
-              "family": "fastethernet",
-              "name": "FastEthernet0"
-            },
-            {
-              "index": 1,
-              "type": "eBluetooth",
-              "family": "",
-              "name": ""
-            }
-          ],
-          "hasConfig": false
-        },
-        {
           "key": "PC-PT+Linksys-WMP300N",
           "modules": [
             "Linksys-WMP300N"
@@ -4664,6 +4643,27 @@ const ptCatalogJson = r'''{
             {
               "index": 4,
               "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "PC-PT+PT-HOST-NM-1CFE",
+          "modules": [
+            "PT-HOST-NM-1CFE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
               "family": "",
               "name": ""
             }
@@ -4868,11 +4868,25 @@ const ptCatalogJson = r'''{
     {
       "model": "Printer-PT",
       "type": "printer",
-      "kind": "printer",
-      "aliases": [
-        "printer"
-      ],
-      "variants": []
+      "kind": "Printer",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Printer-PT+PT-HOST-NM-1CFE",
+          "modules": [
+            "PT-HOST-NM-1CFE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "PT8000 Activated",
@@ -5162,41 +5176,6 @@ const ptCatalogJson = r'''{
       "aliases": [],
       "variants": [
         {
-          "key": "SBC-PT+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER+PT-IOT-NM-1W-AC",
-          "modules": [
-            "PT-IOT-CUSTOM-IO",
-            "PT-IOT-POWER-ADAPTER",
-            "PT-IOT-NM-1W-AC"
-          ],
-          "ports": [
-            {
-              "index": 0,
-              "type": "eHostWirelessAC",
-              "family": "",
-              "name": ""
-            },
-            {
-              "index": 1,
-              "type": "eBluetooth",
-              "family": "",
-              "name": ""
-            },
-            {
-              "index": 2,
-              "type": "",
-              "family": "",
-              "name": ""
-            },
-            {
-              "index": 3,
-              "type": "",
-              "family": "",
-              "name": ""
-            }
-          ],
-          "hasConfig": false
-        },
-        {
           "key": "SBC-PT+PT-IOE-CUSTOM-IO+PT-IOE-POWER-ADAPTER+PT-IOE-NM-1W-AC",
           "modules": [
             "PT-IOE-CUSTOM-IO",
@@ -5257,6 +5236,41 @@ const ptCatalogJson = r'''{
               "family": "io",
               "name": "D0",
               "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "SBC-PT+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER+PT-IOT-NM-1W-AC",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-IOT-POWER-ADAPTER",
+            "PT-IOT-NM-1W-AC"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessAC",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
             }
           ],
           "hasConfig": false
@@ -5369,6 +5383,28 @@ const ptCatalogJson = r'''{
           "hasConfig": false
         },
         {
+          "key": "Server-PT+PT-HOST-NM-1CFE+PT-HOST-NM-1CGE",
+          "modules": [
+            "PT-HOST-NM-1CFE",
+            "PT-HOST-NM-1CGE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        },
+        {
           "key": "Server-PT+PT-HOST-NM-1W",
           "modules": [
             "PT-HOST-NM-1W"
@@ -5390,28 +5426,6 @@ const ptCatalogJson = r'''{
               "index": 2,
               "type": "",
               "family": "",
-              "name": ""
-            }
-          ],
-          "hasConfig": false
-        },
-        {
-          "key": "Server-PT+PT-HOST-NM-1CFE+PT-HOST-NM-1CGE",
-          "modules": [
-            "PT-HOST-NM-1CFE",
-            "PT-HOST-NM-1CGE"
-          ],
-          "ports": [
-            {
-              "index": 0,
-              "type": "eCopperFastEthernet",
-              "family": "fastethernet",
-              "name": "FastEthernet0"
-            },
-            {
-              "index": 1,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
               "name": ""
             }
           ],
@@ -5942,11 +5956,48 @@ const ptCatalogJson = r'''{
           "hasConfig": false
         },
         {
-          "key": "Thing+PT-UNV-PWR-ADAPTER",
+          "key": "Thing+PT-IOT-NM-1CE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
           "modules": [
+            "PT-IOT-NM-1CE",
+            "PT-IOT-CUSTOM-IO",
             "PT-UNV-PWR-ADAPTER"
           ],
-          "ports": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
           "hasConfig": false
         },
         {
@@ -5991,48 +6042,11 @@ const ptCatalogJson = r'''{
           "hasConfig": false
         },
         {
-          "key": "Thing+PT-IOT-NM-1CE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "key": "Thing+PT-UNV-PWR-ADAPTER",
           "modules": [
-            "PT-IOT-NM-1CE",
-            "PT-IOT-CUSTOM-IO",
             "PT-UNV-PWR-ADAPTER"
           ],
-          "ports": [
-            {
-              "index": 0,
-              "type": "eCopperEthernet",
-              "family": "ethernet",
-              "name": ""
-            },
-            {
-              "index": -1,
-              "type": "eCustomIO",
-              "family": "io",
-              "name": "A2",
-              "namingEvidence": "PT-authored saved cable endpoint"
-            },
-            {
-              "index": -1,
-              "type": "eCustomIO",
-              "family": "io",
-              "name": "A0",
-              "namingEvidence": "PT-authored saved cable endpoint"
-            },
-            {
-              "index": -1,
-              "type": "eCustomIO",
-              "family": "io",
-              "name": "A1",
-              "namingEvidence": "PT-authored saved cable endpoint"
-            },
-            {
-              "index": -1,
-              "type": "eCustomIO",
-              "family": "io",
-              "name": "A3",
-              "namingEvidence": "PT-authored saved cable endpoint"
-            }
-          ],
+          "ports": [],
           "hasConfig": false
         }
       ]
@@ -6061,11 +6075,23 @@ const ptCatalogJson = r'''{
     {
       "model": "TV-PT",
       "type": "tv",
-      "kind": "tv",
-      "aliases": [
-        "smart tv"
-      ],
-      "variants": []
+      "kind": "TV",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "TV-PT",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperCoaxial",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Water Detector",
@@ -6166,6 +6192,70 @@ const ptCatalogJson = r'''{
               "index": 0,
               "type": "eCopperFastEthernet",
               "family": "fastethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "WiredEndDevice-PT",
+      "type": "wired-end-device",
+      "kind": "WiredEndDevice",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "WiredEndDevice-PT+PT-WIREDENDDEVICE-NM-1CFE",
+          "modules": [
+            "PT-WIREDENDDEVICE-NM-1CFE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "WirelessEndDevice-PT",
+      "type": "wireless-end-device",
+      "kind": "WirelessEndDevice",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "WirelessEndDevice-PT+PT-WIRELESSENDDEVICE-NM-1W",
+          "modules": [
+            "PT-WIRELESSENDDEVICE-NM-1W"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessG",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
               "name": ""
             }
           ],

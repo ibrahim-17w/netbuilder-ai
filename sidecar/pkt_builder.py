@@ -83,6 +83,11 @@ KIND_PATTERNS = {
     "cyber-observer": ("cyberobserver",),
     "controller": ("networkcontroller",),
     "power-distribution": ("powerdistribution", "power distribution device"),
+    "meraki-server": ("merakiserver", "meraki server"),
+    "wired-end-device": ("wiredenddevice", "wired end device"),
+    "wireless-end-device": ("wirelessenddevice", "wireless end device"),
+    "analog-phone": ("analogphone", "analog phone"),
+    "voip-adapter": ("homevoip", "voipadapter", "voip adapter"),
 }
 
 CLI_KINDS = ("router", "switch", "multilayer switch")
@@ -95,7 +100,7 @@ CORE_TYPES = ("router", "firewall", "cloud", "modem", "wireless-router")
 AGGREGATION_TYPES = ("multilayer switch", "wlc")
 ACCESS_TYPES = ("switch", "wireless", "accesspoint", "wireless access point",
                 "hub")
-SERVICE_TYPES = ("server",)
+SERVICE_TYPES = ("server", "meraki-server")
 TIER_CORE, TIER_AGGREGATION, TIER_ACCESS, TIER_SERVICES, TIER_HOSTS = range(5)
 
 

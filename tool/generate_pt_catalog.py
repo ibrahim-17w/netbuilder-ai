@@ -28,7 +28,10 @@ KINDS = {
     'Pda': 'smartphone', 'TabletPC': 'tablet', 'CellTower': 'cell-tower',
     'CentralOfficeServer': 'central-office', 'NetworkController': 'controller',
     'Hub': 'hub', 'SecurityAppliance': 'firewall', 'ASA': 'firewall',
-    'MerakiServer': 'controller', 'Sniffer': 'sniffer',
+    'MerakiServer': 'meraki-server', 'Sniffer': 'sniffer',
+    'WiredEndDevice': 'wired-end-device',
+    'WirelessEndDevice': 'wireless-end-device',
+    'TV': 'tv',
     'DataHistorian': 'historian', 'CyberObserver': 'cyber-observer',
     'Power Distribution Device': 'power-distribution',
 }
