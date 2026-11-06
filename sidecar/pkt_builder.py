@@ -2267,6 +2267,13 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
     project = str(project or plan.get("project") or "default").strip() \
         or "default"
     warnings: list[str] = []
+    # Structured preflight results.  A warning is a sentence for a human; these
+    # lists are what the caller and the tests can act on, so a device the
+    # library cannot build is never merely a line of text the app may drop.
+    missing_devices: list[dict] = []
+    missing_links: list[dict] = []
+    model_substitutions: list[dict] = []
+    interface_remappings: list[dict] = []
 
     # What ports does each node need?  Links say it directly; the compiled
     # config says it for every interface it touches.
@@ -2326,10 +2333,31 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
         device_report_services: dict = {}
         constraints={str(link.get(side+'If')):link['cable'] for link in sections['links']
                      if link.get('exactPorts') and link.get('cable') for side in ('a','b') if link.get(side)==name}
+        requested_model = str(node.get('model') or '').strip()
         variant, notes = select_variant(library, {**node,'portMedia':constraints}, wanted.get(name, []))
         warnings.extend(notes)
         if variant is None:
+            missing_devices.append({
+                'name': name,
+                'type': node_type,
+                'requestedModel': requested_model,
+                'reason': next((note for note in notes if note.startswith(name)),
+                               f'{name}: no {node_type or "device"} template is available'),
+            })
             continue
+        # A model swap is allowed only when selection found a template that
+        # covers every requested interface.  Record it structurally as well as
+        # in the warning text, so the export report cannot call the plan met
+        # while the file holds a different router.
+        if requested_model and hardware.identity(
+                requested_model) != hardware.identity(variant.get('model')):
+            model_substitutions.append({
+                'device': name,
+                'requested': requested_model,
+                'used': str(variant.get('model') or ''),
+                'reason': next((note for note in notes
+                                if 'instead of' in note), ''),
+            })
         # Name the model's cableable ports only now that it is CHOSEN.
         #
         # Doing it to the whole library instead changes WHICH model is
@@ -2410,6 +2438,12 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
         # port the source save left nameless, so the link resolves at all.
         # Clocking: a serial DCE end needs the flag set on the port itself.
         for spec, port in plan_ports.items():
+            if normalize_port_name(spec) != normalize_port_name(port['name']):
+                interface_remappings.append({
+                    'device': name,
+                    'requested': spec,
+                    'assigned': port['name'],
+                })
             clock = _clock_rate_for(config_lines, port["name"])
             if clock:
                 dce_ports[(name, port["name"])] = clock
@@ -2542,9 +2576,19 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
     link_blocks = []
     link_report = []
     for link in sections["links"]:
+        warnings_before = len(warnings)
         block = _build_link(library, link, refs, port_names, warnings,
                             dce_ports, used_ports, variants_used)
         if block is None:
+            missing_links.append({
+                'a': str(link.get('a') or ''),
+                'aIf': str(link.get('aIf') or ''),
+                'b': str(link.get('b') or ''),
+                'bIf': str(link.get('bIf') or ''),
+                'cable': str(link.get('cable') or ''),
+                'reason': (warnings[-1] if len(warnings) > warnings_before
+                           else 'link could not be built'),
+            })
             continue
         # The link's own port claims (resolved or spare-remapped) count
         # toward the used set, so a later link cannot take them.
@@ -2617,6 +2661,17 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
                          "template library may not cover the planned models")
 
     _validate(xml, refs)
+    # The single status the whole export is judged by.  A build is only VALID
+    # when every planned device and every planned link is in the document; a
+    # missing printer is EXPORT_INCOMPLETE even if the file itself is readable.
+    if not nodes:
+        status = "INVALID"
+    elif missing_devices or missing_links:
+        status = "EXPORT_INCOMPLETE"
+    elif _dedupe(warnings):
+        status = "VALID_WITH_WARNINGS"
+    else:
+        status = "VALID"
     return {
         "xml": xml,
         "version": version or library.get("version") or "",
@@ -2628,6 +2683,12 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
         "linkCount": len(link_blocks),
         "plannedDevices": len(nodes),
         "plannedLinks": len(sections["links"]),
+        "status": status,
+        "complete": status in ("VALID", "VALID_WITH_WARNINGS"),
+        "missingDevices": missing_devices,
+        "missingLinks": missing_links,
+        "modelSubstitutions": model_substitutions,
+        "interfaceRemappings": interface_remappings,
         "templateVersion": library.get("version") or "",
         "templateDirectory": library.get("_directory") or "",
         # Which drawing was used, so the app can tell the user what changed
@@ -3301,8 +3362,15 @@ def _backup_existing(target: str) -> str:
 def generate_pkt_file(plan: dict, out_path: str, *, project: str = "",
                       library: dict | None = None, version: str = "",
                       replace: bool = False, backup: bool = True,
+                      allow_incomplete: bool = False,
                       log=None) -> dict:
-    """Build the topology and write it as a .pkt.  Returns the report."""
+    """Build the topology and write it as a .pkt.  Returns the report.
+
+    An incomplete build is refused by default: writing a file that silently
+    lacks four planned devices is exactly the failure this guard exists to
+    stop.  ``allow_incomplete=True`` writes it anyway, and the report still
+    carries ``status: EXPORT_INCOMPLETE`` plus the missing device/link lists.
+    """
     say = log or (lambda *_: None)
     # out_path arrives as a CLI arg (offline tool) or from the engine's
     # generate endpoint; a raw '..' segment is refused before abspath can
@@ -3326,11 +3394,72 @@ def generate_pkt_file(plan: dict, out_path: str, *, project: str = "",
     if parent and not os.path.isdir(parent):
         raise BuildError(f"output directory does not exist: {parent}")
     built = build_pkt(plan, library, project=project, version=version)
+    if built["status"] == "INVALID":
+        raise BuildError(
+            "this plan has no devices the template library can build; no "
+            "file was written")
+    if built["status"] == "EXPORT_INCOMPLETE" and not allow_incomplete:
+        missing_devices = ", ".join(
+            entry["name"] for entry in built.get("missingDevices", [])) or "none"
+        missing_links = "; ".join(
+            f"{entry['a']}-{entry['b']}" for entry in built.get("missingLinks", [])) or "none"
+        raise BuildError(
+            "export incomplete: "
+            f"{built['deviceCount']}/{built['plannedDevices']} devices and "
+            f"{built['linkCount']}/{built['plannedLinks']} links could be "
+            f"built; missing devices: {missing_devices}; missing links: "
+            f"{missing_links}. No file was written. Fix the unsupported "
+            "devices/connections or explicitly allow an incomplete build.")
     started = time.perf_counter()
     payload = pkt_codec.encrypt_pkt(built["xml"])
     temp = target + ".tmp"
     with open(temp, "wb") as stream:
         stream.write(payload)
+    # Prove the container by reading it back BEFORE it replaces the target.
+    # Counting what we meant to write is not evidence; decrypting the bytes on
+    # disk is.
+    try:
+        readback = pkt_codec.decrypt_pkt(open(temp, "rb").read())
+        disk_devices = len(re.findall(rb"<DEVICE>", readback))
+        disk_links = len(re.findall(rb"<LINK>", readback))
+        disk_names = {
+            match.group(1).decode("utf-8", "replace").strip()
+            for match in re.finditer(
+                rb"<DEVICE>.*?<NAME translate=\"true\">([^<]*)</NAME>",
+                readback, re.S)
+        }
+        expected_names = {str(entry.get("name") or "")
+                          for entry in built["devices"]}
+        missing_names = sorted(expected_names - disk_names)
+        verification = {
+            "deviceCountOnDisk": disk_devices,
+            "linkCountOnDisk": disk_links,
+            "deviceCountMatches": disk_devices == built["deviceCount"],
+            "linkCountMatches": disk_links == built["linkCount"],
+            "missingNamesOnDisk": missing_names,
+        }
+        verification["ok"] = (
+            verification["deviceCountMatches"]
+            and verification["linkCountMatches"]
+            and not missing_names)
+        if not verification["ok"]:
+            raise BuildError(
+                "export verification failed: the written file does not match "
+                f"the build report ({verification}). No file was kept.")
+    except BuildError:
+        try:
+            os.remove(temp)
+        except OSError:
+            pass
+        raise
+    except Exception as exc:  # noqa: BLE001 - a corrupt write is fatal
+        try:
+            os.remove(temp)
+        except OSError:
+            pass
+        raise BuildError(
+            f"export verification failed: the written file could not be read "
+            f"back ({exc}). No file was kept.") from exc
     os.replace(temp, target)
     elapsed = time.perf_counter() - started
     report = {
@@ -3347,6 +3476,13 @@ def generate_pkt_file(plan: dict, out_path: str, *, project: str = "",
         "devices": built["devices"],
         "links": built["links"],
         "warnings": built["warnings"],
+        "status": built["status"],
+        "complete": built["complete"],
+        "missingDevices": built["missingDevices"],
+        "missingLinks": built["missingLinks"],
+        "modelSubstitutions": built["modelSubstitutions"],
+        "interfaceRemappings": built["interfaceRemappings"],
+        "verification": verification,
         # The drawing this file was actually written with, so the app can
         # remember it and the next build keeps it.  Dropping it here is what
         # made a chosen layout silently revert to the default one: the app

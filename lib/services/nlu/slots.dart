@@ -58,6 +58,10 @@ class ExtractedQuantity {
   final bool maximum;
   final String? role;
 
+  /// True when the number describes how many existing devices a connection
+  /// uses ("connect 5 PCs to Switch 1"), not how many to create.
+  final bool distribution;
+
   const ExtractedQuantity({
     required this.kind,
     required this.value,
@@ -69,6 +73,7 @@ class ExtractedQuantity {
     this.minimum = false,
     this.maximum = false,
     this.role,
+    this.distribution = false,
   });
 }
 
@@ -180,6 +185,7 @@ class BriefSlotPipeline {
                 r'(?:at\s+most|no\s+more\s+than|not\s+more\s+than|up\s+to|under|below|fewer\s+than|less\s+than|maximum\s+of)\s*$',
               ).hasMatch(clause.text.substring(0, quantity.at - clause.start)),
               role: quantity.role,
+              distribution: quantity.distribution,
             ),
     ];
   }
@@ -380,7 +386,9 @@ class BriefSlotPipeline {
   static String? lastCountedKind(String lower) {
     final records = _quantityRecords(lower);
     for (var i = records.length - 1; i >= 0; i--) {
-      if (records[i].value > 0) return records[i].kind;
+      if (records[i].value > 0 && !records[i].distribution) {
+        return records[i].kind;
+      }
     }
     return null;
   }
@@ -439,6 +447,7 @@ class BriefSlotPipeline {
     final records = _quantityRecords(lower);
     final order = <String>[];
     for (final r in records) {
+      if (r.distribution) continue;
       if (r.kind == 'router' && r.site != null && !order.contains(r.site)) {
         order.add(r.site!);
       }
@@ -475,7 +484,10 @@ class BriefSlotPipeline {
       final counts = <String, int>{};
       for (final kind in deviceKinds.map((item) => item.type)) {
         final own = records
-            .where((record) => record.site == site && record.kind == kind)
+            .where((record) =>
+                !record.distribution &&
+                record.site == site &&
+                record.kind == kind)
             .toList();
         if (own.isEmpty) continue;
         var total = 0;
@@ -539,6 +551,30 @@ class BriefSlotPipeline {
   /// it names, where it was said, and how it relates to the kind's other
   /// amounts (which site it belongs to, whether it corrects an earlier
   /// number, whether it is announced as an addition).
+  /// A connection instruction that names where the devices go
+  /// ("connect 5 PCs to Switch 1") is a distribution of the inventory, not
+  /// another requirement for it.
+  ///
+  /// The destination matters. "connect two routers over a serial WAN" is a
+  /// request to build two routers, not a note about two that already exist;
+  /// treating every connection verb as distribution made that brief plan one
+  /// router and lose the serial WAN entirely.
+  static bool _distributionAt(String clause, int start, int end) {
+    final before = clause.substring(0, start.clamp(0, clause.length));
+    final after = clause.substring(end.clamp(0, clause.length));
+    final connector = RegExp(
+      r'\b(?:connect(?:ed|ing|s)?|cable[ds]?|cabling|attach(?:ed|ing|es)?|'
+      r'link(?:ed|ing|s)?|wire[ds]?|wiring|plug(?:ged|ging|s)?|'
+      r'hook(?:ed|ing|s)?(?:\s+up)?)\b[^.;]{0,24}$',
+      caseSensitive: false,
+    ).hasMatch(before);
+    if (!connector) return false;
+    return RegExp(
+      r'^[^.;]{0,40}?\b(?:to|into|onto)\s+\S',
+      caseSensitive: false,
+    ).hasMatch(after);
+  }
+
   static List<_Qty> _quantityRecords(String lower) {
     final clauses = _clauses(lower);
     final anchors = _siteAnchors(lower);
@@ -567,6 +603,11 @@ class BriefSlotPipeline {
             site: _siteAt(lower, anchors, at, end: m.end),
             correction: _correctionBefore(clause.text, local),
             role: m.groupCount > 1 ? m.group(2)?.trim() : null,
+            distribution: _distributionAt(
+              clause.text,
+              local,
+              m.end - clause.start,
+            ),
           ),
         );
       }
@@ -855,9 +896,14 @@ class BriefSlotPipeline {
   ///   downstairs" is still 6);
   /// * an unlabeled repeat is a restatement and adds nothing.
   static int? _quantityTotal(List<_Qty> records, String type) {
+    // Distribution phrases ("connect 5 PCs to Switch 1") describe how the
+    // devices already counted are cabled.  Counting them as inventory both
+    // inflated the total and, because the parser treats a repeat as a
+    // restatement, could shrink a stated 25 PCs to 5.  They are not
+    // quantities of new devices and never enter a total.
     final own = [
       for (final r in records)
-        if (r.kind == type) r,
+        if (r.kind == type && !r.distribution) r,
     ];
     if (own.isEmpty) return null;
     var base = own.first.value;
@@ -1345,6 +1391,7 @@ class _Qty {
   final bool correction;
   final bool add;
   final String? role;
+  final bool distribution;
   const _Qty({
     required this.kind,
     required this.value,
@@ -1354,5 +1401,6 @@ class _Qty {
     this.correction = false,
     this.add = false,
     this.role,
+    this.distribution = false,
   }) : end = end ?? at;
 }

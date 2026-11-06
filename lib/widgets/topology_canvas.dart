@@ -772,12 +772,19 @@ class _TopologyCanvasState extends State<TopologyCanvas> {
 
   void _fit(Size viewport) {
     final frame = _frame!;
+    // Keep a visible margin, and never shrink a large lab to a speck: below
+    // 5% the device glyphs stop being readable, so the pan/zoom controls are
+    // the better answer at that point.  This is a fit, not a shrink-to-fit at
+    // any cost.
+    const padding = 24.0;
+    final availableWidth = math.max(viewport.width - padding * 2, 1.0);
+    final availableHeight = math.max(viewport.height - padding * 2, 1.0);
     final scale = math
         .min(
-          viewport.width / frame.size.width,
-          viewport.height / frame.size.height,
+          availableWidth / frame.size.width,
+          availableHeight / frame.size.height,
         )
-        .clamp(0.01, 1.5);
+        .clamp(0.05, 1.5);
     _view.value = Matrix4.diagonal3Values(scale, scale, scale)
       ..setTranslationRaw(
         (viewport.width - frame.size.width * scale) / 2,
@@ -1006,6 +1013,25 @@ class _TopologyCanvasState extends State<TopologyCanvas> {
                         ),
                       ],
                     ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 8,
+                bottom: 8,
+                child: Material(
+                  color: kWorkspaceBackground.withValues(alpha: 0.92),
+                  shape: RoundedRectangleBorder(
+                    side: const BorderSide(color: kWorkspaceDot),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: IconButton(
+                    tooltip: 'Fit network to screen',
+                    iconSize: 18,
+                    visualDensity: VisualDensity.compact,
+                    color: kWorkspaceLabel,
+                    onPressed: () => _fit(viewport),
+                    icon: const Icon(Icons.fit_screen_outlined),
                   ),
                 ),
               ),

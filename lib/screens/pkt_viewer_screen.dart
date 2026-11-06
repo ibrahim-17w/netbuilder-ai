@@ -94,13 +94,18 @@ class _PktViewerScreenState extends State<PktViewerScreen> {
                   child: Text(
                     // Say what this is, once, where the user just arrived:
                     // Packet Tracer was not found, so this is the app's own
-                    // drawing of the same file - not Packet Tracer itself.
+                    // drawing of the approved plan - not Packet Tracer itself.
+                    // Be exact about what the badge counts mean: this view
+                    // draws the plan at the build's positions, and an
+                    // incomplete export can contain fewer devices, so calling
+                    // these counts "the file" was the mismatch users saw.
                     'Packet Tracer was not found on this device, so this is '
-                    'the built-in viewer: the same network the file '
-                    'contains, drawn Packet Tracer-style. Drag or pinch to '
-                    'explore; '
-                    'tap a device for details. Install Packet Tracer and '
-                    'the same file will open there.',
+                    'the built-in viewer. It draws the approved plan at the '
+                    'positions the build wrote into the file; when the export '
+                    'report is incomplete the file can contain fewer '
+                    'devices. Drag or pinch to explore; tap a device for '
+                    'details. Install Packet Tracer and the same file will '
+                    'open there.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
