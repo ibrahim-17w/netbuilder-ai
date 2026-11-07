@@ -15,9 +15,10 @@ developer help?
    package.
 3. Install Cisco Packet Tracer on the pilot machine if the session includes
    the autopilot. Offline planning and `.pkt` generation must work without it.
-4. Give the tester `NetBuilderAI-Tester-Setup.exe`, `README-TESTER.txt`, and the
-   SHA256 for the installer. Do not give them a checkout, Flutter, Python, or a
-   pre-created API key.
+4. Give the tester `NetBuilderAI-Tester-Setup.exe`, `README-TESTER.txt`,
+   `TESTER-RUNBOOK.md` (the tester-facing walkthrough of the offline-only
+   path) and the SHA256 for the installer. Do not give them a checkout,
+   Flutter, Python, or a pre-created API key.
 5. Start a screen recording only with explicit consent. Record the app version,
    engine version, Windows version, and whether Packet Tracer was present.
 
