@@ -317,3 +317,113 @@ def test_aaa_broken_server_produces_findings(tmp_path):
     g = pkt_audit.grade(path, _intent_plan())
     # grading must NOT give a full score when AAA has no users/clients
     assert g["score"] < g["max"]
+
+
+# --------------------------------------------------------------------------
+# Dangling devices, dead-end switches, layout outliers, parked services
+# --------------------------------------------------------------------------
+
+def _dangling_plan():
+    return {
+        "projectName": "dangling-test",
+        "steps": [
+            {"action": "create_nodes", "nodes": [
+                {"name": "R1", "type": "router", "model": "2911"},
+                {"name": "SW1", "type": "switch"},
+                {"name": "PC1", "type": "pc"},
+                {"name": "PC2", "type": "pc"},
+                {"name": "PDU1", "type": "power-distribution"},
+                {"name": "LT1", "type": "laptop"},
+            ]},
+            {"action": "create_links", "links": [
+                {"a": "R1", "aIf": "g0/0", "b": "SW1", "bIf": "f0/1"},
+                {"a": "SW1", "aIf": "f0/2", "b": "PC1", "bIf": "f0"},
+            ]},
+        ],
+    }
+
+
+def test_dangling_devices_are_reported(tmp_path):
+    path = str(tmp_path / "dangling.pkt")
+    pkt_builder.generate_pkt_file(_dangling_plan(), path,
+                                  project="dangling-test", replace=True)
+    rep = pkt_audit.audit(path, "dangling-test")
+    by_dev = {}
+    for f in rep["findings"]:
+        by_dev.setdefault(f["device"], []).append(f)
+    # The PDU powers nothing: medium, with the power-cable remedy.
+    pdu = by_dev.get("PDU1", [])
+    assert any(f["severity"] == "medium" and "powers nothing" in f["text"]
+               for f in pdu)
+    # LT1 was placed and never wired: an info row, not silence.
+    assert any("no cable" in f["text"] for f in by_dev.get("LT1", []))
+    # R1, SW1 and PC1 are cabled: they must NOT be flagged.
+    for wired in ("R1", "SW1", "PC1"):
+        assert not any("not cabled" in f["text"] for f in by_dev.get(wired, []))
+
+
+def test_deadend_switch_is_reported(tmp_path):
+    plan = {
+        "projectName": "deadend-test",
+        "steps": [
+            {"action": "create_nodes", "nodes": [
+                {"name": "SW1", "type": "switch"},
+                {"name": "SW2", "type": "switch"},
+                {"name": "PC1", "type": "pc"},
+            ]},
+            {"action": "create_links", "links": [
+                {"a": "SW1", "aIf": "f0/23", "b": "SW2", "bIf": "f0/23"},
+                {"a": "SW1", "aIf": "f0/2", "b": "PC1", "bIf": "f0"},
+            ]},
+        ],
+    }
+    path = str(tmp_path / "deadend.pkt")
+    pkt_builder.generate_pkt_file(plan, path, project="deadend-test",
+                                  replace=True)
+    rep = pkt_audit.audit(path, "deadend-test")
+    sw2 = [f for f in rep["findings"] if f["device"] == "SW2"
+           and "nothing hangs off it" in f["text"]]
+    assert sw2 and sw2[0]["severity"] == "info"
+    # SW1 has an end device behind it: not a dead end.
+    assert not [f for f in rep["findings"] if f["device"] == "SW1"
+                and "nothing hangs off it" in f["text"]]
+
+
+def test_layout_outlier_is_reported():
+    devs = [
+        {"name": "R1", "kind": "Router", "x": 100.0, "y": 100.0},
+        {"name": "SW1", "kind": "Switch", "x": 300.0, "y": 100.0},
+        {"name": "PC1", "kind": "Pc", "x": 500.0, "y": 100.0},
+        {"name": "PC2", "kind": "Pc", "x": 700.0, "y": 100.0},
+        {"name": "PDU0", "kind": "Power Distribution Device",
+         "x": 3000.0, "y": 4000.0},
+    ]
+    out = pkt_audit.layout_findings(devs)
+    assert [f["device"] for f in out] == ["PDU0"]
+    assert out[0]["severity"] == "medium"
+    assert "far outside" in out[0]["text"]
+    # A tidy canvas stays quiet.
+    tidy = [{"name": n, "kind": "Pc", "x": float(x), "y": 100.0}
+            for n, x in (("A", 100), ("B", 300), ("C", 500), ("D", 700))]
+    assert pkt_audit.layout_findings(tidy) == []
+
+
+def test_disabled_service_panels_are_reported():
+    svcs = {
+        "SRV1": [{"service": "dhcp", "enabled": False, "detail": "1 pool(s)"}],
+        "SRV2": [{"service": "dns", "enabled": False, "detail": "2 record(s)"}],
+        "SRV3": [{"service": "aaa", "enabled": False,
+                  "detail": "3 user(s), 1 client(s)"}],
+        "SRV4": [{"service": "dhcp", "enabled": False, "detail": "0 pool(s)"}],
+        "SRV5": [{"service": "http", "enabled": True, "detail": ""}],
+    }
+    out = pkt_audit.service_findings(svcs)
+    by_dev = {f["device"]: f for f in out}
+    assert by_dev["SRV1"]["severity"] == "info"
+    assert "OFF" in by_dev["SRV1"]["text"] and "DHCP" in by_dev["SRV1"]["text"]
+    assert by_dev["SRV2"]["severity"] == "medium"
+    assert by_dev["SRV3"]["severity"] == "medium"
+    # No pool / no records / no users -> the panel is empty, not parked.
+    assert "SRV4" not in by_dev
+    # Enabled panels are never findings.
+    assert "SRV5" not in by_dev

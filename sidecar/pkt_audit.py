@@ -55,6 +55,7 @@ def devices(xml: bytes) -> List[dict]:
         if cm:
             config = cm.group(1).decode("utf-8", "replace")
         ref = re.search(rb"save-ref-id:(\d+)", block)
+        pos = re.search(rb"<LOGICAL>\s*<X>(-?\d+)</X>\s*<Y>(-?\d+)</Y>", block)
         out.append({
             "name": name,
             "kind": kind,
@@ -63,6 +64,8 @@ def devices(xml: bytes) -> List[dict]:
             "config_lines": config.count("\n") + (1 if config.strip() else 0),
             "config": config,
             "ref": ref.group(1).decode() if ref else "",
+            "x": float(pos.group(1)) if pos else None,
+            "y": float(pos.group(2)) if pos else None,
         })
     return out
 
@@ -170,6 +173,170 @@ def cable_findings(cable_rows: List[dict], devs: List[dict]) -> List[dict]:
                     "Tracer may hold the link down."
                 ),
             })
+    return out
+
+
+# Device kinds that legitimately sit on the canvas with no cable: IoE sensor
+# and actuator blocks are placed to be registered to an MCU, so an uncabled
+# one is not a topology hole. Everything else uncabled is reported, with
+# wireless-capable clients called out as info rather than a fault.
+_LINKLESS_SKIP_KINDS = ("mcu", "sbc", "component", "sensor", "iot")
+
+
+def dangling_findings(devs: List[dict], cable_rows: List[dict]) -> List[dict]:
+    """Placed devices that no cable touches.
+
+    A generator that has to hit an exact device count can wire a switch to
+    the nearest neighbour and leave it serving nothing, or drop a PDU on the
+    canvas it can never connect (no power cable) - both look complete and
+    audit silent.  Network gear and power devices dangling like that are a
+    topology hole; an uncabled end device is at least worth an info row.
+    """
+    linked = set()
+    for row in cable_rows:
+        linked.update((row.get("a", "?"), row.get("b", "?")))
+    out = []
+    for d in devs:
+        name = d["name"]
+        if not name or name in linked:
+            continue
+        k = (d.get("kind") or "").strip().lower()
+        if any(word in k for word in _LINKLESS_SKIP_KINDS):
+            continue
+        if "power distribution" in k:
+            out.append({
+                "severity": "medium",
+                "device": name,
+                "text": (f"{name} is placed but powers nothing - no power "
+                         "cable runs from it, so every outlet on it is dead. "
+                         "Wire the devices it should feed with power cables, "
+                         "or drop it from the plan."),
+            })
+        elif "switch" in k or "hub" in k or "bridge" in k or "repeater" in k \
+                or "router" in k or "firewall" in k or "modem" in k \
+                or "cloud" in k or "controller" in k or "server" in k:
+            out.append({
+                "severity": "medium",
+                "device": name,
+                "text": (f"{name} is placed but not cabled to anything - no "
+                         "traffic can ever reach it. Wire it into the "
+                         "topology or drop it from the plan."),
+            })
+        else:
+            out.append({
+                "severity": "info",
+                "device": name,
+                "text": (f"{name} is placed but has no cable - if it reaches "
+                         "the network wirelessly that is fine, otherwise it "
+                         "needs a cable to be usable."),
+            })
+    return out
+
+
+def deadend_findings(devs: List[dict], cable_rows: List[dict]) -> List[dict]:
+    """Switch-like devices whose ONLY link is to another switch-like device.
+
+    A real access switch hangs end devices off itself; a switch wired to
+    nothing but its neighbour is dead weight the plan's device count asked
+    for, not a role in the topology (distribution switches have two or more
+    switch links and are left alone).
+    """
+    by_name = {d["name"]: d for d in devs}
+    per_dev: Dict[str, List[dict]] = {}
+    for row in cable_rows:
+        per_dev.setdefault(row.get("a", "?"), []).append(row)
+        per_dev.setdefault(row.get("b", "?"), []).append(row)
+    out = []
+    for name, rows in per_dev.items():
+        d = by_name.get(name)
+        if d is None or not _switch_like(d.get("kind", "")):
+            continue
+        if len(rows) != 1:
+            continue
+        other = rows[0].get("b") if rows[0].get("a") == name \
+            else rows[0].get("a")
+        od = by_name.get(other or "")
+        if od is not None and _switch_like(od.get("kind", "")):
+            out.append({
+                "severity": "info",
+                "device": name,
+                "text": (f"{name} connects only to {other} and nothing hangs "
+                         "off it - no end device or router uses it, so the "
+                         "cable adds a spanning-tree hop for no traffic. "
+                         "Attach end devices or drop it."),
+            })
+    return out
+
+
+def layout_findings(devs: List[dict]) -> List[dict]:
+    """Devices parked far outside the bounding box of the rest.
+
+    A device that drifted thousands of pixels past the topology (a PPU left
+    at the canvas corner) reads as misplaced clutter even when it is wired;
+    flag it so the canvas gets tidied or the device gets wired in.
+    """
+    pts = [(d["name"], d.get("x"), d.get("y")) for d in devs]
+    pts = [(n, x, y) for n, x, y in pts if x is not None and y is not None]
+    if len(pts) < 4:
+        return []
+    out = []
+    for name, x, y in pts:
+        others = [(px, py) for n, px, py in pts if n != name]
+        left = min(px for px, _ in others)
+        right = max(px for px, _ in others)
+        top = min(py for _, py in others)
+        bottom = max(py for _, py in others)
+        # One span of slack: a real layout grid easily gaps half a span
+        # between neighbours; a runaway device sits whole spans beyond.
+        span = max(right - left, bottom - top, 600)
+        dx = max(left - x, x - right, 0)
+        dy = max(top - y, y - bottom, 0)
+        if dx > span or dy > span:
+            out.append({
+                "severity": "medium",
+                "device": name,
+                "text": (f"{name} sits at ({int(x)}, {int(y)}), far outside "
+                         f"the rest of the layout (x {int(left)}..{int(right)}, "
+                         f"y {int(top)}..{int(bottom)}) - drag it into the "
+                         "topology so the canvas stays readable."),
+            })
+    return out
+
+
+def service_findings(svcs: Dict[str, List[dict]]) -> List[dict]:
+    """Configured-but-disabled server panels: pools/accounts that cannot serve."""
+    out = []
+    for name, rows in (svcs or {}).items():
+        for row in rows:
+            if row.get("enabled"):
+                continue
+            svc = row.get("service", "")
+            detail = row.get("detail", "")
+            if svc == "dhcp" and detail and not detail.startswith("0 pool"):
+                out.append({
+                    "severity": "info",
+                    "device": name,
+                    "text": (f"{name} has {detail} configured but the DHCP "
+                             "service is OFF - any client set to DHCP gets "
+                             "nothing. Turn the service On unless the pool is "
+                             "deliberately parked."),
+                })
+            elif svc == "dns" and detail and not detail.startswith("0 record"):
+                out.append({
+                    "severity": "medium",
+                    "device": name,
+                    "text": (f"{name} has {detail} configured but the DNS "
+                             "service is OFF - every A record it holds is "
+                             "unresolvable. Turn the service On."),
+                })
+            elif svc == "aaa" and detail and not detail.startswith("0 user"):
+                out.append({
+                    "severity": "medium",
+                    "device": name,
+                    "text": (f"{name} has AAA accounts configured but the "
+                             "AAA service is OFF - logins against it can "
+                             "never succeed. Turn the service On."),
+                })
     return out
 
 
@@ -359,6 +526,17 @@ def audit(path: str, project: str = "") -> dict:
     # most expensive thing an offline audit can miss: every packet is dropped
     # and the file still looks complete.
     for row in cable_findings(cable_rows, devs):
+        add(row["severity"], row["device"], row["text"])
+    # A device no cable touches (dangling switch, an unwired PDU) or one
+    # parked far outside the layout reads as complete and still is wrong.
+    for row in dangling_findings(devs, cable_rows):
+        add(row["severity"], row["device"], row["text"])
+    for row in deadend_findings(devs, cable_rows):
+        add(row["severity"], row["device"], row["text"])
+    for row in layout_findings(devs):
+        add(row["severity"], row["device"], row["text"])
+    # Server panels that are configured but switched off cannot serve.
+    for row in service_findings(svcs):
         add(row["severity"], row["device"], row["text"])
     for name, state in aaa.items():
         if state["enabled"] and not state["users"]:
