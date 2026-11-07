@@ -256,6 +256,10 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README-TESTER.txt') `
     -Destination (Join-Path $StageRoot 'README-TESTER.txt') -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README-PORTABLE.txt') `
     -Destination (Join-Path $StageRoot 'README-PORTABLE.txt') -Force
+# The tester-facing walkthrough travels with the app: a pilot user should not
+# need a second download to know what to do first.
+Copy-Item -LiteralPath (Join-Path $AppRoot 'pilot\TESTER-RUNBOOK.md') `
+    -Destination (Join-Path $StageRoot 'TESTER-RUNBOOK.md') -Force
 # The uninstaller is part of the payload, not the IExpress wrapper, so it is
 # present in both the installed copy and the portable ZIP.
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'installer_uninstall.ps1') `
@@ -291,6 +295,7 @@ foreach ($Relative in @(
         'tesseract\tesseract.exe',
         'README-TESTER.txt',
         'README-PORTABLE.txt',
+        'TESTER-RUNBOOK.md',
         'uninstall.ps1')) {
     $Full = Join-Path $StageRoot $Relative
     if (-not (Test-Path -LiteralPath $Full -PathType Leaf)) { continue }

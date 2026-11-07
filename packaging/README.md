@@ -11,7 +11,8 @@
 | `dist/SHA256SUMS.txt` | Human-checkable checksums for the release |
 
 The installer and the portable ZIP contain the same staged app, frozen sidecar,
-Packet Tracer templates, OCR payload, uninstaller and READMEs.
+Packet Tracer templates, OCR payload, uninstaller, READMEs and the tester
+runbook (`TESTER-RUNBOOK.md`, the walkthrough a pilot user is handed).
 
 ## Build
 
