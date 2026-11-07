@@ -3252,6 +3252,7 @@ class _ChatScreenState extends State<ChatScreen> {
               : '- Your previous build is kept as `$backup`, so this edit is '
                     'reversible.',
         );
+        _writeExportStatus(body, res);
         _writeVerification(body, check);
       } else {
         body
@@ -3266,6 +3267,7 @@ class _ChatScreenState extends State<ChatScreen> {
             '- Devices: ${res['deviceCount'] ?? '?'}, '
             'Cables: ${res['linkCount'] ?? '?'}',
           );
+        _writeExportStatus(body, res);
         _writeVerification(body, check);
       }
       // Every build is read back and judged against the design rubric, and only
@@ -3311,7 +3313,7 @@ class _ChatScreenState extends State<ChatScreen> {
         path,
         note:
             '${check == null ? 'verification not collected' : (check.verified ? 'build verified against the file' : 'verification found differences')}'
-            '; ${_layoutNote()}',
+            '; ${_layoutNote()}${_exportNote(res)}',
       );
       _persistLayoutNoteOnIntent();
       return (
@@ -3528,6 +3530,7 @@ class _ChatScreenState extends State<ChatScreen> {
           '- Compiled on this device: no Packet Tracer, no PC, nothing '
           'left it.',
         );
+      _writeExportStatus(body, report);
       _writeVerification(body, check);
       // Same design review the engine build records, so a phone-built lab
       // is held to the same rubric and remembered the same way.
@@ -3570,7 +3573,7 @@ class _ChatScreenState extends State<ChatScreen> {
         path,
         note:
             'built on-device; ${check == null ? 'verification not collected' : (check.verified ? 'build verified against the file' : 'verification found differences')}'
-            '; ${_layoutNote()}',
+            '; ${_layoutNote()}${_exportNote(report)}',
       );
       _persistLayoutNoteOnIntent();
       return (
@@ -4159,6 +4162,25 @@ class _ChatScreenState extends State<ChatScreen> {
     for (final line in check.lines) {
       body.writeln(line);
     }
+  }
+
+  /// What the generator actually exported, including what it could not.
+  ///
+  /// The counts alone say a file exists; the status says whether it is the
+  /// lab the plan asked for. An incomplete export used to be invisible here,
+  /// so a file missing devices read exactly like a complete one.
+  void _writeExportStatus(StringBuffer body, Map<String, dynamic> report) {
+    for (final line in BuildPreflight.exportStatus(report)) {
+      body.writeln(line);
+    }
+  }
+
+  /// A short export-status suffix for the artifact note, so the file list
+  /// remembers a partial export instead of only the verification verdict.
+  String _exportNote(Map<String, dynamic> report) {
+    final status = '${report['status'] ?? ''}'.trim();
+    if (status.isEmpty || status == 'VALID') return '';
+    return '; export $status';
   }
 
   /// The design review of what was just built, written for a person rather

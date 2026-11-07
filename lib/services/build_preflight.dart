@@ -440,6 +440,132 @@ class BuildPreflight {
     }
   }
 
+  /// The generator's own export status for the file it just wrote.
+  ///
+  /// A build can end with a file on disk and still not be the lab the plan
+  /// asked for: an unsupported model is dropped or substituted, a requested
+  /// port does not exist, or the caller explicitly allowed an incomplete
+  /// export. The generator reports all of that structurally (`status`,
+  /// `missingDevices`, `missingLinks`, `modelSubstitutions`,
+  /// `interfaceRemappings`, `verification`) and the build message used to
+  /// drop it on the floor - so a partial file read as a success. Printing it
+  /// here, next to the counts it qualifies, is the fix.
+  static List<String> exportStatus(Map<String, dynamic> report) {
+    if (report.isEmpty) return const <String>[];
+    final status = '${report['status'] ?? ''}'.trim().toUpperCase();
+    final written = _intOf(report['deviceCount']);
+    final planned = _intOf(report['plannedDevices']);
+    final cables = _intOf(report['linkCount']);
+    final plannedCables = _intOf(report['plannedLinks']);
+    final counts = planned != null && plannedCables != null
+        ? '${written ?? '?'}/$planned device(s), '
+              '${cables ?? '?'}/$plannedCables cable(s) written'
+        : '${written ?? '?'} device(s), ${cables ?? '?'} cable(s) written';
+    final complete =
+        report['complete'] == true ||
+        status == 'VALID' ||
+        status == 'VALID_WITH_WARNINGS';
+    final lines = <String>[];
+    if (status.isEmpty) {
+      lines.add(
+        '- Export status: not reported - the generator did not say whether '
+        'every planned device and cable was written ($counts).',
+      );
+    } else if (complete) {
+      lines.add(
+        '- Export status: $status - every planned device and cable is in the '
+        'file ($counts).',
+      );
+    } else {
+      lines.add(
+        '- Export status: $status - **the file is not the plan** ($counts).',
+      );
+    }
+    final missingDevices = _deviceEntries(report['missingDevices']);
+    if (missingDevices.isNotEmpty) {
+      lines.add('    - missing devices: ${_cap(missingDevices)}');
+    }
+    final missingLinks = _linkEntries(report['missingLinks']);
+    if (missingLinks.isNotEmpty) {
+      lines.add('    - missing cables: ${_cap(missingLinks)}');
+    }
+    final substitutions = _remapEntries(report['modelSubstitutions']);
+    if (substitutions.isNotEmpty) {
+      lines.add(
+        '    - model substitutions: ${_cap(substitutions)} - these devices are '
+        'in the file as a different model from the one the plan named',
+      );
+    }
+    final remaps = _remapEntries(report['interfaceRemappings']);
+    if (remaps.isNotEmpty) {
+      lines.add(
+        '    - interface remaps: ${_cap(remaps)} - the plan asked for a port '
+        'the device does not have, so the cable went to a different one',
+      );
+    }
+    final verification = report['verification'];
+    if (verification is Map && verification.isNotEmpty) {
+      final onDisk = _intOf(verification['deviceCountOnDisk']);
+      final cablesOnDisk = _intOf(verification['linkCountOnDisk']);
+      lines.add(
+        verification['ok'] == true
+            ? '    - read back from disk: ${onDisk ?? '?'} device(s), '
+                  '${cablesOnDisk ?? '?'} cable(s) - matches the build.'
+            : '    - read back from disk did NOT match the build: '
+                  '${onDisk ?? '?'} device(s), ${cablesOnDisk ?? '?'} cable(s) '
+                  '- do not trust this file.',
+      );
+    }
+    return lines;
+  }
+
+  static int? _intOf(Object? value) =>
+      value is num ? value.toInt() : int.tryParse('${value ?? ''}'.trim());
+
+  static List<String> _deviceEntries(Object? raw) {
+    final out = <String>[];
+    if (raw is! List) return out;
+    for (final entry in raw) {
+      if (entry is Map) {
+        final name = '${entry['name'] ?? '?'}'.trim();
+        final reason = '${entry['reason'] ?? ''}'.trim();
+        out.add(reason.isEmpty ? name : '$name ($reason)');
+      } else if ('$entry'.trim().isNotEmpty) {
+        out.add('$entry'.trim());
+      }
+    }
+    return out;
+  }
+
+  static List<String> _linkEntries(Object? raw) {
+    final out = <String>[];
+    if (raw is! List) return out;
+    for (final entry in raw) {
+      if (entry is Map) {
+        out.add('${entry['a'] ?? '?'}-${entry['b'] ?? '?'}');
+      } else if ('$entry'.trim().isNotEmpty) {
+        out.add('$entry'.trim());
+      }
+    }
+    return out;
+  }
+
+  static List<String> _remapEntries(Object? raw) {
+    final out = <String>[];
+    if (raw is! List) return out;
+    for (final entry in raw) {
+      if (entry is Map) {
+        out.add(
+          '${entry['device'] ?? '?'}: '
+          '${entry['requested'] ?? '?'} -> ${entry['used'] ?? '?'}',
+        );
+      } else if ('$entry'.trim().isNotEmpty) {
+        out.add('$entry'.trim());
+      }
+    }
+    return out;
+  }
+
   static List<String> _sortedCopy(List<String> items) => items.toList()..sort();
 
   static String _cap(List<String> items, [int n = 8]) => items.length <= n
