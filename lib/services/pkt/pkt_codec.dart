@@ -612,9 +612,7 @@ Uint8List xmlSafe(Uint8List data) {
   return out;
 }
 
-/// True when the buffer looks like a Packet Tracer save container.
-bool isPkt(List<int> data) {
-  if (data.length < _minPktBytes) return false;
+bool _hasXmlPrefix(List<int> data) {
   for (final b in data) {
     if (b == 0x20 ||
         b == 0x09 ||
@@ -624,9 +622,22 @@ bool isPkt(List<int> data) {
         b == 0x0C) {
       continue;
     }
-    return b != 0x3C /* < */;
+    return b == 0x3C /* < */;
   }
-  return true;
+  return false;
+}
+
+/// Cheap container hint; decode XML-looking prefixes to disambiguate them.
+bool isPkt(List<int> data) {
+  if (data.length < _minPktBytes) return false;
+  if (!_hasXmlPrefix(data)) return true;
+  // The outer scramble has no magic bytes: even '<' can be ciphertext.
+  try {
+    decryptPkt(data);
+    return true;
+  } on PktFormatError {
+    return false;
+  }
 }
 
 /// Decode a .pkt/.pka container and return the XML bytes.
@@ -637,10 +648,6 @@ Uint8List decryptPkt(List<int> raw) {
   final data = Uint8List.fromList(raw);
   if (data.length < _minPktBytes) {
     throw PktFormatError('file is too small (${data.length} bytes)');
-  }
-  final first = isPkt(data) ? data.first : 0x3C;
-  if (first == 0x3C) {
-    throw const PktFormatError('this file is plain XML, not an encrypted save');
   }
   final stage1 = _stageOuterDecode(data);
   final key = TwofishKey(ptKey);
@@ -659,6 +666,10 @@ Uint8List decryptPkt(List<int> raw) {
     return _qtUncompress(_stageInner(decrypted));
   } catch (e) {
     errors.add('CBC: $e');
+  }
+  // Only diagnose plain XML after both container formats have failed.
+  if (_hasXmlPrefix(data)) {
+    throw const PktFormatError('this file is plain XML, not an encrypted save');
   }
   throw PktFormatError('could not decode the file (${errors.join('; ')})');
 }

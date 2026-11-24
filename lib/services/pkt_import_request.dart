@@ -1,4 +1,5 @@
 import '../models/network_intent.dart';
+import 'human_language.dart';
 import 'pkt_plan_import_service.dart';
 
 /// Reads "use this file as my lab" - the request to make the scanned capture
@@ -45,9 +46,8 @@ class PktImportReply {
     final intent = imported.intent;
     final b = StringBuffer()
       ..writeln(
-        '**$fileName is the lab now.** ${intent.nodes.length} device(s), '
-        '${intent.links.length} link(s) read from the save and turned into '
-        'the standing plan.',
+        '**$fileName is the lab now.** '
+        '${HumanLanguage.list([HumanLanguage.count(intent.nodes.length, 'device'), HumanLanguage.count(intent.links.length, 'link')])} read from the save and turned into the standing plan.',
       );
     final replacedStood = replaced != null && replaced.nodes.isNotEmpty;
     if (replacedStood) {
@@ -55,8 +55,8 @@ class PktImportReply {
         ..writeln()
         ..writeln(
           'This replaces the plan that was standing '
-          '(${replaced.nodes.length} device(s)). Say "undo that" to think '
-          'again - the change is in the log.',
+          '(${HumanLanguage.count(replaced.nodes.length, 'device')}). Say '
+          '"undo that" to think again - the change is in the log.',
         );
     }
     if (imported.preservedDetails.isNotEmpty) {

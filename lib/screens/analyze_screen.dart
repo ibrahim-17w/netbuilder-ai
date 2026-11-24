@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/network_intent.dart';
 import '../services/autopilot_service.dart';
+import '../services/human_language.dart';
 import '../services/validator_service.dart';
 import '../theme/app_kit.dart';
 import '../theme/app_palette.dart';
@@ -295,7 +296,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     setState(() {
       _busy = true;
       _message =
-          'Approved. Applying $count fix(es) and preparing verification...';
+          'Approved. Applying ${HumanLanguage.count(count, 'fix')} and preparing verification...';
     });
     try {
       final svc = AutopilotService.of(context);
@@ -552,8 +553,8 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
           AppKeyValue(
             label: 'Scope',
             value:
-                '${summary['device_count'] ?? 0} device(s), '
-                '${summary['finding_count'] ?? 0} finding(s)',
+                '${HumanLanguage.count(((summary['device_count'] as num?) ?? 0).toInt(), 'device')}, '
+                '${HumanLanguage.count(((summary['finding_count'] as num?) ?? 0).toInt(), 'finding')}',
           ),
           AppKeyValue(
             label: 'Severity',
@@ -602,7 +603,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
       icon: count == 0 ? Icons.lock_outline : Icons.approval_outlined,
       title: count == 0
           ? 'No fixes selected'
-          : 'Review and approve $count fix(es)',
+          : 'Review and approve ${HumanLanguage.count(count, 'fix')}',
       subtitle: count == 0
           ? 'Tick a suggested fix on a device below. Nothing is applied '
                 'without this step.'
@@ -614,7 +615,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
           label: Text(
             count == 0
                 ? 'Select suggested fixes first'
-                : 'Review and approve $count fix(es)',
+                : 'Review and approve ${HumanLanguage.count(count, 'fix')}',
           ),
         ),
       ],
@@ -670,7 +671,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                 Flexible(child: Text('$name (${dev['type'] ?? 'device'})')),
                 const SizedBox(width: AppTheme.s8),
                 AppTag(
-                  label: '${findings.length} finding(s)',
+                  label: HumanLanguage.count(findings.length, 'finding'),
                   tone: findings.isEmpty ? AppTone.success : AppTone.warning,
                 ),
               ],

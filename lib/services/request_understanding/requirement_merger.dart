@@ -1,8 +1,99 @@
 import 'dart:convert';
 
 import '../../models/design_brief.dart';
+import '../../models/network_intent.dart';
+import '../../models/plan_operation.dart';
+import 'coverage_checker.dart';
 import '../../models/request_contract_utils.dart';
 import '../../models/request_requirement.dart';
+
+String _normalizedText(String value) =>
+    value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+
+String _legacyProperty(Requirement requirement) {
+  final property = requirement.property
+      .trim()
+      .replaceAllMapped(RegExp(r'([a-z])([A-Z])'), (m) => '${m[1]}_${m[2]}')
+      .toLowerCase()
+      .replaceAll(RegExp(r'[\s-]+'), '_');
+  return switch (property) {
+    'protocol' when _normalizedText(requirement.subject) == 'routing' =>
+      'routing_protocol',
+    'routing' => 'routing_protocol',
+    'devicecount' => 'device_count',
+    'basesubnet' => 'base_subnet',
+    'routermodel' => 'router_model',
+    'switchmodel' => 'switch_model',
+    _ => property,
+  };
+}
+
+String _canonicalSubject(Requirement requirement) {
+  final subject = _normalizedText(requirement.subject);
+  if (_legacyProperty(requirement) == 'routing_protocol' &&
+      const {'routing', 'network'}.contains(subject)) {
+    return 'network';
+  }
+  return switch (subject) {
+    'pcs' ||
+    'computer' ||
+    'computers' ||
+    'workstation' ||
+    'workstations' => 'pc',
+    'routers' => 'router',
+    'switches' => 'switch',
+    'servers' => 'server',
+    _ => subject,
+  };
+}
+
+Object? _canonicalValue(Requirement requirement, Object? value) {
+  // Comparison normalization is not a rewrite of the original fact. Secrets,
+  // structured snapshots and other case-sensitive settings retain their value.
+  if (value is! String ||
+      RegExp(
+        r'password|secret|psk|credential',
+        caseSensitive: false,
+      ).hasMatch(requirement.property)) {
+    return value;
+  }
+  final text = _normalizedText(value);
+  if (_legacyProperty(requirement) == 'routing_protocol') {
+    return switch (text) {
+      'open shortest path first' || 'ospf routing' || 'ospf protocol' => 'ospf',
+      'enhanced interior gateway routing protocol' ||
+      'eigrp routing' => 'eigrp',
+      'border gateway protocol' || 'bgp routing' => 'bgp',
+      'static routes' || 'static routing' || 'static route' => 'static',
+      'no dynamic routing' || 'no routing' => 'none',
+      _ => text,
+    };
+  }
+  if (const {
+    'base_subnet',
+    'subnet',
+    'gateway',
+  }.contains(_legacyProperty(requirement))) {
+    return text.replaceAll(RegExp(r'\s+'), '');
+  }
+  return text;
+}
+
+String _scopeKey(RequirementScope scope) {
+  // Include ancestry/context so identically named VLANs/services at different
+  // sites are not mistaken for the same scoped property.
+  Object? normalize(Object? value) {
+    if (value is String) return _normalizedText(value);
+    if (value is Map) {
+      final keys = value.keys.map((key) => '$key').toList()..sort();
+      return {for (final key in keys) key: normalize(value[key])};
+    }
+    if (value is List) return value.map(normalize).toList();
+    return value;
+  }
+
+  return jsonEncode(normalize(scope.toJson()));
+}
 
 /// A conflict is retained with its source excerpts so the UI can ask about
 /// the exact clause pair instead of choosing the last value it saw.
@@ -117,7 +208,7 @@ class RequirementMergeResult {
   }
 
   static String? _briefSlot(Requirement requirement) {
-    final property = requirement.property.toLowerCase();
+    final property = _legacyProperty(requirement);
     return switch (property) {
       'routing' || 'routing_protocol' => DesignBrief.routing,
       'scale' || 'device_count' => DesignBrief.scale,
@@ -128,7 +219,9 @@ class RequirementMergeResult {
   }
 
   static BriefFact? _briefFact(Requirement requirement, String slot) {
-    final raw = requirement.value;
+    final raw = requirement.property == 'device_count'
+        ? RequirementPlanFacts.expectedCount(requirement)
+        : requirement.value;
     if (raw == null) return null;
     final value = '$raw';
     final (source, origin) = switch (requirement.origin) {
@@ -153,6 +246,7 @@ class RequirementMergeResult {
         BriefSource.plan,
       ),
       RequirementOrigin.unknown => ('unknown provenance', BriefSource.plan),
+      _ => ('imported project decision', BriefSource.plan),
     };
     if (slot == DesignBrief.routing) {
       final routing = value.toLowerCase();
@@ -225,7 +319,7 @@ class RequirementMergeResult {
           }.contains(requirement.origin)) {
         continue;
       }
-      final property = requirement.property.toLowerCase();
+      final property = _legacyProperty(requirement);
       switch (property) {
         case 'routing':
         case 'routing_protocol':
@@ -314,6 +408,228 @@ class RequirementMergeResult {
 /// and unresolved requirements for the later coordinator.
 class RequirementMerger {
   const RequirementMerger._();
+
+  /// Bind relative requests once, before merging. The expected total/snapshot
+  /// is portable request state, so followups and reopen do not use the new plan
+  /// as their own baseline. Existing bound values are never rebound.
+  static List<Requirement> bindToBase({
+    required Iterable<Requirement> requirements,
+    required NetworkIntent? base,
+    Iterable<PlanOperation> operations = const [],
+  }) {
+    final input = requirements.toList();
+    final ops = operations.toList();
+    final explicitServices = {
+      for (final r in input)
+        if (r.property == 'service_role' &&
+            r.scope.kind == RequirementScopeKind.device &&
+            !const {
+              'another server',
+              'other server',
+            }.contains(r.scope.scopeId.toLowerCase()))
+          r.scope.scopeId.toLowerCase(),
+    };
+    final removed = <String>{
+      for (final operation in ops)
+        if (operation.kind == PlanOperationKind.removeDevices)
+          for (final name
+              in (operation.payload['deviceIds'] as List? ?? const []))
+            if (name is String) name,
+    };
+    final output = <Requirement>[];
+    for (var requirement in input) {
+      if (requirement.state != RequirementState.active) {
+        output.add(requirement);
+        continue;
+      }
+      try {
+        if (base != null) {
+          requirement = requirement.copyWith(
+            scope: RequirementPlanFacts.canonicalScope(base, requirement.scope),
+          );
+          if (requirement.property == 'service_role' &&
+              requirement.scope.kind == RequirementScopeKind.device &&
+              const {
+                'another server',
+                'other server',
+              }.contains(requirement.scope.scopeId.toLowerCase())) {
+            final matches = base.nodes
+                .where(
+                  (n) =>
+                      n.type.toLowerCase() == 'server' &&
+                      !explicitServices.contains(n.name.toLowerCase()),
+                )
+                .toList();
+            if (matches.length == 1) {
+              requirement = requirement.copyWith(
+                scope: RequirementScope(
+                  kind: RequirementScopeKind.device,
+                  scopeId: matches.single.name,
+                ),
+              );
+            }
+          }
+        }
+        final value = requirement.value;
+        if (requirement.property == 'device_count' &&
+            requirement.quantityRole == QuantityRole.increment &&
+            value is int) {
+          if (base == null || value < 0) {
+            output.add(requirement);
+            continue;
+          }
+          final count = RequirementPlanFacts.countDevices(
+            base,
+            requirement.scope,
+            requirement.subject,
+          );
+          requirement = requirement.copyWith(
+            value: {
+              'binding': 'device_count_delta_v1',
+              'delta': value,
+              'baseCount': count,
+              'expectedTotal': count + value,
+              'baseRevision': base.revision,
+            },
+          );
+        } else if (requirement.comparator == RequirementComparator.preserve &&
+            value == true &&
+            base != null) {
+          final property = RequirementPlanFacts.preserveProperty(
+            requirement.property,
+          );
+          final allowedRemoved = property == 'addressing'
+              ? removed.toList()
+              : <String>[];
+          requirement = requirement.copyWith(
+            value: {
+              'binding': 'preserve_v1',
+              'baseRevision': base.revision,
+              'property': property,
+              'expected': RequirementPlanFacts.preservationSnapshot(
+                base,
+                requirement.scope,
+                property,
+                subject: requirement.subject,
+                removedDeviceIds: allowedRemoved,
+              ),
+              'removedDeviceIds': allowedRemoved,
+            },
+          );
+        }
+        output.add(requirement);
+      } on FormatException {
+        // Keep the exact original fact: the checker gives the scope/property
+        // reason. Failed binding must not fabricate a zero count/snapshot.
+        output.add(requirement);
+      }
+    }
+    return List.unmodifiable(output);
+  }
+
+  /// Update references only after the whole operation set has been accepted.
+  /// No substring replacement: unrelated names, prose, and CIDRs stay intact.
+  static List<Requirement> rebindAcceptedRenames({
+    required Iterable<Requirement> requirements,
+    required Iterable<PlanOperation> operations,
+  }) {
+    final renamed = <String, String>{};
+    for (final op in operations) {
+      if (op.kind != PlanOperationKind.renameDevice) continue;
+      final oldName = op.payload['deviceId'], newName = op.payload['newName'];
+      if (oldName is! String || newName is! String) continue;
+      for (final name in renamed.keys.toList()) {
+        if (renamed[name]!.toLowerCase() == oldName.toLowerCase()) {
+          renamed[name] = newName;
+        }
+      }
+      renamed[oldName.toLowerCase()] = newName;
+    }
+    if (renamed.isEmpty) return requirements.toList(growable: false);
+    String rewrite(String name) => renamed[name.toLowerCase()] ?? name;
+    String scopeId(RequirementScope scope) {
+      if (scope.kind == RequirementScopeKind.device) {
+        return rewrite(scope.scopeId);
+      }
+      if (scope.kind == RequirementScopeKind.linkInterface) {
+        for (final entry in renamed.entries) {
+          for (final separator in [':', '|', ' ', '/']) {
+            final prefix = '${entry.key}$separator';
+            if (scope.scopeId.toLowerCase().startsWith(prefix)) {
+              return '${entry.value}$separator${scope.scopeId.substring(prefix.length)}';
+            }
+          }
+        }
+      }
+      return scope.scopeId;
+    }
+
+    Object? rewriteSnapshot(Object? value, [String key = '']) {
+      if (value is String) {
+        return const {
+              'name',
+              'node',
+              'a',
+              'b',
+              'deviceId',
+              'device',
+              'aaaServer',
+              'aaaRouter',
+              'vpnPeerA',
+              'vpnPeerB',
+              'dce',
+            }.contains(key)
+            ? rewrite(value)
+            : value;
+      }
+      if (value is List) {
+        return [for (final item in value) rewriteSnapshot(item, key)];
+      }
+      if (value is Map) {
+        return {
+          for (final entry in value.entries)
+            key == 'positions' ? rewrite('${entry.key}') : '${entry.key}':
+                rewriteSnapshot(entry.value, '${entry.key}'),
+        };
+      }
+      return value;
+    }
+
+    RequirementScope rewriteScope(RequirementScope scope) {
+      final json = scope.toJson();
+      json['scopeId'] = scopeId(scope);
+      if (json['deviceId'] is String) {
+        json['deviceId'] = rewrite(json['deviceId'] as String);
+      }
+      if (json['parent'] != null) {
+        json['parent'] = rewriteScope(
+          RequirementScope.fromJson(json['parent']),
+        ).toJson();
+      }
+      return RequirementScope.fromJson(json);
+    }
+
+    return [
+      for (final requirement in requirements)
+        requirement.copyWith(
+          subject: requirement.scope.kind == RequirementScopeKind.device
+              ? rewrite(requirement.subject)
+              : requirement.subject,
+          scope: rewriteScope(requirement.scope),
+          value:
+              const {
+                    'device_name',
+                    'device_presence',
+                  }.contains(requirement.property) &&
+                  requirement.value is String
+              ? rewrite(requirement.value as String)
+              : requirement.value is Map &&
+                    (requirement.value as Map)['binding'] == 'preserve_v1'
+              ? rewriteSnapshot(requirement.value)
+              : requirement.value,
+        ),
+    ];
+  }
 
   static RequirementMergeResult merge(Iterable<Requirement> input) {
     final byId = <String, Requirement>{};
@@ -544,26 +860,27 @@ class RequirementMerger {
       RequirementStrength.explicit => 100,
       RequirementStrength.advisory => 0,
     };
-    final origin = switch (requirement.origin) {
-      RequirementOrigin.currentExplicit => 6,
-      RequirementOrigin.establishedProject => 5,
-      RequirementOrigin.scopedRememberedPreference => 4,
-      RequirementOrigin.environmentProfile => 3,
-      RequirementOrigin.derivedDefault => 2,
-      RequirementOrigin.unknown => 1,
+    final origin = switch (requirement.origin.name) {
+      'currentExplicit' => 7,
+      'establishedProject' => 6,
+      'imported' => 5,
+      'scopedRememberedPreference' => 4,
+      'environmentProfile' => 3,
+      'derivedDefault' => 2,
+      _ => 1,
     };
     return strength + origin;
   }
 
   static String _key(Requirement requirement) =>
-      '${requirement.subject.toLowerCase()}|${requirement.scope.kind.name}|'
-      '${requirement.scope.scopeId.toLowerCase()}|${requirement.property.toLowerCase()}';
+      '${_canonicalSubject(requirement)}|${_scopeKey(requirement.scope)}|'
+      '${_legacyProperty(requirement)}';
 
   static String _meaningKey(Requirement requirement) => jsonEncode({
     'comparator': requirement.comparator.name,
-    'value': requirement.value,
+    'value': _canonicalValue(requirement, requirement.value),
     'quantityRole': requirement.quantityRole.name,
-    'unit': requirement.unit,
+    'unit': _normalizedText(requirement.unit),
   });
 
   static int _compareRequirements(Requirement a, Requirement b) {
@@ -575,6 +892,20 @@ class RequirementMerger {
   }
 
   static bool _incompatible(Requirement a, Requirement b) {
+    // Bound increments are absolute outcomes of one accepted edit, not new
+    // deltas to apply on every reopen/followup.
+    final aValue = _canonicalValue(
+      a,
+      a.quantityRole == QuantityRole.increment
+          ? RequirementPlanFacts.expectedCount(a) ?? a.value
+          : a.value,
+    );
+    final bValue = _canonicalValue(
+      b,
+      b.quantityRole == QuantityRole.increment
+          ? RequirementPlanFacts.expectedCount(b) ?? b.value
+          : b.value,
+    );
     if (a.comparator == RequirementComparator.forbidden &&
         b.comparator == RequirementComparator.forbidden) {
       return false;
@@ -584,18 +915,48 @@ class RequirementMerger {
       final forbidden = a.comparator == RequirementComparator.forbidden ? a : b;
       final chosen = identical(forbidden, a) ? b : a;
       return chosen.comparator == RequirementComparator.equals &&
-          jsonValueEquals(forbidden.value, chosen.value);
+          jsonValueEquals(
+            _canonicalValue(forbidden, forbidden.value),
+            _canonicalValue(chosen, chosen.value),
+          );
     }
     if (a.comparator == RequirementComparator.preserve ||
         b.comparator == RequirementComparator.preserve) {
       return !jsonValueEquals(a.value, b.value);
     }
+    // Distinct exact links in one brief are additive inventory, not competing
+    // values for one property: "R1 g0/0 connects to R2 g0/0" and "R2 g0/1
+    // connects to R3 g0/0" both belong in the plan. Genuine port reuse is
+    // caught by plan validation, not by treating the second cable as a
+    // contradiction of the first.
+    if (const {
+      'link',
+      'subnet',
+      'base_subnet',
+      'allocation_sites',
+      'site_inventory',
+      'unsupported',
+      'isolation_policy',
+      'unsupported_policy',
+      'advanced_config',
+      'advanced_configuration',
+      'unsupported_service_configuration',
+      'service_setting',
+      'service_settings',
+      'gateway',
+    }.contains(_legacyProperty(a))) {
+      // Address assignment compatibility is domain-aware and is checked by
+      // RequirementValidator. Policy/config clauses are additive evidence,
+      // never last-string-wins settings. Forbidden/equal pairs above still
+      // conflict, even for a collection property.
+      return false;
+    }
 
     final aExact = a.comparator == RequirementComparator.equals;
     final bExact = b.comparator == RequirementComparator.equals;
-    final aNumber = _number(a.value);
-    final bNumber = _number(b.value);
-    if (aExact && bExact) return !jsonValueEquals(a.value, b.value);
+    final aNumber = _number(aValue);
+    final bNumber = _number(bValue);
+    if (aExact && bExact) return !jsonValueEquals(aValue, bValue);
     if (aExact && bNumber != null) return !_satisfies(aNumber, b);
     if (bExact && aNumber != null) return !_satisfies(bNumber, a);
     if (a.comparator == RequirementComparator.atLeast &&

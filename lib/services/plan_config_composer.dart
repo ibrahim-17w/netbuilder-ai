@@ -663,6 +663,72 @@ class PlanConfigComposer {
   /// excluded-address range covering the addresses the plan already assigned
   /// statically (the gateway and the addressed PCs/servers) - facts no
   /// generic answer has.
+  /// The complete router-local pool block, shared by answers and adapters.
+  /// Unlike prose answers, build callers do not cap the number of LAN pools.
+  static String routerDhcpConfig(
+    NetworkIntent plan,
+    String router, {
+    int? maxPools,
+  }) {
+    final lans = _lansOf(plan, router);
+    String? dnsIp;
+    for (final node in plan.nodes) {
+      if (node.type != 'server' ||
+          !node.services.any((role) => role.toLowerCase() == 'dns')) {
+        continue;
+      }
+      dnsIp = plan.addressing
+          .where((a) => a.node == node.name)
+          .map((a) => _netOf(a.ipCidr)?.host)
+          .whereType<String>()
+          .where((ip) => ip != '0.0.0.0')
+          .firstOrNull;
+      if (dnsIp != null) break;
+    }
+    final dhcpClients = {
+      for (final node in plan.nodes)
+        if (node.serviceRules['addressing'] is Map &&
+            (node.serviceRules['addressing'] as Map)['mode'] == 'dhcp')
+          node.name,
+    };
+    final sb = StringBuffer();
+    var count = 0;
+    for (final lan in lans) {
+      if (maxPools != null && count >= maxPools) {
+        sb.writeln('! plus one pool per remaining LAN subnet');
+        break;
+      }
+      count++;
+      final taken = <int>[];
+      for (final a in plan.addressing) {
+        if (dhcpClients.contains(a.node)) continue;
+        final net = _netOf(a.ipCidr);
+        if (net == null || net.host == lan.net.network) continue;
+        if (NetworkTools.sameSubnet(
+          '${net.network}/${net.prefix}',
+          '${lan.net.network}/${lan.net.prefix}',
+        )) {
+          taken.add(NetworkTools.ipToInt(net.host)!);
+        }
+      }
+      if (taken.isEmpty) taken.add(NetworkTools.ipToInt(lan.net.host)!);
+      taken.sort();
+      final first = NetworkTools.intToIp(taken.first);
+      final last = NetworkTools.intToIp(taken.last);
+      sb.writeln(
+        first == last
+            ? 'ip dhcp excluded-address $first'
+            : 'ip dhcp excluded-address $first $last',
+      );
+      sb.writeln('ip dhcp pool LAN_${lan.net.network.replaceAll('.', '_')}');
+      sb.writeln(' network ${lan.net.network} ${lan.net.mask}');
+      sb.writeln(' default-router ${lan.net.host}');
+      if (dnsIp != null) sb.writeln(' dns-server $dnsIp');
+      sb.writeln('exit');
+    }
+    return sb.toString();
+  }
+
   static String? _dhcp(NetworkIntent plan) {
     final routers = _routers(plan);
     if (routers.isEmpty) return null;
@@ -679,22 +745,6 @@ class PlanConfigComposer {
         'subnet and gateway.',
       );
     }
-    // A DNS server the plan carries (a server node running dns, addressed)
-    // is named in every pool; without one the line is left out rather than
-    // pointing at an invented 8.8.8.8.
-    String? dnsIp;
-    for (final n in plan.nodes) {
-      if (n.type != 'server' ||
-          !n.services.any((s) => s.toLowerCase() == 'dns')) {
-        continue;
-      }
-      for (final a in plan.addressing) {
-        if (a.node != n.name) continue;
-        dnsIp = _netOf(a.ipCidr)?.host;
-        break;
-      }
-      if (dnsIp != null) break;
-    }
     final sb = StringBuffer()
       ..writeln(_dhcpLead(plan, lansByRouter))
       ..writeln();
@@ -706,47 +756,7 @@ class PlanConfigComposer {
       sb.writeln('$step. On ${entry.key}:');
       sb.writeln();
       sb.writeln('```');
-      var count = 0;
-      for (final lan in entry.value) {
-        if (count >= 2) {
-          sb.writeln('! plus one pool per remaining LAN subnet');
-          break;
-        }
-        count++;
-        // Every address the plan already assigned inside this subnet; the
-        // pool must not hand those out again. The excluded-address lines are
-        // global config, so they go BEFORE the pool block (inside `ip dhcp
-        // pool` mode IOS rejects them).
-        final taken = <int>[];
-        for (final a in plan.addressing) {
-          final net = _netOf(a.ipCidr);
-          if (net == null) continue;
-          if (!NetworkTools.sameSubnet(
-            '${net.network}/${net.prefix}',
-            '${lan.net.network}/${lan.net.prefix}',
-          )) {
-            continue;
-          }
-          if (net.host == lan.net.network) continue; // network address row
-          taken.add(NetworkTools.ipToInt(net.host)!);
-        }
-        if (taken.isEmpty) {
-          taken.add(NetworkTools.ipToInt(lan.net.host)!);
-        }
-        taken.sort();
-        final first = NetworkTools.intToIp(taken.first);
-        final last = NetworkTools.intToIp(taken.last);
-        sb.writeln(
-          first == last
-              ? 'ip dhcp excluded-address $first'
-              : 'ip dhcp excluded-address $first $last',
-        );
-        sb.writeln('ip dhcp pool LAN_${lan.net.network.replaceAll('.', '_')}');
-        sb.writeln(' network ${lan.net.network} ${lan.net.mask}');
-        sb.writeln(' default-router ${lan.net.host}');
-        if (dnsIp != null) sb.writeln(' dns-server $dnsIp');
-        sb.writeln('exit');
-      }
+      sb.write(routerDhcpConfig(plan, entry.key, maxPools: 2));
       sb.writeln('```');
       sb.writeln();
       step++;

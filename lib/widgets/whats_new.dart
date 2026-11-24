@@ -8,6 +8,23 @@ import '../services/settings_service.dart';
 const List<({String version, String date, List<String> changes})>
 kChangelogEntries = [
   (
+    version: '1.1.0',
+    date: 'November 2026',
+    changes: [
+      'A named lab keeps its name: "lab named release-validation" now names '
+          'the plan and the file it builds',
+      'The .pkt builder no longer drops a cableable device out of the '
+          'Physical Workspace, which made Packet Tracer refuse some saves',
+      'Explicit server roles stay on the server the brief names '
+          '("DHCP on SRV1, DNS on SRV2")',
+      'Unsupported service requests (DHCP failover, Active Directory) are '
+          'named as unsupported instead of quietly planned',
+      'A phone composer that fits: Return adds a line, suggestions step '
+          'aside for the keyboard, and Android back returns to the chat',
+      'Build details are one tap away instead of filling the screen',
+    ],
+  ),
+  (
     version: '1.0.0',
     date: 'September 2026',
     changes: [

@@ -9,6 +9,7 @@ import '../services/pkt/pkt_export_service.dart';
 import '../models/build_record.dart';
 import '../theme/app_kit.dart';
 import '../theme/app_palette.dart';
+import 'pkt_verification_status.dart';
 
 /// Recent generated .pkt files live beside the existing Packet Tracer file
 /// tools, so history is easy to find without adding another navigation item.
@@ -160,6 +161,8 @@ class _PktBuildHistoryPanelState extends State<PktBuildHistoryPanel> {
               ),
             ],
           ),
+          const SizedBox(height: 6),
+          PktVerificationStatus(verification: entry.verification),
           if ((entry.planJson.isNotEmpty && widget.onOpenPlan != null) ||
               exists)
             Align(

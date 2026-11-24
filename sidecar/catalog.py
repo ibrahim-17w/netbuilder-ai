@@ -121,9 +121,14 @@ DEVICE_PALETTE = {
 # historian, cyber-observer, controller, power-distribution) were taught
 # DEVICE_PALETTE entries above; the set stays as the landing place for the
 # next offline-buildable kind that has no taught click-path yet.
+# Empty since the seven industrial/control kinds (hub, sniffer, plc,
+# historian, cyber-observer, controller, power-distribution) were taught
+# DEVICE_PALETTE entries above; the set stays as the landing place for the
+# next offline-buildable kind that has no taught click-path yet.
 OFFLINE_ONLY_DEVICE_KINDS = {
     # Real templates, but no taught live palette path yet. They compile into
     # offline .pkt files and are reported as offline_only on a live run.
+    "bridge",
     "meraki-server",
     "wired-end-device",
     "wireless-end-device",
@@ -138,9 +143,10 @@ OFFLINE_ONLY_DEVICE_KINDS = {
 # Kinds the planner can name but neither builder can place yet. They are kept
 # equal to `unsupportedDeviceKinds` in lib/services/nlu/lexicon.dart by
 # test_device_palette.py. A kind leaves this set only when DEVICE_PALETTE has
-# a real placement path for it; until then no substitute is placed.
+# a real placement path for it; until then no substitute is placed. Bridge-PT
+# left it in 2026-11-14: a harvested template makes the offline build work,
+# and the kind moved to OFFLINE_ONLY_DEVICE_KINDS.
 UNSUPPORTED_DEVICE_KINDS = {
-    "bridge",
     "repeater",
 }
 

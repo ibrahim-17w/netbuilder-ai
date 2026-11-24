@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 
 import '../models/network_intent.dart';
+import '../services/human_language.dart';
 import '../services/network_block_service.dart';
 import '../services/topology_edit_service.dart';
 import '../services/packet_tracer/catalog.dart';
@@ -196,9 +197,10 @@ class _TopologyPreviewScreenState extends State<TopologyPreviewScreen> {
       SnackBar(
         content: Text(
           result.clearedAddressCount == 0
-              ? 'Duplicated ${selected.length} devices and their internal cables.'
-              : 'Duplicated the group; cleared ${result.clearedAddressCount} '
-                    'conflicting address(es).',
+              ? 'Duplicated ${HumanLanguage.count(selected.length, 'device')} '
+                    'and their internal cables.'
+              : 'Duplicated the group; cleared '
+                    '${HumanLanguage.count(result.clearedAddressCount, 'conflicting address')}.',
         ),
       ),
     );
@@ -211,7 +213,7 @@ class _TopologyPreviewScreenState extends State<TopologyPreviewScreen> {
     if (result.added.isNotEmpty) _change(result.intent);
     final text = result.added.isEmpty
         ? 'No compatible free ports were found for this group.'
-        : 'Added ${result.added.length} compatible cable(s)'
+        : 'Added ${HumanLanguage.count(result.added.length, 'compatible cable')}'
               '${result.notConnected.isEmpty ? '.' : '; could not connect ${result.notConnected.join(', ')}.'}';
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
     _finishGroupSelection();
@@ -278,8 +280,9 @@ class _TopologyPreviewScreenState extends State<TopologyPreviewScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Added ${selected.name}; ${result.clearedAddressCount} conflicting '
-          'address(es) need review.',
+          'Added ${selected.name}; '
+          '${HumanLanguage.count(result.clearedAddressCount, 'conflicting address')} '
+          '${result.clearedAddressCount == 1 ? 'needs' : 'need'} review.',
         ),
       ),
     );
@@ -484,6 +487,7 @@ class _TopologyPreviewScreenState extends State<TopologyPreviewScreen> {
             model: choice.device.model,
             exactModel: true,
             modules: choice.variant.modules,
+            variantKey: choice.variant.key,
           ),
         ],
       ),
@@ -710,6 +714,7 @@ class _TopologyPreviewScreenState extends State<TopologyPreviewScreen> {
                 'model': hardwareChoice.device.model,
                 'exactModel': true,
                 'modules': hardwareChoice.variant.modules,
+                'variantKey': hardwareChoice.variant.key,
               })
             else
               n,

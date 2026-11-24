@@ -1,4 +1,7 @@
 import '../models/network_intent.dart';
+import 'human_language.dart';
+import 'network_math.dart';
+import 'request_understanding/saved_artifact_audit.dart';
 
 /// What a build says for itself: a concise preflight before compiling, and a
 /// plan-vs-file comparison from the audit afterwards.
@@ -28,8 +31,16 @@ class BuildPreflight {
       '- Target: ${targetName(target)} - offline compile; no Packet Tracer '
           'window is opened and nothing is typed anywhere.',
       '- Plan: ${describeDevices(intent)}; routing ${intent.routing}; '
-          '${intent.links.length} link(s).',
+          '${HumanLanguage.count(intent.links.length, 'link')}.',
     ];
+    final pinned = intent.nodes
+        .where((node) => node.variantKey != null)
+        .toList();
+    if (pinned.isNotEmpty) {
+      lines.add(
+        '- Pinned hardware: ${pinned.map((node) => '${node.name}=${node.variantKey}').join('; ')}.',
+      );
+    }
     final assumptions = intent.assumptions
         .where((a) => a.trim().isNotEmpty)
         .toList();
@@ -56,21 +67,17 @@ class BuildPreflight {
   ///
   /// [audit] is the engine's `/pkt/audit` result for the file that was just
   /// written; devices are compared by name. [builtDevices] is the generator's
-  /// own record of what it wrote (`/pkt/generate` -> `devices`), which is what
-  /// the links are checked against.
-  ///
-  /// The offline audit reads devices and their interfaces and carries NO link
-  /// list, so the older pair-comparison against a missing key reported every
-  /// planned link as "not found in the file" - on files that contained all of
-  /// them. A check that cries wolf on every build is worse than no check, so
-  /// links are verified by the ports that were really written.
+  /// own record of what it wrote. It can translate remapped interface names,
+  /// but it cannot verify a saved cable, address, mask, or service flag.
+  /// Missing read-back fields remain explicitly unverified.
   static ({bool verified, List<String> lines}) compare({
     required NetworkIntent intent,
     required Map<String, dynamic> audit,
     List<dynamic> builtDevices = const [],
   }) {
+    final saved = SavedArtifactAudit(audit);
     final devices = audit['devices'];
-    if (devices is! List) {
+    if (devices is! List || !saved.hasDeviceInventory) {
       return (
         verified: false,
         lines: const [
@@ -115,7 +122,9 @@ class BuildPreflight {
         final device = endpoint.device.trim();
         final port = builtPorts[device]?[endpoint.iface.trim()];
         if (port == null || port.isEmpty) {
-          unbuilt.add('$device:${endpoint.iface}');
+          if (builtPorts.containsKey(device)) {
+            unbuilt.add('$device:${endpoint.iface}');
+          }
           continue;
         }
         final key = '$device:$port';
@@ -136,7 +145,19 @@ class BuildPreflight {
     // translates a plan interface to the real port it landed on, so a
     // remapped cable is compared on the port that exists, not the one that
     // was requested.
-    final auditRows = <String, List<({String name, String ip})>>{};
+    final auditRows =
+        <
+          String,
+          List<
+            ({
+              String name,
+              String ip,
+              String? mask,
+              bool ipObserved,
+              bool maskObserved,
+            })
+          >
+        >{};
     for (final d in devices) {
       if (d is! Map) continue;
       final name = '${d['name'] ?? ''}'.trim();
@@ -148,6 +169,18 @@ class BuildPreflight {
             (
               name: '${row['name'] ?? ''}'.trim(),
               ip: '${row['ip'] ?? ''}'.trim(),
+              mask: row['mask'] is String
+                  ? (row['mask'] as String).trim()
+                  : row['subnet'] is String
+                  ? (row['subnet'] as String).trim()
+                  : null,
+              ipObserved:
+                  row.containsKey('ip') &&
+                  row['ipObserved'] != false &&
+                  row['readable'] != false,
+              maskObserved:
+                  (row['mask'] is String || row['subnet'] is String) &&
+                  row['maskObserved'] != false,
             ),
       ];
     }
@@ -164,11 +197,8 @@ class BuildPreflight {
     for (final a in intent.addressing) {
       final device = a.node.trim();
       final rows = auditRows[device.toLowerCase()];
-      if (rows == null) continue; // the device itself is already reported
-      if (rows.isEmpty) {
-        // The audit could not read this device's interfaces at all (a host
-        // panel, a model the reader does not cover): say so, do not fail the
-        // build over evidence nobody collected.
+      if (rows == null || rows.isEmpty) {
+        // Missing rows are unreadable, not an implicit address match.
         addressesNotComparable++;
         continue;
       }
@@ -179,10 +209,17 @@ class BuildPreflight {
         _canonIface(row?.name ?? port),
       );
       if (row == null) {
-        addressGaps.add(
-          '$device: the file has no interface for ${a.iface}, which the plan '
-          'assigns ${a.ipCidr}',
-        );
+        // An unnamed/unreadable raw port is not proof of an absent one.
+        if (rows.any((entry) => entry.name.isEmpty) ||
+            saved.device(device)?['interfacesComplete'] != true) {
+          addressesNotComparable++;
+        } else {
+          addressGaps.add(
+            '$device: the file has no interface for ${a.iface}, which the plan assigns ${a.ipCidr}',
+          );
+        }
+      } else if (!row.ipObserved) {
+        addressesNotComparable++;
       } else if (row.ip.isEmpty || row.ip.toLowerCase() == 'unassigned') {
         addressGaps.add(
           '$device ${a.iface} is unconfigured in the file; the plan assigns '
@@ -193,7 +230,18 @@ class BuildPreflight {
           '$device ${a.iface} carries ${row.ip} in the file; the plan assigns '
           '${a.ipCidr}',
         );
+      } else {
+        final parts = a.ipCidr.split('/');
+        final prefix = parts.length == 2 ? int.tryParse(parts[1]) : null;
+        if (prefix == null || !row.maskObserved || row.mask == null) {
+          addressesNotComparable++;
+        } else if (NetworkMath.prefixFromMask(row.mask!) != prefix) {
+          addressGaps.add(
+            '$device ${a.iface} carries mask ${row.mask} in the file; the plan assigns ${a.ipCidr}',
+          );
+        }
       }
+      if (a.ip6Cidr?.isNotEmpty == true) addressesNotComparable++;
     }
     // The other direction: a planned device carrying a saved address the plan
     // never assigned is template leftovers - exactly the state the builder
@@ -206,6 +254,11 @@ class BuildPreflight {
       if (planned == null) continue; // extra devices are reported above
       for (final row in entry.value) {
         if (row.ip.isEmpty || row.ip.toLowerCase() == 'unassigned') continue;
+        if (row.name.isEmpty || !row.ipObserved) {
+          // A raw address without a name cannot be mapped to a requested port.
+          addressesNotComparable++;
+          continue;
+        }
         final coveredPorts = covered[entry.key] ?? const <String>{};
         if (coveredPorts.contains(_canonIface(row.name))) continue;
         leftovers.add('${planned.name} ${row.name} = ${row.ip}');
@@ -220,34 +273,27 @@ class BuildPreflight {
     // defect classes PlanRepairService fixes, so a file that has them is not
     // verified - otherwise a .pkt can come back clean holding the very defect
     // the repair pass was supposed to eliminate.
-    final semantic = <String>[];
-    final auditedFindings = audit['findings'];
-    if (auditedFindings is List) {
-      semantic.addAll(auditedFindings.map((f) => '$f'));
-    }
-    // A service the plan gave a role but the file never enabled. The audit
-    // reports services per device, so this is checked device by device.
-    final servicesByName = <String, Set<String>>{};
-    for (final d in devices) {
-      if (d is! Map) continue;
-      final name = '${d['name'] ?? ''}'.trim();
-      final svcs = d['services'];
-      if (name.isEmpty || svcs is! List) continue;
-      servicesByName[name] = svcs
-          .map<String>((e) => '$e'.toLowerCase())
-          .toSet();
-    }
+    final semantic = saved.findings.toList();
+    // Strings mean observed enabled roles; engine objects expose an actual
+    // enabled flag. Missing/unknown is unverified, never enabled by truthiness.
+    final servicesByName = <String, Map<String, bool?>>{
+      for (final device in saved.devices)
+        SavedArtifactAudit.text(device['name']).toLowerCase():
+            SavedArtifactAudit.serviceStates(device),
+    };
     final roleGaps = <String>[];
+    var servicesNotComparable = 0;
     for (final n in intent.nodes) {
-      if (n.services.isEmpty) continue;
-      final have = servicesByName[n.name.trim()];
-      if (have == null) continue; // device not in the file: reported above
-      final absent = n.services
-          .map((s) => s.toLowerCase())
-          .where((s) => !have.contains(s))
-          .toList();
-      if (absent.isNotEmpty) {
-        roleGaps.add('${n.name} is missing ${absent.join(', ')}');
+      final have = servicesByName[n.name.trim().toLowerCase()];
+      for (final role in n.services) {
+        final value = have?[role.toLowerCase()];
+        if (value == null) {
+          servicesNotComparable++;
+        } else if (!value) {
+          roleGaps.add(
+            '${n.name} has ${role.toLowerCase()} disabled in the file',
+          );
+        }
       }
     }
     semantic.addAll(roleGaps);
@@ -272,14 +318,7 @@ class BuildPreflight {
             bIf: '${row['bIf'] ?? ''}'.trim(),
           ),
     ];
-    final declaredLinkCount =
-        (audit['linkCount'] as num?)?.toInt() ??
-        (audit['summary'] is Map
-            ? ((audit['summary'] as Map)['links'] as num?)?.toInt()
-            : null);
-    final linksComparable =
-        savedRows.isNotEmpty ||
-        (declaredLinkCount != null && declaredLinkCount == 0);
+    final linksComparable = saved.hasLinkInventory;
     String pairKey(String devA, String ifA, String devB, String ifB) {
       final left = '${devA.toLowerCase()}|${_canonIface(ifA)}';
       final right = '${devB.toLowerCase()}|${_canonIface(ifB)}';
@@ -317,22 +356,29 @@ class BuildPreflight {
         leftovers.isEmpty &&
         semantic.isEmpty) {
       final links = linksComparable
-          ? '${savedCables.length} cable(s) verified against the saved file'
+          ? '${HumanLanguage.count(savedCables.length, 'cable')} verified against the saved file'
           : linksChecked
-          ? '${intent.links.length} link(s) verified against the ports '
-                'the generator wrote'
+          ? '${HumanLanguage.count(intent.links.length, 'link')} reported against generator ports '
+                '(not independent saved-file evidence)'
           : 'links not compared - the audit carries no link data and no '
                 'generator report was collected';
-      final compared = intent.addressing.length - addressesNotComparable;
+      final compared = (intent.addressing.length - addressesNotComparable)
+          .clamp(0, intent.addressing.length);
       final addresses = intent.addressing.isEmpty
           ? ''
-          : '; $compared address(es) verified against the saved ports'
-                '${addressesNotComparable > 0 ? ' ($addressesNotComparable not comparable - no interface rows for that device)' : ''}';
+          : '; ${HumanLanguage.count(compared.toInt(), 'address')} verified against saved IPs and masks'
+                '${addressesNotComparable > 0 ? ' ($addressesNotComparable unverified address/mask observations)' : ''}';
+      final verified =
+          (linksComparable || intent.links.isEmpty) &&
+          addressesNotComparable == 0 &&
+          servicesNotComparable == 0;
       return (
-        verified: linksComparable || intent.links.isEmpty,
+        verified: verified,
         lines: [
-          '- Verification: ${linksComparable || intent.links.isEmpty ? 'the file agrees with the plan' : 'unverified - saved cable evidence was not collected'} '
-              '(${foundNames.length} device(s); $links$addresses).',
+          '- Verification: ${verified ? 'the observed file properties agree with the plan' : 'unverified - required saved-file evidence was not collected'} '
+              '(${HumanLanguage.count(foundNames.length, 'device')}; $links$addresses).',
+          if (servicesNotComparable > 0)
+            '- Services: $servicesNotComparable requested enabled flag(s) could not be read; unverified.',
         ],
       );
     }
@@ -422,8 +468,9 @@ class BuildPreflight {
         parts.add('$n $name');
       }
     });
-    if (other > 0) parts.add('$other other device(s)');
-    return '$total device(s)${parts.isEmpty ? '' : ' (${parts.join(', ')})'}';
+    if (other > 0) parts.add(HumanLanguage.count(other, 'other device'));
+    return '${HumanLanguage.count(total, 'device')}'
+        '${parts.isEmpty ? '' : ' (${parts.join(', ')})'}';
   }
 
   /// The friendly name of a build target.
@@ -458,9 +505,9 @@ class BuildPreflight {
     final cables = _intOf(report['linkCount']);
     final plannedCables = _intOf(report['plannedLinks']);
     final counts = planned != null && plannedCables != null
-        ? '${written ?? '?'}/$planned device(s), '
-              '${cables ?? '?'}/$plannedCables cable(s) written'
-        : '${written ?? '?'} device(s), ${cables ?? '?'} cable(s) written';
+        ? '${written ?? '?'} of $planned devices, '
+              '${cables ?? '?'} of $plannedCables cables written'
+        : '${written ?? '?'} devices, ${cables ?? '?'} cables written';
     final complete =
         report['complete'] == true ||
         status == 'VALID' ||
@@ -480,6 +527,19 @@ class BuildPreflight {
       lines.add(
         '- Export status: $status - **the file is not the plan** ($counts).',
       );
+    }
+    final deviceRows = report['devices'];
+    if (deviceRows is List) {
+      final hardware = [
+        for (final row in deviceRows)
+          if (row is Map && (row['variantKey'] ?? row['template']) is String)
+            '${row['name']}=${row['variantKey'] ?? row['template']}',
+      ];
+      if (hardware.isNotEmpty) {
+        lines.add(
+          '    - selected hardware (generator report): ${hardware.join('; ')}',
+        );
+      }
     }
     final missingDevices = _deviceEntries(report['missingDevices']);
     if (missingDevices.isNotEmpty) {
@@ -509,10 +569,10 @@ class BuildPreflight {
       final cablesOnDisk = _intOf(verification['linkCountOnDisk']);
       lines.add(
         verification['ok'] == true
-            ? '    - read back from disk: ${onDisk ?? '?'} device(s), '
-                  '${cablesOnDisk ?? '?'} cable(s) - matches the build.'
+            ? '    - read back from disk: ${onDisk ?? '?'} devices, '
+                  '${cablesOnDisk ?? '?'} cables - matches the build.'
             : '    - read back from disk did NOT match the build: '
-                  '${onDisk ?? '?'} device(s), ${cablesOnDisk ?? '?'} cable(s) '
+                  '${onDisk ?? '?'} devices, ${cablesOnDisk ?? '?'} cables '
                   '- do not trust this file.',
       );
     }
@@ -575,8 +635,24 @@ class BuildPreflight {
   /// The row whose port matches [port], comparing names the way Cisco
   /// abbreviates them: the plan says `g0/0`, the save says
   /// `GigabitEthernet0/0`, and both must read as the same interface.
-  static ({String name, String ip})? _findByPort(
-    List<({String name, String ip})> rows,
+  static ({
+    String name,
+    String ip,
+    String? mask,
+    bool ipObserved,
+    bool maskObserved,
+  })?
+  _findByPort(
+    List<
+      ({
+        String name,
+        String ip,
+        String? mask,
+        bool ipObserved,
+        bool maskObserved,
+      })
+    >
+    rows,
     String port,
   ) {
     final wanted = _canonIface(port);

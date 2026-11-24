@@ -42,21 +42,49 @@ UI reports, not a launch failure.
 
 ## Request path
 
-1. **Parse and plan.** `NetworkIntent` and the planner turn language into
-   nodes, links, addressing and routing. Local validation runs before any file
-   is written or device is touched.
-2. **Budget context.** `ContextBudget.plan` chooses the turns and fixed blocks
-   that fit the runtime window. The plan is built against
-   `min(user budget, real runtime window)`, so a 4k runtime is never handed a
-   256k request.
-3. **Answer.** `ProviderChatService` talks to the configured provider (Gemini
-   or an OpenAI-compatible endpoint), or the offline assistant answers locally
-   when there is no key.
-4. **Build.** The on-device `.pkt` builder writes a Packet Tracer save from
-   bundled templates. The desktop engine can also drive Packet Tracer and
-   verify each action on screen.
-5. **Verify.** The generated file is read back and compared with the plan.
-   A step that cannot be verified is reported as unverified, not claimed.
+1. **Interpret and reconcile.** The source-mapped request reader produces typed
+   requirements, exclusions and operations. `RequestCoordinator` merges project
+   constraints and applies supported edits to a candidate, preserving the prior
+   plan when a clause, reference or operation cannot be resolved. Read-only
+   questions do not become new design requirements.
+2. **Check coverage.** `CoverageChecker` compares exact/bounded inventory,
+   names/models, scopes, subnets, service roles and preservation requirements.
+   `BuildReadiness` combines this with validation and explicit target support.
+   Model, generation, saved-file read-back and live-check capabilities are
+   independent; unknown policy support is not assumed.
+3. **Assist only when needed.** The configured provider may propose a bounded
+   structured interpretation for an unresolved supported edit. Closed-schema,
+   source-span, scope, value and exclusion checks run locally, with at most one
+   repair. Proposals are revalidated at the coordinator boundary; ordinary
+   answer generation cannot execute them. Clear offline requests need no key.
+4. **Budget the real request.** `SessionState.mandatoryRequestContext()` retains
+   requirements/exclusions, active scope, actions and pending questions.
+   `ContextBudget` fits optional history around those mandatory blocks and the
+   runtime window. The transport uses the budgeted system text and checks each
+   tool round; an oversized mandatory request is refused, not truncated.
+5. **Persist and present one outcome.** The plan and `RequestOutcome` share the
+   existing session save boundary. `RequestOutcomeCard` renders recorded facts,
+   actual diffs, provenance and separate planning/file/live statuses. Corrections
+   are explicit turns through the same coordinator, bound to the displayed
+   project, revision and fact identity.
+6. **Build the bound snapshot.** `.pkt` readiness uses Packet Tracer capabilities,
+   not an unrelated chat export target. `BuildActionIdentity` covers project,
+   semantic/build revision, requirement digest, site/scope, layout and output.
+   The existing job service deduplicates identical active requests and rejects
+   conflicting ones; per-run tokens guard late callbacks.
+7. **Audit actual saved bytes.** Engine and on-device readers normalize observed
+   device, interface/mask, service-flag, link and position evidence. Artifact
+   SHA-256 is computed from the same bytes decoded. A missing field is unverified,
+   an observed discrepancy is a mismatch, and a replaced file or stale action
+   invalidates prior proof while retaining its history. Generator reports and
+   live network checks remain separate.
+
+Attachments are data, not instructions. Explicit explain/compare/import/edit/
+build-from intent is required. OCR records original-byte identity and uncertainty;
+critical unreadable values require confirmation. Packet Tracer imports retain
+observed imported provenance rather than relabeling inferred defaults as user
+facts or verified evidence. Legacy sessions remain readable without fabricated
+provenance.
 
 ## Memory and privacy boundaries
 
@@ -74,6 +102,34 @@ UI reports, not a launch failure.
 - Release Android builds keep cleartext traffic disabled. The debug manifest
   may allow local HTTP for development only.
 
+## Learned knowledge (offline replay)
+
+Answers a keyed model gave to a question-shaped ask are kept so the app can
+answer offline later. Two tiers, both local:
+
+1. **Exact replay** - `lib/services/learned_answers_service.dart` +
+   the `learned_answer` table. "Same question, same answer": the normalized
+   question is the key, the answer replays verbatim. Capture is picky
+   (refusals, error stubs, out-of-scope asks and computable-fact conflicts
+   are never stored), and repetition across independent answers confirms.
+2. **Concept knowledge** - `lib/services/concept_knowledge.dart` +
+   the `knowledge_concept` table (schema v13). The same learning, filed
+   under the THING the question is about via a curated alias dictionary, so
+   a differently-worded ask retrieves it with an honest confidence tier:
+   alias-anchored hits answer directly, token-overlap hits are phrased as
+   qualified, and a question naming two concepts of which only one is known
+   is answered partially - the known part explained, the missing part named
+   as missing, never invented. Contradicting answers become `conflict` rows
+   for the user to resolve in Memory > Q&A; stored knowledge is never
+   silently overwritten.
+
+Rules both tiers share: stored answers are TEXT replayed into the chat -
+nothing parses or executes them, and nothing feeds them to the planner;
+every entry carries its source and verification status, shown in the answer's
+provenance line and editable/deletable in the Memory screen; the app never
+enables search grounding and never trains on outputs, so retention stays the
+user's own local replay with attribution.
+
 ## Code map
 
 | Area | Where |
@@ -82,6 +138,7 @@ UI reports, not a launch failure.
 | Plans and validation | `lib/models/network_intent.dart`, `lib/services/validator_service.dart` |
 | Chat and context | `lib/screens/chat_screen.dart`, `lib/services/chat_service.dart`, `lib/services/context_budget.dart` |
 | Provider transport | `lib/services/ai_provider.dart`, `lib/services/provider_chat_service.dart` |
+| Engine model calls | `sidecar/model_gateway.py` (in-process Respan Gateway), `sidecar/pt_autopilot.py` (`_llm_request`) |
 | Local memory | `lib/services/memory_service.dart` |
 | On-device `.pkt` | `lib/services/pkt/`, `sidecar/pkt_template_build.py` |
 | Python engine | `sidecar/pt_autopilot.py` (HTTP routes, planner, executor, automation) |

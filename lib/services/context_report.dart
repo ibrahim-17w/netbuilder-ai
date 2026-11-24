@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'human_language.dart';
+
 /// One line of the request breakdown: a label and what it cost in tokens.
 class ReportSection {
   final String label;
@@ -169,7 +171,7 @@ class RequestReport {
       '   ${(windowFraction * 100).toStringAsFixed(0)}% of the window',
     );
     b.writeln(
-      'history: $turnsSent turn(s) sent verbatim, '
+      'history: ${HumanLanguage.count(turnsSent, 'turn')} sent verbatim, '
       '$turnsSummarized compacted',
     );
     if (notes.isEmpty) {

@@ -2,13 +2,18 @@
 // Adapters compile this into GNS3 / Cisco / PT / Terraform.
 import '../services/nlu/lexicon.dart';
 import '../services/nlu/parser.dart' as brief_reader;
+import '../services/human_language.dart';
 import 'normalized_message.dart';
 import 'dart:convert';
 import 'dart:ui' show Offset;
 
 import '../services/nlu/slots.dart';
+import '../services/nlu/routing_constraints.dart';
+import '../services/nlu/requirement_scope_reader.dart';
 import '../services/networking_help_reader.dart';
 import '../services/packet_tracer/catalog.dart';
+import '../services/packet_tracer/brief_reader.dart' show PtBriefRequest;
+import '../services/packet_tracer/endpoint_reference.dart';
 import '../services/sizing_service.dart';
 
 class NetNode {
@@ -17,6 +22,11 @@ class NetNode {
   final String? model; // e.g. c3725, 2960
   final bool exactModel;
   final List<String> modules;
+
+  /// Exact bundled hardware variant selected by the user. Preserve the key
+  /// verbatim: module sets alone cannot identify a physical slot layout.
+  /// Null retains the legacy model/module-inclusion selection behavior.
+  final String? variantKey;
   final String? mgmtIp;
 
   /// Explicit site ownership when the source brief scopes this device to a
@@ -39,6 +49,7 @@ class NetNode {
     this.model,
     this.exactModel = false,
     this.modules = const [],
+    this.variantKey,
     this.mgmtIp,
     this.siteId,
     this.services = const [],
@@ -51,6 +62,7 @@ class NetNode {
     if (model != null) 'model': model,
     if (exactModel) 'exactModel': true,
     if (modules.isNotEmpty) 'modules': modules,
+    if (variantKey != null) 'variantKey': variantKey,
     if (mgmtIp != null) 'mgmtIp': mgmtIp,
     if (siteId != null) 'siteId': siteId,
     if (services.isNotEmpty) 'services': services,
@@ -64,6 +76,7 @@ class NetNode {
     model: j['model'] as String?,
     exactModel: j['exactModel'] == true,
     modules: List<String>.from(j['modules'] ?? const []),
+    variantKey: j['variantKey'] as String?,
     mgmtIp: j['mgmtIp'] as String?,
     siteId: j['siteId'] as String?,
     services: ((j['services'] as List?) ?? [])
@@ -1023,6 +1036,9 @@ class NetworkIntent {
           '|hardware:${n.exactModel}:${(n.modules.toList()..sort()).join(',')}',
         );
       }
+      if (n.variantKey != null) {
+        b.write('|variant:${jsonEncode(n.variantKey)}');
+      }
       if (n.serviceRules.isNotEmpty) {
         // Sanitized exactly like the planner export: credential keys never
         // reach the identifier.
@@ -1093,7 +1109,7 @@ class NetworkIntent {
     return jsonEncode(value);
   }
 
-  /// A plan version a person can read: "17 device(s), 16 link(s), rev 3f9a1c02".
+  /// A plan version a person can read: "17 devices, 16 links (revision 3f9a1c02)".
   /// The plan's links with a physically correct cable kind filled in.
   ///
   /// The executor's plan payload is written from this list, so the crossover
@@ -1145,7 +1161,8 @@ class NetworkIntent {
   }
 
   String get revisionLabel =>
-      '${nodes.length} device(s), ${links.length} link(s), rev $revision';
+      '${HumanLanguage.count(nodes.length, 'device')}, '
+      '${HumanLanguage.count(links.length, 'link')} (revision $revision)';
 
   /// FNV-1a, 32-bit, rendered as 8 hex digits. Not a security hash - just a
   /// cheap, stable identity so two different plans cannot look like the same.
@@ -1892,50 +1909,24 @@ class NetworkIntent {
   /// Null when the brief said nothing positive about routing; callers keep
   /// their own default (static) in that case.
   static String? resolveRouting(String lower) {
-    final negatedBefore = RegExp(
-      r"\b(?:not|no|never|avoid|without|drop|remove|instead\s+of|"
-      r"rather\s+than|don['’]?t|do\s+not)\b[^.;,!?]{0,18}$",
+    // Technical words inside a name, quoted value or credential are data,
+    // not routing decisions. Mask them without changing the clause offsets.
+    lower = lower.replaceAllMapped(
+      RegExp(r'`[^`\n]*`|"[^"\n]*"|\x27[^\x27\n]*\x27'),
+      (match) => ' ' * (match.end - match.start),
     );
-    final instructedBefore = RegExp(
-      r'\b(?:use|using|run|running|switch\s+to|change\s+(?:it\s+)?to|'
-      r'go\s+with|set\s+(?:routing\s+)?to|prefer|enable|configure|'
-      r'implement|adopt|choose|pick|make\s+it|go\s+for)\b[^.;,!?]{0,6}$',
+    lower = lower.replaceAllMapped(
+      RegExp(
+        r'\b(?:ssid|password|secret|psk)\s+(?:name\s+)?[^\s,;]+',
+        caseSensitive: false,
+      ),
+      (match) => ' ' * (match.end - match.start),
     );
-    final instructedAfter = RegExp(r'^\s*(?:instead|as\s+the\s+protocol)');
-    final mentions =
-        <({int at, String proto, bool negated, bool instructed})>[];
-    for (final proto in const ['ospf', 'eigrp', 'bgp', 'static']) {
-      final pattern = proto == 'static'
-          ? RegExp(r'\bstatic\b')
-          : RegExp('\\b$proto\\b');
-      for (final m in pattern.allMatches(lower)) {
-        final before = lower.substring(
-          m.start > 40 ? m.start - 40 : 0,
-          m.start,
-        );
-        final end = m.end + 12 > lower.length ? lower.length : m.end + 12;
-        mentions.add((
-          at: m.start,
-          proto: proto,
-          negated: negatedBefore.hasMatch(before),
-          instructed:
-              instructedBefore.hasMatch(before) ||
-              instructedAfter.hasMatch(lower.substring(m.end, end)),
-        ));
-      }
-    }
-    mentions.sort((a, b) => a.at.compareTo(b.at));
-    final positive = [
-      for (final m in mentions)
-        if (!m.negated) m,
-    ];
+    final mentions = RoutingConstraintReader.read(lower);
+    final positive = mentions.where((mention) => !mention.forbidden).toList();
     if (positive.isEmpty) return null;
-    final instructed = [
-      for (final m in positive)
-        if (m.instructed) m,
-    ];
-    final pool = instructed.isEmpty ? positive : instructed;
-    return pool.last.proto;
+    final instructed = positive.where((mention) => mention.instructed).toList();
+    return (instructed.isEmpty ? positive : instructed).last.protocol;
   }
 
   /// What the chat's standing plan becomes after one more turn, plus the brief
@@ -1983,6 +1974,66 @@ class NetworkIntent {
     }
     if (!hasStanding) {
       return (plan: parsed, brief: brief);
+    }
+    // A cabling-only turn edits the existing inventory, not a fresh parse of
+    // the brief. Reparsing "Connect PC1 to SW1" invented another switch and
+    // discarded configured devices when merged as an inventory request.
+    final connections = PtBriefRequest.read(brief).connections;
+    final connectionOnly =
+        connections.isNotEmpty &&
+        RegExp(r'^\s*connect\b', caseSensitive: false).hasMatch(brief) &&
+        !RegExp(
+          r'\b(?:add|remove|delete|create|replace|rename|configure|assign)\b',
+          caseSensitive: false,
+        ).hasMatch(brief);
+    if (connectionOnly) {
+      final changed = <NetLink>[];
+      final questions = <String>[];
+      for (final requested in connections) {
+        final a = EndpointReference.resolve(requested.a, previous.nodes);
+        final b = EndpointReference.resolve(requested.b, previous.nodes);
+        if (a.node == null || b.node == null) {
+          questions.add(
+            'Name the existing devices for ${requested.a} to ${requested.b}; no inventory or cabling was changed.',
+          );
+          continue;
+        }
+        changed.add(
+          NetLink.fromJson({
+            ...requested.toJson(),
+            'a': a.node!.name,
+            'b': b.node!.name,
+          }),
+        );
+      }
+      if (questions.isNotEmpty) {
+        return (
+          plan: previous.copyWith(
+            questions: {...previous.questions, ...questions}.toList(),
+          ),
+          brief: previousBrief,
+        );
+      }
+      bool endpoint(String node, String port, String other, String otherPort) =>
+          node.toLowerCase() == other.toLowerCase() &&
+          ptPortName(port) == ptPortName(otherPort);
+      final keep = previous.links.where(
+        (old) => !changed.any(
+          (next) =>
+              endpoint(old.a, old.aIf, next.a, next.aIf) ||
+              endpoint(old.a, old.aIf, next.b, next.bIf) ||
+              endpoint(old.b, old.bIf, next.a, next.aIf) ||
+              endpoint(old.b, old.bIf, next.b, next.bIf),
+        ),
+      );
+      final combined = [
+        previousBrief.trim(),
+        brief.trim(),
+      ].where((s) => s.isNotEmpty).join('\n');
+      return (
+        plan: previous.copyWith(links: [...keep, ...changed]),
+        brief: combined,
+      );
     }
     // A replacement and an addition are separate operations, in spoken order.
     final mixed = RegExp(
@@ -2159,6 +2210,7 @@ class NetworkIntent {
             model: s.model,
             exactModel: s.exactModel,
             modules: s.modules,
+            variantKey: s.variantKey,
             mgmtIp: s.mgmtIp,
             siteId: s.siteId,
             services: s.services,
@@ -2421,7 +2473,11 @@ class NetworkIntent {
     // profile - and adding that profile's three servers to a four-server lab
     // grew it to eleven. What the user asked for is one more server.
     final additionLower = brief.toLowerCase();
-    final stated = BriefSlotPipeline.extractCounts(additionLower, brief);
+    final stated = BriefSlotPipeline.extractCounts(
+      additionLower,
+      brief,
+      tinyOfficeDefault: false,
+    );
     int mergedCount(String type) {
       final added = stated[type] ?? 0;
       return added == 0
@@ -2724,8 +2780,9 @@ class NetworkIntent {
     final stripTail = RegExp(r'[\s,.;:]+$');
     final baseClean = base.replaceAll(stripTail, '');
     final briefClean = brief.trim().replaceAll(stripTail, '');
-    final combined = '$baseClean, $briefClean, actually ${tally.join(' ')}'
-        .trim();
+    final combined =
+        '$baseClean. $briefClean. Global totals: actually ${tally.join(' ')}'
+            .trim();
     final NetworkIntent merged;
     try {
       merged = parseSimple(
@@ -2805,10 +2862,15 @@ class NetworkIntent {
     int count(NetworkIntent p, String type) =>
         p.nodes.where((n) => n.type == type).length;
     final bits = <String>[];
+    const labels = {
+      'router': 'router',
+      'switch': 'switch',
+      'pc': 'PC',
+      'server': 'server',
+    };
     for (final type in const ['router', 'switch', 'pc', 'server']) {
       final d = count(after, type) - count(before, type);
-      if (d > 0) bits.add('+$d $type(s)');
-      if (d < 0) bits.add('$d $type(s)');
+      if (d != 0) bits.add(HumanLanguage.signedCount(d, labels[type]!));
     }
     if (before.routing != after.routing) {
       bits.add('routing is now ${after.routing} (was ${before.routing})');
@@ -2817,13 +2879,19 @@ class NetworkIntent {
         .where((v) => !before.vlans.contains(v))
         .toList();
     if (addedVlans.isNotEmpty) {
-      bits.add('VLAN(s) ${addedVlans.join(', ')} added');
+      bits.add(
+        '${HumanLanguage.count(addedVlans.length, 'VLAN')} added: '
+        '${addedVlans.join(', ')}',
+      );
     }
     final removedVlans = before.vlans
         .where((v) => !after.vlans.contains(v))
         .toList();
     if (removedVlans.isNotEmpty) {
-      bits.add('VLAN(s) ${removedVlans.join(', ')} removed');
+      bits.add(
+        '${HumanLanguage.count(removedVlans.length, 'VLAN')} removed: '
+        '${removedVlans.join(', ')}',
+      );
     }
     final wasOn = enabledControls(before.security).toSet();
     final nowOn = enabledControls(after.security).toSet();
@@ -3081,6 +3149,25 @@ class NetworkIntent {
     caseSensitive: false,
   );
 
+  /// "server name admin password 123", "AAA server named admin with
+  /// password 123".
+  ///
+  /// People label the login with the box it lives on instead of the word
+  /// "username", and the generic labels above do not cover that: the brief
+  /// "1 AAA server name admin password 123" parsed as an AAA server with NO
+  /// account, so the build was held back by a warning that read like the
+  /// user had done something wrong. The label is deliberately tied to
+  /// "server", so a device hostname ("switch name SW1") is never read as a
+  /// login.
+  static final RegExp _serverCredentialPattern = RegExp(
+    r'\b(?:aaa|radius|tacacs\+?)?\s*servers?\s+(?:named|name)\s+'
+    r'([A-Za-z0-9_.-]{1,32})'
+    r'\s*[,;]?\s*(?:(?:with|and|its|their|is|of)\s+)?'
+    r'\b(?:password|pass|pwd|passwd)\b\s*(?:is\s+|[:=]\s*)?'
+    r'([^\s,;.]+)',
+    caseSensitive: false,
+  );
+
   /// Every login the brief states, in the order it says them.
   ///
   /// Both orders are scanned and the earliest match of a given user name
@@ -3111,6 +3198,18 @@ class NetworkIntent {
     // user name group 3.
     for (final m in credentialPatternReversed.allMatches(text)) {
       take(m.group(3)!, m.group(1)!, m.start, m.group(0)!);
+    }
+    for (final m in _serverCredentialPattern.allMatches(text)) {
+      // "server name password 123" (no user name at all) must not become an
+      // account called "password": the pattern's label is the box, and the
+      // word after it is only a name when it is not itself a credential word.
+      if (RegExp(
+        r'^(?:password|pass|pwd|passwd|name|named)$',
+        caseSensitive: false,
+      ).hasMatch(m.group(1)!)) {
+        continue;
+      }
+      take(m.group(1)!, m.group(2)!, m.start, m.group(0)!);
     }
     found.sort((a, b) => a.at.compareTo(b.at));
     return found;
@@ -3223,9 +3322,29 @@ class NetworkIntent {
   /// Group 1 is the keyword, group 2 the separator the user wrote and group 3
   /// the value, so the redaction keeps the brief's own punctuation.
   static final RegExp _secretValue = RegExp(
-    r"""\b((?:pre[\s-]?shared|shared)?[\s-]?key|psk|password|passwd|secret)\b"""
-    r"""(\s*(?:(?:is|are|of)\b\s*)?[:=]?\s*)"""
-    r"""("[^"\n]+"|'[^'\n]+'|[^\s,;]+)""",
+    r"""\b((?:pre[ -]?shared|shared)?[ -]?key|psk|password|passwd|secret)\b(?![\w-])"""
+    r"""([ \t]*(?:(?:is|are|of)\b[ \t]*)?[:=][ \t]*|[ \t]+(?:(?:is|are|of)\b[ \t]+)?)"""
+    r"""("[^"\r\n]+"|'[^'\r\n]+'|[^\s,;]+)""",
+    caseSensitive: false,
+  );
+
+  // IOS encryption/type numbers are syntax, not the secret. Keep those and
+  // command arguments (peer addresses, privilege levels, etc.) intact. Never
+  // allow whitespace in a prefix or value to cross a configuration line.
+  static final RegExp _cliSecretValue = RegExp(
+    r'^(\s*(?:'
+    r'enable[ \t]+(?:secret|password)(?:[ \t]+level[ \t]+\d+)?|'
+    r'username[ \t]+\S+(?:[ \t]+privilege[ \t]+\d+)?[ \t]+(?:secret|password)|'
+    r'password|(?:tacacs|radius)-server(?:[ \t]+host[ \t]+\S+)?[ \t]+key|'
+    r'crypto[ \t]+isakmp[ \t]+key|pre-shared-key(?:[ \t]+(?:local|remote))?|'
+    r'key-string|neighbor[ \t]+\S+[ \t]+password|'
+    r'ip[ \t]+ospf[ \t]+(?:authentication-key|message-digest-key[ \t]+\d+[ \t]+md5)'
+    r')(?:[ \t]+[05789])?[ \t]+)'
+    r'''("[^"\r\n]*"|'[^'\r\n]*'|[^\s]+)''',
+    caseSensitive: false,
+  );
+  static final RegExp _cliCommunity = RegExp(
+    r'^(\s*snmp-server[ \t]+community[ \t]+)([^\s]+)',
     caseSensitive: false,
   );
 
@@ -3239,8 +3358,52 @@ class NetworkIntent {
   /// where the note is written keeps the stored value safe as well as the
   /// exported one; the credential itself still reaches the executor through
   /// [SecurityIntent], which is where it belongs.
-  static String redactSecrets(String text) =>
-      text.replaceAllMapped(_secretValue, (m) {
+  static String redactSecrets(String text) {
+    // Serialized configurations must be decoded first: JSON's escaped newline
+    // is not a CLI line boundary, and rewriting the serialized bytes can eat
+    // the rest of a device config (or invalidate its enclosing document).
+    final trimmed = text.trimLeft();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        dynamic redactValue(dynamic value) {
+          if (value is String) return redactSecrets(value);
+          if (value is List) return value.map(redactValue).toList();
+          if (value is Map) {
+            return value.map((key, value) => MapEntry(key, redactValue(value)));
+          }
+          return value;
+        }
+
+        final decoded = jsonDecode(text);
+        final safe = redactValue(decoded);
+        return jsonEncode(safe) == jsonEncode(decoded)
+            ? text
+            : jsonEncode(safe);
+      } catch (_) {
+        // Not JSON: it is still free text, redacted one physical line at a time.
+      }
+    }
+    return text.replaceAllMapped(RegExp(r'[^\r\n]+'), (lineMatch) {
+      final line = lineMatch.group(0)!;
+      for (final command in [_cliSecretValue, _cliCommunity]) {
+        final match = command.firstMatch(line);
+        if (match != null) {
+          return line.replaceRange(
+            match.start,
+            match.end,
+            '${match.group(1)}$redacted',
+          );
+        }
+      }
+      // These commands manage encryption/keys; they contain no credential.
+      if (RegExp(
+        r'^\s*(?:no[ \t]+)?(?:service[ \t]+password-encryption|'
+        r'crypto[ \t]+key[ \t]+(?:generate|zeroize)\b)',
+        caseSensitive: false,
+      ).hasMatch(line)) {
+        return line;
+      }
+      return line.replaceAllMapped(_secretValue, (m) {
         final value = m.group(3)!;
         final bare = value
             .replaceAll(RegExp(r'''^["']|["']$'''), '')
@@ -3251,6 +3414,8 @@ class NetworkIntent {
         final tail = _trailingPunctuation(value);
         return '${m.group(1)}${m.group(2)}$redacted$tail';
       });
+    });
+  }
 
   /// The ";" and "." a brief puts after a value, which belong to the sentence
   /// rather than to the secret.
@@ -3331,6 +3496,7 @@ class NetworkIntent {
           model: node.model,
           exactModel: node.exactModel,
           modules: node.modules,
+          variantKey: node.variantKey,
           mgmtIp: node.mgmtIp,
           siteId: node.siteId,
           services: node.services,
@@ -3684,6 +3850,37 @@ class NetworkIntent {
   }
 
   /// The parser itself, over an already-bridged brief.
+  /// The server a role word names when the name comes AFTER it.
+  ///
+  /// "DHCP on SRV1", "DNS is SRV2", "SRV3: http" bind one clause each.
+  /// Only an explicit short connector counts, so prose such as "2 servers
+  /// run DHCP and SRV2 hosts DNS" cannot hand SRV2 the first role.
+  static String? _ownerAfterRole(
+    String fragment,
+    int wordEnd,
+    Map<int, String> nameAt,
+  ) {
+    String? best;
+    var bestGap = 1 << 30;
+    for (final entry in nameAt.entries) {
+      final at = entry.key;
+      if (at < wordEnd) continue;
+      final gap = at - wordEnd;
+      if (gap > 24) continue;
+      final between = fragment.substring(wordEnd, at).trim().toLowerCase();
+      if (!RegExp(
+        r'^(?:on|is|runs?|=|:|at|for|via|to|served by)?$',
+      ).hasMatch(between)) {
+        continue;
+      }
+      if (gap < bestGap) {
+        bestGap = gap;
+        best = entry.value;
+      }
+    }
+    return best;
+  }
+
   static NetworkIntent _parseBridgedBrief(
     String projectName,
     String text,
@@ -3810,6 +4007,7 @@ class NetworkIntent {
     // inventory. Later site-scoped edits can then resolve from saved plan
     // state without guessing from device names or a stale brief.
     final explicitSiteCounts = BriefSlotPipeline.siteDeviceCounts(text);
+    final hasMultipleInventorySites = explicitSiteCounts.length > 1;
     for (final type in deviceKinds.map((kind) => kind.type)) {
       final owned = nodes.where((node) => node.type == type).toList();
       var cursor = 0;
@@ -3823,6 +4021,7 @@ class NetworkIntent {
             model: node.model,
             exactModel: node.exactModel,
             modules: node.modules,
+            variantKey: node.variantKey,
             mgmtIp: node.mgmtIp,
             siteId: entry.key,
             services: node.services,
@@ -4236,9 +4435,10 @@ class NetworkIntent {
         .where((e) => e.key == router)
         .length;
 
-    NetNode? routerWithRoom(int startAt) {
+    NetNode? routerWithRoom(int startAt, {String? siteId}) {
       for (var k = 0; k < routers.length; k++) {
         final r = routers[(startAt + k) % routers.length];
+        if (siteId != null && r.siteId != siteId) continue;
         if (routerPortsUsed(r.name) < routerPortCapacity(r.model)) return r;
       }
       return null;
@@ -4248,7 +4448,10 @@ class NetworkIntent {
     // its own router uplink). The addressing pass reads this.
     final trunkedFrom = <String, String>{};
     for (var i = 0; i < switches.length; i++) {
-      final r = routerWithRoom(i);
+      final r = routerWithRoom(
+        i,
+        siteId: hasMultipleInventorySites ? switches[i].siteId : null,
+      );
       if (routers.isEmpty && i == 0) {
         // A plan with switches and no router at all - "two switches and
         // three pcs" - is one layer-2 network, and this first switch is its
@@ -4262,7 +4465,12 @@ class NetworkIntent {
         final name = switches[i].name;
         String? host;
         for (final s in switches) {
-          if (s.name == name) continue;
+          if (s.name == name ||
+              (hasMultipleInventorySites &&
+                  switches[i].siteId != null &&
+                  s.siteId != switches[i].siteId)) {
+            continue;
+          }
           if (!linkedTo(s.name) &&
               !trunkedFrom.containsKey(s.name) &&
               !(routers.isEmpty && s.name == switches.first.name)) {
@@ -4358,6 +4566,29 @@ class NetworkIntent {
     }
 
     if (switches.isNotEmpty) {
+      for (final device in [
+        ...userDevices,
+        ...serverDevices,
+      ].where((n) => hasMultipleInventorySites && n.siteId != null)) {
+        final local = switches.where((s) => s.siteId == device.siteId).toList();
+        if (local.isEmpty) continue;
+        final withRoom = local
+            .where(
+              (s) =>
+                  (usedPorts[s.name]?.length ?? 0) <
+                  switchPortCapacity(s.model) - 1,
+            )
+            .toList();
+        final pool = withRoom.isEmpty ? local : withRoom;
+        pool.sort(
+          (a, b) => (usedPorts[a.name]?.length ?? 0).compareTo(
+            usedPorts[b.name]?.length ?? 0,
+          ),
+        );
+        attach(pool.first.name, [device]);
+      }
+      userDevices.removeWhere((n) => linkedTo(n.name));
+      serverDevices.removeWhere((n) => linkedTo(n.name));
       final per = userDevices.length ~/ switches.length;
       final extra = userDevices.length % switches.length;
       var taken = 0;
@@ -4643,7 +4874,26 @@ class NetworkIntent {
     // goes to the remaining LANs in order, exactly as before.
     final siteLanBlock = <int, String>{};
     final siteLanLast = <int, String>{};
-    if (siteRouters.isNotEmpty) {
+    final scopeReader = RequirementScopeReader(text);
+    final siteSubnetQueues = <String, List<String>>{};
+    final vlanSubnetQueues = <String, String>{};
+    for (final match in RegExp(
+      r'(\d+\.\d+\.\d+\.\d+)\s*/\s*(\d+)',
+    ).allMatches(text)) {
+      final cidr = '${match.group(1)}/${match.group(2)}';
+      if ((int.tryParse(match.group(2)!) ?? 24) >= 30) continue;
+      final context = scopeReader.contextAt(match.start, end: match.end);
+      if (context.vlanId != null) {
+        vlanSubnetQueues['${context.siteId ?? ''}|${context.vlanId}'] = cidr;
+        lanQueue.remove(cidr);
+      } else if (context.siteId != null) {
+        (siteSubnetQueues[context.siteId!] ??= []).add(cidr);
+        lanQueue.remove(cidr);
+      }
+    }
+    if (siteSubnetQueues.isEmpty &&
+        vlanSubnetQueues.isEmpty &&
+        siteRouters.isNotEmpty) {
       final qualified = [
         for (final c in statedLan)
           if (brief_reader.subnetSitsAtASite(text, c)) c,
@@ -4652,6 +4902,13 @@ class NetworkIntent {
         siteLanBlock[i] = qualified[i];
         lanQueue.remove(qualified[i]);
       }
+    }
+    if (siteSubnetQueues.isEmpty &&
+        siteLanBlock.isEmpty &&
+        vlanSubnetQueues.isEmpty) {
+      // Keep the established unscoped addressing order; site-specific queues
+      // are relevant only when the brief actually assigns a subnet to a site.
+      siteLanLast.clear();
     }
     final lanBase = statedLan.isNotEmpty ? statedLan.first : base;
 
@@ -4708,6 +4965,14 @@ class NetworkIntent {
     /// of that block for a further LAN at the same site, then whatever the
     /// brief still has, then a derived one.
     String lanSubnetFor(String routerName) {
+      final siteId = routers
+          .where((r) => r.name == routerName)
+          .firstOrNull
+          ?.siteId;
+      final statedAtSite = siteSubnetQueues[siteId];
+      if (statedAtSite != null && statedAtSite.isNotEmpty) {
+        return statedAtSite.removeAt(0);
+      }
       final site = routerSite[routerName];
       if (site != null) {
         final last = siteLanLast[site];
@@ -4847,9 +5112,16 @@ class NetworkIntent {
         }
         for (var i = 0; i < vlans.length; i++) {
           final v = vlans[i];
-          final subnet = usedSubnets.add(_vlanSubnet(v))
-              ? _vlanSubnet(v)
-              : derivedLanSubnet();
+          final ownerSite =
+              routers.firstWhere((r) => r.name == routerName).siteId ?? '';
+          final requested =
+              vlanSubnetQueues.remove('$ownerSite|vlan $v') ??
+              vlanSubnetQueues.remove('|vlan $v');
+          final subnet =
+              requested ??
+              (usedSubnets.add(_vlanSubnet(v))
+                  ? _vlanSubnet(v)
+                  : derivedLanSubnet());
           addressing.add(
             InterfaceAddr(
               node: routerName,
@@ -5004,6 +5276,14 @@ class NetworkIntent {
       for (final a in addressing) {
         if (a.node != router) continue;
         if (a.iface.toLowerCase().startsWith('s')) continue;
+        final transit = links.any(
+          (link) =>
+              ((link.a == router && link.aIf == a.iface) ||
+                  (link.b == router && link.bIf == a.iface)) &&
+              routers.any((r) => r.name == link.a) &&
+              routers.any((r) => r.name == link.b),
+        );
+        if (transit) continue;
         return a.ipCidr;
       }
       return null;
@@ -5315,13 +5595,23 @@ class NetworkIntent {
     }
 
     if (servers.isNotEmpty) {
-      final fragments = text.toLowerCase().split(RegExp(r'[\n.]'));
-      for (final frag in fragments) {
+      for (final fragment in RegExp(
+        r'[^\n.]+',
+      ).allMatches(text.toLowerCase())) {
+        final frag = fragment.group(0)!;
+        final site = scopeReader.siteAt(fragment.start);
+        final siteServers = site == null
+            ? servers
+            : servers.where((s) => s.siteId == site).toList();
+        if (site != null && siteServers.isEmpty) continue;
         // Collect the roles in the order they were *said*, not in map order:
         // "1 server is dhcp and the other is AAA" must give dhcp the first
         // server and AAA the second.
         final hits = <(int, String, String)>[]; // position, word, role
         roleWords.forEach((word, role) {
+          if (role == 'dhcp' && BriefSlotPipeline.routerDhcpRequested(text)) {
+            return;
+          }
           final at = frag.indexOf(word);
           if (at >= 0) hits.add((at, word, role));
         });
@@ -5376,7 +5666,7 @@ class NetworkIntent {
                 r'\b\d{1,3}\s*(?:servers?|server-pt devices?)\s*:',
                 caseSensitive: false,
               ).hasMatch(frag);
-          final free = servers
+          final free = siteServers
               .map((s) => s.name)
               .where((name) => !(roles[name]?.isNotEmpty ?? false))
               .toList();
@@ -5400,7 +5690,7 @@ class NetworkIntent {
             // panels and one server doing everything).
             for (var i = 0; i < found.length; i++) {
               final target = free.isEmpty
-                  ? servers.first.name
+                  ? siteServers.first.name
                   : free[i % free.length];
               roles.putIfAbsent(target, () => []);
               if (!roles[target]!.contains(found[i])) {
@@ -5444,11 +5734,11 @@ class NetworkIntent {
               // "1 AAA server ... and set up AAA with the client name admin" -
               // and the second mention, in a fragment of its own, used to land
               // on servers.first and put AAA on the DHCP box as well.
-              final holder = servers
+              final holder = siteServers
                   .map((s) => s.name)
                   .where((name) => roles[name]?.contains(role) ?? false)
                   .firstOrNull;
-              target = holder ?? servers.first.name;
+              target = holder ?? siteServers.first.name;
             }
             final owned = roles.putIfAbsent(target, () => []);
             if (!owned.contains(role)) owned.add(role);
@@ -5467,11 +5757,18 @@ class NetworkIntent {
             (n) => n <= hit.$1 && n + nameAt[n]!.length > hit.$1,
           );
           if (insideLabel) continue;
-          // The server nearest in front of the word is the one it is about.
+          // The server nearest in front of the word is the one it is about,
+          // unless the sentence names one right after it: "DHCP on SRV1,
+          // DNS on SRV2" is a binding per clause. Reading only backwards
+          // made every clause after the first belong to the previous server,
+          // so a nine-service list arrived rotated by one (SRV1 running DNS,
+          // SRV9 unconfigured) even though every binding was explicit.
           var closest = '';
           for (final n in names) {
             if (n <= hit.$1) closest = nameAt[n]!;
           }
+          final after = _ownerAfterRole(frag, hit.$1 + hit.$2.length, nameAt);
+          if (after != null) closest = after;
           // A role another node owns by name or by address does not also
           // belong to the server nearest this word.
           final owner = claimedElsewhere[hit.$3];
@@ -5635,6 +5932,7 @@ class NetworkIntent {
             model: n.model,
             exactModel: n.exactModel,
             modules: n.modules,
+            variantKey: n.variantKey,
             mgmtIp: n.mgmtIp,
             siteId: n.siteId,
             services: roles[n.name]!,
@@ -5642,6 +5940,53 @@ class NetworkIntent {
           );
         }
       }
+    }
+
+    // Router DHCP owns IOS pools; clients request DHCP rather than receiving
+    // invented static assignments. Pool generation stays in PlanConfigComposer
+    // and derives its subnet/gateway from the router's actual LAN rows.
+    if (BriefSlotPipeline.routerDhcpRequested(text) && routers.isNotEmpty) {
+      final ownerMatch = RegExp(
+        r'\bdhcp\s+(?:server\s+)?(?:on|from|by)\s+(r\d+)\b|'
+        r'\b(r\d+)\s+(?:provides?|serves?|runs?|hosts?)\s+dhcp',
+        caseSensitive: false,
+      ).firstMatch(text);
+      final ownerName = ownerMatch?.group(1) ?? ownerMatch?.group(2);
+      final owners = ownerName == null
+          ? routers
+          : routers.where(
+              (r) => r.name.toLowerCase() == ownerName.toLowerCase(),
+            );
+      for (final owner in owners) {
+        final index = nodes.indexWhere((n) => n.name == owner.name);
+        final current = nodes[index];
+        nodes[index] = NetNode.fromJson({
+          ...current.toJson(),
+          'services': {...current.services, 'dhcp'}.toList(),
+          'serviceRules': {
+            ...current.serviceRules,
+            'dhcp': {
+              ...((current.serviceRules['dhcp'] as Map?) ?? const {}),
+              'mode': 'server',
+            },
+          },
+        });
+      }
+      final clients = nodes
+          .where((n) => const {'pc', 'laptop'}.contains(n.type))
+          .toList();
+      for (final client in clients) {
+        final index = nodes.indexWhere((n) => n.name == client.name);
+        nodes[index] = NetNode.fromJson({
+          ...client.toJson(),
+          'serviceRules': {
+            ...client.serviceRules,
+            'addressing': {'mode': 'dhcp'},
+          },
+        });
+      }
+      final clientNames = clients.map((n) => n.name).toSet();
+      addressing.removeWhere((a) => clientNames.contains(a.node));
     }
 
     // WIRELESS RULES: "an AP with SSID CORP and WEP key 1234567890" -
@@ -5658,7 +6003,7 @@ class NetworkIntent {
         .toList();
     if (wirelessDevices.isNotEmpty) {
       final ssidMatch = RegExp(
-        'ssid\\s*(?:name\\s*)?(["\']?)([a-z0-9_. -]{2,32}?)\\1(?=[\\s,.,]|\\s*(?:with|using|and|key|wep|wpa|hidden|\$))',
+        'ssid\\s*(?:name\\s*)?(["\']?)([a-z0-9_. -]{2,32}?)\\1(?=[\\s,.;]|\\s*(?:with|using|and|key|wep|wpa|hidden|\$))',
         caseSensitive: false,
       ).firstMatch(text);
       final ssid = ssidMatch == null ? null : (ssidMatch.group(2) ?? '').trim();
@@ -5687,6 +6032,7 @@ class NetworkIntent {
             model: n.model,
             exactModel: n.exactModel,
             modules: n.modules,
+            variantKey: n.variantKey,
             mgmtIp: n.mgmtIp,
             siteId: n.siteId,
             services: n.services,
@@ -5754,8 +6100,8 @@ class NetworkIntent {
       // The role parser above only binds 'aaa' to a server when the wording
       // let it; a brief that names AAA without a server role wins a role on
       // the first server so the control is actually buildable.
-      final first = servers.first;
-      final idx = nodes.indexOf(first);
+      final first = nodes.firstWhere((n) => n.name == servers.first.name);
+      final idx = nodes.indexWhere((n) => n.name == first.name);
       final newServices = [
         ...first.services,
         if (!first.services.contains('aaa')) 'aaa',
@@ -5766,6 +6112,7 @@ class NetworkIntent {
         model: first.model,
         exactModel: first.exactModel,
         modules: first.modules,
+        variantKey: first.variantKey,
         mgmtIp: first.mgmtIp,
         siteId: first.siteId,
         services: newServices,
@@ -6149,7 +6496,7 @@ class NetworkIntent {
     if (BriefSlotPipeline.completesMultiSite(lower, text))
       'The brief describes ${siteCount(text)} sites with no per-site '
           'breakdown: each site was given its own router and access '
-          'switch(es), the routers are joined by a WAN link, and the devices '
+          'switches, the routers are joined by a WAN link, and the devices '
           'were split across the sites. Say the counts per site to pin the '
           'layout.',
     ..._quantityCaveats(lower),

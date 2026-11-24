@@ -30,6 +30,7 @@ Future<void> showArtifactDialog(
   required String text,
   String subtitle = '',
   String copyLabel = 'Copy',
+  Widget? contentHeader,
   List<Widget> actions = const [],
 }) {
   final theme = Theme.of(context);
@@ -88,13 +89,23 @@ Future<void> showArtifactDialog(
                 ),
                 padding: const EdgeInsets.all(AppTheme.s16),
                 child: SingleChildScrollView(
-                  child: SelectableText(
-                    text,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontFamily: 'monospace',
-                      fontSize: 12.5,
-                      height: 1.45,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (contentHeader != null) ...[
+                        contentHeader,
+                        const SizedBox(height: AppTheme.s12),
+                      ],
+                      SelectableText(
+                        text,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontFamily: 'monospace',
+                          fontSize: 12.5,
+                          height: 1.45,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

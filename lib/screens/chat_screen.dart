@@ -15,9 +15,22 @@ import '../models/design_brief.dart';
 import '../models/environment_profile.dart';
 import '../models/network_intent.dart';
 import '../models/request_interpretation.dart';
+import '../models/request_requirement.dart';
+import '../models/plan_operation.dart';
+import '../services/request_understanding/coverage_checker.dart';
+import '../services/request_understanding/requirement_merger.dart';
+import '../services/request_understanding/build_readiness.dart';
+import '../services/request_understanding/build_action_identity.dart';
+import '../services/request_understanding/artifact_evidence_service.dart';
+import '../services/request_understanding/normalizer.dart';
+import '../services/request_understanding/response_presentation.dart';
+import '../services/request_understanding/attachment_grounding.dart';
+import '../services/request_understanding/attachment_intent.dart';
+import '../services/request_understanding/model_proposal_service.dart';
 import '../services/adapters/packet_tracer_adapter.dart';
 import '../services/advisor_service.dart' show AdviceAnswer;
 import '../services/ai_provider.dart';
+import '../services/assistant_voice.dart';
 import '../services/autopilot_service.dart';
 import '../services/attachment_ocr.dart';
 import '../services/build_guide.dart';
@@ -29,7 +42,9 @@ import '../services/clarification_service.dart';
 import '../services/design_brief_service.dart';
 import '../services/environment_profile_service.dart';
 import '../services/guide_request_reader.dart';
+import '../services/human_language.dart';
 import '../services/networking_help_reader.dart';
+import '../services/concept_knowledge.dart';
 import '../services/learned_answers_service.dart';
 import '../services/chat_service.dart';
 import '../services/file_edit_intent.dart';
@@ -62,8 +77,6 @@ import '../services/design_memory.dart';
 import '../services/design_review.dart';
 import '../services/engine_status.dart';
 import '../services/memory_service.dart';
-import '../services/message_understanding.dart';
-import '../services/misparse_ledger.dart';
 import '../services/phrasing_memory_service.dart';
 import '../services/runtime_window.dart';
 import '../services/scope_gate.dart';
@@ -98,6 +111,7 @@ import '../widgets/rule_dialog.dart';
 import '../widgets/slot_fix_dialog.dart';
 import '../widgets/conversation_search.dart';
 import '../widgets/readiness_panel.dart';
+import '../widgets/request_outcome_card.dart';
 
 /// Chooses the destination for an automatically requested configuration
 /// export. The regular app uses the system file picker; tests can return a
@@ -119,9 +133,31 @@ typedef ConfigurationExportPathChooser =
 /// * Anything the user approves that is worth reusing (a rule, a preference)
 ///   is written to the same memory the planner reads, so a correction given
 ///   in the chat actually changes the next plan.
+/// A committed/restored chat plan, not a speculative parser candidate.
+class ChatActiveContext {
+  final String conversationId;
+  final String title;
+  final NetworkIntent? intent;
+  final String brief;
+  final String target;
+
+  const ChatActiveContext({
+    required this.conversationId,
+    required this.title,
+    required this.intent,
+    required this.brief,
+    required this.target,
+  });
+}
+
 class ChatScreen extends StatefulWidget {
   final String initialProject;
   final void Function(String project)? onOpenProject;
+  final ValueChanged<ChatActiveContext>? onActiveContextChanged;
+
+  /// A shell edit to the same committed conversation. Never a new plan from
+  /// another conversation and never applied over an in-flight chat candidate.
+  final ChatActiveContext? activeContext;
 
   /// Optional provider facade for deterministic embeddings and integration
   /// checks. Production screens use the provider built from Settings.
@@ -142,6 +178,8 @@ class ChatScreen extends StatefulWidget {
     super.key,
     this.initialProject = 'default',
     this.onOpenProject,
+    this.onActiveContextChanged,
+    this.activeContext,
     this.providerChatServiceOverride,
     this.configurationExportPathChooserOverride,
     this.initialDraft = '',
@@ -216,6 +254,60 @@ const int kRevealChunk = 48;
 const Duration kRevealTick = Duration(milliseconds: 30);
 
 class _ChatScreenState extends State<ChatScreen> {
+  NetworkIntent? _committedIntent;
+  int _activeContextEpoch = 0;
+
+  void _publishActiveContext({String? conversationId}) {
+    if (!mounted ||
+        (conversationId != null && _conversation != conversationId)) {
+      return;
+    }
+    _committedIntent = _lastIntent;
+    final plan = _committedIntent;
+    final snapshot = ChatActiveContext(
+      conversationId: _conversation,
+      title: plan?.projectName ?? ConversationTitles.display(_conversation),
+      intent: plan,
+      brief: _lastBrief,
+      target: _target,
+    );
+    final epoch = ++_activeContextEpoch;
+    // Restores/resets may run inside setState. Notify the shell outside its
+    // build, and drop an old restore after a newer conversation/commit.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          epoch != _activeContextEpoch ||
+          _conversation != snapshot.conversationId) {
+        return;
+      }
+      widget.onActiveContextChanged?.call(snapshot);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant ChatScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final incoming = widget.activeContext;
+    if (_busy ||
+        incoming == null ||
+        identical(incoming, oldWidget.activeContext) ||
+        incoming.conversationId != _conversation ||
+        incoming.intent == null ||
+        incoming.intent!.revision == _committedIntent?.revision) {
+      return;
+    }
+    _lastIntent = incoming.intent;
+    _committedIntent = incoming.intent;
+    _lastBrief = incoming.brief;
+    _previousIntent = incoming.intent;
+    _previousBrief = incoming.brief;
+    _state
+        .withIntentJson(
+          jsonEncode(incoming.intent!.toJson(includeSecrets: false)),
+        )
+        .withLastBrief(incoming.brief);
+  }
+
   void _openSettings() {
     final open = widget.onOpenSettings;
     if (open != null) {
@@ -231,6 +323,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
   final _input = TextEditingController();
   final _project = TextEditingController();
+
+  /// Unsent text, kept with the conversation it was typed in.
+  ///
+  /// The composer used to keep whatever was last typed across a conversation
+  /// switch: a half-written message followed the user into another chat, and
+  /// coming back to the first one found an empty box. Drafts are remembered
+  /// in memory for the session; sending or clearing the box removes the entry.
+  final Map<String, String> _drafts = <String, String>{};
   final _scroll = ScrollController();
 
   /// Named so "Edit and resend" can put the caret back in the composer where
@@ -362,6 +462,9 @@ class _ChatScreenState extends State<ChatScreen> {
   String _artifactPath = '';
   String _artifactName = '';
   String _artifactUpdatedAt = '';
+  StreamSubscription<FileSystemEvent>? _artifactWatch;
+  String _watchedArtifact = '';
+  Future<void>? _artifactRefresh;
 
   /// The drawing this conversation builds with (see [LayoutRequest]). Devices
   /// are placed by the engine from this, so it is part of the build request,
@@ -411,6 +514,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _activeRequestSnapshotStarted = false;
   int? _activeRequestSnapshotPendingToken;
   String _activePriorRequestOutcomeJson = '';
+  String _activePriorOutcomeTurnCreatedAt = '';
   bool _activeBriefChanged = false;
 
   /// .pkt names handed out this session, so a second build of the same lab
@@ -490,6 +594,10 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     _scroll.addListener(_onScroll);
     _input.addListener(_onComposerChanged);
+    _input.addListener(_rememberDraft);
+    // The constructor may have put a prefill in the box before the listener
+    // existed; keep it with this conversation too.
+    _rememberDraft();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
     // Find out whether the .pkt engine answers before the user tries
     // anything, so an unreachable address is stated up front with a way
@@ -548,6 +656,9 @@ class _ChatScreenState extends State<ChatScreen> {
   /// screenshots, change log and context report: "build it" compiled the wrong
   /// lab, and a screenshot attached in one chat was sent into the next.
   void _resetConversationState() {
+    _artifactWatch?.cancel();
+    _artifactWatch = null;
+    _watchedArtifact = '';
     // A reveal still writing into the old transcript is finished and stored
     // first, so its answer is not lost when the screen changes underneath it.
     _revealFinish?.call();
@@ -584,6 +695,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _requestReport = null;
     _status = '';
     _chat?.lastPlan = null;
+    _publishActiveContext();
   }
 
   /// What the model backend can honestly be said to be doing right now,
@@ -627,12 +739,14 @@ class _ChatScreenState extends State<ChatScreen> {
     _revealPersist?.call();
     _reveal?.cancel();
     // Nothing this screen started may keep running after it is gone.
+    _artifactWatch?.cancel();
     _generation.cancel();
     _settings?.removeListener(_onSettingsChanged);
     _memoryRef?.removeListener(_onMemoryChanged);
     EngineStatus.instance.removeListener(_onEngineStatus);
     _scroll.removeListener(_onScroll);
     _input.removeListener(_onComposerChanged);
+    _input.removeListener(_rememberDraft);
     _composerFocus.dispose();
     _input.dispose();
     _project.dispose();
@@ -718,7 +832,15 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!_conversationNavigationStarted &&
           widget.initialProject.trim().isEmpty &&
           settings.lastProject.isNotEmpty) {
+        final draftOwner = _conversation;
         _project.text = settings.lastProject;
+        // A prefill supplied with the screen belongs to the conversation
+        // that is actually opening, not the placeholder it started under.
+        if (_input.text.isNotEmpty && draftOwner != _conversation) {
+          _drafts
+            ..remove(draftOwner)
+            ..[_conversation] = _input.text;
+        }
       }
       // WHAT THE RUNTIME REALLY HOLDS. Probed once per load, then the request
       // is fitted to it. Without this the app planned against the Settings
@@ -747,6 +869,10 @@ class _ChatScreenState extends State<ChatScreen> {
       _checkEngine();
     }
     await _refreshConversations();
+    // The stored voice ("Shorter answers" / "Less formal") reaches the
+    // offline answers through the cache below; the model path reads the
+    // same keys from its prompt.
+    await _refreshStoredStyle();
     if (epoch != _loadEpoch) return;
     if (mem == null || !mem.ready) return;
     try {
@@ -844,6 +970,8 @@ class _ChatScreenState extends State<ChatScreen> {
             }
           }
         });
+        _publishActiveContext(conversationId: conversation);
+        await _refreshArtifactClaims();
         // Restore the file and conversation immediately. A slow/unavailable
         // keychain must not leave "edit it" pointing at an empty session.
         final loadedIntent = _lastIntent;
@@ -863,6 +991,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 credentials['brief'] ?? '',
               );
             });
+            _publishActiveContext(conversationId: conversation);
           }
         }
       } catch (_) {}
@@ -943,11 +1072,39 @@ class _ChatScreenState extends State<ChatScreen> {
   /// The memory store opened after this screen mounted. Reload once so the
   /// stored transcript and conversation state appear without a manual switch.
   void _onMemoryChanged() {
+    // The stored style ("Shorter answers" / "Less formal") may have changed
+    // - from the Settings panel or the per-message feedback menu. Refresh
+    // the cache the offline path reads on every turn; the one-shot readiness
+    // handling below stays untouched.
+    unawaited(_refreshStoredStyle());
     if (_memoryReadyHandled) return;
     final memory = _memoryRef;
     if (memory == null || !memory.ready || !mounted) return;
     _memoryReadyHandled = true;
     unawaited(_load());
+  }
+
+  /// The user's stored style, cached for the offline path. The model path
+  /// reads these keys fresh from the prompt builder every turn; the offline
+  /// answers below are synchronous, so they read the cache instead, and the
+  /// cache is refreshed on load and whenever the memory store notifies.
+  String _styleTone = '';
+  String _styleLength = '';
+
+  Future<void> _refreshStoredStyle() async {
+    final mem = _memory;
+    if (mem == null || !mem.ready) return;
+    try {
+      final tone = await mem.readPref(AssistantVoice.toneKey);
+      final length = await mem.readPref(AssistantVoice.lengthKey);
+      if (!mounted) return;
+      setState(() {
+        _styleTone = tone ?? '';
+        _styleLength = length ?? '';
+      });
+    } catch (_) {
+      // The default voice is what an unreadable store gets.
+    }
   }
 
   /// Settings changed while this chat was open: the provider, model, key,
@@ -1055,6 +1212,7 @@ class _ChatScreenState extends State<ChatScreen> {
     MemoryService? mem,
     String userText,
   ) async {
+    await _refreshArtifactClaims();
     var rules = <String>[];
     var prefs = <String, String>{};
     EnvironmentProfile? envProfile;
@@ -1066,9 +1224,18 @@ class _ChatScreenState extends State<ChatScreen> {
       } catch (_) {}
     }
     final svc = _engine();
-    final blockers = await svc.blockerLines(project: _project.text.trim());
-    final unsupported = await svc.provenUnsupported();
-    final live = _liveContext ? await _liveState(svc) : '';
+    // An engine's findings are worth asking for only when an engine answered.
+    // The chat already shows the engine's state, and the routes below each
+    // carry their own ten-second budget: with nothing listening, every turn
+    // waited through those timeouts before the answer could even start.
+    final engineUp = EngineStatus.instance.isUp;
+    final blockers = engineUp
+        ? await svc.blockerLines(project: _project.text.trim())
+        : const <String>[];
+    final unsupported = engineUp
+        ? await svc.provenUnsupported()
+        : const <String>[];
+    final live = engineUp && _liveContext ? await _liveState(svc) : '';
 
     // The live run state is the network context; the app's instructions stay
     // in the system prompt where they belong (first, so they are instructions
@@ -1105,8 +1272,8 @@ class _ChatScreenState extends State<ChatScreen> {
     if (intent != null) {
       network.writeln(
         '- plan on the table (rev ${intent.revision}): '
-        '${intent.nodes.length} device(s), '
-        '${intent.links.length} link(s), routing ${intent.routing.isEmpty ? 'none' : intent.routing}',
+        '${HumanLanguage.count(intent.nodes.length, 'device')}, '
+        '${HumanLanguage.count(intent.links.length, 'link')}, routing ${intent.routing.isEmpty ? 'none' : intent.routing}',
       );
       final devices = intent.nodes
           .take(14)
@@ -1148,15 +1315,8 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     return _ContextParts(
-      system: ChatService.systemContext(
-        target: _target,
-        rulePacks: _rulePackBlock(),
-        learnedRules: rules,
-        preferences: prefs,
-        knownBlockers: blockers,
-        unsupportedCapabilities: unsupported,
-        liveState: '',
-      ),
+      system:
+          '${ChatService.systemContext(target: _target, rulePacks: _rulePackBlock(), learnedRules: rules, preferences: prefs, knownBlockers: blockers, unsupportedCapabilities: unsupported, liveState: '')}\n\n${ResponsePresentation.instruction(_recordedOutcome?.interpretation.responsePreferences ?? ResponsePreferenceReader.read(userText))}',
       network: network.toString(),
       session: _state.promptBlock(userText: userText),
       memories: await _relevantMemories(mem, userText),
@@ -1468,8 +1628,8 @@ class _ChatScreenState extends State<ChatScreen> {
         final best = GeminiModelCatalog.recommend(models);
         final lines = StringBuffer()
           ..writeln(
-            '**${models.length} chat model(s) available to this '
-            'key**, best first:',
+            '**${HumanLanguage.count(models.length, 'chat model')} available '
+            'to this key**, best first:',
           )
           ..writeln();
         for (final m in models.take(12)) {
@@ -1565,6 +1725,20 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!mounted) return;
     setState(() => _messages = [..._messages, turn]);
     _jumpToEnd();
+  }
+
+  /// Keep the unsent text with the conversation it belongs to.
+  ///
+  /// Called on every edit, so switching chats cannot carry a draft into the
+  /// wrong transcript, and reopening a chat restores what was typed there.
+  /// Sending (which clears the box) or deleting the chat removes the entry.
+  void _rememberDraft() {
+    final conversation = _conversation;
+    if (_input.text.isEmpty) {
+      _drafts.remove(conversation);
+    } else {
+      _drafts[conversation] = _input.text;
+    }
   }
 
   /// The "/" menu follows the composer: a leading "/token" with no space
@@ -1819,12 +1993,163 @@ class _ChatScreenState extends State<ChatScreen> {
   /// [_compilePkt] refuses to build over, computed in one place so the build
   /// card, the chat summary and the build itself cannot disagree about whether
   /// a plan is buildable.
+  List<Requirement> get _currentRequirements =>
+      RequestCoordinator.requirementsFromSession(_state.requestOutcomeJson);
+
+  BuildReadinessResult _readiness(NetworkIntent? plan) =>
+      BuildReadiness.evaluate(
+        plan: plan,
+        target: 'packet-tracer',
+        offlineBuild: true,
+        requirements: _currentRequirements,
+        interpretation: _recordedOutcome?.interpretation,
+        base: _previousIntent,
+      );
+
   List<ValidationIssue> _blockingFindings(NetworkIntent? plan) => plan == null
       ? const <ValidationIssue>[]
-      : ValidatorService.validateCached(
-          plan,
-          target: _target,
-        ).where((i) => i.blocks).toList();
+      : [
+          for (final blocker in _readiness(plan).blockers)
+            ValidationIssue(
+              'error',
+              blocker.reason +
+                  (blocker.alternatives.isEmpty
+                      ? ''
+                      : ' Alternatives: ${blocker.alternatives.join('; ')}'),
+            ),
+        ];
+
+  BuildActionIdentity _actionIdentity(
+    NetworkIntent plan, {
+    String output = 'pkt',
+  }) => BuildActionIdentity.forPlan(
+    plan: plan,
+    requirements: _currentRequirements,
+    target: output == 'pkt' ? 'packet-tracer' : _target,
+    projectId: _conversation,
+    output: output,
+    outputOptions: {'selectedTarget': _target},
+  );
+
+  bool _actionIsCurrent(BuildActionIdentity identity) =>
+      mounted &&
+      _lastIntent != null &&
+      _actionIdentity(_lastIntent!).key == identity.key;
+
+  Future<void> _recordArtifactEvidence(ArtifactEvidenceResult evidence) async {
+    if (!_actionIsCurrent(evidence.action)) return;
+    final outcome = _recordedOutcome;
+    if (outcome == null) return;
+    final updated = RequestOutcome(
+      interpretation: outcome.interpretation,
+      candidatePlan: outcome.candidatePlan,
+      changeSet: outcome.changeSet,
+      coverage: evidence.coverage,
+      clarifications: outcome.clarifications,
+      requestedActions: outcome.requestedActions,
+      disposition: outcome.disposition,
+    );
+    final next = SessionState.decode(_state.encode())
+      ..requestOutcomeJson = jsonEncode(updated.toJson());
+    final store = _memory;
+    if (store != null && store.ready) {
+      try {
+        await store.setSessionState(evidence.action.projectId, next.encode());
+      } catch (_) {
+        if (_actionIsCurrent(evidence.action)) {
+          _appendSystem(
+            'The file was read, but its verification result could not be saved. Re-audit it after reopening.',
+          );
+        }
+        return;
+      }
+    }
+    if (_actionIsCurrent(evidence.action)) {
+      setState(() => _state = next);
+      _watchArtifact();
+    }
+  }
+
+  void _watchArtifact() {
+    if (_watchedArtifact == _artifactPath) return;
+    _artifactWatch?.cancel();
+    _artifactWatch = null;
+    _watchedArtifact = _artifactPath;
+    if (_artifactPath.isEmpty) return;
+    final watchedPath = _artifactPath;
+    try {
+      final file = File(watchedPath).absolute;
+      _artifactWatch = file.parent.watch().listen(
+        (event) {
+          if (!mounted || _artifactPath != watchedPath) return;
+          if (File(event.path).absolute.path.toLowerCase() ==
+                  file.path.toLowerCase() ||
+              event is FileSystemMoveEvent) {
+            unawaited(_refreshArtifactClaims());
+          }
+        },
+        onError: (Object _) {
+          if (mounted && _artifactPath == watchedPath) {
+            unawaited(_refreshArtifactClaims());
+          }
+        },
+      );
+    } on FileSystemException {
+      // Sandboxed providers may not support watching. Every send still checks
+      // the content hash before using previously recorded artifact claims.
+    }
+  }
+
+  Future<void> _refreshArtifactClaims() {
+    final active = _artifactRefresh;
+    if (active != null) return active;
+    final pending = _refreshArtifactClaimsOnce();
+    _artifactRefresh = pending;
+    return pending.whenComplete(() {
+      if (identical(_artifactRefresh, pending)) _artifactRefresh = null;
+    });
+  }
+
+  Future<void> _refreshArtifactClaimsOnce() async {
+    _watchArtifact();
+    final outcome = _recordedOutcome;
+    final plan = _lastIntent;
+    if (outcome?.coverage == null ||
+        plan == null ||
+        _artifactPath.isEmpty ||
+        !outcome!.coverage!.requirements.any(
+          (row) => row.evidence.any((item) => item.artifactHash.isNotEmpty),
+        )) {
+      return;
+    }
+    final identity = _actionIdentity(plan);
+    final savedPath = _artifactPath;
+    final refreshed = await ArtifactEvidenceService.refreshFile(
+      coverage: outcome.coverage!,
+      currentAction: identity,
+      file: File(savedPath),
+    );
+    if (_artifactPath != savedPath ||
+        !_actionIsCurrent(identity) ||
+        _recordedOutcome?.interpretation.turnId !=
+            outcome.interpretation.turnId) {
+      return;
+    }
+    if (jsonEncode(refreshed.toJson()) ==
+        jsonEncode(outcome.coverage!.toJson())) {
+      return;
+    }
+    final updated = RequestOutcome(
+      interpretation: outcome.interpretation,
+      candidatePlan: outcome.candidatePlan,
+      changeSet: outcome.changeSet,
+      coverage: refreshed,
+      clarifications: outcome.clarifications,
+      requestedActions: outcome.requestedActions,
+      disposition: outcome.disposition,
+    );
+    setState(() => _state.requestOutcomeJson = jsonEncode(updated.toJson()));
+  }
 
   /// The build card for ONE plan version.
   ///
@@ -1841,6 +2166,7 @@ class _ChatScreenState extends State<ChatScreen> {
         'revision': plan.revision,
         'buildRevision': plan.buildRevision,
         'project': plan.projectName,
+        'actionIdentity': _actionIdentity(plan).toJson(),
         'devices': plan.nodes.length,
         'links': plan.links.length,
         'blocking': blocking.length,
@@ -1903,17 +2229,16 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     final stamped = (action.payload['revision'] ?? '').toString();
     if (stamped.isEmpty) {
-      return 'Not built: this card never recorded which plan it was written '
-          'for, so there is nothing to trust it against. Ask me to build the '
-          'current plan and I will write a fresh card for it '
-          '(rev ${plan.revision}: ${plan.nodes.length} device(s), '
-          '${plan.links.length} link(s)).';
+      return 'I didn\'t build it: this card never recorded which plan it was '
+          'written for, so there\'s nothing to trust it against. Ask me to '
+          'build the current plan and I\'ll write a fresh card for it '
+          '(right now it\'s ${HumanLanguage.list([HumanLanguage.count(plan.nodes.length, 'device'), HumanLanguage.count(plan.links.length, 'link')])}).';
     }
     if (stamped != plan.revision) {
-      return 'Not built: this card was written for plan rev $stamped, but the '
-          'plan has moved on (rev ${plan.revision} - ${plan.nodes.length} '
-          'device(s), ${plan.links.length} link(s)). Ask me to build the '
-          'current plan instead of clicking this card.';
+      return 'I didn\'t build it: this card was written for an earlier version '
+          'of the plan, '
+          'and the network has changed since. It now has '
+          '${HumanLanguage.list([HumanLanguage.count(plan.nodes.length, 'device'), HumanLanguage.count(plan.links.length, 'link')])}. Ask me to build the current plan instead of clicking this card.';
     }
     final stampedBuildRevision = (action.payload['buildRevision'] ?? '')
         .toString();
@@ -1926,14 +2251,28 @@ class _ChatScreenState extends State<ChatScreen> {
       return 'Not built: the drawing or device positions changed after this '
           'card was written. Ask me to build the current plan instead.';
     }
+    final rawIdentity = action.payload['actionIdentity'];
+    if (rawIdentity != null) {
+      try {
+        if (BuildActionIdentity.fromJson(rawIdentity) !=
+            _actionIdentity(plan)) {
+          return 'Not built: the project, requirements, target or output changed after this card was written. Ask for a fresh build.';
+        }
+      } on FormatException {
+        return 'Not built: this card has an invalid action identity. Ask for a fresh build.';
+      }
+    } else if (_currentRequirements.isNotEmpty) {
+      return 'Not built: this older card does not record the current requirements. Ask for a fresh build.';
+    }
     if (!_hasChosenNetworkDesign(plan)) {
       return 'Choose a network design before continuing.';
     }
     final blocking = _blockingFindings(plan);
     if (blocking.isNotEmpty) {
-      return 'Not built: the plan still has ${blocking.length} finding(s) '
-          'that would be baked into the .pkt. Fix these first (the list is in '
-          'the card), then ask me to build it.';
+      return 'I didn\'t build it: the plan still has '
+          '${HumanLanguage.count(blocking.length, 'problem')} that would be '
+          'baked into the .pkt. Fix these first, then ask me to build it.\n\n'
+          '${blocking.map((issue) => HumanLanguage.findingLine(issue.severity, issue.message)).join('\n')}';
     }
     return null;
   }
@@ -2193,19 +2532,6 @@ class _ChatScreenState extends State<ChatScreen> {
       _quickReplies = _layoutQuickReplies(request.style);
     });
     _jumpToEnd();
-  }
-
-  /// Stamp the drawing the engine reported onto the plan itself, so the choice
-  /// survives the next build from any screen rather than living only in this
-  /// screen's memory until the app is closed.
-  void _persistLayoutNoteOnIntent() {
-    final intent = _lastIntent;
-    if (intent == null) return;
-    final cleaned = [
-      for (final n in intent.notes)
-        if (!n.toLowerCase().startsWith('layout:')) n,
-    ];
-    _lastIntent = intent.copyWith(notes: [...cleaned, _layoutNote()]);
   }
 
   /// The devices a request named, in the user's own words, for a message that
@@ -2971,6 +3297,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _jumpToEnd();
       return;
     }
+    final buildIdentity = _actionIdentity(_lastIntent!);
     _buildInFlight = true;
     try {
       setState(() {
@@ -2983,7 +3310,7 @@ class _ChatScreenState extends State<ChatScreen> {
         expectedBuildRevision: (action.payload['buildRevision'] ?? '')
             .toString(),
       );
-      if (!mounted) return;
+      if (!_actionIsCurrent(buildIdentity)) return;
       setState(() {
         if (!keepBusy) _busy = false;
         _status = keepBusy ? 'Preparing requested outputs...' : '';
@@ -3058,18 +3385,20 @@ class _ChatScreenState extends State<ChatScreen> {
         actions: const <ChatAction>[],
       );
     }
+    final buildIdentity = _actionIdentity(intent);
+    final buildRequirements = _currentRequirements;
+    final buildOutcome = _recordedOutcome;
     // The card the user pressed names the plan version it was written for.
     // Compiling a different one would mean the file, the counts on the card
     // and the plan on the table all describe different networks.
     if (expectedRevision.isNotEmpty && expectedRevision != intent.revision) {
       return (
         text:
-            'I did not build this. The card you pressed was written for plan '
-            'rev $expectedRevision; the plan on the table is now rev '
-            '${intent.revision} (${intent.nodes.length} device(s), '
-            '${intent.links.length} link(s)). Ask me to build the current '
-            'plan and I will compile exactly that - I will not compile a '
-            'different network than the card promised.',
+            'I didn\'t build this. The card you pressed was written for plan '
+            'rev $expectedRevision; the plan is now rev ${intent.revision} '
+            '(${HumanLanguage.list([HumanLanguage.count(intent.nodes.length, 'device'), HumanLanguage.count(intent.links.length, 'link')])}). Ask me to build the current plan and I\'ll compile exactly '
+            'that - I won\'t compile a different network than the card '
+            'promised.',
         actions: const <ChatAction>[],
       );
     }
@@ -3098,12 +3427,13 @@ class _ChatScreenState extends State<ChatScreen> {
           .toList();
       return (
         text:
-            'I did not build this yet: the plan still has '
-            '${blocking.length} finding(s) that would be baked into the .pkt.\n\n'
+            'I didn\'t build it yet: the plan still has '
+            '${HumanLanguage.count(blocking.length, 'finding')} that would end '
+            'up in the .pkt.\n\n'
             '${errors.isEmpty ? '' : '**Errors**\n${errors.join('\n')}\n\n'}'
             '${warnings.isEmpty ? '' : '**Warnings**\n${warnings.join('\n')}\n\n'}'
-            'Fix these in the brief (or in the network inspector) and ask me to '
-            'build it again.',
+            'Fix these in the brief (or in the network inspector) and ask me '
+            'to build it again.',
         actions: const <ChatAction>[],
       );
     }
@@ -3121,6 +3451,12 @@ class _ChatScreenState extends State<ChatScreen> {
     final engineHealthy = SettingsService.isMobile && preferOnDevice
         ? false
         : await svc.healthy;
+    if (!_actionIsCurrent(buildIdentity)) {
+      return (
+        text: 'Build stopped because the project or request changed.',
+        actions: const <ChatAction>[],
+      );
+    }
     if (preferOnDevice || !engineHealthy) {
       final onDevice = await _compilePktOnDevice(
         intent: intent,
@@ -3137,7 +3473,10 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     try {
       final plan = PacketTracerAdapter.autopilotPlan(intent, layout: drawing);
-      final preflight = BuildPreflight.lines(intent: intent, target: _target);
+      final preflight = BuildPreflight.lines(
+        intent: intent,
+        target: 'packet-tracer',
+      );
       // An in-place edit writes over the file the user already has; the
       // sidecar keeps a timestamped backup of what was there before.
       final editing = inPlacePath.trim().isNotEmpty;
@@ -3159,15 +3498,22 @@ class _ChatScreenState extends State<ChatScreen> {
       // is not in it, and the engine refuses to overwrite. Retry on that
       // refusal with the next free -N suffix instead of dead-ending.
       Object? lastError;
+      String? engineJobId;
+      final jobs = PktBuildJobService.instance;
       Map<String, dynamic> res = {};
       for (var attempt = 0; attempt < 6 && res.isEmpty; attempt++) {
         try {
-          res = await svc.pktGenerate(
-            plan,
-            filename: filename,
-            project: _project.text.trim(),
-            replace: editing,
+          final generated = jobs.runExclusive(
+            identity: buildIdentity,
+            build: () => svc.pktGenerate(
+              plan,
+              filename: filename,
+              project: buildIdentity.projectId,
+              replace: editing,
+            ),
           );
+          engineJobId = jobs.currentJobId;
+          res = await generated;
         } catch (e) {
           lastError = e;
           final message = e.toString().toLowerCase();
@@ -3196,29 +3542,11 @@ class _ChatScreenState extends State<ChatScreen> {
           actions: const <ChatAction>[],
         );
       }
-      PktBuildJobService.instance.recordGeneratedFile(
-        sourceRecordId: await PlanVersionService.captureBuildPlan(
-          memory: _memory,
-          intent: intent,
-          target: _target,
-          instruction: _lastBrief,
-        ),
-        project: intent.projectName,
-        filePath: path,
-        deviceCount: (res['deviceCount'] as num?)?.toInt() ?? 0,
-        linkCount: (res['linkCount'] as num?)?.toInt() ?? 0,
-        planRevision: intent.revision,
-        planJson: jsonEncode(intent.toPlannerJson()),
-      );
-      // The tool layer may now read this capture, and the model may be asked
-      // about it.
-      _capturePath = path;
-      // Verification evidence: read the file we just wrote back through the
-      // engine's audit BEFORE claiming the build matches the plan. No audit
-      // collected means the message below says "unverified", not "done".
+      // Saved-file verification is collected for the captured action identity.
+      // A late result may remain in history, but cannot update the current chat.
       Map<String, dynamic>? audit;
       try {
-        final a = await svc.pktAudit(path, project: _project.text.trim());
+        final a = await svc.pktAudit(path, project: buildIdentity.projectId);
         if (a['devices'] is List) audit = a;
       } catch (_) {
         // Not collected; the build message must say so.
@@ -3230,6 +3558,46 @@ class _ChatScreenState extends State<ChatScreen> {
               audit: audit,
               builtDevices: (res['devices'] as List?) ?? const [],
             );
+      final evidence = ArtifactEvidenceService.completeAudit(
+        action: buildIdentity,
+        requirements: buildRequirements,
+        audit: audit ?? const {},
+        planning: CoverageChecker.check(
+          plan: intent,
+          requirements: buildRequirements,
+          target: buildIdentity.target,
+        ),
+        previousCoverage: buildOutcome?.coverage,
+      );
+      PktBuildJobService.instance.recordGeneratedFile(
+        sourceRecordId: await PlanVersionService.captureBuildPlan(
+          memory: _memory,
+          intent: intent,
+          target: buildIdentity.target,
+          instruction: _lastBrief,
+          requestOutcome: buildOutcome,
+          actionIdentity: buildIdentity,
+        ),
+        project: intent.projectName,
+        filePath: path,
+        deviceCount: (res['deviceCount'] as num?)?.toInt() ?? 0,
+        linkCount: (res['linkCount'] as num?)?.toInt() ?? 0,
+        planRevision: intent.revision,
+        planJson: jsonEncode(intent.toPlannerJson()),
+        actionIdentity: buildIdentity,
+        artifactHash: evidence.artifactHash,
+        coverage: evidence.coverage,
+        expectedJobId: engineJobId,
+      );
+      if (!_actionIsCurrent(buildIdentity) ||
+          jobs.currentJobId != engineJobId) {
+        return (
+          text:
+              'The earlier build produced $path; it is not a result for the current project or request.',
+          actions: const <ChatAction>[],
+        );
+      }
+      _capturePath = path;
       final backup = '${res['backupName'] ?? res['backupPath'] ?? ''}';
       final warnings = (res['warnings'] as List?) ?? const [];
       final body = StringBuffer();
@@ -3270,6 +3638,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _writeExportStatus(body, res);
         _writeVerification(body, check);
       }
+      body.writeln(evidence.lines.join('\n'));
       // Every build is read back and judged against the design rubric, and only
       // the ones that hold together are remembered. This runs after the file
       // exists, so what is reviewed is exactly what was built - not an
@@ -3312,10 +3681,10 @@ class _ChatScreenState extends State<ChatScreen> {
       _rememberArtifact(
         path,
         note:
-            '${check == null ? 'verification not collected' : (check.verified ? 'build verified against the file' : 'verification found differences')}'
+            '${evidence.verified ? 'requested artifact properties verified' : 'artifact requirements not fully verified'}'
             '; ${_layoutNote()}${_exportNote(res)}',
       );
-      _persistLayoutNoteOnIntent();
+      await _recordArtifactEvidence(evidence);
       return (
         text: body.toString(),
         actions: [
@@ -3408,8 +3777,14 @@ class _ChatScreenState extends State<ChatScreen> {
     required Map<String, dynamic>? drawing,
     required bool engineHealthy,
   }) async {
+    final buildIdentity = _actionIdentity(intent);
+    final buildRequirements = _currentRequirements;
+    final buildOutcome = _recordedOutcome;
     final plan = PacketTracerAdapter.autopilotPlan(intent, layout: drawing);
-    final preflight = BuildPreflight.lines(intent: intent, target: _target);
+    final preflight = BuildPreflight.lines(
+      intent: intent,
+      target: 'packet-tracer',
+    );
     // THE FILE IS NAMED FOR THE NETWORK (small-office-ospf.pkt), and the
     // name is checked against the destination folder on disk, so a second
     // build of a different lab never clobbers the first. On-device this is
@@ -3458,16 +3833,19 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       final jobs = PktBuildJobService.instance;
       final projectName = _project.text.trim();
-      final built = await jobs.start(
+      final buildFuture = jobs.start(
         sourceRecordId: await PlanVersionService.captureBuildPlan(
           memory: _memory,
           intent: intent,
-          target: _target,
+          target: buildIdentity.target,
           instruction: _lastBrief,
+          requestOutcome: buildOutcome,
+          actionIdentity: buildIdentity,
         ),
         project: intent.projectName,
         planRevision: intent.revision,
         planJson: jsonEncode(intent.toPlannerJson()),
+        actionIdentity: buildIdentity,
         build: (reportProgress) => OnDevicePktBuilder.buildFromPlan(
           plan: plan,
           appDir: getApplicationDocumentsDirectory,
@@ -3478,6 +3856,8 @@ class _ChatScreenState extends State<ChatScreen> {
           isCancelled: () => jobs.cancelRequested,
         ),
       );
+      final jobId = jobs.currentJobId;
+      final built = await buildFuture;
       if (built == null) {
         return (
           text: jobs.status == PktBuildJobStatus.cancelled
@@ -3489,7 +3869,6 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
       final path = built.file.path;
-      _capturePath = path;
       final report = built.report ?? const <String, dynamic>{};
       // Verification evidence: read the file we just wrote back through the
       // on-device audit BEFORE claiming the build matches the plan. No
@@ -3500,7 +3879,7 @@ class _ChatScreenState extends State<ChatScreen> {
         final a = OnDevicePktBuilder.auditReport(
           built.file.readAsBytesSync(),
           path: path,
-          project: _project.text.trim(),
+          project: buildIdentity.projectId,
         );
         if (a['devices'] is List) audit = a;
       } catch (_) {
@@ -3513,6 +3892,31 @@ class _ChatScreenState extends State<ChatScreen> {
               audit: audit,
               builtDevices: (report['devices'] as List?) ?? const [],
             );
+      final evidence = ArtifactEvidenceService.completeAudit(
+        action: buildIdentity,
+        requirements: buildRequirements,
+        audit: audit ?? const {},
+        planning: CoverageChecker.check(
+          plan: intent,
+          requirements: buildRequirements,
+          target: buildIdentity.target,
+        ),
+        previousCoverage: buildOutcome?.coverage,
+      );
+      if (!_actionIsCurrent(buildIdentity)) {
+        return (
+          text:
+              'The earlier build produced $path; it was not applied to the current project or request.',
+          actions: const <ChatAction>[],
+        );
+      }
+      jobs.updateEvidence(
+        actionIdentity: buildIdentity,
+        artifactHash: evidence.artifactHash,
+        coverage: evidence.coverage,
+        jobId: jobId,
+      );
+      _capturePath = path;
       final warnings = (report['warnings'] as List?) ?? built.warnings;
       final body = StringBuffer()
         ..writeln('**Preflight (checked before compiling)**')
@@ -3532,6 +3936,7 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       _writeExportStatus(body, report);
       _writeVerification(body, check);
+      body.writeln(evidence.lines.join('\n'));
       // Same design review the engine build records, so a phone-built lab
       // is held to the same rubric and remembered the same way.
       final review = DesignReviewer.review(intent);
@@ -3572,10 +3977,10 @@ class _ChatScreenState extends State<ChatScreen> {
       _rememberArtifact(
         path,
         note:
-            'built on-device; ${check == null ? 'verification not collected' : (check.verified ? 'build verified against the file' : 'verification found differences')}'
+            'built on-device; ${evidence.verified ? 'requested artifact properties verified' : 'artifact requirements not fully verified'}'
             '; ${_layoutNote()}${_exportNote(report)}',
       );
-      _persistLayoutNoteOnIntent();
+      await _recordArtifactEvidence(evidence);
       return (
         text: body.toString(),
         actions: [
@@ -3793,6 +4198,7 @@ class _ChatScreenState extends State<ChatScreen> {
         break;
       }
       if (_conversation != conversationId ||
+          _lastIntent?.buildRevision != actionPlan.buildRevision ||
           _lastIntent?.revision != expectedRevision) {
         results.add(
           'Skipped the remaining outputs because the conversation or plan revision changed.',
@@ -3842,6 +4248,7 @@ class _ChatScreenState extends State<ChatScreen> {
               expectedRevision: expectedRevision,
               conversationId: conversationId,
               generationToken: generationToken,
+              format: action.outputOptions['format'] as String? ?? 'text',
             ),
           );
           break;
@@ -3864,6 +4271,7 @@ class _ChatScreenState extends State<ChatScreen> {
     required String expectedRevision,
     required String conversationId,
     required int generationToken,
+    String format = 'text',
   }) async {
     if (!mounted ||
         !_generation.isCurrent(generationToken) ||
@@ -3872,9 +4280,30 @@ class _ChatScreenState extends State<ChatScreen> {
         plan.revision != expectedRevision) {
       return 'Configurations: export skipped because the project or plan changed.';
     }
+    final exportIdentity = _actionIdentity(plan, output: 'configuration');
+    final exportTarget = switch (format) {
+      'text' => _target, // An unqualified export keeps the selected target.
+      'cisco-ios' => 'cisco-ssh',
+      'gns3' => 'gns3',
+      'packet-tracer' => 'packet-tracer',
+      _ => '',
+    };
+    if (exportTarget.isEmpty) {
+      return 'Configurations: export skipped because the requested format is unsupported.';
+    }
+    bool current() =>
+        mounted &&
+        _generation.isCurrent(generationToken) &&
+        _conversation == conversationId &&
+        _lastIntent != null &&
+        _actionIdentity(_lastIntent!, output: 'configuration') ==
+            exportIdentity;
     try {
-      final rendered = BuildArtifactService.renderLocal(plan, _target);
-      final redacted = NetworkIntent.redactSecrets(rendered);
+      final rendered = BuildArtifactService.renderLocal(plan, exportTarget);
+      final redacted = BuildArtifactService.renderLocalRedacted(
+        plan,
+        exportTarget,
+      );
       final bytes = Uint8List.fromList(utf8.encode(redacted));
       final baseName = BuildArtifactService.networkFileName(
         plan: plan,
@@ -3894,8 +4323,14 @@ class _ChatScreenState extends State<ChatScreen> {
       if (savedPath == null || savedPath.trim().isEmpty) {
         return 'Configurations: export cancelled; no configuration file was saved.';
       }
+      if (!current()) {
+        return 'Configurations: the project or plan changed while choosing a destination. No current-plan success was recorded.';
+      }
       if (!Platform.isAndroid && !Platform.isIOS) {
         await File(savedPath).writeAsBytes(bytes, flush: true);
+      }
+      if (!current()) {
+        return 'Configurations were written for the earlier snapshot; the current project has changed.';
       }
       return 'Configurations: saved to $savedPath.'
           '${redacted == rendered ? '' : ' Sensitive credentials were redacted.'}';
@@ -4083,28 +4518,81 @@ class _ChatScreenState extends State<ChatScreen> {
         '${action.payload['name'] ?? path.split(RegExp(r'[\\/]')).last}';
     if (path.isEmpty) return 'That card has no file path.';
     final previous = _lastIntent;
+    final conversation = _conversation;
+    final priorState = _state;
     final bytes = await File(path).readAsBytes();
     final imported = PktPlanImportService.fromBytes(
       bytes,
       projectName: name.replaceAll(RegExp(r'\.pkt$'), ''),
+      sourceName: name,
     );
-    if (!mounted) return '';
-    setState(() {
-      _previousIntent = previous;
-      _lastIntent = imported.intent;
-      _lastBrief = 'the file $name';
-    });
-    _state
-        .withLastBrief(_lastBrief)
-        .withIntentJson(
-          jsonEncode(imported.intent.toJson(includeSecrets: false)),
-        );
+    if (!mounted ||
+        _conversation != conversation ||
+        !identical(_lastIntent, previous) ||
+        !identical(_state, priorState)) {
+      return 'Import stopped because the selected project changed.';
+    }
+    final turnId =
+        '$conversation-import-${DateTime.now().microsecondsSinceEpoch}';
+    final requirements = imported.importedRequirements(
+      projectId: conversation,
+      turnId: turnId,
+    );
+    final outcome = RequestOutcome(
+      interpretation: RequestInterpretation(
+        turnId: turnId,
+        conversationId: conversation,
+        projectId: conversation,
+        basePlanRevision: previous?.revision ?? '',
+        mode: RequestMode.edit,
+        mutationPolicy: MutationPolicy.commitIfValid,
+        requirements: requirements,
+      ),
+      candidatePlan: imported.intent,
+      disposition: RequestDisposition.commit,
+      coverage: CoverageChecker.check(
+        plan: imported.intent,
+        requirements: requirements,
+        target: _target,
+      ),
+      changeSet: previous == null
+          ? null
+          : PlanChangeSet(
+              projectId: conversation,
+              baseRevision: previous.revision,
+              candidateRevision: imported.intent.revision,
+              oldValues: {'plan': previous.toJson(includeSecrets: false)},
+              newValues: {
+                'plan': imported.intent.toJson(includeSecrets: false),
+              },
+            ),
+    );
+    final nextState = SessionState.decode(priorState.encode())
+      ..lastBrief = 'the file $name'
+      ..intentJson = jsonEncode(imported.intent.toJson(includeSecrets: false))
+      ..requestOutcomeJson = jsonEncode(outcome.toJson())
+      ..requestOutcomeTurnCreatedAt = '';
+    nextState.setPendingQuestions(const []);
     final mem = _memory;
     if (mem != null && mem.ready) {
       try {
-        await mem.setSessionState(_conversation, _state.encode());
-      } catch (_) {}
+        await mem.setSessionState(conversation, nextState.encode());
+      } catch (_) {
+        return 'The file was read, but the imported project could not be saved. The previous plan is unchanged.';
+      }
     }
+    if (!mounted ||
+        _conversation != conversation ||
+        !identical(_lastIntent, previous) ||
+        !identical(_state, priorState)) {
+      return 'The import belongs to the earlier project; it was not applied to the current selection.';
+    }
+    setState(() {
+      _previousIntent = previous;
+      _lastIntent = imported.intent;
+      _lastBrief = nextState.lastBrief;
+      _state = nextState;
+    });
     return PktImportReply.text(imported, fileName: name, replaced: previous);
   }
 
@@ -4726,6 +5214,8 @@ class _ChatScreenState extends State<ChatScreen> {
       previousPlan: null,
       history: _messages.where((m) => !m.isError).toList(),
       privateMode: _settings?.privateMode ?? false,
+      styleTone: _styleTone,
+      styleLength: _styleLength,
     );
     final at = DateTime.now().toIso8601String();
     final ask = ChatMessage(role: 'user', text: text, createdAt: at);
@@ -4773,6 +5263,127 @@ class _ChatScreenState extends State<ChatScreen> {
     }());
   }
 
+  Future<void> _handleGroundedAttachmentTurn(
+    String text,
+    List<ChatImage> attachments,
+    int token,
+  ) async {
+    final conversation = _conversation;
+    final base = _lastIntent;
+    final prior = _state;
+    final request = AttachmentIntent.read(text);
+    final service = _engine();
+    OcrEvidence evidence;
+    if (await service.healthy) {
+      evidence = await AttachmentOcr.read(
+        attachments,
+        readBase64: ChatService().readBase64,
+        ocr: service.ocrImageBase64,
+      );
+    } else {
+      evidence = OcrEvidence(
+        note:
+            'The local image reader is unavailable. Type the critical inventory and connection details to continue.',
+      );
+    }
+    if (!mounted ||
+        !_generation.isCurrent(token) ||
+        _conversation != conversation ||
+        !identical(_lastIntent, base) ||
+        !identical(_state, prior)) {
+      return;
+    }
+    final turnId =
+        '$conversation-attachment-${DateTime.now().microsecondsSinceEpoch}';
+    final grounded = AttachmentGrounding.fromOcr(
+      evidence,
+      userText: text,
+      projectId: conversation,
+      turnId: turnId,
+    );
+    final questions = [...grounded.pendingQuestions];
+    if (questions.isEmpty) {
+      questions.add(
+        PendingRequestQuestion(
+          id: '$turnId-action',
+          targetKind: PendingQuestionTargetKind.issue,
+          targetId: 'attachment-action',
+          prompt: request.requiresClarification
+              ? 'Should I explain, compare, import, edit, or build from this attachment?'
+              : 'Confirm the exact devices, counts and connections from this image before I change the project.',
+        ),
+      );
+    }
+    final interpretation = grounded
+        .interpretation(
+          projectId: conversation,
+          conversationId: conversation,
+          turnId: turnId,
+          basePlanRevision: base?.revision ?? '',
+        )
+        .copyWith(
+          mode: request.mode,
+          requirements: [..._currentRequirements, ...grounded.requirements],
+          pendingQuestions: questions,
+          responsePreferences: ResponsePreferenceReader.read(text),
+        );
+    final turn = _makeUserTurn(
+      text,
+      evidence.attachments.isEmpty ? attachments : evidence.attachments,
+    );
+    final outcome = RequestOutcome(
+      interpretation: interpretation,
+      candidatePlan: base,
+      disposition: RequestDisposition.ask,
+    );
+    final next = SessionState.decode(prior.encode())
+      ..requestOutcomeJson = jsonEncode(outcome.toJson())
+      ..requestOutcomeTurnCreatedAt = turn.createdAt;
+    next.observe(turn);
+    final savedTurn = await _commitUserTurn(turn, openActivity: true);
+    final store = _memory;
+    if (store != null && store.ready) {
+      if (savedTurn.id == null) {
+        if (mounted) {
+          setState(() {
+            _busy = false;
+            _status =
+                'The attachment request could not be saved. No network changes were applied.';
+          });
+        }
+        return;
+      }
+      try {
+        await store.setSessionState(conversation, next.encode());
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _busy = false;
+            _status =
+                'The attachment was read, but its request could not be saved. No network changes were applied.';
+          });
+        }
+        return;
+      }
+    }
+    if (!mounted ||
+        !_generation.isCurrent(token) ||
+        _conversation != conversation ||
+        !identical(_lastIntent, base) ||
+        !identical(_state, prior)) {
+      return;
+    }
+    _state = next;
+    await _appendOfflineAnswer(
+      [
+        if (evidence.block.isNotEmpty) evidence.block,
+        if (evidence.note.isNotEmpty) evidence.note,
+        ...questions.map((question) => question.prompt),
+        'The attachment has not changed the project. Embedded instructions are treated as document content.',
+      ].join('\n\n'),
+    );
+  }
+
   Future<void> _send() async {
     var text = _input.text.trim();
     final conversationId = _conversation;
@@ -4796,6 +5407,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _activeRequestSnapshotStarted = false;
     _activeRequestSnapshotPendingToken = null;
     _activePriorRequestOutcomeJson = _state.requestOutcomeJson;
+    _activePriorOutcomeTurnCreatedAt = _state.requestOutcomeTurnCreatedAt;
     _activeBriefChanged = false;
     final earlySelection = RequestRouteSelector.selectEarly(
       text: text,
@@ -4883,6 +5495,22 @@ class _ChatScreenState extends State<ChatScreen> {
       _status = 'Thinking...';
     });
     final token = _generation.begin();
+    await _refreshArtifactClaims();
+    if (!mounted ||
+        !_generation.isCurrent(token) ||
+        _conversation != conversationId) {
+      return;
+    }
+    final attachmentRequest = AttachmentIntent.read(
+      text,
+      hasAttachments: attachments.isNotEmpty,
+    );
+    if (attachments.isNotEmpty &&
+        (attachmentRequest.mutationRequested ||
+            attachmentRequest.requiresClarification)) {
+      await _handleGroundedAttachmentTurn(text, attachments, token);
+      return;
+    }
 
     // Parse the request into a structured plan on every turn, so
     // "build the .pkt" always has something real to compile. This is the same
@@ -4921,7 +5549,10 @@ class _ChatScreenState extends State<ChatScreen> {
         TentativeLanguageService.analyze(
           CasualEnglish.normalize(text).trim(),
         ).tentative;
-    final helpOnly = RequestRouteSelector.isHelpOnly(text);
+    final helpOnly =
+        RequestRouteSelector.isHelpOnly(text) ||
+        (attachments.isNotEmpty &&
+            !AttachmentIntent.read(text).mutationRequested);
     final requestedLayout = helpOnly
         ? null
         : LayoutRequest.read(text, currentStyle: _layoutStyleOf(_artifactPath));
@@ -4952,7 +5583,14 @@ class _ChatScreenState extends State<ChatScreen> {
         // new lab, or unchanged) - see NetworkIntent.followUp.
         final rules = await _learnedRules();
         final prefs = await _learnedPrefs();
-        final parsed = await NetworkIntent.parseSimpleAsync('chat', text);
+        // An explicitly named lab keeps its name on the plan and therefore on
+        // the file: "lab named release-validation" must not compile to
+        // chat.pkt. No name in the words keeps the conversation project.
+        final requestedName = ConversationTitles.requestedNetworkName(text);
+        final planProject = requestedName == null || requestedName.isEmpty
+            ? 'chat'
+            : requestedName;
+        final parsed = await NetworkIntent.parseSimpleAsync(planProject, text);
         final withMemory = PlannerMemoryService.apply(
           parsed,
           rules: rules,
@@ -4968,7 +5606,7 @@ class _ChatScreenState extends State<ChatScreen> {
           // the turn, but flattening it here destroys inventory lists such as
           // "3 routers: R1, R2, R3" and can add duplicate generated devices.
           parsed: withMemory,
-          project: 'chat',
+          project: planProject,
         );
         if (!mounted || !_generation.isCurrent(token)) return;
         // Re-apply defaults after a follow-up merge so the online and offline
@@ -4995,7 +5633,7 @@ class _ChatScreenState extends State<ChatScreen> {
           artifactCandidates: _state.knownArtifacts.length,
           currentLayoutStyle: _layoutStyleOf(_artifactPath),
         );
-        final requestOutcome = !routeSelection.coordinatorOwnsPlan
+        var requestOutcome = !routeSelection.coordinatorOwnsPlan
             ? null
             : RequestCoordinator.coordinate(
                 text: text,
@@ -5008,8 +5646,45 @@ class _ChatScreenState extends State<ChatScreen> {
                 legacyBrief: legacyOutcome.brief,
                 baseBrief: _previousBrief,
                 existingRequirements: existingRequirements,
+                existingPendingQuestions:
+                    _recordedOutcome?.interpretation.pendingQuestions ??
+                    const [],
                 messageId: turnId,
               );
+        if (requestOutcome != null &&
+            _previousIntent != null &&
+            settings?.privateMode != true &&
+            _chat != null) {
+          final service = _chat!;
+          final proposalInput = ProposalInput(
+            text: text,
+            local: requestOutcome.interpretation,
+            base: _previousIntent!,
+            target: _target,
+            providerIdentity: service.interpretationIdentity,
+            preferencesIdentity: BuildActionIdentity.digestJson(prefs),
+          );
+          if (proposalInput.eligible) {
+            final proposal = await service.extractInterpretation(
+              proposalInput,
+              abortTrigger: _generation.abortTrigger,
+              abortProbe: () =>
+                  !_generation.isCurrent(token) ||
+                  _conversation != conversationId,
+            );
+            if (!mounted ||
+                !_generation.isCurrent(token) ||
+                _conversation != conversationId) {
+              return;
+            }
+            requestOutcome = RequestCoordinator.acceptProposal(
+              local: requestOutcome,
+              proposal: proposal,
+              base: _previousIntent!,
+              target: _target,
+            );
+          }
+        }
         if (requestOutcome != null) {
           _activeRequestOutcome = requestOutcome;
           _activeRequestText = text;
@@ -5067,6 +5742,17 @@ class _ChatScreenState extends State<ChatScreen> {
               'design that fits it and I will apply that instead.',
             );
           }
+        }
+        if (requestOutcome != null &&
+            !requestOutcome.isBlocked &&
+            _lastIntent != null) {
+          requestOutcome = RequestCoordinator.recomputeCoverage(
+            outcome: requestOutcome,
+            candidate: _lastIntent!,
+            target: _target,
+            base: _previousIntent,
+          );
+          _activeRequestOutcome = requestOutcome;
         }
         _understoodOk = requestOutcome?.isBlocked != true;
         if (requestOutcome?.isBlocked != true && _lastIntent != null) {
@@ -5256,6 +5942,28 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     final editInPlace = fileIntent == FileEditIntent.editExisting;
     final userTurn = _makeUserTurn(text, attachments);
+    if (_activeRequestToken == token && _activeRequestOutcome != null) {
+      _state.requestOutcomeTurnCreatedAt = userTurn.createdAt;
+    } else if (!ScopeGate.isOffTopic(text) &&
+        (helpOnly || exploring || _wantsPreview.hasMatch(text))) {
+      final reading = RequestInterpretationAdapter.adapt(
+        originalText: text,
+        projectName: _lastIntent?.projectName ?? _conversation,
+        turnId: '$_conversation-${DateTime.now().microsecondsSinceEpoch}',
+        conversationId: _conversation,
+        projectId: _conversation,
+        basePlanRevision: _lastIntent?.revision ?? '',
+      ).copyWith(requirements: _currentRequirements);
+      _state
+        ..requestOutcomeJson = jsonEncode(
+          RequestOutcome(
+            interpretation: reading,
+            candidatePlan: _lastIntent,
+            disposition: RequestDisposition.answerOnly,
+          ).toJson(),
+        )
+        ..requestOutcomeTurnCreatedAt = userTurn.createdAt;
+    }
     // LAYER 2: fold the new turn into the structured state before anything is
     // sent, so "what about its gateway?" is answerable from data rather than
     // from the model's recollection.
@@ -5317,6 +6025,9 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
     }
+    if (sessionSnapshotSaved) {
+      _publishActiveContext(conversationId: conversationId);
+    }
     if (!mounted || !_generation.isCurrent(token)) {
       // A successful snapshot is already the user's committed plan; Stop
       // prevents follow-on provider/output work. If persistence failed, the
@@ -5361,7 +6072,8 @@ class _ChatScreenState extends State<ChatScreen> {
               : jsonEncode(_previousIntent!.toJson(includeSecrets: false))
           ..lastBrief = _previousBrief
           ..briefJson = jsonEncode(_previousDesignBrief.toJson())
-          ..requestOutcomeJson = _activePriorRequestOutcomeJson;
+          ..requestOutcomeJson = _activePriorRequestOutcomeJson
+          ..requestOutcomeTurnCreatedAt = _activePriorOutcomeTurnCreatedAt;
         final persistenceReason =
             sessionSnapshotError?.toString() ?? 'local storage failed';
         final answer = ChatMessage(
@@ -5407,6 +6119,9 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     }
 
+    if (mem == null || !mem.ready) {
+      _publishActiveContext(conversationId: conversationId);
+    }
     if (coordinatedForTurn != null &&
         !coordinatedForTurn.isBlocked &&
         coordinatedForTurn.interpretation.requestedActions.isNotEmpty) {
@@ -5561,6 +6276,19 @@ class _ChatScreenState extends State<ChatScreen> {
       // key becomes empty rather than keeping the previous value.
       _geminiKey = await settings.getApiKey() ?? '';
       _openAiKey = await settings.getOpenAiKey() ?? '';
+      // A turn with no key configured cannot reach a model at all - the
+      // request below would fail straight into the offline answer - so the
+      // wait label says what actually runs instead of claiming a model is
+      // thinking. "Thinking..." stays for the model path, where a model
+      // really is being waited on.
+      if (mounted &&
+          _geminiKey.trim().isEmpty &&
+          _openAiKey.trim().isEmpty &&
+          _status == 'Thinking...') {
+        setState(() {
+          _status = 'Answering from the rules on this device...';
+        });
+      }
       final parts = await _buildContext(mem, text);
       _memories = parts.memories;
       final service = _chat ?? _buildChat(settings);
@@ -5614,6 +6342,7 @@ class _ChatScreenState extends State<ChatScreen> {
           attachments: attachments,
           networkContext: parts.network,
           sessionState: parts.session,
+          mandatoryState: _state.mandatoryRequestContext(),
           memories: parts.memories,
           storedSummary: parts.summary,
           abortTrigger: _generation.abortTrigger,
@@ -5667,6 +6396,7 @@ class _ChatScreenState extends State<ChatScreen> {
           attachments: attachments,
           networkContext: parts.network,
           sessionState: parts.session,
+          mandatoryState: _state.mandatoryRequestContext(),
           memories: parts.memories,
           storedSummary: parts.summary,
           // Stop has to reach the transport on this path too, otherwise a
@@ -5706,7 +6436,14 @@ class _ChatScreenState extends State<ChatScreen> {
               _lastIntent,
             ).firstOrNull;
       final visibleText = unsupportedModel == null
-          ? reply.text
+          ? ResponsePresentation.apply(
+              reply.text,
+              _recordedOutcome?.interpretation.responsePreferences ??
+                  ResponsePreferenceReader.read(text),
+              hasIssue:
+                  (_recordedOutcome?.clarifications.isNotEmpty ?? false) ||
+                  reply.questions.isNotEmpty,
+            )
           : PacketTracerModelCompatibility.question(unsupportedModel);
       final visibleActions = unsupportedModel == null
           ? reply.actions
@@ -5748,11 +6485,7 @@ class _ChatScreenState extends State<ChatScreen> {
         } else {
           _messages = [..._messages, turn];
         }
-        _status = unsupportedModel != null
-            ? ''
-            : reply.questions.isEmpty
-            ? ''
-            : 'The assistant asks: ${reply.questions.join('  |  ')}';
+        _status = '';
         if (unsupportedModel != null) {
           _quickReplies =
               PacketTracerModelCompatibility.compatibleModels(unsupportedModel)
@@ -5761,6 +6494,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         'Use $model for all ${unsupportedModel.count} ${unsupportedModel.type}s',
                   )
                   .toList();
+          _setPendingQuestionIds(const [], plan: _lastIntent);
+        } else if (reply.suggestedReplies.isNotEmpty) {
+          // The model's questions are what it needs to know. Its suggested
+          // replies are what the user might say back; those are the chips.
+          _quickReplies = reply.suggestedReplies;
           _setPendingQuestionIds(const [], plan: _lastIntent);
         }
       });
@@ -5921,7 +6659,8 @@ class _ChatScreenState extends State<ChatScreen> {
           : jsonEncode(_previousIntent!.toJson(includeSecrets: false))
       ..lastBrief = _previousBrief
       ..briefJson = jsonEncode(_previousDesignBrief.toJson())
-      ..requestOutcomeJson = _activePriorRequestOutcomeJson;
+      ..requestOutcomeJson = _activePriorRequestOutcomeJson
+      ..requestOutcomeTurnCreatedAt = _activePriorOutcomeTurnCreatedAt;
     _appliedDesign = null;
     _understoodOk = false;
     _activeRequestOutcome = null;
@@ -6009,7 +6748,10 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
     final normalized = CasualEnglish.normalize(text);
-    final helpOnly = RequestRouteSelector.isHelpOnly(text);
+    final helpOnly =
+        RequestRouteSelector.isHelpOnly(text) ||
+        (attachments.isNotEmpty &&
+            !AttachmentIntent.read(text).mutationRequested);
     NetworkIntent? plan = helpOnly ? _lastIntent : null;
     List<String> suggestions = const [];
     bool briefChanged = false;
@@ -6192,19 +6934,26 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       } else {
         imageNote =
-            'I cannot read the attached image(s) without the local engine '
-            '(no API key needed once it is running), and this reply was '
+            'I can\'t read the attached image without the local engine '
+            '(no API key needed once it\'s running), and this reply was '
             'written without a model.';
       }
     }
     // LEARNED ANSWERS: the same question answered by the keyed model
     // before is replayed here, offline. Loaded before the reply so the
-    // assistant can lead with the exact answer the model gave.
+    // assistant can lead with the exact answer the model gave. When no
+    // exact row exists, the concept store is consulted instead, so a
+    // differently-worded question still reaches what was learned (see
+    // [ConceptKnowledge]) - the exact replay always wins when it has one.
     final mem = _memory;
     LearnedAnswer? learned;
+    ConceptRetrieval? concept;
     if (mem != null && mem.ready) {
       try {
         learned = await mem.bestLearnedAnswer(text);
+        if (learned == null || learned.answer.trim().isEmpty) {
+          concept = await mem.retrieveConcepts(text);
+        }
       } catch (_) {}
     }
     // The remembered environment: the advisor still believes the message
@@ -6248,6 +6997,10 @@ class _ChatScreenState extends State<ChatScreen> {
       // how it remembers what the user asked first.
       history: _messages.where((m) => !m.isError).toList(),
       privateMode: privateMode,
+      // The user's stored style, so the keyless answers speak the same
+      // personality the model prompt was given.
+      styleTone: _styleTone,
+      styleLength: _styleLength,
       // Files this conversation produced - "show saved networks" reports
       // what is real, including each build's verification note.
       knownArtifacts: [
@@ -6256,8 +7009,10 @@ class _ChatScreenState extends State<ChatScreen> {
       // An active troubleshooting ladder owns the turn: hand its state in
       // so the flow's next step (or its exit) is what gets answered.
       activeFlow: _state.flowState.isNotEmpty ? _state.flowState : null,
-      // The learned answer for this exact question, when one exists.
+      // The learned answer for this exact question, when one exists; the
+      // concept-level match underneath it, when the exact store is empty.
       learnedAnswer: learned,
+      conceptKnowledge: concept,
       // The remembered venue/scale/budget/skill, when one has been learned.
       environmentProfile: envProfile,
       // The scale this conversation already settled - "20 employees" said
@@ -6356,10 +7111,18 @@ class _ChatScreenState extends State<ChatScreen> {
           '${DesignBriefService.labelFor(id)}: ${fact.display} '
               '(${fact.source})',
     ];
-    final answerText = rememberedSummary.isEmpty
-        ? baseAnswerText
-        : '$baseAnswerText\n\nUsing your saved preferences: '
-              '${rememberedSummary.join('; ')}.';
+    final answerText = ResponsePresentation.apply(
+      rememberedSummary.isEmpty
+          ? baseAnswerText
+          : '$baseAnswerText\n\nUsing your saved preferences: '
+                '${rememberedSummary.join('; ')}.',
+      _recordedOutcome?.interpretation.responsePreferences ??
+          ResponsePreferenceReader.read(text),
+      hasIssue:
+          unsupportedGroup != null ||
+          clarifying.isNotEmpty ||
+          (_recordedOutcome?.clarifications.isNotEmpty ?? false),
+    );
     if (!mounted) return;
     setState(() {
       _messages = [..._messages, turn];
@@ -6409,6 +7172,9 @@ class _ChatScreenState extends State<ChatScreen> {
       } catch (saveError) {
         answerStateSaveError = saveError;
       }
+    }
+    if (answerStateSaveError == null) {
+      _publishActiveContext(conversationId: conversationId);
     }
     if (!mounted || !_generation.isCurrent(turnToken)) return;
     _revealAnswer(
@@ -6493,9 +7259,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }) async {
     final mem = _memory;
     LearnedAnswer? learned;
+    ConceptRetrieval? concept;
     if (mem != null && mem.ready) {
       try {
         learned = await mem.bestLearnedAnswer(text);
+        if (learned == null || learned.answer.trim().isEmpty) {
+          concept = await mem.retrieveConcepts(text);
+        }
       } catch (_) {}
     }
     final reply = OfflineAssistantService.reply(
@@ -6506,11 +7276,14 @@ class _ChatScreenState extends State<ChatScreen> {
       previousPlan: _previousIntent,
       history: _messages.where((m) => !m.isError).toList(),
       privateMode: privateMode,
+      styleTone: _styleTone,
+      styleLength: _styleLength,
       knownArtifacts: [
         for (final f in _state.knownArtifacts) (name: f.name, note: f.note),
       ],
       activeFlow: _state.flowState.isNotEmpty ? _state.flowState : null,
       learnedAnswer: learned,
+      conceptKnowledge: concept,
       environmentProfile: await _loadEnvironmentProfile(),
       // The questions wait: a what-if is not an answer to one, and asking
       // again in the middle of somebody wondering out loud is how a
@@ -6950,13 +7723,24 @@ class _ChatScreenState extends State<ChatScreen> {
             outcome = '';
             break;
           }
+          final errorCount = findings
+              .where((i) => i.severity == 'error')
+              .length;
+          final warningCount = findings
+              .where((i) => i.severity == 'warning')
+              .length;
+          final noteCount = findings.length - errorCount - warningCount;
           await showDialog<void>(
             context: context,
             builder: (dialogContext) => AlertDialog(
               title: Text(
                 findings.isEmpty
                     ? 'The plan is clean'
-                    : '${findings.length} finding(s)',
+                    : HumanLanguage.findingsSummary(
+                        errorCount,
+                        warningCount,
+                        noteCount,
+                      ),
               ),
               content: SingleChildScrollView(
                 child: SelectableText(
@@ -6964,7 +7748,10 @@ class _ChatScreenState extends State<ChatScreen> {
                       ? 'The validator found nothing to fix in '
                             '"${checkedPlan.projectName}".'
                       : findings
-                            .map((i) => '[${i.severity}] ${i.message}')
+                            .map(
+                              (i) =>
+                                  HumanLanguage.finding(i.severity, i.message),
+                            )
                             .join('\n'),
                 ),
               ),
@@ -6978,7 +7765,7 @@ class _ChatScreenState extends State<ChatScreen> {
           );
           outcome = findings.isEmpty
               ? 'Checked the plan: clean, nothing to fix.'
-              : 'Checked the plan: ${findings.length} finding(s) shown.';
+              : 'Checked the plan: ${HumanLanguage.count(findings.length, 'finding')} shown.';
           break;
         default:
           outcome = 'Unsupported action: ${action.kind}';
@@ -7442,8 +8229,9 @@ class _ChatScreenState extends State<ChatScreen> {
     final ask = ChatMessage(role: 'user', text: text, createdAt: stamp);
     final answerText = remaining.isNotEmpty
         ? PacketTracerModelCompatibility.question(remaining.first)
-        : 'Updated the model for ${selectedGroup.count} ${selectedGroup.type} '
-              'device(s) to $selectedModel. All device names, links, and the '
+        : 'Updated '
+              '${HumanLanguage.count(selectedGroup.count, '${selectedGroup.type} device')} '
+              'to $selectedModel. All device names, links, and the '
               '${updated.nodes.length}-device inventory are unchanged. Choose a '
               'network design to continue.';
     final actions = remaining.isEmpty ? _planActions(updated) : <ChatAction>[];
@@ -7770,16 +8558,26 @@ class _ChatScreenState extends State<ChatScreen> {
     final overlayOpen =
         (width < sidebarBreakpoint && _sidebarOpen) ||
         (width < inspectorBreakpoint && _inspectorOpen);
-    return PopScope(
-      canPop: !overlayOpen,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop || !overlayOpen) return;
-        setState(() {
-          _sidebarOpen = false;
-          _inspectorOpen = false;
-        });
+    return CallbackShortcuts(
+      // Desktop convention, scoped to the conversation: Ctrl+F (Cmd+F on a
+      // Mac) opens search in THIS chat. The sidebar's search still answers
+      // "which chat was that in?".
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyF, control: true):
+            _openSearch,
+        const SingleActivator(LogicalKeyboardKey.keyF, meta: true): _openSearch,
       },
-      child: _conversationLayout(),
+      child: PopScope(
+        canPop: !overlayOpen,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop || !overlayOpen) return;
+          setState(() {
+            _sidebarOpen = false;
+            _inspectorOpen = false;
+          });
+        },
+        child: _conversationLayout(),
+      ),
     );
   }
 
@@ -7932,7 +8730,17 @@ class _ChatScreenState extends State<ChatScreen> {
         if (!SettingsService.isMobile &&
             _engineReachable == false &&
             !showReadiness)
-          _engineBanner(),
+          // One status bar at a time: while a build notice is on screen it
+          // already says what the device can do, and the engine banner's
+          // summary plus three buttons took enough height to leave the
+          // conversation a sliver at a laptop-sized window.
+          ListenableBuilder(
+            listenable: PktBuildJobService.instance,
+            builder: (context, _) =>
+                PktBuildJobService.instance.status == PktBuildJobStatus.idle
+                ? _engineBanner()
+                : const SizedBox.shrink(),
+          ),
         Expanded(
           child: empty
               ? _openingScreen()
@@ -7944,6 +8752,11 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: ListView.builder(
                         controller: _scroll,
                         padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
+                        // Dragging the conversation puts the phone keyboard
+                        // away; on a short screen it otherwise covers half of
+                        // what the person is trying to read.
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
                         // The typing bubble is for the wait before an answer
                         // starts. Once the answer is streaming in, its own
                         // bubble is already there and a second one would be a
@@ -7955,7 +8768,16 @@ class _ChatScreenState extends State<ChatScreen> {
                           if (index == _messages.length && _waiting) {
                             return _centred(const TypingBubble());
                           }
-                          return _centred(_bubble(index));
+                          return _centred(
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (_startsNewDay(index))
+                                  _daySeparator(_messages[index].createdAt),
+                                _bubble(index),
+                              ],
+                            ),
+                          );
                         },
                       ),
                     ),
@@ -8037,7 +8859,7 @@ class _ChatScreenState extends State<ChatScreen> {
             children: [
               const Spacer(),
               Flexible(child: SingleChildScrollView(child: _welcomeHead)),
-              SizedBox(height: compact ? AppTheme.s4 : AppTheme.s16),
+              SizedBox(height: compact ? 0 : AppTheme.s16),
               _composer(),
             ],
           ),
@@ -8110,6 +8932,13 @@ class _ChatScreenState extends State<ChatScreen> {
       _project.text = id;
       _resetConversationState();
     });
+    // Restore the text typed in THIS chat, not the one being left: the input
+    // listener has already saved the old draft under the old conversation id.
+    final draft = _drafts[id] ?? '';
+    _input.value = TextEditingValue(
+      text: draft,
+      selection: TextSelection.collapsed(offset: draft.length),
+    );
     _settings?.setLastProject(id);
     await _load();
     if (!mounted) return;
@@ -8154,8 +8983,10 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       await mem.clearChat(conversation: id);
     } catch (_) {}
+    _drafts.remove(id);
     if (id == _conversation) {
       setState(_resetConversationState);
+      _input.clear();
     }
     await _refreshConversations();
   }
@@ -8254,6 +9085,9 @@ class _ChatScreenState extends State<ChatScreen> {
       _resetConversationState();
       _unseen = 0;
     });
+    // A new conversation starts with an empty box; the old chat's draft was
+    // already saved by the input listener and returns when it is reopened.
+    _input.clear();
     await _load();
   }
 
@@ -8679,467 +9513,147 @@ class _ChatScreenState extends State<ChatScreen> {
       } catch (_) {}
     }
     if (!mounted) return;
+    _drafts.remove(id);
+    _input.clear();
     setState(_resetConversationState);
     await _refreshConversations();
   }
 
-  /// Fix one slot of the parse from the "Understood" card.
-  ///
-  /// Tapping a chip asks for the value the user meant, re-reads THIS turn's
-  /// words with that value in them, and replaces the standing plan with what
-  /// they reparse to. Two things make it worth more than a button:
-  ///
-  /// * the user never has to re-type English and hope the parser does better
-  ///   - the plan is corrected where they can see it;
-  /// * every tap is a LABELED training pair (their exact words, what they
-  ///   meant), which is what the misparse ledger counts and, at three
-  ///   sightings, proposes as a phrasing. Zero ambiguity, because the user
-  ///   supplied the label themselves.
-  Future<void> _fixSlot({
-    required int messageIndex,
-    required String slot,
-    required String label,
-    required String value,
-  }) async {
+  /// Corrections are new, explicit user turns through the same coordinator and
+  /// persistence boundary as a typed edit. A dialog never holds mutation authority.
+  Future<void> _fixOutcome(OutcomeCorrection correction) async {
     final intent = _lastIntent;
-    if (intent == null || _busy || messageIndex < 0) return;
-    // The controller lives INSIDE the dialog: the route is still animating
-    // out - and still listening - when showDialog returns, so disposing the
-    // controller here broke the very widget that was going away.
+    final shown = _recordedOutcome;
+    if (intent == null || _busy || shown == null) return;
+    bool current() =>
+        mounted &&
+        !_busy &&
+        _conversation == correction.projectId &&
+        _lastIntent?.buildRevision == correction.buildRevision &&
+        _recordedOutcome?.interpretation.turnId == correction.turnId;
+    if (!current()) return;
     final fixed = await showDialog<String>(
       context: context,
-      builder: (_) => SlotFixDialog(label: label, value: value),
+      builder: (_) =>
+          SlotFixDialog(label: correction.label, value: correction.value),
     );
     if (fixed == null || !mounted) return;
+    if (!current()) {
+      _appendSystem(
+        'That correction belongs to an earlier project or plan. Nothing was changed; correct the current result instead.',
+      );
+      return;
+    }
     final answer = fixed.trim();
-    if (answer.isEmpty || answer == value) return;
-
-    final original = _messages[messageIndex].text;
-    final corrected = MisparseLedger.correctedBrief(
-      original: original,
-      slot: slot,
-      value: answer,
-      current: intent,
-    );
-    if (corrected == null || corrected.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'I could not rewrite "$original" with $label $answer, so '
-            'nothing was changed. Type the correction instead and I will '
-            'read it.',
-          ),
-        ),
-      );
-      return;
+    if (answer.isEmpty || answer == correction.value) return;
+    final text = correction.slot == 'routing'
+        ? 'change routing to $answer'
+        : correction.slot.startsWith('count:')
+        ? 'make it $answer ${correction.slot.substring(6)}s'
+        : answer;
+    _input.text = text;
+    await _send();
+    if (!mounted || _conversation != correction.projectId) return;
+    final result = _recordedOutcome;
+    if (result?.disposition == RequestDisposition.commit &&
+        result?.interpretation.turnId != correction.turnId) {
+      setState(() {
+        _slotFixNote = 'Fixed: $answer ${correction.label}.';
+      });
     }
+  }
 
-    final understood = MisparseLedger.briefFromPlan(intent);
+  RequestOutcome? get _recordedOutcome {
+    if (_state.requestOutcomeJson.isEmpty) return null;
     try {
-      final outcome = NetworkIntent.followUp(
-        previous: _previousIntent,
-        previousBrief: _previousBrief,
-        brief: corrected,
-        parsed: NetworkIntent.parseSimple('chat', corrected),
-        project: 'chat',
-      );
-      _lastIntent = outcome.plan;
-      _lastBrief = outcome.brief;
-      _brief = DesignBriefService.briefForTurn(
-        previous: _brief,
-        normalizedText: corrected,
-        parsedPlan: outcome.plan,
-      ).brief;
-      _understoodOk = true;
-      _state
-          .withLastBrief(_lastBrief)
-          .withIntentJson(
-            jsonEncode(outcome.plan.toJson(includeSecrets: false)),
-          );
-      _state.briefJson = jsonEncode(_brief.toJson());
-    } catch (_) {
-      // A fix that cannot be re-parsed changes nothing at all.
-      return;
-    }
-    _slotFixNote = 'Fixed: $answer $label - remembered for "$original".';
-    setState(() {});
-
-    final mem = _memory;
-    if (mem != null) {
-      try {
-        await mem.recordMisparse(
-          original: original,
-          understood: understood,
-          corrected: corrected,
-          slot: slot,
-          source: 'tap',
-        );
-        await mem.setSessionState(_conversation, _state.encode());
-      } catch (_) {
-        // The plan on screen is already right; only the lesson is lost.
-      }
+      return RequestOutcome.fromJson(jsonDecode(_state.requestOutcomeJson));
+    } on FormatException {
+      return null;
     }
   }
 
-  /// The "here is exactly what I understood" card: the parse of the
-  /// latest user turn as chips - device counts, VLANs, routing, and how
-  /// sure the parser is - with the planner's open questions as tappable
-  /// chips that write themselves into the composer. Intent made visible
-  /// AND correctable: the plan is fixed before it is built, not after.
+  /// Display only the outcome attached to this exact user turn. Legacy sessions
+  /// without an association do not invent provenance by reparsing old text.
   Widget _intentUnderstood(int index) {
-    final intent = _lastIntent;
-    if (intent == null || !_understoodOk) return const SizedBox.shrink();
-    // Only under the LATEST user turn - older turns had older plans.
-    var lastUser = -1;
-    for (var i = _messages.length - 1; i >= 0; i--) {
-      if (_messages[i].isUser) {
-        lastUser = i;
-        break;
-      }
+    if (index < 0 || index >= _messages.length) return const SizedBox.shrink();
+    final message = _messages[index];
+    final outcome = _recordedOutcome;
+    if (outcome == null ||
+        !message.isUser ||
+        _state.requestOutcomeTurnCreatedAt.isEmpty ||
+        _state.requestOutcomeTurnCreatedAt != message.createdAt) {
+      return const SizedBox.shrink();
     }
-    if (index != lastUser) return const SizedBox.shrink();
-
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
-    final counts = <String, int>{};
-    for (final n in intent.nodes) {
-      counts[n.type] = (counts[n.type] ?? 0) + 1;
+    final latest = _messages.lastWhere((turn) => turn.isUser);
+    if (!identical(message, latest)) return const SizedBox.shrink();
+    final currentResponse =
+        _recordedOutcome?.interpretation.responsePreferences;
+    if (currentResponse?.configurationOnly == true) {
+      return const SizedBox.shrink();
     }
-
-    String unit(String type, int n) {
-      if (type == 'pc') return n == 1 ? 'PC' : 'PCs';
-      if (type == 'wireless') return n == 1 ? 'AP' : 'APs';
-      if (type == 'switch') return n == 1 ? 'switch' : 'switches';
-      if (type == 'wireless-router') {
-        return n == 1 ? 'wireless router' : 'wireless routers';
-      }
-      return n == 1 ? type : '${type}s';
-    }
-
-    const order = [
-      'router',
-      'switch',
-      'pc',
-      'server',
-      'firewall',
-      'wireless',
-      'laptop',
-      'printer',
-      'phone',
-      'cloud',
-      'modem',
-    ];
-    final chips = <Widget>[];
-    final shown = <String>{};
-    void addCountChip(String type) {
-      final n = counts[type];
-      if (n == null || n <= 0 || !shown.add(type)) return;
-      chips.add(
-        _slotChip(
-          '$n ${unit(type, n)}',
-          // TAP TO FIX. A count is the slot the parser most often gets wrong
-          // and the one a user most wants to change, and the correction is
-          // the clearest learning signal there is: their words, what it
-          // became, no re-typed English in between.
-          onTap: () => _fixSlot(
-            messageIndex: index,
-            slot: 'count:$type',
-            label: unit(type, n),
-            value: '$n',
-          ),
-        ),
-      );
-    }
-
-    for (final t in order) {
-      addCountChip(t);
-    }
-    for (final t in counts.keys.toList()..sort()) {
-      addCountChip(t);
-    }
-    for (final v in intent.vlans) {
-      chips.add(
-        _slotChip(
-          'VLAN $v',
-          accent: true,
-          onTap: () => _fixSlot(
-            messageIndex: index,
-            slot: 'vlan:$v',
-            label: 'VLAN $v',
-            value: '$v',
-          ),
-        ),
-      );
-    }
-    // Always shown, unlike before: a slot the card does not display is a
-    // slot the user cannot correct, and a default routing choice is exactly
-    // the kind of thing people want to argue with.
-    chips.add(
-      _slotChip(
-        intent.routing.toUpperCase(),
-        accent: intent.routing != 'static',
-        onTap: () => _fixSlot(
-          messageIndex: index,
-          slot: 'routing',
-          label: 'routing protocol',
-          value: intent.routing,
-        ),
-      ),
-    );
-
-    final questions = intent.questions.take(3).toList();
-    final pct = (intent.confidence * 100).round();
-    // How this very message was read: kind of turn, corrections found, and
-    // whether the words pointed at a saved file - with the excerpts they
-    // came from, so the card explains itself, not just the plan.
-    final reading = MessageUnderstanding.read(
-      text: _messages[index].text,
-      parsed: intent,
-    );
-
-    // WHAT THIS TURN CHANGED. The count chips describe the standing plan; on
-    // their own they cannot tell "add the AAA server" from "ok, build it",
-    // and a request the planner could not apply used to look identical to one
-    // it did. The delta is named here, and a turn that changed nothing says
-    // so rather than leaving the user to guess.
-    final hadStanding =
-        _previousIntent != null && _previousIntent!.nodes.isNotEmpty;
-    final delta = NetworkIntent.planChangeSummary(_previousIntent, intent);
-    final changeLine = delta.isNotEmpty
-        ? 'Changed by this message: $delta.'
-        : hadStanding
-        ? 'No count, routing or security change was applied by this '
-              'message - the standing lab stands as it was.'
-        : '';
-
-    // The roles the plan actually carries, so a named server role is visible
-    // as data instead of only being mentioned in the chat text.
-    final roleChips = <String>[
-      for (final n in intent.nodes)
-        for (final s in n.services)
-          if (s.trim().isNotEmpty) '${n.name}: ${s.toUpperCase()}',
-      if (intent.security.aaa)
-        'AAA (${intent.security.aaaProtocol.toUpperCase()})'
-            '${intent.security.aaaServer == null ? '' : ' on ${intent.security.aaaServer}'}',
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.only(top: AppTheme.s6),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: AppTheme.readingMeasure),
-        child: Container(
-          padding: const EdgeInsets.all(AppTheme.s12),
-          decoration: BoxDecoration(
-            color: AppPalette.neutralFill(scheme),
-            borderRadius: BorderRadius.circular(AppTheme.rMd),
-            border: Border.all(color: AppPalette.accentBorder(scheme)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.auto_awesome_outlined,
-                    size: 14,
-                    color: scheme.primary,
-                  ),
-                  const SizedBox(width: AppTheme.s6),
-                  Text(
-                    'Understood',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: scheme.primary,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                  const SizedBox(width: AppTheme.s8),
-                  Tooltip(
-                    message: 'How sure the offline parser is of this plan',
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppTheme.s6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceContainerHighest.withValues(
-                          alpha: 0.6,
-                        ),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        '$pct%',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if (chips.isNotEmpty) ...[
-                const SizedBox(height: AppTheme.s8),
-                Wrap(
-                  spacing: AppTheme.s6,
-                  runSpacing: AppTheme.s6,
-                  children: chips,
-                ),
-              ],
-              // The confirmation for the last tap-to-fix, so a correction is
-              // never silent: what it became is said in the card the user
-              // just argued with.
-              if (_slotFixNote != null && _slotFixNote!.isNotEmpty) ...[
-                const SizedBox(height: AppTheme.s6),
-                Text(
-                  _slotFixNote!,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-              if (roleChips.isNotEmpty) ...[
-                const SizedBox(height: AppTheme.s8),
-                Wrap(
-                  spacing: AppTheme.s6,
-                  runSpacing: AppTheme.s6,
-                  children: [
-                    for (final role in roleChips) _slotChip(role, accent: true),
-                  ],
-                ),
-              ],
-              if (changeLine.isNotEmpty) ...[
-                const SizedBox(height: AppTheme.s8),
-                Text(
-                  changeLine,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-              if (reading.why.isNotEmpty) ...[
-                const SizedBox(height: AppTheme.s8),
-                Text(
-                  'Read as: ${reading.why}',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-              if (reading.corrections.isNotEmpty) ...[
-                const SizedBox(height: AppTheme.s4),
-                Text(
-                  'Corrections read: ${reading.corrections.take(3).map((c) => '"${c.excerpt}"').join(', ')}',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-              if (reading.reference != null) ...[
-                const SizedBox(height: AppTheme.s4),
-                Text(
-                  'Points at the file: "${reading.reference!.excerpt}"',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-              if (questions.isNotEmpty) ...[
-                const SizedBox(height: AppTheme.s10),
-                Text(
-                  'Worth confirming:',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: AppTheme.s6),
-                Wrap(
-                  spacing: AppTheme.s6,
-                  runSpacing: AppTheme.s6,
-                  children: [
-                    for (final q in questions)
-                      _slotChip(
-                        q,
-                        accent: true,
-                        question: true,
-                        onTap: () {
-                          // Fill, never send: the answer is the user's words
-                          // to choose, the same rule the welcome openers use.
-                          _input.text = q;
-                          _input.selection = TextSelection.collapsed(
-                            offset: _input.text.length,
-                          );
-                          _composerFocus.requestFocus();
-                        },
-                      ),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
+    final snapshot = outcome.candidatePlan;
+    final current =
+        outcome.interpretation.projectId == _conversation &&
+        (snapshot == null ||
+            snapshot.buildRevision == _lastIntent?.buildRevision);
+    return RequestOutcomeCard(
+      outcome: outcome,
+      isCurrent: current,
+      correctionNote: _slotFixNote ?? '',
+      onCorrect: _fixOutcome,
+      onReply: (issueId, prompt) {
+        if (!current) return;
+        _input.text = prompt;
+        _input.selection = TextSelection.collapsed(offset: prompt.length);
+        _composerFocus.requestFocus();
+      },
     );
   }
 
-  /// One chip in the Understood card. It is tappable when it can be
-  /// ANSWERED (a question goes into the composer) or CORRECTED (a count,
-  /// a VLAN, the routing protocol opens [_fixSlot]); a chip with no onTap
-  /// is there to be read, not argued with.
-  Widget _slotChip(
-    String text, {
-    bool accent = false,
-    bool question = false,
-    VoidCallback? onTap,
-  }) {
+  /// Whether this turn opens a new calendar day in the transcript.
+  ///
+  /// A single-day chat stays exactly as it was: the first turn only earns a
+  /// date when it is not from today, and later turns earn one when the day
+  /// changes. That makes a conversation picked up over several days readable
+  /// without putting a redundant "Today" over every fresh chat.
+  bool _startsNewDay(int index) {
+    final current = DateTime.tryParse(_messages[index].createdAt);
+    if (current == null) return false;
+    if (index == 0) return HumanLanguage.dayLabel(current) != 'Today';
+    final previous = DateTime.tryParse(_messages[index - 1].createdAt);
+    if (previous == null) return true;
+    final a = current.toLocal();
+    final b = previous.toLocal();
+    return a.year != b.year || a.month != b.month || a.day != b.day;
+  }
+
+  /// A quiet date rule between turns: "Today", "Yesterday" or a full date.
+  /// It reads as a separator, not as a message.
+  Widget _daySeparator(String createdAt) {
+    final parsed = DateTime.tryParse(createdAt);
+    if (parsed == null) return const SizedBox.shrink();
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final color = accent ? scheme.primary : scheme.onSurface;
-    final chip = Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTheme.s10,
-        vertical: AppTheme.s6,
-      ),
-      decoration: BoxDecoration(
-        color: accent
-            ? AppPalette.accentFill(scheme)
-            : scheme.surfaceContainerHighest.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: accent
-              ? AppPalette.accentBorder(scheme)
-              : scheme.outlineVariant,
-        ),
-      ),
+    return Padding(
+      // A stable key so tests (and future scroll targets) can tell a date
+      // rule apart from the sidebar's own date groups.
+      key: const ValueKey('day-separator'),
+      padding: const EdgeInsets.only(top: AppTheme.s2, bottom: AppTheme.s14),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          if (question) ...[
-            Icon(Icons.help_outline, size: 13, color: color),
-            const SizedBox(width: AppTheme.s4),
-          ],
-          // Flexible: a question is a sentence, and a sentence in a chip
-          // must WRAP inside the card, never overflow it (the wide test
-          // font caught this one).
-          Flexible(
+          const Expanded(child: Divider(endIndent: AppTheme.s12)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppTheme.s10),
             child: Text(
-              text,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: color,
+              HumanLanguage.dayLabel(parsed),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: AppPalette.mutedText(theme.colorScheme),
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
+          const Expanded(child: Divider(indent: AppTheme.s12)),
         ],
       ),
-    );
-    if (onTap == null) return chip;
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
-      child: chip,
     );
   }
 
@@ -9283,6 +9797,10 @@ class _ChatScreenState extends State<ChatScreen> {
                                   brief: _briefFromPayload(
                                     message.actions[i].payload,
                                   ),
+                                  deviceCount:
+                                      (message.actions[i].payload['devices']
+                                              as num?)
+                                          ?.toInt(),
                                 )
                               else
                                 _actionCard(
@@ -9544,22 +10062,86 @@ class _ChatScreenState extends State<ChatScreen> {
               onSelected: (value) {
                 if (value == 'again') _regenerate();
                 if (value == 'remember') _rememberFromMessage(message);
+                if (value == 'shorter') {
+                  _setVoicePreference(
+                    AssistantVoice.lengthKey,
+                    AssistantVoice.concise,
+                    'Got it - shorter answers from here.',
+                  );
+                }
+                if (value == 'longer') {
+                  _setVoicePreference(
+                    AssistantVoice.lengthKey,
+                    AssistantVoice.detailed,
+                    'Got it - more detail from here.',
+                  );
+                }
+                if (value == 'casual') {
+                  _setVoicePreference(
+                    AssistantVoice.toneKey,
+                    AssistantVoice.casual,
+                    'Got it - I\'ll keep it casual.',
+                  );
+                }
+                if (value == 'formal') {
+                  _setVoicePreference(
+                    AssistantVoice.toneKey,
+                    AssistantVoice.formal,
+                    'Got it - I\'ll keep it formal.',
+                  );
+                }
               },
-              itemBuilder: (context) => const [
-                PopupMenuItem(
-                  value: 'again',
-                  child: ListTile(
-                    dense: true,
-                    leading: Icon(Icons.refresh),
-                    title: Text('Answer again'),
+              itemBuilder: (context) => [
+                // "Answer again" rewinds the LAST turn. Offering it under an
+                // older answer made the menu regenerate a different question
+                // than the one it was opened on.
+                if (!_messages.skip(index + 1).any((m) => m.isUser))
+                  PopupMenuItem(
+                    value: 'again',
+                    child: ListTile(
+                      dense: true,
+                      leading: Icon(Icons.refresh),
+                      title: Text('Answer again'),
+                    ),
                   ),
-                ),
                 PopupMenuItem(
                   value: 'remember',
                   child: ListTile(
                     dense: true,
                     leading: Icon(Icons.bookmark_add_outlined),
                     title: Text('Remember as a rule'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'shorter',
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.compress),
+                    title: Text('Shorter answers'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'longer',
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.notes),
+                    title: Text('More detail'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'casual',
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.chat_bubble_outline),
+                    title: Text('Less formal'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'formal',
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.work_outline),
+                    title: Text('More formal'),
                   ),
                 ),
               ],
@@ -10121,7 +10703,16 @@ class _ChatScreenState extends State<ChatScreen> {
     List<({ClarificationQuestion question, BriefFact fact, String raw})>
     answers,
   ) async {
+    final currentConversation = _conversation;
+    final basePlan = _lastIntent;
+    final baseState = _state;
     final profile = await _loadEnvironmentProfile();
+    if (!mounted ||
+        _conversation != currentConversation ||
+        !identical(_lastIntent, basePlan) ||
+        !identical(_state, baseState)) {
+      return;
+    }
     var candidatePlan = _lastIntent;
     var candidateBrief = _brief;
     final applied =
@@ -10186,9 +10777,107 @@ class _ChatScreenState extends State<ChatScreen> {
               !clarifying.any((question) => question.id == id),
         );
 
+    final lastUser = _messages.where((message) => message.isUser).lastOrNull;
+    final turnId =
+        '$currentConversation-clarification-${DateTime.now().microsecondsSinceEpoch}';
+    final sourceText = answers.first.raw;
+    final answerRequirements = <Requirement>[];
+    for (final answer in applied) {
+      final property = answer.question.id == DesignBrief.routing
+          ? 'routing'
+          : answer.question.id == DesignBrief.scale
+          ? (answer.fact.quantityKind == QuantityKind.userLoad
+                ? 'user_load'
+                : 'device_count')
+          : answer.question.id == DesignBrief.segmentation
+          ? 'segmentation'
+          : answer.question.id;
+      final count = int.tryParse(answer.fact.value);
+      answerRequirements.add(
+        Requirement(
+          id: '$turnId-${answer.question.id}',
+          subject: property == 'device_count' ? 'pc' : 'network',
+          property: property,
+          value: property == 'device_count' || property == 'user_load'
+              ? count ?? answer.fact.value
+              : answer.fact.value,
+          scope: RequirementScope.project(currentConversation),
+          origin: RequirementOrigin.currentExplicit,
+          strength: RequirementStrength.explicit,
+          sourceTurnId: turnId,
+          sourceSpans: [
+            SourceSpan.fromText(
+              messageId: turnId,
+              originalText: sourceText,
+              start: 0,
+              end: sourceText.length,
+            ),
+          ],
+          quantityRole: property == 'device_count'
+              ? QuantityRole.total
+              : property == 'user_load'
+              ? QuantityRole.userLoad
+              : QuantityRole.unspecified,
+        ),
+      );
+    }
+    final mergedRequirements = RequirementMerger.merge([
+      for (final requirement in _currentRequirements)
+        requirement.origin == RequirementOrigin.currentExplicit
+            ? requirement.copyWith(origin: RequirementOrigin.establishedProject)
+            : requirement,
+      ...answerRequirements,
+    ]);
+    if (mergedRequirements.conflicts.isNotEmpty) {
+      _appendSystem(
+        'These answers conflict with an established requirement. The previous plan was kept; restate which constraint should change.',
+      );
+      return;
+    }
+    final interpretation = RequestInterpretation(
+      turnId: turnId,
+      conversationId: currentConversation,
+      projectId: currentConversation,
+      basePlanRevision: basePlan?.revision ?? '',
+      mode: RequestMode.clarify,
+      mutationPolicy: MutationPolicy.commitIfValid,
+      requirements: mergedRequirements.requirements,
+      responsePreferences: ResponsePreferenceReader.read(sourceText),
+      pendingQuestions: [
+        for (final id in pendingIds)
+          PendingRequestQuestion(
+            id: '$turnId-pending-$id',
+            targetKind: PendingQuestionTargetKind.issue,
+            targetId: id,
+            prompt: ClarificationService.questionById(id)?.question ?? id,
+          ),
+      ],
+    );
+    final answerOutcome = RequestOutcome(
+      interpretation: interpretation,
+      candidatePlan: candidatePlan,
+      disposition: RequestDisposition.commit,
+      coverage: CoverageChecker.check(
+        plan: candidatePlan,
+        requirements: mergedRequirements.requirements,
+        target: _target,
+        base: basePlan,
+      ),
+      changeSet: basePlan == null || candidatePlan == null
+          ? null
+          : PlanChangeSet(
+              projectId: currentConversation,
+              baseRevision: basePlan.revision,
+              candidateRevision: candidatePlan.revision,
+              oldValues: {'plan': basePlan.toJson(includeSecrets: false)},
+              newValues: {'plan': candidatePlan.toJson(includeSecrets: false)},
+            ),
+    );
     final nextState = SessionState.decode(_state.encode())
       ..briefJson = jsonEncode(candidateBrief.toJson())
-      ..lastBrief = _lastBrief;
+      ..lastBrief = _lastBrief
+      ..requestOutcomeJson = jsonEncode(answerOutcome.toJson())
+      ..requestOutcomeTurnCreatedAt = lastUser?.createdAt ?? '';
     nextState.setPendingQuestions([
       for (final id in pendingIds)
         PendingQuestionContext(
@@ -10217,10 +10906,22 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     }
 
+    if (!mounted ||
+        _conversation != currentConversation ||
+        !identical(_lastIntent, basePlan) ||
+        !identical(_state, baseState)) {
+      return;
+    }
     _brief = candidateBrief;
     _lastIntent = candidatePlan;
     _state = nextState;
-    final ready = candidateBrief.ready;
+    final ready = BuildReadiness.evaluate(
+      plan: candidatePlan,
+      target: _target,
+      offlineBuild: true,
+      requirements: mergedRequirements.requirements,
+      interpretation: interpretation,
+    ).canBuild;
     final b = StringBuffer()
       ..writeln('**Got it**:')
       ..writeln(
@@ -10340,7 +11041,13 @@ class _ChatScreenState extends State<ChatScreen> {
   ChatAction _briefCardFor(DesignBrief brief) => ChatAction(
     kind: 'brief_card',
     summary: 'Design brief',
-    payload: {'brief': brief.toJson()},
+    // The card's own status line needs the size it is judging: "enough to
+    // build" next to a 50-device refusal was two answers disagreeing on one
+    // screen. The count rides with the card so it cannot go stale with it.
+    payload: {
+      'brief': brief.toJson(),
+      if (_lastIntent != null) 'devices': _lastIntent!.nodes.length,
+    },
   );
 
   /// Decode a persisted brief card payload; a card that will not decode
@@ -10404,6 +11111,38 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       _appendSystem('Could not save that rule: $e');
     }
+  }
+
+  /// Style feedback from a message's menu. It is stored in the same local
+  /// preferences table as every other lesson, so the next turn - with or
+  /// without a model - reads the same choice. The snackbar offers to redo the
+  /// answer the user just judged, which is the whole point of asking.
+  Future<void> _setVoicePreference(
+    String key,
+    String value,
+    String confirmation,
+  ) async {
+    final mem = _memory;
+    if (mem == null || !mem.ready) {
+      _appendSystem(
+        'I can\'t remember a style choice in this session. Say it in the '
+        'message instead - for example "keep it short" or "less formal".',
+      );
+      return;
+    }
+    try {
+      await mem.setPref(key, value);
+    } catch (e) {
+      _appendSystem('Could not save that style: $e');
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text(confirmation),
+        action: SnackBarAction(label: 'Answer again', onPressed: _regenerate),
+      ),
+    );
   }
 
   Widget _thumbnail(ChatImage image) {
@@ -10787,63 +11526,27 @@ class _ChatScreenState extends State<ChatScreen> {
   /// button. The tap sends 'apply fix: kind', which runs ONLY that repair
   /// pass and answers with a fresh card - one finding, one visible change,
   /// none of the other repairs dragged along.
+  ///
+  /// A long brief blocks the build with a dozen findings, each two lines of
+  /// message plus an "Alternatives:" tail - a wall of boxes. The rows are
+  /// deduplicated, collapsed to three with the alternatives tail hidden, and
+  /// the rest sit behind a "Show N more findings" toggle.
   Widget _findingFixRows(ChatAction action, int messageIndex, int actionIndex) {
     final findings = (action.payload['findings'] as List?) ?? const [];
-    final rows = <Widget>[];
-    for (var i = 0; i < findings.length; i++) {
-      final entry = findings[i];
+    final entries = <MapEntry<String, String>>[];
+    final seen = <String>{};
+    for (final entry in findings) {
       if (entry is! Map) continue;
       final message = (entry['message'] ?? '').toString();
       final fixKind = (entry['fixKind'] ?? '').toString();
-      if (message.isEmpty) continue;
-      rows.add(
-        Container(
-          margin: const EdgeInsets.only(top: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: AppPalette.hairline(Theme.of(context).colorScheme),
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  message,
-                  style: const TextStyle(fontSize: 11, height: 1.35),
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (fixKind.isNotEmpty)
-                TextButton.icon(
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                  onPressed: _busy
-                      ? null
-                      : () => _sendQuickReply('apply fix: $fixKind'),
-                  icon: const Icon(Icons.build_circle_outlined, size: 15),
-                  label: const Text(
-                    'Apply this fix',
-                    style: TextStyle(fontSize: 11),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      );
+      if (message.isEmpty || !seen.add(message)) continue;
+      entries.add(MapEntry(message, fixKind));
     }
-    if (rows.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: 8, left: 26),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [for (final row in rows) row],
-      ),
+    if (entries.isEmpty) return const SizedBox.shrink();
+    return _FindingFixRows(
+      entries: entries,
+      busy: _busy,
+      onFix: _busy ? null : (fixKind) => _sendQuickReply('apply fix: $fixKind'),
     );
   }
 
@@ -10968,8 +11671,7 @@ class _ChatScreenState extends State<ChatScreen> {
             'This build card never recorded which plan it was written for, so '
             'it is not buildable and no device or link count is claimed. '
             'Ask me to build the current plan'
-            '${plan == null ? '' : ' (${plan.nodes.length} device(s), '
-                      '${plan.links.length} link(s), rev ${plan.revision})'}.',
+            '${plan == null ? '' : ' (${HumanLanguage.list([HumanLanguage.count(plan.nodes.length, 'device'), HumanLanguage.count(plan.links.length, 'link')])}, rev ${plan.revision})'}.',
           );
           break;
         }
@@ -10978,7 +11680,7 @@ class _ChatScreenState extends State<ChatScreen> {
             : (plan?.projectName.trim() ?? '');
         lines.add(
           'Build "$shownName" from the plan this card was written for: '
-          '$devices device(s), $links link(s), target $_target'
+          '${HumanLanguage.list([HumanLanguage.count(devices, 'device'), HumanLanguage.count(links, 'link')])}, target $_target'
           '${stamped.isEmpty ? '' : ', rev $stamped'}. '
           'The file this writes is a Packet Tracer .pkt; the target is the '
           'compatibility reference the build checks against.',
@@ -10995,8 +11697,7 @@ class _ChatScreenState extends State<ChatScreen> {
           } else {
             lines.add(
               'The plan has since changed (now rev ${plan.revision}: '
-              '${plan.nodes.length} device(s), ${plan.links.length} link(s)). '
-              'Build the current plan instead of this card.',
+              '${HumanLanguage.list([HumanLanguage.count(plan.nodes.length, 'device'), HumanLanguage.count(plan.links.length, 'link')])}). Build the current plan instead of this card.',
             );
           }
           break;
@@ -11005,12 +11706,16 @@ class _ChatScreenState extends State<ChatScreen> {
         // the card and the reason the button is withheld are the same thing.
         final findings = _blockingFindings(plan);
         if (findings.isNotEmpty) {
-          lines.add('Not buildable yet - ${findings.length} finding(s):');
+          lines.add(
+            'Not buildable yet - ${HumanLanguage.count(findings.length, 'finding')}:',
+          );
           for (final issue in findings.take(6)) {
-            lines.add('  [${issue.severity}] ${issue.message}');
+            lines.add(
+              '  ${HumanLanguage.finding(issue.severity, issue.message)}',
+            );
           }
           if (findings.length > 6) {
-            lines.add('  ... and ${findings.length - 6} more.');
+            lines.add('  ...and ${findings.length - 6} more.');
           }
         }
         break;
@@ -11104,7 +11809,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       setState(() {
         _seedHint =
-            '${library.devices.length} device template(s): '
+            '${HumanLanguage.count(library.devices.length, 'device template')}: '
             '${(library.kinds.toList()..sort()).join(', ')}';
       });
       final audit = OnDevicePktBuilder.audit(File(path).readAsBytesSync());
@@ -11264,7 +11969,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     '${_thousands(plan.tokensUsed)} of '
                     '${_thousands(plan.windowTokens)} tokens used'
                     '${plan.summarized ? ' · ${plan.turnsSummarized} earlier '
-                              'turn(s) summarized' : ''}.',
+                              '${plan.turnsSummarized == 1 ? 'turn' : 'turns'} summarized' : ''}.',
                     style: theme.textTheme.bodySmall,
                   ),
                 ),
@@ -11403,4 +12108,101 @@ class _PendingChange {
     required this.field,
     required this.newValue,
   });
+}
+
+/// The blocked build card's finding rows, collapsed: three deduplicated
+/// findings with the "Alternatives:" tail hidden, the rest behind a toggle.
+/// A long brief used to stack a dozen two-line boxes here and bury the card.
+class _FindingFixRows extends StatefulWidget {
+  final List<MapEntry<String, String>> entries;
+  final bool busy;
+  final ValueChanged<String>? onFix;
+
+  const _FindingFixRows({
+    required this.entries,
+    required this.busy,
+    required this.onFix,
+  });
+
+  @override
+  State<_FindingFixRows> createState() => _FindingFixRowsState();
+}
+
+class _FindingFixRowsState extends State<_FindingFixRows> {
+  static const _visibleWhenCollapsed = 3;
+
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final visible = _expanded
+        ? widget.entries
+        : widget.entries.take(_visibleWhenCollapsed);
+    final hidden = widget.entries.length - visible.length;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, left: 26),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final entry in visible) _row(theme, entry.key, entry.value),
+          if (widget.entries.length > _visibleWhenCollapsed)
+            TextButton(
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+              ),
+              onPressed: () => setState(() => _expanded = !_expanded),
+              child: Text(
+                _expanded
+                    ? 'Show less'
+                    : 'Show $hidden more finding${hidden == 1 ? '' : 's'}',
+                style: const TextStyle(fontSize: 11),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(ThemeData theme, String message, String fixKind) {
+    // The "Alternatives: ..." tail is guidance the user can read once the
+    // row is expanded; collapsed rows stay one line so the card skims.
+    final head = message.split(' Alternatives:').first.trim();
+    final hasTail = message.contains(' Alternatives:');
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppPalette.hairline(theme.colorScheme)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              _expanded || !hasTail ? message : '$head…',
+              style: const TextStyle(fontSize: 11, height: 1.35),
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (fixKind.isNotEmpty)
+            TextButton.icon(
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              onPressed: widget.busy ? null : () => widget.onFix!(fixKind),
+              icon: const Icon(Icons.build_circle_outlined, size: 15),
+              label: const Text(
+                'Apply this fix',
+                style: TextStyle(fontSize: 11),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

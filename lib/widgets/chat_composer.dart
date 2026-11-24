@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/chat_message.dart';
+import '../services/settings_service.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
 
@@ -59,10 +60,29 @@ class ChatComposer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final width = MediaQuery.sizeOf(context).width;
+    final narrow = width < 600;
+    // The real platform capability, not defaultTargetPlatform: the widget-test
+    // binding reports android for every test. This is the same switch the
+    // phone's offline builder and engine paths use.
+    final mobile = SettingsService.isMobile;
+    // On a phone the keyboard can take half the screen. While it is open the
+    // suggestions are hidden: they were pushing the field up and leaving the
+    // person typing into a box with almost no room left.
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    // A landscape phone leaves the opening screen about a hundred pixels for
+    // the box. Suggestion chips there cost more than they give: the welcome
+    // screen above already carries them and scrolls.
+    final shortScreen = MediaQuery.sizeOf(context).height < 420;
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+        padding: EdgeInsets.fromLTRB(
+          narrow ? 8 : 12,
+          shortScreen ? 2 : 4,
+          narrow ? 8 : 12,
+          shortScreen ? 4 : (narrow ? 8 : 10),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -120,7 +140,10 @@ class ChatComposer extends StatelessWidget {
             // The assistant's own suggestions, as one-tap chips: a chat where
             // the answer is "say \"use ospf\"" should make that a button, not
             // a typing exercise.
-            if (skillMenu == null && quickReplies.isNotEmpty && !busy)
+            if (skillMenu == null &&
+                quickReplies.isNotEmpty &&
+                !busy &&
+                !((mobile && keyboardOpen) || shortScreen))
               Padding(
                 key: const ValueKey('quick-replies'),
                 padding: const EdgeInsets.only(bottom: 6),
@@ -256,12 +279,14 @@ class ChatComposer extends StatelessWidget {
                         ],
                       ),
                       Expanded(
-                        // ENTER SENDS, SHIFT+ENTER ADDS A LINE.  A
+                        // A HARDWARE ENTER SENDS; SHIFT+ENTER ADDS A LINE.
                         // CallbackShortcuts sits closer to the field than the
                         // app-wide text-editing shortcuts, so it wins for a
                         // bare Enter while Shift+Enter falls through to the
-                        // default newline.  TextInputAction.send also makes an
-                        // on-screen Android keyboard show a Send key.
+                        // default newline. The IME action is a newline (see
+                        // below), because on Android it used to replace the
+                        // Return key with Send - so a multi-line brief could
+                        // not be written on a phone at all.
                         child: CallbackShortcuts(
                           bindings: <ShortcutActivator, VoidCallback>{
                             const SingleActivator(LogicalKeyboardKey.enter):
@@ -281,15 +306,42 @@ class ChatComposer extends StatelessWidget {
                             // reads as "the app is broken" rather than "busy".
                             autofocus: true,
                             minLines: 1,
-                            maxLines: 6,
-                            textInputAction: TextInputAction.send,
+                            // A phone gets fewer visible lines: six rows plus
+                            // the chips and the keyboard left the transcript
+                            // with almost nothing. A landscape phone gets two:
+                            // a long restored draft otherwise grew the box
+                            // until the opening screen overflowed. The text
+                            // still scrolls inside the field.
+                            maxLines: shortScreen
+                                ? 2
+                                : narrow
+                                ? 4
+                                : 6,
+                            // On a touch platform the IME action key inserts a
+                            // newline: Android used to replace Return with Send,
+                            // so a multi-line brief could not be written. A
+                            // desktop keyboard keeps Send, because there Enter
+                            // is the shortcut above and the action only backs
+                            // the synthetic submit path.
+                            textInputAction: mobile
+                                ? TextInputAction.newline
+                                : TextInputAction.send,
+                            // Keep the caret clear of the keyboard when the
+                            // field scrolls into view.
+                            scrollPadding: EdgeInsets.fromLTRB(
+                              20,
+                              20,
+                              20,
+                              mobile ? 96 : 20,
+                            ),
                             decoration: InputDecoration(
                               // labelText gives the field a real accessible
                               // name; the hint teaches the shortcuts.
                               labelText: 'Message',
-                              hintText:
-                                  'Ask a question, or describe what to do '
-                                  '(Enter sends - Shift+Enter = new line)',
+                              hintText: narrow || mobile
+                                  ? 'Ask a question, or describe what to do'
+                                  : 'Ask a question, or describe what to do '
+                                        '(Enter sends - Shift+Enter = new line)',
                               // The capsule IS the field's surface: the fill and
                               // outline are removed so the input melts into it.
                               filled: false,
@@ -297,6 +349,11 @@ class ChatComposer extends StatelessWidget {
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,
                             ),
+                            // An explicit submit action still sends: some IMEs
+                            // ignore the configured newline action, and the
+                            // test harness delivers one. A real Android Return
+                            // key sends newline (above), so this never turns
+                            // "skip line" back into "send".
                             onSubmitted: (_) => onSend(),
                           ),
                         ),

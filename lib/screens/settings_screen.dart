@@ -6,11 +6,14 @@ import 'package:provider/provider.dart';
 
 import '../services/adapters/gns3_adapter.dart';
 import '../services/app_version.dart';
+import '../services/assistant_voice.dart';
 import '../services/autopilot_service.dart';
 import '../services/context_budget.dart';
 import '../services/gemini_model_catalog.dart';
 import '../services/gemini_service.dart';
+import '../services/human_language.dart';
 import '../services/engine_configuration_sync.dart';
+import '../services/memory_service.dart';
 import '../services/provider_chat_service.dart';
 import '../services/pkt/pkt_export_service.dart';
 import '../services/packet_tracer/catalog.dart';
@@ -84,6 +87,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<String>? _detected;
   String? _detectedNote;
 
+  /// The stored voice preferences (`AssistantVoice.lengthKey` /
+  /// `AssistantVoice.toneKey`), read from the same prefs table the chat's
+  /// per-message feedback menu writes. '' means the default is in force.
+  String _styleLength = '';
+  String _styleTone = '';
+
   /// Re-run detection silently when the key field settles.
   Timer? _detectDebounce;
 
@@ -150,7 +159,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _detected = models.map((m) => m.name).toList();
         _detectedNote = models.isEmpty
             ? 'This key listed no chat models.'
-            : '${models.length} model(s) available'
+            : '${HumanLanguage.count(models.length, 'model')} available'
                   '${best == null ? '' : ' - latest stable: ${best.name}'}';
         if (announce) {
           _status = _detectedNote!;
@@ -221,7 +230,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _engine.text = s.engineBase;
     _outputDir.text = s.outputDir;
     _pktVersion.text = s.packetTracerVersion;
+    await _loadVoicePrefs();
     if (mounted) setState(() {});
+  }
+
+  /// Read the voice preferences back from the store the chat writes, so the
+  /// panel shows what is actually in force rather than what was last set
+  /// here. Unreadable prefs leave the default on screen.
+  Future<void> _loadVoicePrefs() async {
+    try {
+      final mem = context.read<MemoryService>();
+      if (!mem.ready) return;
+      final prefs = await mem.allPrefs();
+      _styleLength = (prefs[AssistantVoice.lengthKey] ?? '')
+          .trim()
+          .toLowerCase();
+      _styleTone = (prefs[AssistantVoice.toneKey] ?? '').trim().toLowerCase();
+    } catch (_) {
+      // The panel keeps its defaults; the chat's own controls still work.
+    }
+  }
+
+  /// Store one voice preference and keep the panel honest about it: an
+  /// optimistic flip followed by a read-back revert on failure, matching
+  /// how the chat's feedback menu reports a style it could not save.
+  Future<void> _setVoicePref(String key, String value) async {
+    final mem = context.read<MemoryService>();
+    if (!mem.ready) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Memory is not available in this session, so the style was not '
+            'saved.',
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      if (key == AssistantVoice.lengthKey) {
+        _styleLength = value;
+      } else {
+        _styleTone = value;
+      }
+    });
+    try {
+      await mem.setPref(key, value);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(SnackBar(content: Text('Could not save that style: $e')));
+      await _loadVoicePrefs();
+      if (mounted) setState(() {});
+    }
   }
 
   Future<void> _saveAndTest() async {
@@ -437,10 +500,94 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'Unsaved changes - press Save + test provider to store them.',
           ),
         _modelPanel(s),
+        _assistantStylePanel(),
         _targetsPanel(s),
         _automationPanel(s),
         _appearancePanel(s),
         _aboutPanel(s),
+      ],
+    );
+  }
+
+  // --- assistant style -------------------------------------------------------
+
+  /// The same two voice preferences the chat's per-message feedback menu
+  /// sets ("Shorter answers", "Less formal"), surfaced here so they are
+  /// discoverable outside a conversation. Both write through
+  /// [AssistantVoice]'s keys, so the model prompt, the offline answers and
+  /// this panel always read one stored value.
+  Widget _assistantStylePanel() {
+    return AppSection(
+      title: 'Assistant style',
+      subtitle:
+          'How the assistant writes. Applies to every new answer, offline or model.',
+      children: [
+        AppPanel(
+          icon: Icons.format_align_left_outlined,
+          title: 'Answer length',
+          children: [
+            SegmentedButton<String>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: '', label: Text('Default')),
+                ButtonSegment(
+                  value: AssistantVoice.concise,
+                  icon: Icon(Icons.compress, size: 16),
+                  label: Text('Shorter'),
+                ),
+                ButtonSegment(
+                  value: AssistantVoice.detailed,
+                  icon: Icon(Icons.notes, size: 16),
+                  label: Text('More detail'),
+                ),
+              ],
+              selected: {
+                const [
+                      '',
+                      AssistantVoice.concise,
+                      AssistantVoice.detailed,
+                    ].contains(_styleLength)
+                    ? _styleLength
+                    : '',
+              },
+              onSelectionChanged: (values) =>
+                  _setVoicePref(AssistantVoice.lengthKey, values.first),
+            ),
+          ],
+        ),
+        AppPanel(
+          icon: Icons.record_voice_over_outlined,
+          title: 'Tone',
+          children: [
+            SegmentedButton<String>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: '', label: Text('Default')),
+                ButtonSegment(
+                  value: AssistantVoice.casual,
+                  icon: Icon(Icons.chat_bubble_outline, size: 16),
+                  label: Text('Casual'),
+                ),
+                ButtonSegment(
+                  value: AssistantVoice.formal,
+                  icon: Icon(Icons.work_outline, size: 16),
+                  label: Text('Formal'),
+                ),
+              ],
+              selected: {
+                const [
+                      '',
+                      AssistantVoice.casual,
+                      AssistantVoice.formal,
+                    ].contains(_styleTone)
+                    ? _styleTone
+                    : '',
+              },
+              onSelectionChanged: (values) =>
+                  _setVoicePref(AssistantVoice.toneKey, values.first),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -1297,8 +1444,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Text(
                         'Local-first network builder for Packet Tracer and GNS3.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),

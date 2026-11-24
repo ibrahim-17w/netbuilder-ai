@@ -2,6 +2,7 @@ import 'dart:ui' show Offset;
 
 import '../models/network_intent.dart';
 import 'packet_tracer/catalog.dart';
+import 'packet_tracer/hardware_check.dart';
 
 class AutoWireResult {
   final NetworkIntent intent;
@@ -44,6 +45,7 @@ class TopologyEditService {
                   model: n.model,
                   exactModel: n.exactModel,
                   modules: n.modules,
+                  variantKey: n.variantKey,
                   mgmtIp: n.mgmtIp,
                   siteId: n.siteId,
                   services: n.services,
@@ -160,8 +162,8 @@ class TopologyEditService {
                 if (cable.mismatch(
                       portA,
                       portB,
-                      modulesA: nodeA.modules,
-                      modulesB: nodeB.modules,
+                      modulesA: PtHardwareCheck.installedModules(nodeA),
+                      modulesB: PtHardwareCheck.installedModules(nodeB),
                     ) !=
                     null) {
                   continue;
@@ -249,7 +251,10 @@ class TopologyEditService {
       if (link.b == node.name) occupied.add(ptPortName(link.bIf));
     }
     final ports = <String, PtPort>{};
-    for (final variant in device.variants) {
+    final variants = node.variantKey == null
+        ? device.variants
+        : PtHardwareCheck.variantsForNode(node);
+    for (final variant in variants) {
       if (node.modules.isNotEmpty &&
           !node.modules.every(variant.modules.contains)) {
         continue;

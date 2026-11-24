@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'human_language.dart';
+
 /// One local DNS answer.
 class DnsLookup {
   final String host;
@@ -18,7 +20,7 @@ class DnsLookup {
   bool get ok => addresses.isNotEmpty;
 
   String get summary => ok
-      ? '$host resolved to ${addresses.length} address(es) in ${elapsedMs}ms'
+      ? '$host resolved to ${HumanLanguage.count(addresses.length, 'address')} in ${elapsedMs}ms'
       : 'no answer for $host${error.isEmpty ? '' : ' ($error)'}';
 
   Map<String, dynamic> toMap() => {

@@ -9,6 +9,8 @@
 /// path: they all come from [AiProviderConfig].
 enum AiProviderKind { gemini, openai }
 
+enum StructuredOutputCapability { schema, jsonOnly, unsupported }
+
 class AiProviderConfig {
   final AiProviderKind kind;
 
@@ -23,6 +25,13 @@ class AiProviderConfig {
   /// Optional OpenAI org / project fields; harmless when unused.
   final String organization;
   final String project;
+  final StructuredOutputCapability? structuredOutput;
+
+  StructuredOutputCapability get interpretationCapability =>
+      structuredOutput ??
+      (kind == AiProviderKind.gemini
+          ? StructuredOutputCapability.schema
+          : StructuredOutputCapability.jsonOnly);
 
   const AiProviderConfig({
     required this.kind,
@@ -31,6 +40,7 @@ class AiProviderConfig {
     this.extraHeaders = const {},
     this.organization = '',
     this.project = '',
+    this.structuredOutput,
   });
 
   String get label =>

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/autopilot_service.dart';
+import '../services/human_language.dart';
 import '../theme/app_kit.dart';
 import '../theme/app_palette.dart';
 
@@ -75,7 +76,7 @@ class CorrectionBadges extends StatelessWidget {
         _badge(
           'x$thrashCount',
           scheme.tertiary,
-          'Corrected $thrashCount time(s) before - a repeated edit on the '
+          'Corrected ${HumanLanguage.count(thrashCount, 'time')} before - a repeated edit on the '
               'same element is a sign the wrong thing is being blamed.',
         ),
     ];

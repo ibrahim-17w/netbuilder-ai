@@ -104,6 +104,17 @@ class PacketTracerAdapter {
           ),
     );
     if (anyV6) out['ipv6'] = 'true';
+    final node = intent.nodes.where((n) => n.name == device).firstOrNull;
+    final addressing = node?.serviceRules['addressing'];
+    if (addressing is Map && addressing['mode'] == 'dhcp') {
+      out.addAll({
+        'dhcp': 'true',
+        'ip': '0.0.0.0',
+        'mask': '0.0.0.0',
+        'gw': '0.0.0.0',
+        'dns': '0.0.0.0',
+      });
+    }
     return out;
   }
 

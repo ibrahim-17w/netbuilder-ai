@@ -358,13 +358,33 @@ class ResponsePreferences {
   final ResponseBrevity brevity;
   final ResponseFormat format;
   final bool explainChanges;
+  final int? maxSentences;
+  final bool configurationOnly;
+
+  /// `casual`, `formal`, or empty when the user did not ask for a tone.
+  /// Kept as a free string so older sessions deserialize unchanged and a
+  /// future tone vocabulary does not need a schema migration.
+  final String tone;
 
   const ResponsePreferences({
     this.language = '',
     this.brevity = ResponseBrevity.defaultStyle,
     this.format = ResponseFormat.defaultFormat,
     this.explainChanges = true,
-  });
+    this.maxSentences,
+    this.configurationOnly = false,
+    this.tone = '',
+  }) : assert(maxSentences == null || maxSentences > 0);
+
+  bool get isArabic =>
+      language.toLowerCase().split(RegExp('[-_]')).first == 'ar';
+  bool get isConcise =>
+      brevity == ResponseBrevity.concise ||
+      maxSentences != null ||
+      configurationOnly ||
+      !explainChanges;
+  bool get isCasual => tone.trim().toLowerCase() == 'casual';
+  bool get isFormal => tone.trim().toLowerCase() == 'formal';
 
   factory ResponsePreferences.fromJson(Object? value) {
     final json = strictJsonObject(value, 'ResponsePreferences');
@@ -373,6 +393,9 @@ class ResponsePreferences {
       'brevity',
       'format',
       'explainChanges',
+      'maxSentences',
+      'configurationOnly',
+      'tone',
     }, 'ResponsePreferences');
     return ResponsePreferences(
       language: readString(json, 'language', defaultValue: ''),
@@ -389,6 +412,15 @@ class ResponsePreferences {
         defaultValue: ResponseFormat.defaultFormat,
       ),
       explainChanges: readBool(json, 'explainChanges', defaultValue: true),
+      maxSentences: json['maxSentences'] == null
+          ? null
+          : readInt(json, 'maxSentences', minimum: 1),
+      configurationOnly: readBool(
+        json,
+        'configurationOnly',
+        defaultValue: false,
+      ),
+      tone: readString(json, 'tone', defaultValue: ''),
     );
   }
 
@@ -397,6 +429,9 @@ class ResponsePreferences {
     'brevity': brevity.name,
     'format': format.name,
     'explainChanges': explainChanges,
+    if (maxSentences != null) 'maxSentences': maxSentences,
+    'configurationOnly': configurationOnly,
+    if (tone.isNotEmpty) 'tone': tone,
   };
 
   ResponsePreferences copyWith({
@@ -404,11 +439,18 @@ class ResponsePreferences {
     ResponseBrevity? brevity,
     ResponseFormat? format,
     bool? explainChanges,
+    int? maxSentences,
+    bool clearMaxSentences = false,
+    bool? configurationOnly,
+    String? tone,
   }) => ResponsePreferences(
     language: language ?? this.language,
     brevity: brevity ?? this.brevity,
     format: format ?? this.format,
     explainChanges: explainChanges ?? this.explainChanges,
+    maxSentences: clearMaxSentences ? null : maxSentences ?? this.maxSentences,
+    configurationOnly: configurationOnly ?? this.configurationOnly,
+    tone: tone ?? this.tone,
   );
 
   @override

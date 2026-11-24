@@ -1,4 +1,11 @@
-pyautogui>=0.9.54
-pywinauto>=0.6.8
-pillow>=10.0.0
-pynput>=1.7.6
+# Pinned to the versions this app was built and tested against.
+#
+# The sidecar is compiled into a PyInstaller bundle and drives the mouse and
+# keyboard, so an unpinned install can ship a different input/OCR stack than
+# the one the tests exercised. Bump these deliberately, and record the bump in
+# docs/dependencies.md.
+pyautogui==0.9.54
+pywinauto==0.6.9
+pillow==12.3.0
+pynput==1.8.2
+respan-gateway==0.3.0

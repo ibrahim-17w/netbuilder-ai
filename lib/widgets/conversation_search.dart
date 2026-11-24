@@ -83,7 +83,15 @@ class _ConversationSearchState extends State<ConversationSearch> {
                 child: TextField(
                   controller: _field,
                   autofocus: true,
+                  textInputAction: TextInputAction.search,
                   onChanged: (_) => setState(() {}),
+                  onSubmitted: (_) {
+                    // Enter opens the first hit: a search field that needs a
+                    // second, precise tap to reach the obvious answer is a
+                    // keyboard dead end.
+                    final hits = matches(widget.messages, _field.text);
+                    if (hits.isNotEmpty) widget.onOpen(hits.first);
+                  },
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.search, size: 20),
                     hintText: 'Search this conversation',

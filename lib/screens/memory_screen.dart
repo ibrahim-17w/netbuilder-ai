@@ -11,7 +11,9 @@ import '../models/build_record.dart';
 import '../models/environment_profile.dart';
 import '../services/app_version.dart';
 import '../services/autopilot_service.dart';
+import '../services/concept_knowledge.dart';
 import '../services/engine_status.dart';
+import '../services/human_language.dart';
 import '../services/memory_service.dart';
 import '../services/misparse_ledger.dart';
 import '../services/settings_service.dart';
@@ -53,6 +55,13 @@ class _MemoryScreenState extends State<MemoryScreen> {
   /// Learned answers from keyed-model replies (question -> answer),  /// newest-seen first. Each row replays offline when the same question is
   /// asked with no key - and can be dropped here.
   List<Map<String, dynamic>> _learnedAnswers = [];
+
+  /// Concept knowledge: the same learnings organized by the THING the
+  /// knowledge is about (see [ConceptKnowledge]). A differently-worded
+  /// question reaches what an exact match cannot; every row's source and
+  /// verification status are shown here and can be corrected or dropped.
+  List<KnowledgeConcept> _concepts = [];
+  String _conceptQuery = '';
 
   /// Questions the offline material could not answer, most recent first.
   /// The corpus's backlog, recorded from real misses.
@@ -302,6 +311,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
     _prefs = await mem.allPrefs();
     _phrasings = await mem.allPhrasings();
     _learnedAnswers = await mem.allLearnedAnswers();
+    _concepts = await mem.allConcepts();
     _openQuestions = await mem.openQuestions();
     _envProfile = await mem.environmentProfile();
     _loadEnvEditor();
@@ -381,6 +391,235 @@ class _MemoryScreenState extends State<MemoryScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Learned answer forgotten')));
+  }
+
+  /// Drop one concept entry. Retrieval reads the store live, so the entry
+  /// stops answering immediately - not after a restart. A conflict row is
+  /// resolved by deleting it: the stored knowledge keeps standing.
+  Future<void> _forgetConcept(int id) async {
+    final mem = context.read<MemoryService>();
+    await mem.deleteConcept(id);
+    if (!mounted) return;
+    setState(() => _concepts.removeWhere((c) => c.id == id));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Concept forgotten')));
+  }
+
+  /// Add one USER-WRITTEN concept entry. User-authored explanations are
+  /// knowledge the app is entitled to keep: they start verified, and the
+  /// provenance line says "you taught me". The topic name is free-form when
+  /// it is not one of the curated concepts.
+  Future<void> _addConcept() async {
+    final nameCtl = TextEditingController();
+    final answerCtl = TextEditingController();
+    final summaryCtl = TextEditingController();
+    final beginnerCtl = TextEditingController();
+    final exampleCtl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Teach a concept'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: nameCtl,
+                decoration: const InputDecoration(
+                  labelText: 'Topic',
+                  hintText: 'e.g. "Subnet mask" or "Our office Wi-Fi"',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: answerCtl,
+                maxLines: 6,
+                decoration: const InputDecoration(
+                  labelText: 'Explanation',
+                  hintText: 'What the app will answer with, offline',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: summaryCtl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Short version (optional)',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: beginnerCtl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Beginner version (optional)',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: exampleCtl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Example (optional)',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    if (nameCtl.text.trim().isEmpty || answerCtl.text.trim().isEmpty) return;
+    final mem = context.read<MemoryService>();
+    await mem.saveConcept(
+      concept: nameCtl.text,
+      label: nameCtl.text,
+      answer: answerCtl.text,
+      summary: summaryCtl.text,
+      beginner: beginnerCtl.text,
+      example: exampleCtl.text,
+    );
+    await _refresh();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Concept saved - it answers offline now')),
+    );
+  }
+
+  /// Remove ALL learned concept knowledge, after an explicit confirmation.
+  /// The exact-answer replay rows and every other memory section are not
+  /// touched by this one panel's action.
+  Future<void> _clearConcepts() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Clear all learned concepts?'),
+        content: const Text(
+          'Every concept the app learned is deleted: paraphrases will no '
+          'longer reach this knowledge offline. Exact-question replays and '
+          'the rest of memory are not affected.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final mem = context.read<MemoryService>();
+    await mem.clearConcepts();
+    if (!mounted) return;
+    setState(() => _concepts = []);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Learned concepts cleared')));
+  }
+
+  /// Correct one concept entry. The edited text is what the user means, so
+  /// the store marks the row verified; the provenance line still names the
+  /// original source. Every field is optional except the explanation.
+  Future<void> _editConcept(KnowledgeConcept entry) async {
+    final answerCtl = TextEditingController(text: entry.answer);
+    final summaryCtl = TextEditingController(text: entry.summary);
+    final beginnerCtl = TextEditingController(text: entry.beginner);
+    final exampleCtl = TextEditingController(text: entry.example);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('Correct: ${entry.displayName}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Source: ${entry.origin == 'user'
+                    ? 'you'
+                    : entry.source.isEmpty
+                    ? 'AI provider'
+                    : entry.source} · status ${entry.status}',
+                style: Theme.of(c).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: answerCtl,
+                maxLines: 6,
+                decoration: const InputDecoration(
+                  labelText: 'Explanation',
+                  hintText: 'What the app will answer with',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: summaryCtl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Short version (optional)',
+                  hintText: 'Served when asked to explain briefly',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: beginnerCtl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Beginner version (optional)',
+                  hintText: 'Served when asked to explain simply',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: exampleCtl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Example (optional)',
+                  hintText: 'Served when asked for an example',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    if (answerCtl.text.trim().isEmpty) return;
+    final mem = context.read<MemoryService>();
+    await mem.updateConcept(
+      entry.id,
+      answer: answerCtl.text,
+      summary: summaryCtl.text,
+      beginner: beginnerCtl.text,
+      example: exampleCtl.text,
+    );
+    await _refresh();
   }
 
   /// Drop one learned phrasing. The store also refreshes the live index,
@@ -1380,6 +1619,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _openQuestionsPanel(theme),
+        _conceptsPanel(theme),
         AppPanel(
           icon: Icons.lightbulb_outline,
           title: 'Learned answers',
@@ -1467,6 +1707,156 @@ class _MemoryScreenState extends State<MemoryScreen> {
                 ),
           ],
         ),
+      ],
+    );
+  }
+
+  /// The concepts panel: what was learned, organized by the THING the
+  /// knowledge is about. Searchable, inspectable (source + verification
+  /// status on every row), correctable, and clearable - the knowledge
+  /// library stays the user's, never a black box.
+  Widget _conceptsPanel(ThemeData theme) {
+    final query = _conceptQuery.trim().toLowerCase();
+    final shown = query.isEmpty
+        ? _concepts
+        : _concepts
+              .where(
+                (c) =>
+                    c.displayName.toLowerCase().contains(query) ||
+                    c.concept.toLowerCase().contains(query) ||
+                    c.answer.toLowerCase().contains(query),
+              )
+              .toList();
+    return AppPanel(
+      icon: Icons.category_outlined,
+      title: 'Concepts',
+      subtitle:
+          'What the app learned, organized by topic: a differently-worded '
+          'question reaches the same knowledge offline. Tap a row to correct '
+          'it; the source and verification status are shown on every entry. '
+          'On this device only.',
+      children: [
+        if (_concepts.length > 3)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppTheme.s8),
+            child: TextField(
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search, size: 20),
+                hintText: 'Search concepts',
+                isDense: true,
+              ),
+              onChanged: (v) => setStateSafe(() => _conceptQuery = v),
+            ),
+          ),
+        if (_concepts.isNotEmpty)
+          Align(
+            alignment: Alignment.centerRight,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton.icon(
+                  onPressed: _addConcept,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Add your own'),
+                ),
+                TextButton.icon(
+                  onPressed: _clearConcepts,
+                  icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+                  label: const Text('Clear all concepts'),
+                ),
+              ],
+            ),
+          ),
+        if (shown.isEmpty)
+          Text(
+            _concepts.isEmpty
+                ? 'Nothing learned yet. Ask a question while your API key is '
+                      'active and what the model explains is kept here, '
+                      'organized by topic, for offline replay.'
+                : 'No concept matches "$_conceptQuery".',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          )
+        else
+          for (final c in shown)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppTheme.s8),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.s12,
+                  AppTheme.s8,
+                  AppTheme.s4,
+                  AppTheme.s8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppPalette.panelAlt(theme.colorScheme),
+                  borderRadius: BorderRadius.circular(AppTheme.rMd),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  c.displayName,
+                                  style: theme.textTheme.titleSmall,
+                                ),
+                              ),
+                              const SizedBox(width: AppTheme.s8),
+                              Text(
+                                '${c.status}'
+                                '${c.seenCount > 1 ? ' · ${c.seenCount}x' : ''}',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: c.verified
+                                      ? AppPalette.success(theme.colorScheme)
+                                      : c.status == 'conflict'
+                                      ? theme.colorScheme.error
+                                      : theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            c.answer,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            c.origin == 'user'
+                                ? 'You · on this device'
+                                : 'Learned from '
+                                      '${c.source.isEmpty ? 'your AI provider' : c.source}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Correct this entry',
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      onPressed: () => _editConcept(c),
+                    ),
+                    IconButton(
+                      tooltip: 'Forget this concept',
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: () => _forgetConcept(c.id),
+                    ),
+                  ],
+                ),
+              ),
+            ),
       ],
     );
   }
@@ -1781,7 +2171,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
                 tone: AppTone.success,
                 dense: true,
                 message:
-                    'RECORDED: $_autoSaved recurring pattern(s) filed below '
+                    'RECORDED: ${HumanLanguage.count(_autoSaved, 'recurring pattern')} '
+                    'filed below '
                     'for review - they do not change plans until you teach a '
                     'rule that says so.',
               ),

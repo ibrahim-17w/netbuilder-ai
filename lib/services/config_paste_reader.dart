@@ -54,8 +54,10 @@ class ConfigPasteReader {
         r'^current\s+configuration\s*:\s*\d+\s+bytes$',
         caseSensitive: false,
       ).hasMatch(line) ||
-      RegExp(r'^building\s+configuration\s*\.+$', caseSensitive: false)
-          .hasMatch(line) ||
+      RegExp(
+        r'^building\s+configuration\s*\.+$',
+        caseSensitive: false,
+      ).hasMatch(line) ||
       // The echoed command with its prompt ("R1#show running-config").
       RegExp(
         r'^[\w.@-]+[#>]\s*show\s+(?:running-config|run|startup-config|start)\b',

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'ai_provider.dart';
+import 'context_budget.dart';
 import 'generation_control.dart';
 import 'tool_loop.dart';
 import 'tool_protocol.dart';
@@ -39,6 +40,8 @@ class ToolRuntime {
 
   /// The capture the tools should be answered from (a server-side path).
   String capturePath;
+  int? runtimeWindowTokens;
+  int? outputReserveTokens;
 
   ToolRuntime({
     required this.config,
@@ -179,6 +182,14 @@ class ToolRuntime {
     Future<void>? abortTrigger,
     bool Function()? abortProbe,
   }) async {
+    if (runtimeWindowTokens case final window?) {
+      ContextBudget.requirePayloadFits(
+        messages: messages,
+        windowTokens: window,
+        outputReserve: outputReserveTokens,
+        tools: declarations(),
+      );
+    }
     final system = _systemText(messages);
     final response = isGemini
         ? await _post(
@@ -192,6 +203,8 @@ class ToolRuntime {
             },
             body: {
               'contents': _geminiContents(messages),
+              if (outputReserveTokens != null)
+                'generationConfig': {'maxOutputTokens': outputReserveTokens},
               // Gemini takes the system prompt out of band, not as a turn.
               if (system.isNotEmpty)
                 'systemInstruction': {
@@ -210,6 +223,8 @@ class ToolRuntime {
             headers: _openAiHeaders(),
             body: {
               'model': config.model,
+              if (outputReserveTokens != null)
+                'max_tokens': outputReserveTokens,
               'messages': messages,
               'tools': declarations(),
             },

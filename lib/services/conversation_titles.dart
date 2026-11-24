@@ -99,26 +99,48 @@ class ConversationTitles {
 
   /// The network name in a brief: "network named X", "network for company
   /// X", "lab named X". Null when the words carry no name.
+  ///
+  /// A name needs its cue word. Without one, "a network with 2 routers"
+  /// read the inventory as the name - which titled the conversation (and
+  /// would name the file) "with 2 routers and 4 switches".
   static final RegExp _namedNetwork = RegExp(
     r'(?:network|lab|project|topology)\s+'
-    r'(?:for\s+(?:company|client|customer|us|me)\s+|named\s+|called\s+)?'
+    r'(?:for\s+(?:company|client|customer|us|me)\s+|named\s+|called\s+)'
     r'([A-Za-z][A-Za-z0-9_. -]{1,38}?)(?:\.|,|;|\s+with\s+|\s+at\s+'
     r'|\s+running\s+|\s+HQ\b|$)',
     caseSensitive: false,
   );
 
-  static String? _namedNetworkIn(String lower) {
-    for (final m in _namedNetwork.allMatches(lower)) {
+  /// The name the brief gives the network, in the spelling the user wrote.
+  ///
+  /// This is what the plan is named and what the generated file is called: a
+  /// lab asked for as "release-validation" must not arrive as `chat.pkt`. The
+  /// patterns are deliberately explicit ("named", "called", "network for
+  /// company") so ordinary prose such as "build a network with 2 routers"
+  /// never turns into a name.
+  static String? requestedNetworkName(String raw) {
+    for (final m in _namedNetwork.allMatches(raw)) {
       final name = (m.group(1) ?? '').trim().replaceAll(RegExp(r'\s+'), ' ');
       if (name.isEmpty) continue;
-      // Skip generic words the matcher can catch ("network at ...").
-      if (const ['the', 'a', 'an', 'this', 'that', 'company', 'client']
-          .contains(name.toLowerCase())) {
+      if (const [
+        'the',
+        'a',
+        'an',
+        'this',
+        'that',
+        'company',
+        'client',
+      ].contains(name.toLowerCase())) {
         continue;
       }
       return name;
     }
     return null;
+  }
+
+  static String? _namedNetworkIn(String lower) {
+    final name = requestedNetworkName(lower);
+    return name == null ? null : _title(name);
   }
 
   static String? _topicIn(String lower) {

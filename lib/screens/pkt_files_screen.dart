@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 
 import '../models/network_intent.dart';
 import '../services/autopilot_service.dart';
+import '../services/human_language.dart';
 import '../theme/app_kit.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
@@ -456,7 +457,7 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
             icon: Icons.report_problem_outlined,
             message:
                 'Missing: ${(comparison['devicesMissing'] as List?)?.join(', ') ?? 'none'}'
-                '${(comparison['linksFailed'] ?? 0) > 0 ? ' · ${comparison['linksFailed']} link(s) failed to record' : ''}',
+                '${(comparison['linksFailed'] ?? 0) > 0 ? ' · ${HumanLanguage.count(((comparison['linksFailed'] as num?) ?? 0).toInt(), 'link')} failed to record' : ''}',
           ),
         AppCodeBlock(
           text: artifact['sha256'] == null
@@ -533,8 +534,8 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
       icon: Icons.analytics_outlined,
       title: 'Topology analysis',
       subtitle:
-          '${devices.length} device(s) inspected, '
-          '$reds red link indicator(s)',
+          '${HumanLanguage.count(devices.length, 'device')} inspected, '
+          '${HumanLanguage.count(reds.toInt(), 'red link indicator')}',
       children: [
         if (error.isNotEmpty)
           AppBanner(dense: true, tone: AppTone.danger, message: error),
@@ -547,8 +548,10 @@ class _PktFilesScreenState extends State<PktFilesScreen> {
             title:
                 '${device['name'] ?? 'device'} '
                 '(${device['type'] ?? 'unknown'})',
-            subtitle:
-                '${((device['findings'] as List?) ?? const []).length} finding(s)',
+            subtitle: HumanLanguage.count(
+              ((device['findings'] as List?) ?? const []).length,
+              'finding',
+            ),
           ),
         const AppBanner(
           dense: true,

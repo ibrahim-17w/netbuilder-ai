@@ -1,4 +1,5 @@
 import '../models/chat_message.dart';
+import 'human_language.dart';
 
 /// The conversation's long-term memory.
 ///
@@ -66,7 +67,7 @@ class ConversationMemory {
     final tail = all.sublist(all.length - cap);
     return [
       head,
-      '... ${all.length - cap - 1} earlier request(s) omitted ...',
+      '... ${HumanLanguage.count(all.length - cap - 1, 'earlier request')} omitted ...',
       ...tail,
     ];
   }

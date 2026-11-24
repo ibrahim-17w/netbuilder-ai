@@ -1,4 +1,6 @@
 import '../models/network_intent.dart';
+import 'domain_vocabulary.dart';
+import 'human_language.dart';
 import 'adapters/packet_tracer_adapter.dart';
 import 'nlu/lexicon.dart';
 
@@ -11,26 +13,6 @@ import 'nlu/lexicon.dart';
 /// server roles, the desktop addresses, and an ordered verification list.
 class BuildGuide {
   const BuildGuide._();
-
-  static const _serviceLabels = <String, String>{
-    'dhcp': 'DHCP',
-    'dhcpv6': 'DHCPv6',
-    'dns': 'DNS',
-    'http': 'HTTP',
-    'https': 'HTTPS',
-    'aaa': 'AAA',
-    'email': 'Email',
-    'ftp': 'FTP',
-    'ntp': 'NTP',
-    'tftp': 'TFTP',
-    'syslog': 'Syslog',
-    'iot': 'IoT registration',
-    'snmp': 'SNMP',
-    'vm': 'Voicemail',
-    'cme': 'Call Manager Express',
-    'radiuseap': 'RADIUS EAP',
-    'prp': 'PRP',
-  };
 
   /// Markdown for the standing plan. Pure: no file, no provider, no UI.
   ///
@@ -90,7 +72,8 @@ class BuildGuide {
       )
       ..writeln()
       ..writeln(
-        'Plan: ${nodes.length} device(s), ${links.length} cable(s), routing '
+        'Plan: ${HumanLanguage.count(nodes.length, 'device')}, '
+        '${HumanLanguage.count(links.length, 'cable')}, routing '
         '`${intent.routing}`'
         '${realHardware ? ', target real hardware' : ', target Packet Tracer'}.',
       );
@@ -331,7 +314,9 @@ class BuildGuide {
 
   static String _roles(dynamic serverEntry) {
     final services = ((serverEntry as Map?)?['services'] as Map?) ?? const {};
-    return services.keys.map((k) => _serviceLabels['$k'] ?? '$k').join(', ');
+    return services.keys
+        .map((k) => DomainVocabulary.serviceRoleLabel('$k'))
+        .join(', ');
   }
 
   /// The file name an exported guide saves as - the brief's own words when
@@ -374,7 +359,7 @@ class BuildGuide {
   static String _cell(String text) => text.replaceAll('|', r'\|');
 
   static List<String> _serviceLines(String role, dynamic params) {
-    final label = _serviceLabels[role] ?? role.toUpperCase();
+    final label = DomainVocabulary.serviceRoleLabel(role);
     final map = params is Map ? params : const {};
     switch (role) {
       case 'dhcp':

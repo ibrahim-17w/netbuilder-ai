@@ -1,22 +1,8 @@
-import 'fuzzy_match.dart';
-
-/// Turns the way a person actually types into text the planner and the
-/// assistant can both use: lowercase, typos, shorthand and filler are all
-/// normal here.
+/// Conservative conversational spelling aliases shared by local readers.
 ///
-/// Two layers of typo handling: an exact table for the mistakes seen most
-/// often (which can map a misspelling onto a word with a different first
-/// letter, e.g. `acess` -> `access`), and [FuzzyMatch] underneath it for
-/// everything the table has never seen. The table is tried first because a
-/// human-authored mapping is more trustworthy than a distance calculation;
-/// the fuzzy layer is what stops an unseen typo from silently dropping a
-/// device from the plan.
-///
-/// It is deliberately conservative about data. Any token carrying a digit, a
-/// slash or an "@" (addresses, CIDRs, emails, hostnames with numbers) is left
-/// exactly as typed, and a token with mixed upper/lower case is never
-/// rewritten - so "2 routers", "192.168.1.0/24" and a password like
-/// "LabAdmin2026" or "SecretPass" all survive untouched.
+/// Only a curated domain-word table is corrected. Unrecognized words, Arabic
+/// text and exact technical values are never passed through fuzzy rewriting.
+/// In particular, a modal such as "could" must not become the device "cloud".
 class CasualEnglish {
   const CasualEnglish._();
 
@@ -34,6 +20,8 @@ class CasualEnglish {
     'im': 'i am',
     'ive': 'i have',
     'dont': 'do not',
+    "don't": 'do not',
+    'don’t': 'do not',
     'doesnt': 'does not',
     'cant': 'cannot',
     'wont': 'will not',
@@ -69,6 +57,17 @@ class CasualEnglish {
     // edits but `aaa`/`asa` is one, and they mean different things), so the
     // common ones are asserted here by hand instead.
     'pss': 'pc', 'pcc': 'pc',
+    // Observed domain aliases, not edit-distance guesses. Ordinary words
+    // such as "serve", "could", "role" and "services" are not aliases.
+    'rotuer': 'router',
+    'routre': 'router',
+    'roter': 'router',
+    'routar': 'router',
+    'printr': 'printer',
+    'switsh': 'switch', 'switchs': 'switches', 'serser': 'server',
+    'servre': 'server', 'sevr': 'server', 'lapto': 'laptop',
+    'printar': 'printer', 'firewal': 'firewall', 'vlaan': 'vlan',
+    'ospff': 'ospf', 'gatewy': 'gateway', 'trnuk': 'trunk',
   };
 
   static const List<String> _filler = [
@@ -88,9 +87,34 @@ class CasualEnglish {
     'ok so',
   ];
 
-  static final RegExp _dataToken = RegExp(r'[\d/@]');
-  static final RegExp _edges = RegExp(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$');
+  static final RegExp _dataToken = RegExp(r'[\d٠-٩۰-۹/@\\.:_+=-]');
+  // Arabic is language, not punctuation. The old ASCII-only edge trim erased
+  // every Arabic word, including the negation in "بدون DNS".
+  static final RegExp _edges = RegExp(
+    r'^[^A-Za-z0-9\u0600-\u06ff]+|[^A-Za-z0-9\u0600-\u06ff]+$',
+  );
   static final RegExp _mixed = RegExp(r'^(?=.*[a-z])(?=.*[A-Z]).*$');
+
+  /// Values protected before any whitespace, punctuation or filler pass.
+  static final RegExp _literal = RegExp(
+    r'(?<!\w)\.\d{1,3}(?:\s*[-–]\s*\.\d{1,3})?|'
+    r'`[^`\r\n]*`|"[^"\r\n]*"|(?<!\w)\x27[^\x27\r\n]*\x27|'
+    r'(?:(?:ssid|network\s+name)\s*(?::|=|\bis\b)?\s*)'
+    r'(?:"[^"\r\n]*"|`[^`\r\n]*`|\x27[^\x27\r\n]*\x27|[^\s,;]+)|'
+    r'(?:(?:password|passphrase|secret|psk|pre-shared\s+key|hostname|'
+    r'كلم[ةه]\s+(?:المرور|السر)|اسم\s+الشبك[ةه])\s*(?::|=|\bis\b)?\s*)[^\s,;]+|'
+    r'(?:[A-Za-z]:[\\/]|\\\\|/)[^\s,;]+|'
+    r'\b[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+(?:/[^\s,;]*)?',
+    caseSensitive: false,
+  );
+
+  /// A known conversational token, for the source-mapped bridge as well as
+  /// the legacy assistant path. Callers must protect literal-value ranges.
+  static String normalizeToken(String token) {
+    if (_dataToken.hasMatch(token) || _mixed.hasMatch(token)) return token;
+    final lower = token.toLowerCase();
+    return _typos[lower] ?? _shorthand[lower] ?? _pluralTypo(lower) ?? token;
+  }
 
   /// ".1" and ".11" are a shorthand host part - "with .1 as each gateway",
   /// "PC1-PC5 addresses .11-.15 on the R1 LAN" - and the leading dot is what
@@ -138,7 +162,31 @@ class CasualEnglish {
     return '${singular}s';
   }
 
-  static String normalize(String raw) {
+  static String normalize(String raw) =>
+      _outsideLiterals(raw, _normalizeProse).trim();
+
+  static String _outsideLiterals(
+    String raw,
+    String Function(String) transform,
+  ) {
+    var prefix = 'ZcodeProtectedLiteral';
+    while (raw.contains(prefix)) {
+      prefix += 'X';
+    }
+    final values = <String>[];
+    final protected = raw.replaceAllMapped(_literal, (match) {
+      final index = values.length;
+      values.add(match.group(0)!);
+      return '$prefix${index}X';
+    });
+    var result = transform(protected);
+    for (var i = 0; i < values.length; i++) {
+      result = result.replaceAll('$prefix${i}X', values[i]);
+    }
+    return result;
+  }
+
+  static String _normalizeProse(String raw) {
     final trimmed = raw.trim();
     if (trimmed.isEmpty) return '';
     final s = trimmed
@@ -157,25 +205,7 @@ class CasualEnglish {
           ? token
           : token.replaceAll(_edges, '');
       if (core.isEmpty) continue;
-      // Data (addresses, CIDRs, emails, quantities, password with digits) is
-      // kept verbatim so nothing numeric is ever damaged.
-      if (_dataToken.hasMatch(core)) {
-        out.add(core);
-        continue;
-      }
-      // Mixed-case words are treated as deliberate (a password, a hostname)
-      // and never rewritten.
-      final mapped = _mixed.hasMatch(core)
-          ? null
-          : (_typos[core.toLowerCase()] ??
-                _shorthand[core.toLowerCase()] ??
-                _pluralTypo(core.toLowerCase()) ??
-                // Nothing in the tables knows this word. Before giving up on it,
-                // ask the fuzzy matcher: an unseen typo (`switsh`, `rotuer`,
-                // `sevr`) would otherwise stay an unknown word and the device it
-                // names would drop out of the plan entirely.
-                FuzzyMatch.correct(core));
-      out.add(mapped ?? core);
+      out.add(normalizeToken(core));
     }
     var joined = out.join(' ');
     for (final f in _filler) {
@@ -286,11 +316,11 @@ class CasualEnglish {
   /// contains a key, so running it twice changes nothing - and case is
   /// preserved: the caller lowercases first, and a mixed-case token is data
   /// by the same rule [normalize] applies.
-  static String canonical(String text) {
-    var t = text;
+  static String canonical(String text) => _outsideLiterals(text, (prose) {
+    var result = prose;
     for (final (pattern, to) in _canonicalRules) {
-      t = t.replaceAll(pattern, to);
+      result = result.replaceAll(pattern, to);
     }
-    return t;
-  }
+    return result;
+  });
 }

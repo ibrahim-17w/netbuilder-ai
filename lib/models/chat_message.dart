@@ -1,5 +1,111 @@
 import 'dart:convert';
 
+import '../services/human_language.dart';
+import 'network_intent.dart';
+
+/// Source identity and observation limits, never authority to change a project.
+/// [contentHash] is SHA-256 of the original attachment bytes, not its file path
+/// or OCR text. Missing metadata on older sessions stays unknown. A page,
+/// region or confidence is present only when the reader actually supplied it.
+class AttachmentSource {
+  final String attachmentId;
+  final String contentHash;
+  final String name;
+  final String mimeType;
+  final String location;
+  final int? page;
+  final String? region;
+  final double? confidence;
+  final String uncertainty;
+  final bool incomplete;
+
+  const AttachmentSource({
+    this.attachmentId = '',
+    this.contentHash = '',
+    this.name = '',
+    this.mimeType = '',
+    this.location = '',
+    this.page,
+    this.region,
+    this.confidence,
+    this.uncertainty = 'unknown',
+    this.incomplete = true,
+  });
+
+  bool get hasContentIdentity =>
+      attachmentId.isNotEmpty &&
+      RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(contentHash);
+
+  Map<String, dynamic> toMap() => {
+    'attachmentId': attachmentId,
+    'contentHash': contentHash,
+    if (name.isNotEmpty) 'name': NetworkIntent.redactSecrets(name),
+    if (mimeType.isNotEmpty) 'mimeType': mimeType,
+    if (location.isNotEmpty) 'location': NetworkIntent.redactSecrets(location),
+    if (page != null) 'page': page,
+    if (region != null) 'region': NetworkIntent.redactSecrets(region!),
+    if (confidence != null) 'confidence': confidence,
+    'uncertainty': NetworkIntent.redactSecrets(uncertainty),
+    'incomplete': incomplete,
+  };
+
+  factory AttachmentSource.fromMap(Map<String, dynamic> map) {
+    final page = map['page'];
+    final confidence = map['confidence'];
+    if (page != null && (page is! int || page < 1)) {
+      throw const FormatException(
+        'Attachment page must be a positive integer.',
+      );
+    }
+    if (confidence != null &&
+        (confidence is! num ||
+            !confidence.isFinite ||
+            confidence < 0 ||
+            confidence > 1)) {
+      throw const FormatException(
+        'Attachment confidence must be between 0 and 1.',
+      );
+    }
+    return AttachmentSource(
+      attachmentId: (map['attachmentId'] ?? '').toString(),
+      contentHash: (map['contentHash'] ?? '').toString(),
+      name: (map['name'] ?? '').toString(),
+      mimeType: (map['mimeType'] ?? '').toString(),
+      location: (map['location'] ?? '').toString(),
+      page: page as int?,
+      region: map['region']?.toString(),
+      confidence: (confidence as num?)?.toDouble(),
+      uncertainty: (map['uncertainty'] ?? 'unknown').toString(),
+      incomplete: map['incomplete'] is bool ? map['incomplete'] as bool : true,
+    );
+  }
+
+  AttachmentSource copyWith({
+    String? attachmentId,
+    String? contentHash,
+    String? name,
+    String? mimeType,
+    String? location,
+    int? page,
+    String? region,
+    double? confidence,
+    bool clearReaderPrecision = false,
+    String? uncertainty,
+    bool? incomplete,
+  }) => AttachmentSource(
+    attachmentId: attachmentId ?? this.attachmentId,
+    contentHash: contentHash ?? this.contentHash,
+    name: name ?? this.name,
+    mimeType: mimeType ?? this.mimeType,
+    location: location ?? this.location,
+    page: page ?? this.page,
+    region: clearReaderPrecision ? null : region ?? this.region,
+    confidence: clearReaderPrecision ? null : confidence ?? this.confidence,
+    uncertainty: uncertainty ?? this.uncertainty,
+    incomplete: incomplete ?? this.incomplete,
+  );
+}
+
 /// One attachment on a chat message.
 ///
 /// Images live on disk (see [ChatService.persistImage]) and only the path is
@@ -11,12 +117,14 @@ class ChatImage {
   final String name;
   final String mimeType;
   final int bytes;
+  final AttachmentSource? source;
 
   const ChatImage({
     required this.path,
     required this.name,
     this.mimeType = 'image/png',
     this.bytes = 0,
+    this.source,
   });
 
   Map<String, dynamic> toMap() => {
@@ -24,6 +132,7 @@ class ChatImage {
     'name': name,
     'mimeType': mimeType,
     'bytes': bytes,
+    if (source != null) 'source': source!.toMap(),
   };
 
   factory ChatImage.fromMap(Map<String, dynamic> m) => ChatImage(
@@ -31,6 +140,19 @@ class ChatImage {
     name: (m['name'] ?? 'image').toString(),
     mimeType: (m['mimeType'] ?? 'image/png').toString(),
     bytes: (m['bytes'] as num?)?.toInt() ?? 0,
+    source: m['source'] is Map
+        ? AttachmentSource.fromMap(
+            Map<String, dynamic>.from(m['source'] as Map),
+          )
+        : null,
+  );
+
+  ChatImage copyWith({AttachmentSource? source}) => ChatImage(
+    path: path,
+    name: name,
+    mimeType: mimeType,
+    bytes: bytes,
+    source: source ?? this.source,
   );
 
   String get sizeLabel => bytes <= 0
@@ -152,11 +274,12 @@ class ChatAction {
         return 'Remember ${payload['key'] ?? '?'} = ${payload['value'] ?? ''}';
       case 'paste_cli':
         final configs = (payload['configs'] as Map?) ?? const {};
-        return 'Type CLI on ${configs.length} device(s): '
+        return 'Type CLI on ${HumanLanguage.count(configs.length, 'device')}: '
             '${configs.keys.join(', ')}';
       case 'config_pcs':
         final pcs = (payload['pcs'] as Map?) ?? const {};
-        return 'Set desktop IPs on ${pcs.length} PC(s): ${pcs.keys.join(', ')}';
+        return 'Set desktop IPs on ${HumanLanguage.count(pcs.length, 'PC')}: '
+            '${pcs.keys.join(', ')}';
       case 'run_control':
         return '${(payload['command'] ?? 'pause').toString().toUpperCase()} '
             'the autopilot';

@@ -76,6 +76,133 @@ CATALOG = json.loads(r'''{
             }
           ],
           "hasConfig": true
+        },
+        {
+          "key": "1841+WIC-2T",
+          "modules": [
+            "WIC-2T"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eSmartSerial",
+              "family": "serial",
+              "name": "Serial0/1/0"
+            },
+            {
+              "index": 1,
+              "type": "eSmartSerial",
+              "family": "serial",
+              "name": "Serial0/1/1"
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0"
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
+            }
+          ],
+          "hasConfig": true
+        },
+        {
+          "key": "1841+WIC-1ENET",
+          "modules": [
+            "WIC-1ENET"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": "Ethernet0/0/0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0"
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
+            }
+          ],
+          "hasConfig": true
+        },
+        {
+          "key": "1841+HWIC-8A+WIC-2T",
+          "modules": [
+            "HWIC-8A",
+            "WIC-2T"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eSmartSerial",
+              "family": "serial",
+              "name": "Serial0/1/0"
+            },
+            {
+              "index": 2,
+              "type": "eSmartSerial",
+              "family": "serial",
+              "name": "Serial0/1/1"
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0"
+            },
+            {
+              "index": 4,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
+            }
+          ],
+          "hasConfig": true
+        },
+        {
+          "key": "1841+HWIC-8A",
+          "modules": [
+            "HWIC-8A"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0"
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
+            }
+          ],
+          "hasConfig": true
         }
       ]
     },
@@ -116,16 +243,50 @@ CATALOG = json.loads(r'''{
     {
       "model": "2620XM",
       "type": "router",
-      "kind": "router",
+      "kind": "Router",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "2620XM",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
     },
     {
       "model": "2621XM",
       "type": "router",
-      "kind": "router",
+      "kind": "Router",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "2621XM",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
     },
     {
       "model": "2811",
@@ -133,6 +294,39 @@ CATALOG = json.loads(r'''{
       "kind": "Router",
       "aliases": [],
       "variants": [
+        {
+          "key": "2811+WIC-2T",
+          "modules": [
+            "WIC-2T"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eSmartSerial",
+              "family": "serial",
+              "name": "Serial0/2/0"
+            },
+            {
+              "index": 1,
+              "type": "eSmartSerial",
+              "family": "serial",
+              "name": "Serial0/2/1"
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0"
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
+            }
+          ],
+          "hasConfig": true
+        },
         {
           "key": "2811",
           "modules": [],
@@ -186,22 +380,67 @@ CATALOG = json.loads(r'''{
           "hasConfig": true
         },
         {
-          "key": "2811+WIC-2T",
+          "key": "2811+NM-4A-S",
           "modules": [
-            "WIC-2T"
+            "NM-4A/S"
           ],
           "ports": [
             {
               "index": 0,
-              "type": "eSmartSerial",
-              "family": "serial",
-              "name": "Serial0/2/0"
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/0"
             },
             {
               "index": 1,
-              "type": "eSmartSerial",
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
+            },
+            {
+              "index": 2,
+              "type": "eSerial",
               "family": "serial",
-              "name": "Serial0/2/1"
+              "name": "Serial1/0"
+            },
+            {
+              "index": 3,
+              "type": "eSerial",
+              "family": "serial",
+              "name": "Serial1/1"
+            },
+            {
+              "index": 4,
+              "type": "eSerial",
+              "family": "serial",
+              "name": "Serial1/2"
+            },
+            {
+              "index": 5,
+              "type": "eSerial",
+              "family": "serial",
+              "name": "Serial1/3"
+            }
+          ],
+          "hasConfig": true
+        },
+        {
+          "key": "2811+HWIC-AP-AG-B",
+          "modules": [
+            "HWIC-AP-AG-B"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eAccessPointWirelessG",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eAccessPointWirelessA",
+              "family": "",
+              "name": ""
             },
             {
               "index": 2,
@@ -449,6 +688,177 @@ CATALOG = json.loads(r'''{
               "type": "eCopperFastEthernet",
               "family": "fastethernet",
               "name": "FastEthernet0/24"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "2950T-24",
+      "type": "switch",
+      "kind": "Switch",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "2950T-24",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/2"
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/3"
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/4"
+            },
+            {
+              "index": 4,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/5"
+            },
+            {
+              "index": 5,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/6"
+            },
+            {
+              "index": 6,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/7"
+            },
+            {
+              "index": 7,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/8"
+            },
+            {
+              "index": 8,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/9"
+            },
+            {
+              "index": 9,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/10"
+            },
+            {
+              "index": 10,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/11"
+            },
+            {
+              "index": 11,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/12"
+            },
+            {
+              "index": 12,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/13"
+            },
+            {
+              "index": 13,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/14"
+            },
+            {
+              "index": 14,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/15"
+            },
+            {
+              "index": 15,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/16"
+            },
+            {
+              "index": 16,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/17"
+            },
+            {
+              "index": 17,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/18"
+            },
+            {
+              "index": 18,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/19"
+            },
+            {
+              "index": 19,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/20"
+            },
+            {
+              "index": 20,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/21"
+            },
+            {
+              "index": 21,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/22"
+            },
+            {
+              "index": 22,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/23"
+            },
+            {
+              "index": 23,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/24"
+            },
+            {
+              "index": 24,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/1"
+            },
+            {
+              "index": 25,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/2"
             }
           ],
           "hasConfig": true
@@ -805,6 +1215,361 @@ CATALOG = json.loads(r'''{
       ]
     },
     {
+      "model": "3650-24PS",
+      "type": "switch",
+      "kind": "MultiLayerSwitch",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "3650-24PS+C3650-BUILTIN+C3650-SFP-BUILTIN",
+          "modules": [
+            "C3650-BUILTIN",
+            "C3650-SFP-BUILTIN"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/1"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/2"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/3"
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/4"
+            },
+            {
+              "index": 4,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/5"
+            },
+            {
+              "index": 5,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/6"
+            },
+            {
+              "index": 6,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/7"
+            },
+            {
+              "index": 7,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/8"
+            },
+            {
+              "index": 8,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/9"
+            },
+            {
+              "index": 9,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/10"
+            },
+            {
+              "index": 10,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/11"
+            },
+            {
+              "index": 11,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/12"
+            },
+            {
+              "index": 12,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/13"
+            },
+            {
+              "index": 13,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/14"
+            },
+            {
+              "index": 14,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/15"
+            },
+            {
+              "index": 15,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/16"
+            },
+            {
+              "index": 16,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/17"
+            },
+            {
+              "index": 17,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/18"
+            },
+            {
+              "index": 18,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/19"
+            },
+            {
+              "index": 19,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/20"
+            },
+            {
+              "index": 20,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/21"
+            },
+            {
+              "index": 21,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/22"
+            },
+            {
+              "index": 22,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/23"
+            },
+            {
+              "index": 23,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/24"
+            },
+            {
+              "index": 24,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/1/1"
+            },
+            {
+              "index": 25,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/1/2"
+            },
+            {
+              "index": 26,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/1/3"
+            },
+            {
+              "index": 27,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/1/4"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "3702i",
+      "type": "wireless",
+      "kind": "LightWeightAccessPoint",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "3702i",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0"
+            },
+            {
+              "index": 1,
+              "type": "eAccessPointWirelessN",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "5505",
+      "type": "firewall",
+      "kind": "ASA",
+      "aliases": [
+        "ASA5505",
+        "ASA 5505",
+        "5505"
+      ],
+      "variants": [
+        {
+          "key": "5505+ASA-Cover",
+          "modules": [
+            "ASA-Cover"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": "Ethernet0/0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": "Ethernet0/1"
+            },
+            {
+              "index": 2,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": "Ethernet0/2"
+            },
+            {
+              "index": 3,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": "Ethernet0/3"
+            },
+            {
+              "index": 4,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": "Ethernet0/4"
+            },
+            {
+              "index": 5,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": "Ethernet0/5"
+            },
+            {
+              "index": 6,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": "Ethernet0/6"
+            },
+            {
+              "index": 7,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": "Ethernet0/7"
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
+      "model": "5506-X",
+      "type": "firewall",
+      "kind": "ASA",
+      "aliases": [
+        "ASA5506",
+        "ASA 5506",
+        "5506"
+      ],
+      "variants": [
+        {
+          "key": "5506-X",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/1"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/2"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/3"
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/4"
+            },
+            {
+              "index": 4,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/5"
+            },
+            {
+              "index": 5,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/6"
+            },
+            {
+              "index": 6,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/7"
+            },
+            {
+              "index": 7,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/8"
+            },
+            {
+              "index": 8,
+              "type": "eCopperGigabitManagement",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
+    },
+    {
       "model": "7960",
       "type": "phone",
       "kind": "IpPhone",
@@ -1116,13 +1881,6 @@ CATALOG = json.loads(r'''{
       ]
     },
     {
-      "model": "AC",
-      "type": "iot",
-      "kind": "MCUComponent",
-      "aliases": [],
-      "variants": []
-    },
-    {
       "model": "AccessPoint-PT",
       "type": "wireless",
       "kind": "AccessPoint",
@@ -1181,6 +1939,35 @@ CATALOG = json.loads(r'''{
       ]
     },
     {
+      "model": "AccessPoint-PT-AC",
+      "type": "wireless",
+      "kind": "AccessPoint",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "AccessPoint-PT-AC+PT-REPEATER-NM-1CGE",
+          "modules": [
+            "PT-REPEATER-NM-1CGE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0"
+            },
+            {
+              "index": 1,
+              "type": "eAccessPointWirelessAC",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
       "model": "AccessPoint-PT-N",
       "type": "wireless",
       "kind": "AccessPoint",
@@ -1213,7 +2000,9 @@ CATALOG = json.loads(r'''{
       "model": "Air Conditioner",
       "type": "iot",
       "kind": "MCUComponent",
-      "aliases": [],
+      "aliases": [
+        "AC"
+      ],
       "variants": [
         {
           "key": "Air-Conditioner+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -1238,6 +2027,117 @@ CATALOG = json.loads(r'''{
             }
           ],
           "hasConfig": false
+        },
+        {
+          "key": "Air-Conditioner+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
         }
       ]
     },
@@ -1246,14 +2146,176 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Air-Cooler+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Alarm",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Alarm+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Analog-Phone-PT",
@@ -1288,7 +2350,119 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Appliance+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Appliance(0)",
@@ -1323,31 +2497,99 @@ CATALOG = json.loads(r'''{
       ]
     },
     {
-      "model": "ASA5505",
-      "type": "firewall",
-      "kind": "firewall",
-      "aliases": [
-        "ASA 5505",
-        "5505"
-      ],
-      "variants": []
-    },
-    {
-      "model": "ASA5506",
-      "type": "firewall",
-      "kind": "firewall",
-      "aliases": [
-        "ASA 5506",
-        "5506"
-      ],
-      "variants": []
-    },
-    {
       "model": "Atm Pressure Monitor",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Atm-Pressure-Monitor+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Battery",
@@ -1418,6 +2660,117 @@ CATALOG = json.loads(r'''{
             }
           ],
           "hasConfig": false
+        },
+        {
+          "key": "Battery+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
         }
       ]
     },
@@ -1442,6 +2795,27 @@ CATALOG = json.loads(r'''{
             }
           ],
           "hasConfig": false
+        },
+        {
+          "key": "Beacon+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
         }
       ]
     },
@@ -1450,7 +2824,95 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Blower+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Bluetooth Speaker",
@@ -1485,54 +2947,295 @@ CATALOG = json.loads(r'''{
             }
           ],
           "hasConfig": false
+        },
+        {
+          "key": "Bluetooth-Speaker+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
         }
       ]
     },
     {
       "model": "Bridge-PT",
       "type": "bridge",
-      "kind": "bridge",
+      "kind": "Bridge",
       "aliases": [
         "bridge"
       ],
-      "variants": []
+      "variants": [
+        {
+          "key": "Bridge-PT+PT-SWITCH-NM-1CE",
+          "modules": [
+            "PT-SWITCH-NM-1CE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": "Ethernet0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": "Ethernet1"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
-      "model": "Cable Modem-PT",
+      "model": "Cable-Modem-PT",
       "type": "modem",
-      "kind": "modem",
+      "kind": "CableModem",
       "aliases": [
+        "Cable Modem-PT",
         "cable modem"
       ],
-      "variants": []
+      "variants": [
+        {
+          "key": "Cable-Modem-PT+PT-MODEM-NM-1CFE",
+          "modules": [
+            "PT-MODEM-NM-1CFE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperCoaxial",
+              "family": "coaxial",
+              "name": "Port 0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "Port 1"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Carbon Dioxide Detector",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Carbon-Dioxide-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Carbon Monoxide Detector",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
-    },
-    {
-      "model": "Ceiling Fan",
-      "type": "iot",
-      "kind": "MCUComponent",
-      "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Carbon-Monoxide-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Ceiling Sprinkler",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Ceiling-Sprinkler+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Cell-Tower",
@@ -1716,12 +3419,123 @@ CATALOG = json.loads(r'''{
     {
       "model": "Cloud-PT",
       "type": "cloud",
-      "kind": "cloud",
+      "kind": "Cloud",
       "aliases": [
         "cloud",
         "internet cloud"
       ],
-      "variants": []
+      "variants": [
+        {
+          "key": "Cloud-PT+PT-CLOUD-NM-1S+PT-CLOUD-NM-1AM+PT-CLOUD-NM-1CE+PT-CLOUD-NM-1CX",
+          "modules": [
+            "PT-CLOUD-NM-1S",
+            "PT-CLOUD-NM-1AM",
+            "PT-CLOUD-NM-1CE",
+            "PT-CLOUD-NM-1CX"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eSerial",
+              "family": "serial",
+              "name": "Serial0"
+            },
+            {
+              "index": 1,
+              "type": "eSerial",
+              "family": "serial",
+              "name": "Serial1"
+            },
+            {
+              "index": 2,
+              "type": "eSerial",
+              "family": "serial",
+              "name": "Serial2"
+            },
+            {
+              "index": 3,
+              "type": "eSerial",
+              "family": "serial",
+              "name": "Serial3"
+            },
+            {
+              "index": 4,
+              "type": "eModem",
+              "family": "modem",
+              "name": "Modem0"
+            },
+            {
+              "index": 5,
+              "type": "eModem",
+              "family": "modem",
+              "name": "Modem1"
+            },
+            {
+              "index": 6,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": "Ethernet0"
+            },
+            {
+              "index": 7,
+              "type": "eCopperCoaxial",
+              "family": "coaxial",
+              "name": "Coaxial7"
+            },
+            {
+              "index": 8,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 9,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 10,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 11,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 12,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 13,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Cloud-PT-Empty",
+      "type": "cloud",
+      "kind": "Cloud",
+      "aliases": [],
+      "variants": [
+        {
+          "key": "Cloud-PT-Empty",
+          "modules": [],
+          "ports": [],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "CO Detector",
@@ -1741,6 +3555,46 @@ CATALOG = json.loads(r'''{
               "type": "eCopperFastEthernet",
               "family": "fastethernet",
               "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "CoAxialSplitter-PT",
+      "type": "splitter",
+      "kind": "CoAxialSplitter",
+      "aliases": [
+        "Coaxial Splitter",
+        "coaxial splitter",
+        "splitter"
+      ],
+      "variants": [
+        {
+          "key": "CoAxialSplitter-PT",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperCoaxial",
+              "family": "coaxial",
+              "name": "Port 0",
+              "namingEvidence": "PT-authored tvcoaxiatpcserver.pkt cable endpoint"
+            },
+            {
+              "index": 1,
+              "type": "eCopperCoaxial",
+              "family": "coaxial",
+              "name": "Port 1",
+              "namingEvidence": "PT-authored tvcoaxiatpcserver.pkt cable endpoint"
+            },
+            {
+              "index": 2,
+              "type": "eCopperCoaxial",
+              "family": "coaxial",
+              "name": "Port 2",
+              "namingEvidence": "PT-authored tvcoaxiatpcserver.pkt cable endpoint"
             }
           ],
           "hasConfig": false
@@ -1810,7 +3664,88 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Dimmable-LED+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "DLC100",
@@ -1909,17 +3844,272 @@ CATALOG = json.loads(r'''{
             }
           ],
           "hasConfig": false
+        },
+        {
+          "key": "Door+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
         }
       ]
     },
     {
-      "model": "DSL Modem-PT",
+      "model": "DSL-Modem-PT",
       "type": "modem",
-      "kind": "modem",
+      "kind": "DslModem",
       "aliases": [
+        "DSL Modem-PT",
         "dsl modem"
       ],
-      "variants": []
+      "variants": [
+        {
+          "key": "DSL-Modem-PT+PT-MODEM-NM-1CFE",
+          "modules": [
+            "PT-MODEM-NM-1CFE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eModem",
+              "family": "modem",
+              "name": "Modem0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
+    },
+    {
+      "model": "Fan",
+      "type": "iot",
+      "kind": "MCUComponent",
+      "aliases": [
+        "Ceiling Fan"
+      ],
+      "variants": [
+        {
+          "key": "Fan+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Fire Monitor",
@@ -1996,14 +4186,176 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Flex-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Floor Sprinkler",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Floor-Sprinkler+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Furnace",
@@ -2031,6 +4383,117 @@ CATALOG = json.loads(r'''{
               "family": "io",
               "name": "D0",
               "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "Furnace+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
             }
           ],
           "hasConfig": false
@@ -2066,6 +4529,117 @@ CATALOG = json.loads(r'''{
             }
           ],
           "hasConfig": false
+        },
+        {
+          "key": "Garage-Door+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
         }
       ]
     },
@@ -2074,21 +4648,264 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Generic-Environment-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Generic Sensor",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Generic-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Heating Element",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Heating-Element+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Home Speaker",
@@ -2116,6 +4933,117 @@ CATALOG = json.loads(r'''{
               "family": "io",
               "name": "A0",
               "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "Home-Speaker+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
             }
           ],
           "hasConfig": false
@@ -2324,6 +5252,117 @@ CATALOG = json.loads(r'''{
             }
           ],
           "hasConfig": false
+        },
+        {
+          "key": "Humidifier+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
         }
       ]
     },
@@ -2348,6 +5387,46 @@ CATALOG = json.loads(r'''{
             }
           ],
           "hasConfig": false
+        },
+        {
+          "key": "Humidity-Monitor+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
         }
       ]
     },
@@ -2356,21 +5435,224 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Humidity-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Humiture Monitor",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Humiture-Monitor+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Humiture Sensor",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Humiture-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "IE-2000",
@@ -2610,6 +5892,214 @@ CATALOG = json.loads(r'''{
       "kind": "MultiLayerSwitch",
       "aliases": [],
       "variants": [
+        {
+          "key": "IE-9320+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN+GLC-TE+GLC-LX-SM-RGD",
+          "modules": [
+            "9320-AC-POWER-SUPPLY",
+            "C9320-SFP-BUILTIN",
+            "GLC-TE",
+            "GLC-LX-SM-RGD"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/1",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/2",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/3",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/4",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 4,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/5",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 5,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/6",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 6,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/7",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 7,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/8",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 8,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/9",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 9,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/10",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 10,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/11",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 11,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/12",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 12,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/13",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 13,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/14",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 14,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/15",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 15,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/16",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 16,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/17",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 17,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/18",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 18,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/19",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 19,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/20",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 20,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/21",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 21,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/22",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 22,
+              "type": "eFiberGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/23",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 23,
+              "type": "eFiberGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/24",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 24,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/25",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 25,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/26",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 26,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/27",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 27,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/0/28",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            }
+          ],
+          "hasConfig": true
+        },
         {
           "key": "IE-9320+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN+GLC-LX-SM-RGD+GLC-TE",
           "modules": [
@@ -2998,209 +6488,178 @@ CATALOG = json.loads(r'''{
           "hasConfig": true
         },
         {
-          "key": "IE-9320+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN+GLC-TE+GLC-LX-SM-RGD",
+          "key": "IE-9320+C9320-SFP-BUILTIN",
           "modules": [
-            "9320-AC-POWER-SUPPLY",
-            "C9320-SFP-BUILTIN",
-            "GLC-TE",
-            "GLC-LX-SM-RGD"
+            "C9320-SFP-BUILTIN"
           ],
           "ports": [
             {
               "index": 0,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/1",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/1"
             },
             {
               "index": 1,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/2",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/2"
             },
             {
               "index": 2,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/3",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/3"
             },
             {
               "index": 3,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/4",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/4"
             },
             {
               "index": 4,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/5",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/5"
             },
             {
               "index": 5,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/6",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/6"
             },
             {
               "index": 6,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/7",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/7"
             },
             {
               "index": 7,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/8",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/8"
             },
             {
               "index": 8,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/9",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/9"
             },
             {
               "index": 9,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/10",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/10"
             },
             {
               "index": 10,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/11",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/11"
             },
             {
               "index": 11,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/12",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/12"
             },
             {
               "index": 12,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/13",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/13"
             },
             {
               "index": 13,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/14",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/14"
             },
             {
               "index": 14,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/15",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/15"
             },
             {
               "index": 15,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/16",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/16"
             },
             {
               "index": 16,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/17",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/17"
             },
             {
               "index": 17,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/18",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/18"
             },
             {
               "index": 18,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/19",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/19"
             },
             {
               "index": 19,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/20",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/20"
             },
             {
               "index": 20,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/21",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/21"
             },
             {
               "index": 21,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/22",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/22"
             },
             {
               "index": 22,
-              "type": "eFiberGigabitEthernet",
+              "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/23",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/23"
             },
             {
               "index": 23,
-              "type": "eFiberGigabitEthernet",
+              "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/24",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/24"
             },
             {
               "index": 24,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/25",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/25"
             },
             {
               "index": 25,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/26",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/26"
             },
             {
               "index": 26,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/27",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/27"
             },
             {
               "index": 27,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/0/28",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1/0/28"
             }
           ],
           "hasConfig": true
@@ -3214,10 +6673,11 @@ CATALOG = json.loads(r'''{
       "aliases": [],
       "variants": [
         {
-          "key": "IE-9320-26S2C+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN",
+          "key": "IE-9320-26S2C+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN+GLC-TE",
           "modules": [
             "9320-AC-POWER-SUPPLY",
-            "C9320-SFP-BUILTIN"
+            "C9320-SFP-BUILTIN",
+            "GLC-TE"
           ],
           "ports": [
             {
@@ -3392,11 +6852,10 @@ CATALOG = json.loads(r'''{
           "hasConfig": true
         },
         {
-          "key": "IE-9320-26S2C+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN+GLC-TE",
+          "key": "IE-9320-26S2C+9320-AC-POWER-SUPPLY+C9320-SFP-BUILTIN",
           "modules": [
             "9320-AC-POWER-SUPPLY",
-            "C9320-SFP-BUILTIN",
-            "GLC-TE"
+            "C9320-SFP-BUILTIN"
           ],
           "ports": [
             {
@@ -3739,6 +7198,52 @@ CATALOG = json.loads(r'''{
       "aliases": [],
       "variants": [
         {
+          "key": "ISA-3000+ISA-DC-POWER-ADAPTER-A+ISA-DC-POWER-ADAPTER-B+ISA3000-SFP-BUILTIN+GLC-LX-SM-RGD",
+          "modules": [
+            "ISA-DC-POWER-ADAPTER-A",
+            "ISA-DC-POWER-ADAPTER-B",
+            "ISA3000-SFP-BUILTIN",
+            "GLC-LX-SM-RGD"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitManagement",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/1",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/2",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 3,
+              "type": "eFiberGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/3",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            },
+            {
+              "index": 4,
+              "type": "eFiberGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1/4",
+              "namingEvidence": "Bundled PT-authored interface configuration"
+            }
+          ],
+          "hasConfig": true
+        },
+        {
           "key": "ISA-3000+ISA-DC-POWER-ADAPTER-A+ISA-DC-POWER-ADAPTER-B+ISA3000-SFP-BUILTIN",
           "modules": [
             "ISA-DC-POWER-ADAPTER-A",
@@ -3784,12 +7289,9 @@ CATALOG = json.loads(r'''{
           "hasConfig": true
         },
         {
-          "key": "ISA-3000+ISA-DC-POWER-ADAPTER-A+ISA-DC-POWER-ADAPTER-B+ISA3000-SFP-BUILTIN+GLC-LX-SM-RGD",
+          "key": "ISA-3000+ISA3000-SFP-BUILTIN",
           "modules": [
-            "ISA-DC-POWER-ADAPTER-A",
-            "ISA-DC-POWER-ADAPTER-B",
-            "ISA3000-SFP-BUILTIN",
-            "GLC-LX-SM-RGD"
+            "ISA3000-SFP-BUILTIN"
           ],
           "ports": [
             {
@@ -3802,32 +7304,28 @@ CATALOG = json.loads(r'''{
               "index": 1,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/1",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet0"
             },
             {
               "index": 2,
               "type": "eCopperGigabitEthernet",
               "family": "gigabitethernet",
-              "name": "GigabitEthernet1/2",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "name": "GigabitEthernet1"
             },
             {
               "index": 3,
               "type": "eFiberGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/3",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "family": "",
+              "name": ""
             },
             {
               "index": 4,
               "type": "eFiberGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": "GigabitEthernet1/4",
-              "namingEvidence": "Bundled PT-authored interface configuration"
+              "family": "",
+              "name": ""
             }
           ],
-          "hasConfig": true
+          "hasConfig": false
         }
       ]
     },
@@ -3938,8 +7436,10 @@ CATALOG = json.loads(r'''{
       "aliases": [],
       "variants": [
         {
-          "key": "LAP-PT",
-          "modules": [],
+          "key": "LAP-PT+ACCESS_POINT_POWER_ADAPTER",
+          "modules": [
+            "ACCESS_POINT_POWER_ADAPTER"
+          ],
           "ports": [
             {
               "index": 0,
@@ -3957,10 +7457,8 @@ CATALOG = json.loads(r'''{
           "hasConfig": false
         },
         {
-          "key": "LAP-PT+ACCESS_POINT_POWER_ADAPTER",
-          "modules": [
-            "ACCESS_POINT_POWER_ADAPTER"
-          ],
+          "key": "LAP-PT",
+          "modules": [],
           "ports": [
             {
               "index": 0,
@@ -4046,7 +7544,119 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Lawn-Sprinkler+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "LCD",
@@ -4141,6 +7751,117 @@ CATALOG = json.loads(r'''{
               "family": "io",
               "name": "D0",
               "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "Light+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
             }
           ],
           "hasConfig": false
@@ -4298,6 +8019,23 @@ CATALOG = json.loads(r'''{
           "hasConfig": false
         },
         {
+          "key": "MCU-PT+PT-IOT-NM-1CGE+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CGE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-IOT-POWER-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        },
+        {
           "key": "MCU-PT+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER",
           "modules": [
             "PT-IOT-NM-1CFE",
@@ -4324,23 +8062,6 @@ CATALOG = json.loads(r'''{
               "family": "io",
               "name": "D1",
               "namingEvidence": "PT-authored saved cable endpoint"
-            }
-          ],
-          "hasConfig": false
-        },
-        {
-          "key": "MCU-PT+PT-IOT-NM-1CGE+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER",
-          "modules": [
-            "PT-IOT-NM-1CGE",
-            "PT-IOT-CUSTOM-IO",
-            "PT-IOT-POWER-ADAPTER"
-          ],
-          "ports": [
-            {
-              "index": 0,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": ""
             }
           ],
           "hasConfig": false
@@ -4464,6 +8185,91 @@ CATALOG = json.loads(r'''{
             }
           ],
           "hasConfig": false
+        },
+        {
+          "key": "Meraki-MX65W",
+          "modules": [],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet1"
+            },
+            {
+              "index": 2,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet2"
+            },
+            {
+              "index": 3,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet3"
+            },
+            {
+              "index": 4,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet4"
+            },
+            {
+              "index": 5,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet5"
+            },
+            {
+              "index": 6,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet6"
+            },
+            {
+              "index": 7,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet7"
+            },
+            {
+              "index": 8,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet8"
+            },
+            {
+              "index": 9,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet9"
+            },
+            {
+              "index": 10,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            },
+            {
+              "index": 11,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet1"
+            },
+            {
+              "index": 12,
+              "type": "eAccessPointWirelessAC",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
         }
       ]
     },
@@ -4520,14 +8326,136 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Motion-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Motion Sensor",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Motion-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Motor",
@@ -4612,6 +8540,27 @@ CATALOG = json.loads(r'''{
       "aliases": [],
       "variants": [
         {
+          "key": "PC-PT+PT-HOST-NM-1CFE",
+          "modules": [
+            "PT-HOST-NM-1CFE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        },
+        {
           "key": "PC-PT+Linksys-WMP300N",
           "modules": [
             "Linksys-WMP300N"
@@ -4644,27 +8593,6 @@ CATALOG = json.loads(r'''{
             {
               "index": 4,
               "type": "",
-              "family": "",
-              "name": ""
-            }
-          ],
-          "hasConfig": false
-        },
-        {
-          "key": "PC-PT+PT-HOST-NM-1CFE",
-          "modules": [
-            "PT-HOST-NM-1CFE"
-          ],
-          "ports": [
-            {
-              "index": 0,
-              "type": "eCopperFastEthernet",
-              "family": "fastethernet",
-              "name": "FastEthernet0"
-            },
-            {
-              "index": 1,
-              "type": "eBluetooth",
               "family": "",
               "name": ""
             }
@@ -4711,7 +8639,88 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Photo-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Piezo Speaker",
@@ -4768,7 +8777,48 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Portable-Music-Player+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Potentiometer",
@@ -4863,6 +8913,117 @@ CATALOG = json.loads(r'''{
             }
           ],
           "hasConfig": false
+        },
+        {
+          "key": "Power-Meter+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
         }
       ]
     },
@@ -4870,7 +9031,9 @@ CATALOG = json.loads(r'''{
       "model": "Printer-PT",
       "type": "printer",
       "kind": "Printer",
-      "aliases": [],
+      "aliases": [
+        "printer"
+      ],
       "variants": [
         {
           "key": "Printer-PT+PT-HOST-NM-1CFE",
@@ -5011,11 +9174,33 @@ CATALOG = json.loads(r'''{
     {
       "model": "Repeater-PT",
       "type": "repeater",
-      "kind": "repeater",
+      "kind": "Repeater",
       "aliases": [
         "repeater"
       ],
-      "variants": []
+      "variants": [
+        {
+          "key": "Repeater-PT+PT-REPEATER-NM-1CE",
+          "modules": [
+            "PT-REPEATER-NM-1CE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": "Ethernet0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperEthernet",
+              "family": "ethernet",
+              "name": "Ethernet1"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "RFID Card",
@@ -5029,7 +9214,24 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "RFID-Reader+PT-IOT-NM-1CFE+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "RGB LED",
@@ -5177,6 +9379,41 @@ CATALOG = json.loads(r'''{
       "aliases": [],
       "variants": [
         {
+          "key": "SBC-PT+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER+PT-IOT-NM-1W-AC",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-IOT-POWER-ADAPTER",
+            "PT-IOT-NM-1W-AC"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessAC",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        },
+        {
           "key": "SBC-PT+PT-IOE-CUSTOM-IO+PT-IOE-POWER-ADAPTER+PT-IOE-NM-1W-AC",
           "modules": [
             "PT-IOE-CUSTOM-IO",
@@ -5237,41 +9474,6 @@ CATALOG = json.loads(r'''{
               "family": "io",
               "name": "D0",
               "namingEvidence": "PT-authored saved cable endpoint"
-            }
-          ],
-          "hasConfig": false
-        },
-        {
-          "key": "SBC-PT+PT-IOT-CUSTOM-IO+PT-IOT-POWER-ADAPTER+PT-IOT-NM-1W-AC",
-          "modules": [
-            "PT-IOT-CUSTOM-IO",
-            "PT-IOT-POWER-ADAPTER",
-            "PT-IOT-NM-1W-AC"
-          ],
-          "ports": [
-            {
-              "index": 0,
-              "type": "eHostWirelessAC",
-              "family": "",
-              "name": ""
-            },
-            {
-              "index": 1,
-              "type": "eBluetooth",
-              "family": "",
-              "name": ""
-            },
-            {
-              "index": 2,
-              "type": "",
-              "family": "",
-              "name": ""
-            },
-            {
-              "index": 3,
-              "type": "",
-              "family": "",
-              "name": ""
             }
           ],
           "hasConfig": false
@@ -5384,28 +9586,6 @@ CATALOG = json.loads(r'''{
           "hasConfig": false
         },
         {
-          "key": "Server-PT+PT-HOST-NM-1CFE+PT-HOST-NM-1CGE",
-          "modules": [
-            "PT-HOST-NM-1CFE",
-            "PT-HOST-NM-1CGE"
-          ],
-          "ports": [
-            {
-              "index": 0,
-              "type": "eCopperFastEthernet",
-              "family": "fastethernet",
-              "name": "FastEthernet0"
-            },
-            {
-              "index": 1,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": ""
-            }
-          ],
-          "hasConfig": false
-        },
-        {
           "key": "Server-PT+PT-HOST-NM-1W",
           "modules": [
             "PT-HOST-NM-1W"
@@ -5431,6 +9611,28 @@ CATALOG = json.loads(r'''{
             }
           ],
           "hasConfig": false
+        },
+        {
+          "key": "Server-PT+PT-HOST-NM-1CFE+PT-HOST-NM-1CGE",
+          "modules": [
+            "PT-HOST-NM-1CFE",
+            "PT-HOST-NM-1CGE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
         }
       ]
     },
@@ -5439,7 +9641,88 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Servo+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Signal Generator",
@@ -5478,7 +9761,119 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Siren+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Smart LED",
@@ -5604,14 +9999,136 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Smoke-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Smoke Sensor",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Smoke-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Sniffer",
@@ -5689,6 +10206,117 @@ CATALOG = json.loads(r'''{
             }
           ],
           "hasConfig": false
+        },
+        {
+          "key": "Solar-Panel+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
         }
       ]
     },
@@ -5697,7 +10325,119 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Sound-Frequency-Detector+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Sound Sensor",
@@ -5729,28 +10469,192 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Speaker+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Street Lamp",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Street-Lamp+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Switch-PT",
       "type": "switch",
-      "kind": "switch",
+      "kind": "Switch",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Switch-PT+PT-SWITCH-NM-1CFE+PT-SWITCH-NM-1FFE",
+          "modules": [
+            "PT-SWITCH-NM-1CFE",
+            "PT-SWITCH-NM-1FFE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0/1"
+            },
+            {
+              "index": 1,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet1/1"
+            },
+            {
+              "index": 2,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet2/1"
+            },
+            {
+              "index": 3,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet3/1"
+            },
+            {
+              "index": 4,
+              "type": "eFiberFastEthernet",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 5,
+              "type": "eFiberFastEthernet",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": true
+        }
+      ]
     },
     {
       "model": "Switch-PT-Empty",
       "type": "switch",
-      "kind": "switch",
+      "kind": "Switch",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Switch-PT-Empty",
+          "modules": [],
+          "ports": [],
+          "hasConfig": true
+        }
+      ]
     },
     {
       "model": "TabletPC-PT",
@@ -5866,6 +10770,46 @@ CATALOG = json.loads(r'''{
             }
           ],
           "hasConfig": false
+        },
+        {
+          "key": "Temperature-Monitor+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
         }
       ]
     },
@@ -5930,6 +10874,117 @@ CATALOG = json.loads(r'''{
             }
           ],
           "hasConfig": false
+        },
+        {
+          "key": "Thermostat+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
         }
       ]
     },
@@ -5951,6 +11006,55 @@ CATALOG = json.loads(r'''{
               "type": "eCustomIO",
               "family": "io",
               "name": "D0",
+              "namingEvidence": "PT-authored saved cable endpoint"
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "Thing+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [],
+          "hasConfig": false
+        },
+        {
+          "key": "Thing+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        },
+        {
+          "key": "Thing+PT-IOT-NM-1CGE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CGE",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
               "namingEvidence": "PT-authored saved cable endpoint"
             }
           ],
@@ -6000,55 +11104,6 @@ CATALOG = json.loads(r'''{
             }
           ],
           "hasConfig": false
-        },
-        {
-          "key": "Thing+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
-          "modules": [
-            "PT-IOT-NM-1CFE",
-            "PT-IOT-CUSTOM-IO",
-            "PT-UNV-PWR-ADAPTER"
-          ],
-          "ports": [
-            {
-              "index": 0,
-              "type": "eCopperFastEthernet",
-              "family": "fastethernet",
-              "name": ""
-            }
-          ],
-          "hasConfig": false
-        },
-        {
-          "key": "Thing+PT-IOT-NM-1CGE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
-          "modules": [
-            "PT-IOT-NM-1CGE",
-            "PT-IOT-CUSTOM-IO",
-            "PT-UNV-PWR-ADAPTER"
-          ],
-          "ports": [
-            {
-              "index": 0,
-              "type": "eCopperGigabitEthernet",
-              "family": "gigabitethernet",
-              "name": ""
-            },
-            {
-              "index": -1,
-              "type": "eCustomIO",
-              "family": "io",
-              "name": "A0",
-              "namingEvidence": "PT-authored saved cable endpoint"
-            }
-          ],
-          "hasConfig": false
-        },
-        {
-          "key": "Thing+PT-UNV-PWR-ADAPTER",
-          "modules": [
-            "PT-UNV-PWR-ADAPTER"
-          ],
-          "ports": [],
-          "hasConfig": false
         }
       ]
     },
@@ -6057,27 +11112,208 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Toggle-Push-Button+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Trip Sensor",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Trip-Sensor+PT-IOT-NM-1CFE+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1CFE",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eCopperFastEthernet",
+              "family": "fastethernet",
+              "name": "FastEthernet0"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Trip Wire",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Trip-Wire+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "TV-PT",
       "type": "tv",
       "kind": "TV",
-      "aliases": [],
+      "aliases": [
+        "smart tv"
+      ],
       "variants": [
         {
           "key": "TV-PT",
@@ -6086,8 +11322,8 @@ CATALOG = json.loads(r'''{
             {
               "index": 0,
               "type": "eCopperCoaxial",
-              "family": "",
-              "name": ""
+              "family": "coaxial",
+              "name": "Port0"
             }
           ],
           "hasConfig": false
@@ -6099,49 +11335,605 @@ CATALOG = json.loads(r'''{
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Water-Detector+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Water Drain",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Water-Drain+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Water Level Monitor",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Water-Level-Monitor+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Water Sensor",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Water-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Webcam",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Webcam+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER+PT-IOT-NM-1CGE",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER",
+            "PT-IOT-NM-1CGE"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eCopperGigabitEthernet",
+              "family": "gigabitethernet",
+              "name": "GigabitEthernet0"
+            },
+            {
+              "index": 2,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 5,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Wind Detector",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Wind-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-NM-1W",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": 0,
+              "type": "eHostWirelessN",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 1,
+              "type": "eBluetooth",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 2,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 3,
+              "type": "",
+              "family": "",
+              "name": ""
+            },
+            {
+              "index": 4,
+              "type": "",
+              "family": "",
+              "name": ""
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Wind Sensor",
       "type": "iot",
       "kind": "MCUComponent",
       "aliases": [],
-      "variants": []
+      "variants": [
+        {
+          "key": "Wind-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+          "modules": [
+            "PT-IOT-CUSTOM-IO",
+            "PT-UNV-PWR-ADAPTER"
+          ],
+          "ports": [
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D3",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D4",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "D5",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A0",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A1",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A2",
+              "namingEvidence": "PT custom-IO slot order"
+            },
+            {
+              "index": -1,
+              "type": "eCustomIO",
+              "family": "io",
+              "name": "A3",
+              "namingEvidence": "PT custom-IO slot order"
+            }
+          ],
+          "hasConfig": false
+        }
+      ]
     },
     {
       "model": "Wind Turbine",

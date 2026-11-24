@@ -122,13 +122,63 @@ class PktTemplateDevice {
   /// module and never written out), so the manifest recorded it empty and no
   /// cable could ever reference it - the access point was placed in the
   /// workspace floating, cabled to nothing. 34 models were in that state.
+  /// Kinds whose copper ports Packet Tracer addresses by interface name:
+  /// IOS gear and end hosts, whose real names the saves carry. Everything
+  /// else exposes generic module pins that PT labels "Port 0", "Port 1"...,
+  /// and cabling those by an invented interface name makes PT refuse the
+  /// whole save as incompatible.
+  static const _familyPortKinds = <String>{
+    'router',
+    'switch',
+    'multilayerswitch',
+    'asa',
+    'isa',
+    'pc',
+    'laptop',
+    'server',
+    'printer',
+    'wiredenddevice',
+  };
+  static const _ethernetFamilies = <String>{
+    'ethernet',
+    'fastethernet',
+    'gigabitethernet',
+  };
+  static final _familyGuess = RegExp(
+    r'^(?:FastEthernet|GigabitEthernet|Ethernet)\d+$',
+  );
+
+  /// True when PT labels this kind's copper pins "Port N".
+  bool get usesGenericPortNames {
+    final name = kind.trim().toLowerCase();
+    return name.isNotEmpty && !_familyPortKinds.contains(name);
+  }
+
   PktTemplateDevice withNamedPorts() {
     final taken = <String>{
       for (final p in ports)
         if (p.name.isNotEmpty) p.name,
     };
     final out = <PktTemplatePort>[];
+    final generic = usesGenericPortNames;
+    var slot = 0;
     for (final p in ports) {
+      if (generic && _ethernetFamilies.contains(p.family)) {
+        final current = p.name;
+        final name = current.isEmpty || _familyGuess.hasMatch(current)
+            ? 'Port $slot'
+            : current;
+        slot++;
+        out.add(
+          PktTemplatePort(
+            index: p.index,
+            type: p.type,
+            family: p.family,
+            name: name,
+          ),
+        );
+        continue;
+      }
       if (p.name.isNotEmpty) {
         out.add(p);
         continue;

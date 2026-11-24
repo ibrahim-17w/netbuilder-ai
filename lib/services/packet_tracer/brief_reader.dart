@@ -1,4 +1,5 @@
 import '../../models/network_intent.dart';
+import 'endpoint_reference.dart';
 import 'catalog.dart';
 
 class _Binding {
@@ -7,12 +8,20 @@ class _Binding {
   final PtDevice? device;
   final String? requestedModel;
   final List<String> modules;
+
+  /// True when the name is a connection-sentence phrase ("the cable modem")
+  /// rather than an inventory label. A phrase binding contributes its type
+  /// and device to the counted node it lands on, but must not RENAME that
+  /// node to the phrase - "cable modem" is not a legal hostname and buries
+  /// the planner's own CLOUD1/MODEM1 identity.
+  final bool phrase;
   const _Binding(
     this.name,
     this.type, {
     this.device,
     this.requestedModel,
     this.modules = const [],
+    this.phrase = false,
   });
 
   String? get model => requestedModel ?? device?.model;
@@ -92,10 +101,14 @@ class PtBriefRequest {
   static const _port =
       r'(?:FastEthernet|GigabitEthernet|TenGigabitEthernet|TwentyFiveGigE|HundredGigE|Ethernet|Serial|Async|Fa|Gi|Te|Eth|Se|F|G|S)\s*\d+(?:/\d+){0,3}|RS[- ]?232\d*|Console\s*\d*|Aux(?:iliary)?\s*\d*|USB\s*\d*|Coax(?:ial)?\s*\d*|Modem\s*\d*|Phone\s*\d*|(?:GPIO|D|A)\d+|Port\s*\d+(?:/\d+)*';
   static const _label =
-      r'`[^`\n]+`|"[^"\n]+"|\x27[^\x27\n]+\x27|(?:Multilayer Switch|Access Point|Wireless Router|IP Phone|Analog Phone|Home VoIP|Central Office Server|Cell Tower|Power Distribution Device)\s*\d+|[A-Za-z][A-Za-z0-9_.-]*';
+      r'`[^`\n]+`|"[^"\n]+"|\x27[^\x27\n]+\x27|(?:Multilayer Switch|Access Point|Wireless Router|IP Phone|Analog Phone|Home VoIP|Central Office Server|Cell Tower|Power Distribution Device|Cable Modem|DSL Modem|IoT Server)\s*\d*|[A-Za-z][A-Za-z0-9_.-]*';
+  // "to the cloud Coaxial7": briefs put an article before the second
+  // endpoint, so every joiner skips an optional "the" before the label.
+  static final _joiner =
+      r'(?:connects?\s+to|connected\s+to|to|->|→|and)\s*(?:the\s+)?';
   static final _connection = RegExp(
     '($_label)\\s+($_port)\\s*'
-    r'(?:connects?\s+to|connected\s+to|to|->|→|and)\s*'
+    '$_joiner'
     '($_label)\\s+($_port)',
     caseSensitive: false,
   );
@@ -105,7 +118,7 @@ class PtBriefRequest {
   // second explicit form instead of dropping these exact connections.
   static final _combinedConnection = RegExp(
     '`([^`\\n]+?\\s+$_port)`\\s*'
-    r'(?:connects?\s+to|connected\s+to|to|->|→|and)\s*'
+    '$_joiner'
     '`([^`\\n]+?\\s+$_port)`',
     caseSensitive: false,
   );
@@ -115,12 +128,12 @@ class PtBriefRequest {
   // FastEthernet0/2". Keep that explicit switch port while deriving the
   // endpoint's single port from its model.
   static final _singlePortConnection = RegExp(
-    '($_label)\\s*(?:connects?\\s+to|connected\\s+to|to|->|→)\\s*'
+    '($_label)\\s*$_joiner'
     '($_label)\\s+($_port)',
     caseSensitive: false,
   );
   static final _singlePortReverseConnection = RegExp(
-    '($_label)\\s+($_port)\\s*(?:connects?\\s+to|connected\\s+to|to|->|→)\\s*'
+    '($_label)\\s+($_port)\\s*$_joiner'
     // Do not let the label backtrack into the middle of a name: "Router0"
     // must not become "Router" just so the port lookahead can pass. Without
     // the boundary, "PC0 RS232 to Router0 Console" produced a second console
@@ -203,6 +216,25 @@ class PtBriefRequest {
     'sbc': 'sbc',
     'mcu': 'mcu',
   };
+
+  /// The device a connection-endpoint phrase names, resolved through the
+  /// catalog's own aliases first ("cable modem", "cloud", "internet"), then
+  /// the everyday-noun map. Connection sentences reference devices by these
+  /// common nouns rather than by the CLOUD1/MODEM1 names the inventory
+  /// assigned, and binding them as 'unknown' replaced the real counted
+  /// nodes with phantom nodes no builder could place. The returned device
+  /// also lets a phrase binding adopt the model mention, so the counted
+  /// node and the link endpoint resolve to ONE device instead of adding a
+  /// second one.
+  static PtDevice? _deviceForPhrase(String phrase) {
+    final text = phrase.trim().toLowerCase();
+    if (text.isEmpty) return null;
+    return PacketTracerCatalog.instance.device(text);
+  }
+
+  static String? _typeForPhrase(String phrase) =>
+      _deviceForPhrase(phrase)?.type ??
+      _namedKinds[phrase.trim().toLowerCase()];
   static String? _typeFromName(String name) {
     final n = name.toLowerCase().replaceAll(' ', '');
     // Real lab names commonly carry a site suffix rather than a number:
@@ -540,6 +572,7 @@ class PtBriefRequest {
       PtDevice? device,
       String? requestedModel,
       List<String> modules = const [],
+      bool phrase = false,
     }) {
       final key = name.toLowerCase();
       final old = named[key];
@@ -549,6 +582,7 @@ class PtBriefRequest {
         device: device ?? old?.device,
         requestedModel: requestedModel ?? old?.requestedModel,
         modules: modules.isEmpty ? old?.modules ?? const [] : modules,
+        phrase: phrase || (old?.phrase ?? false),
       );
     }
 
@@ -732,8 +766,10 @@ class PtBriefRequest {
       if (insideEndpointRange(m.start, m.end)) continue;
       final a = _unquote(m[1]!);
       final b = _unquote(m[2]!);
-      final aType = named[a.toLowerCase()]?.type ?? _typeFromName(a);
-      final bType = named[b.toLowerCase()]?.type ?? _typeFromName(b);
+      final aType =
+          named[a.toLowerCase()]?.type ?? _typeForPhrase(a) ?? _typeFromName(a);
+      final bType =
+          named[b.toLowerCase()]?.type ?? _typeForPhrase(b) ?? _typeFromName(b);
       if (aType == null || bType == null) continue;
       matches.add((
         start: m.start,
@@ -749,8 +785,10 @@ class PtBriefRequest {
       if (insideEndpointRange(m.start, m.end)) continue;
       final a = _unquote(m[1]!);
       final b = _unquote(m[3]!);
-      final aType = named[a.toLowerCase()]?.type ?? _typeFromName(a);
-      final bType = named[b.toLowerCase()]?.type ?? _typeFromName(b);
+      final aType =
+          named[a.toLowerCase()]?.type ?? _typeForPhrase(a) ?? _typeFromName(a);
+      final bType =
+          named[b.toLowerCase()]?.type ?? _typeForPhrase(b) ?? _typeFromName(b);
       if (aType == null || bType == null) continue;
       matches.add((
         start: m.start,
@@ -921,13 +959,23 @@ class PtBriefRequest {
     ).allMatches(text)) {
       final name = match[0]!;
       if (!named.containsKey(name.toLowerCase())) {
-        bind(name, _typeFromName(name) ?? 'unknown');
+        bind(
+          name,
+          _typeForPhrase(name) ?? _typeFromName(name) ?? 'unknown',
+          device: _deviceForPhrase(name),
+          phrase: true,
+        );
       }
     }
     for (final match in matches) {
       for (final name in [match.a, match.b]) {
         if (!named.containsKey(name.toLowerCase())) {
-          bind(name, _typeFromName(name) ?? 'unknown');
+          bind(
+            name,
+            _typeForPhrase(name) ?? _typeFromName(name) ?? 'unknown',
+            device: _deviceForPhrase(name),
+            phrase: true,
+          );
         }
       }
     }
@@ -993,12 +1041,24 @@ class PtBriefRequest {
       };
       final keys = replacements.keys.toList()
         ..sort((a, b) => b.length.compareTo(a.length));
+      // Only the connection sentences may carry the prefixed node names. The
+      // inventory clause must keep its generic count words ("1 cloud"): the
+      // general planner reads counts from those words, and a prefixed name
+      // like CLOUD1 has no countable kind behind it.
+      final firstConnection =
+          RegExp(
+            r'\bconnect\b',
+            caseSensitive: false,
+          ).firstMatch(planner)?.start ??
+          -1;
       planner = planner.replaceAllMapped(
         RegExp(
           '(?<![a-z0-9_.-])(?:${keys.map(RegExp.escape).join('|')})(?![a-z0-9_.-])',
           caseSensitive: false,
         ),
-        (match) => replacements[match[0]!.toLowerCase()]!,
+        (match) => match.start >= firstConnection
+            ? replacements[match[0]!.toLowerCase()]!
+            : match[0]!,
       );
     }
     final connections = <NetLink>[];
@@ -1139,11 +1199,26 @@ class PtBriefRequest {
     }
     final queues = <String, List<_ModelMention>>{};
     for (final mention in _models) {
-      if (_bindings.values.any((b) => b.device == mention.device)) continue;
+      // A phrase binding carrying the same device is a link REFERENCE to the
+      // counted node, not the node itself - the counted node still needs the
+      // mention's model. Only a label binding (which becomes the node) may
+      // consume the mention here.
+      if (_bindings.values.any(
+        (b) => !b.phrase && b.device == mention.device,
+      )) {
+        continue;
+      }
       queues
           .putIfAbsent(mention.device.type, () => [])
           .addAll(List.filled(mention.count, mention));
     }
+    // A phrase binding counts as "referring to counted inventory" when a
+    // model mention of its kind exists, or the base plan already carries the
+    // kind and the phrase is a common noun rather than a device name.
+    bool phraseRefersToCounted(_Binding binding) =>
+        _models.any((m) => m.device.type == binding.type) ||
+        (_typeFromName(binding.name) == null &&
+            base.nodes.any((n) => n.type == binding.type));
     final labelsByType = <String, List<String>>{};
     final bindingByName = <String, _Binding>{
       for (final binding in _bindings.values)
@@ -1162,7 +1237,13 @@ class PtBriefRequest {
       }
     }
     for (final binding in _bindings.values) {
+      // A phrase that refers to counted inventory ("the cable modem" for a
+      // counted modem) is a reference, not a label: adding it would rename
+      // the counted node to an untypeable phrase. A phrase that names a NEW
+      // device (PC0 in a connect-only brief) is exactly the label the base
+      // default node needs.
       if (binding.type == 'unknown' ||
+          (binding.phrase && phraseRefersToCounted(binding)) ||
           base.nodes.any(
             (node) => node.name.toLowerCase() == binding.name.toLowerCase(),
           )) {
@@ -1200,7 +1281,15 @@ class PtBriefRequest {
       final modules = binding?.modules.isNotEmpty == true
           ? binding!.modules
           : mention?.modules ?? const <String>[];
-      final name = binding?.name ?? inventoryName ?? node.name;
+      // A phrase binding ("the cable modem") contributes its kind and device
+      // to the counted node but never renames it — the planner's own
+      // CLOUD1/MODEM1 identity is a legal hostname, the phrase is not.
+      final name =
+          (binding?.phrase == true && phraseRefersToCounted(binding!)
+              ? null
+              : binding?.name) ??
+          inventoryName ??
+          node.name;
       names[node.name] = name;
       nodes.add(
         NetNode.fromJson({
@@ -1208,14 +1297,24 @@ class PtBriefRequest {
           'name': name,
           if (binding != null || device != null)
             'type': binding?.type ?? device!.type,
-          if (binding?.model != null || device != null)
+          if (binding?.model != null || device != null) ...{
             'model': binding?.model ?? device!.model,
+            // Explicit hardware wording replaces, rather than reuses, a pin.
+            'variantKey': null,
+          },
           if (binding?.exactModel == true || device != null) 'exactModel': true,
           if (modules.isNotEmpty) 'modules': modules,
         }),
       );
     }
     for (final binding in _bindings.values) {
+      // A common-noun phrase binding ("the cable modem") is a reference to a
+      // counted node of its kind (canonicalized in the link pass), never
+      // extra inventory of its own. A phrase that IS a device name (PC0,
+      // Router0) still names a real node.
+      if (binding.phrase && phraseRefersToCounted(binding)) {
+        continue;
+      }
       if (nodes.any(
         (n) => n.name.toLowerCase() == binding.name.toLowerCase(),
       )) {
@@ -1250,13 +1349,13 @@ class PtBriefRequest {
         );
       }
     }
-    String canonical(String name) =>
-        nodes
-            .where((n) => n.name.toLowerCase() == name.toLowerCase())
-            .firstOrNull
-            ?.name ??
-        names[name] ??
-        name;
+    final ambiguousReferences = <String>{};
+    String canonical(String name) {
+      final reference = EndpointReference.resolve(name, nodes);
+      if (reference.ambiguous) ambiguousReferences.add(name);
+      return reference.node?.name ?? names[name] ?? name;
+    }
+
     final explicit = connections
         .map(
           (l) => NetLink.fromJson({
@@ -1266,34 +1365,93 @@ class PtBriefRequest {
           }),
         )
         .toList();
-    bool conflictsWithExplicit(NetLink candidate) {
-      final a = canonical(candidate.a).toLowerCase();
-      final b = canonical(candidate.b).toLowerCase();
-      final aIf = candidate.aIf.toLowerCase();
-      final bIf = candidate.bIf.toLowerCase();
-      return explicit.any((link) {
-        final x = link.a.toLowerCase(), y = link.b.toLowerCase();
-        final xIf = link.aIf.toLowerCase(), yIf = link.bIf.toLowerCase();
-        final samePair = (a == x && b == y) || (a == y && b == x);
-        final reusedPort =
-            (a == x && aIf == xIf) ||
-            (a == y && aIf == yIf) ||
-            (b == x && bIf == xIf) ||
-            (b == y && bIf == yIf);
-        return samePair || reusedPort;
-      });
+    String portKey(String node, String port) =>
+        '${node.toLowerCase()}|${ptPortName(port)}';
+    final occupied = <String>{
+      for (final link in explicit) ...[
+        portKey(link.a, link.aIf),
+        portKey(link.b, link.bIf),
+      ],
+      for (final link in base.links.where((link) => link.exactPorts)) ...[
+        portKey(canonical(link.a), link.aIf),
+        portKey(canonical(link.b), link.bIf),
+      ],
+    };
+    bool samePair(NetLink a, NetLink b) =>
+        (a.a.toLowerCase() == b.a.toLowerCase() &&
+            a.b.toLowerCase() == b.b.toLowerCase()) ||
+        (a.a.toLowerCase() == b.b.toLowerCase() &&
+            a.b.toLowerCase() == b.a.toLowerCase());
+    // Devices the brief's own connection list cables. An auto-layout edge
+    // joining two of them is the generic layout guessing before it knew the
+    // brief cabled everything itself - keeping it would leave the plan with
+    // double the cables (76 links where the brief asked for 46) and router
+    // uplinks on ports the brief assigned to the WAN triangle.
+    final explicitEndpoints = <String>{
+      for (final link in explicit) ...[
+        link.a.toLowerCase(),
+        link.b.toLowerCase(),
+      ],
+    };
+    // "Associate each laptop wirelessly ... do not cable the laptops": the
+    // brief excused a device kind from cabling, so the generic layout's
+    // auto-attached cable for it is not a guess to keep - it contradicts the
+    // brief. The wireless profile below is how those clients join.
+    final wirelessOnlyLaptops =
+        RegExp(r'laptops?', caseSensitive: false).hasMatch(raw) &&
+        RegExp(
+          r'do\s*not\s*cable|cable\s+the\s+laptops',
+          caseSensitive: false,
+        ).hasMatch(raw);
+    bool autoCabledLaptop(NetLink link) {
+      if (!wirelessOnlyLaptops) return false;
+      bool isLaptop(String name) =>
+          nodes.where((n) => n.name == name).firstOrNull?.type == 'laptop';
+      return isLaptop(link.a) || isLaptop(link.b);
     }
 
-    final links = [
-      for (final link in base.links)
-        if (!conflictsWithExplicit(link))
-          NetLink.fromJson({
-            ...link.toJson(),
-            'a': canonical(link.a),
-            'b': canonical(link.b),
-          }),
-      ...explicit,
-    ];
+    final links = <NetLink>[];
+    for (final old in base.links) {
+      var link = NetLink.fromJson({
+        ...old.toJson(),
+        'a': canonical(old.a),
+        'b': canonical(old.b),
+      });
+      if (explicit.any((candidate) => samePair(link, candidate))) continue;
+      if (!old.exactPorts &&
+          explicit.isNotEmpty &&
+          explicitEndpoints.contains(link.a.toLowerCase()) &&
+          explicitEndpoints.contains(link.b.toLowerCase())) {
+        continue;
+      }
+      if (!old.exactPorts && autoCabledLaptop(link)) continue;
+      if (!old.exactPorts) {
+        final updates = <String, String>{};
+        for (final side in ['a', 'b']) {
+          final name = side == 'a' ? link.a : link.b;
+          final port = side == 'a' ? link.aIf : link.bIf;
+          if (!occupied.contains(portKey(name, port))) continue;
+          final node = nodes.where((node) => node.name == name).firstOrNull;
+          final device = node == null
+              ? null
+              : PacketTracerCatalog.instance.device(node.model ?? '');
+          final available = device?.ports.where(
+            (candidate) =>
+                candidate.medium == 'copper' &&
+                !occupied.contains(portKey(name, candidate.name)),
+          );
+          if (available?.isNotEmpty == true) {
+            updates['${side}If'] = available!.first.name;
+          }
+        }
+        link = NetLink.fromJson({...link.toJson(), ...updates});
+      }
+      // Explicit links are never dropped or remapped. If automatic relocation
+      // cannot find a free port, retain the edge so validation reports it.
+      links.add(link);
+      occupied.addAll([portKey(link.a, link.aIf), portKey(link.b, link.bIf)]);
+    }
+    links.addAll(explicit);
     final security = base.security.toJson();
     for (final key in ['aaaServer', 'aaaRouter', 'vpnPeerA', 'vpnPeerB']) {
       if (security[key] is String) security[key] = canonical(security[key]);
@@ -1315,6 +1473,8 @@ class PtBriefRequest {
       security: SecurityIntent.fromJson(security),
       questions: [
         ...base.questions,
+        for (final name in ambiguousReferences)
+          'Which specific device does "$name" refer to? Name the endpoint before building.',
         for (final n in nodes.where((n) => n.type == 'unknown'))
           'What model or device type is ${n.name}?',
       ],
@@ -1401,11 +1561,23 @@ class PtBriefRequest {
     for (final site in ['HQ', 'EAST', 'WEST']) {
       final router = siteRouters[site];
       if (router == null) continue;
-      final uplink = links.where((link) {
+      // The uplink is THIS router's cable to ITS site switch - and the
+      // exact-port one when the brief cabled it by name. The first filter
+      // version only asked for a switch in the right SITE, so a layout
+      // filler link belonging to a DIFFERENT router (R-EAST -> SW-HQ-ACCESS)
+      // could win and name this router's sub-interface parent after that
+      // router's port - "f0.10" instead of the cabled "g0/0.10".
+      final uplinks = links.where((link) {
+        if (link.a != router.name && link.b != router.name) return false;
         final peerName = link.a == router.name ? link.b : link.a;
         final peer = nodes.where((n) => n.name == peerName).firstOrNull;
         return peer?.type == 'switch' && siteOf(peerName) == site;
-      }).firstOrNull;
+      }).toList();
+      final uplink = uplinks.isEmpty
+          ? null
+          : (uplinks.any((l) => l.exactPorts)
+                ? uplinks.firstWhere((l) => l.exactPorts)
+                : uplinks.first);
       if (uplink == null) continue;
       final routerPort = uplink.a == router.name ? uplink.aIf : uplink.bIf;
       usedSites.add(site);

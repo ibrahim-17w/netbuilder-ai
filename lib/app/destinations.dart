@@ -27,6 +27,21 @@ enum AppDestination {
     AppDestination.settings => 'Settings',
   };
 
+  /// The name that fits a phone's bottom navigation. The full [title] is
+  /// what the app bar and the hub use; this is deliberately shorter, because
+  /// a nav label that ellipsizes is worse than a shorter true word.
+  String get shortTitle => switch (this) {
+    AppDestination.chat => 'Chat',
+    AppDestination.history => 'Saved',
+    AppDestination.execution => 'Plan',
+    AppDestination.analyze => 'Fix',
+    AppDestination.memory => 'Memory',
+    AppDestination.files => 'Files',
+    AppDestination.importPkts => 'Inspect',
+    AppDestination.labs => 'Labs',
+    AppDestination.settings => 'Settings',
+  };
+
   String get description => switch (this) {
     AppDestination.chat =>
       'Talk to the assistant, attach evidence, approve changes',

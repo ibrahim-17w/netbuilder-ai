@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/network_intent.dart';
+import '../services/human_language.dart';
 import '../services/session_state.dart';
 import '../services/validator_service.dart';
 import '../theme/app_theme.dart';
@@ -61,7 +62,7 @@ class ActivityPanel extends StatelessWidget {
     final header = working
         ? 'Working through the network...'
         : problemCount != null && problemCount! > 0
-        ? 'Checked the network - found $problemCount issue(s)'
+        ? 'Checked the network - found ${HumanLanguage.count(problemCount!, 'issue')}'
         : 'Checked the network';
 
     return Padding(
@@ -109,7 +110,7 @@ class ActivityPanel extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '${entries.length} step(s)',
+                      HumanLanguage.count(entries.length, 'step'),
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
@@ -323,8 +324,7 @@ class NetworkInspector extends StatelessWidget {
                 _section(
                   theme,
                   'Detected problems'
-                  '${issues.isEmpty ? '' : ' (${errors.length} error(s), '
-                            '${warnings.length} warning(s))'}',
+                  '${issues.isEmpty ? '' : ' (${HumanLanguage.list([HumanLanguage.count(errors.length, 'error'), HumanLanguage.count(warnings.length, 'warning')])})'}',
                 ),
                 if (issues.isEmpty)
                   _hint(theme, 'The validator found nothing to flag.')

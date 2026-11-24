@@ -29,8 +29,12 @@ class ExportSupport {
         break;
       case 'packet-tracer':
         notes.add(
-          'The .pkt is compiled by this app\'s own offline builder; opening '
-          'it needs a Packet Tracer version that reads 8.x saves. Commands '
+          'The .pkt is compiled by this app\'s own offline builder using '
+          'bundled device templates. Template/save versions do not guarantee '
+          'compatibility with another Packet Tracer version. Generated, file '
+          'read-back checked, opened in Packet Tracer, and connectivity tested '
+          'are independent evidence stages; native checks apply only to the '
+          'recorded installation and exact saved file. Commands '
           'that need hardware the image lacks - crypto without the Security '
           'Technology package, for example - are reported as skipped, never '
           'faked.',

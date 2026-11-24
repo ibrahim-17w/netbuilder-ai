@@ -1,0 +1,487 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="Air Cooler" model="Air Cooler">MCUComponent</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+        <MODEL>PT-UNV-PWR-ADAPTER</MODEL>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAAAgAAABAAUABUAF8ATQBPAEQARQBMAAAACgAAAAAUAEEAaQByACAAQwBvAG8AbABlAHIAAAAUAFAAVABfAFYARQBSAFMASQBPAE4AAAAKAAAAAAoAMQAuADAALgAw</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1234.49</X_COORD>
+      <Y_COORD>1244.48</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT08102AO2</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:17520;cost:200;power source:0;rack units:1;wattage:1;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>1499471918854</TEMPLATE_CREATION_TIME>
+     <IGNORE_TEMPLATE_CREATION_TIME>0</IGNORE_TEMPLATE_CREATION_TIME>
+     <STARTTIME>730933319837</STARTTIME>
+     <STARTSIMTIME>92581263</STARTSIMTIME>
+     <USER_APPS>
+      <RUNNING_APPS>
+       <USER_APP>Chiller (JavaScript)</USER_APP>
+      </RUNNING_APPS>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SAVE_REF_ID>save-ref-id:0</SAVE_REF_ID>
+     <IGNORED_VERSION></IGNORED_VERSION>
+     <SYS_NAME></SYS_NAME>
+     <PTP_ENALBED>0</PTP_ENALBED>
+     <GATEWAY/>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP/>
+     </DHCP_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+       <STANDARD_CHANNEL5G>112</STANDARD_CHANNEL5G>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <GATEWAYV6/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>31-1B-B8-E1-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>7</FILE_NUMBER>
+           <NAME>Chiller (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>var HUMIDITY_RATE = -2/3600; // -2% per hour
+var TEMPERATURE_RATE = -10/3600; // -10C per hour
+var VOLUME_AT_RATE = 100000;
+
+var input;
+function setup() {
+	attachInterrupt(0, isr);
+	isr();
+}
+
+function isr() {
+	input = digitalRead(0)/1023;
+	if ( input > 0 )
+		digitalWrite(5, HIGH);
+	else
+		digitalWrite(5, LOW);
+}
+
+function loop() {
+	updateEnvironment();
+	delay(1000);
+}
+
+
+function updateEnvironment() {
+	var humidity_rate = input*HUMIDITY_RATE*VOLUME_AT_RATE / Environment.getVolume();
+	var temperature_rate = input*TEMPERATURE_RATE*VOLUME_AT_RATE / Environment.getVolume();
+	Environment.setContribution("Humidity", humidity_rate);
+	Environment.setContribution("Ambient Temperature", temperature_rate);
+}
+</TEXT>
+           </FILE_CONTENT>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>8</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>var HUMIDITY_RATE = -2/3600; // -2% per hour
+var TEMPERATURE_RATE = -10/3600; // -10C per hour
+var VOLUME_AT_RATE = 100000;
+
+var input;
+function setup() {
+	attachInterrupt(0, isr);
+	isr();
+}
+
+function isr() {
+	input = digitalRead(0)/1023;
+	if ( input > 0 )
+		digitalWrite(5, HIGH);
+	else
+		digitalWrite(5, LOW);
+}
+
+function loop() {
+	updateEnvironment();
+	delay(1000);
+}
+
+
+function updateEnvironment() {
+	var humidity_rate = input*HUMIDITY_RATE*VOLUME_AT_RATE / Environment.getVolume();
+	var temperature_rate = input*TEMPERATURE_RATE*VOLUME_AT_RATE / Environment.getVolume();
+	Environment.setContribution("Humidity", humidity_rate);
+	Environment.setContribution("Ambient Temperature", temperature_rate);
+}
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>5</FILE_NUMBER>
+           <NAME>Chiller (Python)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>from environment import *
+from physical import *
+from gpio import *
+from time import *
+
+HUMIDITY_RATE = float(-2)/3600; # -2% per hour
+TEMPERATURE_RATE = float(-10)/3600; # -10C per hour
+VOLUME_AT_RATE = 100000;
+
+myinput = 0;
+def setup():
+    add_event_detect(0, isr)
+    isr()
+
+
+def isr():
+    global myinput
+    myinput = digitalRead(0)/1023
+    if myinput > 0:
+    	digitalWrite(5, HIGH)
+    else:
+        digitalWrite(5, LOW)
+
+
+def main():
+    setup()
+    while True:
+        updateEnvironment()
+        delay(1000)
+
+
+def updateEnvironment():
+    global myinput
+    global HUMIDITY_RATE
+    global TEMPERATURE_RATE
+    global VOLUME_AT_RATE
+    humidity_rate = float(myinput*HUMIDITY_RATE*VOLUME_AT_RATE) / Environment.getVolume()
+    temperature_rate = float(myinput*TEMPERATURE_RATE*VOLUME_AT_RATE) / Environment.getVolume()
+    Environment.setContribution("Humidity", humidity_rate, -100, True)
+    Environment.setContribution("Ambient Temperature", temperature_rate, -1000, True)
+
+if __name__ == "__main__":
+	main()</TEXT>
+           </FILE_CONTENT>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>6</FILE_NUMBER>
+             <NAME>main.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>from environment import *
+from physical import *
+from gpio import *
+from time import *
+
+HUMIDITY_RATE = float(-2)/3600; # -2% per hour
+TEMPERATURE_RATE = float(-10)/3600; # -10C per hour
+VOLUME_AT_RATE = 100000;
+
+myinput = 0;
+def setup():
+    add_event_detect(0, isr)
+    isr()
+
+
+def isr():
+    global myinput
+    myinput = digitalRead(0)/1023
+    if myinput > 0:
+    	digitalWrite(5, HIGH)
+    else:
+        digitalWrite(5, LOW)
+
+
+def main():
+    setup()
+    while True:
+        updateEnvironment()
+        delay(1000)
+
+
+def updateEnvironment():
+    global myinput
+    global HUMIDITY_RATE
+    global TEMPERATURE_RATE
+    global VOLUME_AT_RATE
+    humidity_rate = float(myinput*HUMIDITY_RATE*VOLUME_AT_RATE) / Environment.getVolume()
+    temperature_rate = float(myinput*TEMPERATURE_RATE*VOLUME_AT_RATE) / Environment.getVolume()
+    Environment.setContribution("Humidity", humidity_rate, -100, True)
+    Environment.setContribution("Ambient Temperature", temperature_rate, -1000, True)
+
+if __name__ == "__main__":
+	main()</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>8</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>User:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>0</FILE_COUNTER>
+         <CAPACITY>10000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <THING_MODEL>
+      <NAME></NAME>
+      <WIDTH>50.5</WIDTH>
+      <HEIGHT>50.5</HEIGHT>
+      <ANALOG_SLOTS_COUNT>4</ANALOG_SLOTS_COUNT>
+      <DIGITAL_SLOTS_COUNT>6</DIGITAL_SLOTS_COUNT>
+      <SPECIFICATIONS>&lt;html>&lt;head>&lt;/head>&lt;body style="word-wrap: break-word; -webkit-nbsp-mode: space; -webkit-line-break: after-white-space; ">&lt;font class="Apple-style-span" face="'Arial Black'" size="5">Chiller&lt;/font>&lt;div>&lt;div>&lt;div>&lt;/div>&lt;/div>&lt;/div>&lt;h1>&lt;span class="Apple-style-span" style="font-family: Arial; font-weight: normal; font-size: x-large; ">&lt;u>Features:&lt;/u>&lt;/span>&lt;/h1>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Cools the temperature of a typical office space at -10C per hour.&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Reduces the humidity by 2% per hour.&lt;/font>&lt;/li>&lt;/ul>&lt;div style="font-family: 'Courier New'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Usage:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Connect to MCU or SBC.&lt;/font>&lt;/li>&lt;/ul>&lt;div style="font-family: 'Courier New'; font-size: medium; ">&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Direct Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Local Control:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Connect device to MCU or SBC. Use the "digitalWrite" API per Data Specifications.&lt;/font>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Remote Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;div style="font-family: 'Courier New'; font-size: medium; ">&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;div style="font-family: 'Courier New'; font-size: medium; ">&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Data Specifications:&lt;/u>&lt;/span>&lt;/div>&lt;div style="font-family: 'Courier New'; font-size: medium; ">&lt;span class="Apple-style-span" style="font-family: 'Times New Roman'; ">&lt;div style="font-family: 'Courier New'; font-size: medium; ">&lt;span class="Apple-style-span" style="font-family: 'Times New Roman'; ">&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Message Format: [state]&lt;/span>&lt;/div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;blockquote class="webkit-indent-blockquote" style="font-family: 'Times New Roman'; font-size: medium; margin-top: 0px; margin-right: 0px; margin-bottom: 0px; margin-left: 40px; border-top-style: none; border-right-style: none; border-bottom-style: none; border-left-style: none; border-width: initial; border-color: initial; padding-top: 0px; padding-right: 0px; padding-bottom: 0px; padding-left: 0px; ">&lt;font class="Apple-style-span" face="Arial" size="5">state: HIGH or 1 = on, LOW or 0 = off&lt;/font>&lt;/blockquote>&lt;/font>&lt;/span>&lt;/div>&lt;blockquote class="webkit-indent-blockquote" style="font-family: 'Courier New'; font-size: medium; margin-top: 0px; margin-right: 0px; margin-bottom: 0px; margin-left: 40px; border-top-style: none; border-right-style: none; border-bottom-style: none; border-left-style: none; border-width: initial; border-color: initial; padding-top: 0px; padding-right: 0px; padding-bottom: 0px; padding-left: 0px; ">&lt;/blockquote>&lt;/span>&lt;/div>&lt;div style="font-family: 'Courier New'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>&lt;br>&lt;/u>&lt;/font>&lt;/div>&lt;div style="font-family: 'Courier New'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Example:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Connect device through an MCU or a Rocker Switch to turn device on or off.&lt;/font>&lt;/li>&lt;/ul>&lt;/div>&lt;div style="font-family: 'Courier New'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;br>&lt;/font>&lt;/div>&lt;div style="font-family: 'Courier New'; font-size: medium; ">&lt;font class="Apple-style-span" face="'Courier New'">&lt;div>&lt;font class="Apple-style-span" size="5">&lt;br>&lt;/font>&lt;/div>&lt;/font>&lt;/div>&lt;/body>&lt;/html></SPECIFICATIONS>
+      <ROTATION>0</ROTATION>
+      <SCALE>1</SCALE>
+      <PROXY_WIDTH>500</PROXY_WIDTH>
+      <PROXY_HEIGHT>500</PROXY_HEIGHT>
+      <IS_END_DEVICE>FALSE</IS_END_DEVICE>
+      <IS_DESKTOP_AVAILABLE>FALSE</IS_DESKTOP_AVAILABLE>
+      <IS_WORKSPACE_USERAPP>FALSE</IS_WORKSPACE_USERAPP>
+      <IS_TRANSPARENT_BACKGROUND>FALSE</IS_TRANSPARENT_BACKGROUND>
+      <WORKSPACE_OFFSET_X>0</WORKSPACE_OFFSET_X>
+      <WORKSPACE_OFFSET_Y>0</WORKSPACE_OFFSET_Y>
+      <WORKSPACE_Z_LEVEL>10000</WORKSPACE_Z_LEVEL>
+      <WORKSPACE_USERAPP_SHOW_IN_LOGICAL_VIEW>TRUE</WORKSPACE_USERAPP_SHOW_IN_LOGICAL_VIEW>
+      <WORKSPACE_USERAPP_SHOW_IN_PHYSICAL_VIEW>TRUE</WORKSPACE_USERAPP_SHOW_IN_PHYSICAL_VIEW>
+      <SUBCOMPONENTS>
+       <SUBCOMPONENT>
+        <NAME>actuator</NAME>
+        <X>0</X>
+        <Y>0</Y>
+        <Z_ORDER>1</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>0</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>5</SLOT_NUM>
+        <SLOT_TYPE>1</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/Components/air_cooler_off.png]]></IMAGE>
+         <IMAGE><![CDATA[../art/IoE/Components/air_cooler_on.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+      </SUBCOMPONENTS>
+      <RULES>
+       <RULE>
+        <SUBCOMPONENT>actuator</SUBCOMPONENT>
+        <IMAGE_INDEX>0</IMAGE_INDEX>
+        <DIGITAL_VALUE>0</DIGITAL_VALUE>
+        <ANALOG_LOW>0</ANALOG_LOW>
+        <ANALOG_HIGH>0</ANALOG_HIGH>
+       </RULE>
+       <RULE>
+        <SUBCOMPONENT>actuator</SUBCOMPONENT>
+        <IMAGE_INDEX>1</IMAGE_INDEX>
+        <DIGITAL_VALUE>1000</DIGITAL_VALUE>
+        <ANALOG_LOW>0</ANALOG_LOW>
+        <ANALOG_HIGH>0</ANALOG_HIGH>
+       </RULE>
+      </RULES>
+     </THING_MODEL>
+     <IOE_CLIENT>
+      <CLIENT_MODE>NO_SERVER</CLIENT_MODE>
+      <SERVER_ADDRESS></SERVER_ADDRESS>
+      <USERNAME></USERNAME>
+      <PASSWORD></PASSWORD>
+     </IOE_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME></NAME>
+      <MAIL_ID></MAIL_ID>
+      <POP3_SERVER></POP3_SERVER>
+      <SMTP_SERVER></SMTP_SERVER>
+      <USER></USER>
+      <PASSWORD></PASSWORD>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+     <NTP_SERVER>
+      <ENABLED>0</ENABLED>
+      <ENABLED_SERVER_AUTHENTICATE>0</ENABLED_SERVER_AUTHENTICATE>
+      <KEY>0</KEY>
+      <MD5PASSWORD></MD5PASSWORD>
+      <SERVER_IP_LIST/>
+     </NTP_SERVER>
+     <PTP_PROCESS>
+      <PTP_CLOCK_ID>0xff:FF:FF:FF:FE:FF:FF:F0</PTP_CLOCK_ID>
+      <PTP_CLOCK_TIME>1301448599843</PTP_CLOCK_TIME>
+     </PTP_PROCESS>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL>{d6dbaf92-2466-400e-92a4-fcb5bb5fe3b1},{f01e07a4-d79f-4bb0-b2ce-994eb8fb5d05},{98d41f5f-2f24-44f3-973c-18aea7d83db3},{fb7df91d-c89f-47e8-8950-64ba39579973}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.129</X_PN>
+      <Y_PN>0.215</Y_PN>
+      <X>258</X>
+      <Y>430</Y>
+      <SLOT>0</SLOT>
+      <SUBSLOT>0</SUBSLOT>
+      <PARENT_PATH>{d6dbaf92-2466-400e-92a4-fcb5bb5fe3b1},{f01e07a4-d79f-4bb0-b2ce-994eb8fb5d05},{98d41f5f-2f24-44f3-973c-18aea7d83db3}</PARENT_PATH>
+      <CONTAINER_ID>{98d41f5f-2f24-44f3-973c-18aea7d83db3}</CONTAINER_ID>
+      <ICP_CONTAINER_SCENE_X>0</ICP_CONTAINER_SCENE_X>
+      <ICP_CONTAINER_SCENE_Y>0</ICP_CONTAINER_SCENE_Y>
+      <ORIGINAL_DEVICE_UUID>{c4444308-55aa-16ca-ec3a-a9cc27de5b30}</ORIGINAL_DEVICE_UUID>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

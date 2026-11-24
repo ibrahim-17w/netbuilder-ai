@@ -47,6 +47,38 @@ Settings > model key. Keys are stored in the OS secure storage, never in logs
 or diagnostics. Without a key the app stays fully usable: chat falls back to
 the offline assistant and says so.
 
+### Optional: the model gateway
+
+The engine's model calls - the stuck-step repair and the AI-suggest passes -
+go through the open-source
+[Respan Gateway](https://github.com/respanai/respan-gateway)
+running in-process in the local engine. The provider chosen in Settings (Gemini,
+or any OpenAI-compatible endpoint) is configured in the gateway, and the engine
+sends it one OpenAI chat request, so a repair call costs the same provider key
+and nothing else. No Respan account, hosted credits or tracing export are
+involved.
+
+`respan-gateway` ships in `sidecar/requirements.txt`, so
+`pip install -r sidecar/requirements.txt` is all it needs. To see which route
+the engine would take:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:5005/llm_status
+# transport = "gateway" (in-process) or "direct" (no wheel, or a provider
+# that needs extra headers, which keeps the older direct request)
+```
+
+Without the wheel the repair loop keeps working on its own direct request.
+The engine tests cover both routes: `cd sidecar; python -m pytest
+test_model_gateway.py -q`.
+
+Observed on a loopback OpenAI-compatible fixture standing in for the provider:
+a stuck-step repair ran engine -> gateway -> provider, which received
+`model=fixture-model` and the 522-character redacted prompt, and the reply
+parsed into `interface g0/2`, `description to-HQ_Switch`. That check made no
+live provider request; a real keyed run is the normal
+`flutter run -d windows` flow.
+
 ## What you can do
 
 - **Plan in a sentence.** "2 routers, 2 switches and 50 PCs with OSPF" becomes

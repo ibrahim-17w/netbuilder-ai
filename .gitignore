@@ -84,6 +84,8 @@ android/local.properties
 android/key.properties
 android/app/*.jks
 android/app/*.keystore
+# ZCode assistant session state (plans and task notes), not project content
+.zcode/
 ios/Pods/
 ios/.symlinks/
 ios/Flutter/ephemeral/

@@ -143,9 +143,7 @@ class _ReadinessPanelState extends State<ReadinessPanel> {
                             ? 'Hide the setup checklist details'
                             : 'Show the setup checklist details',
                         child: Icon(
-                          _expanded
-                              ? Icons.expand_less
-                              : Icons.expand_more,
+                          _expanded ? Icons.expand_less : Icons.expand_more,
                           size: 20,
                           color: scheme.onSurfaceVariant,
                         ),
@@ -227,9 +225,9 @@ class _ReadinessDot extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             item.label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -237,15 +235,13 @@ class _ReadinessDot extends StatelessWidget {
   }
 }
 
-(IconData, Color) _stateVisuals(
-  ReadinessState state,
-  ColorScheme scheme,
-) => switch (state) {
-  ReadinessState.ready => (Icons.check_circle, scheme.primary),
-  ReadinessState.checking => (Icons.hourglass_top, scheme.onSurfaceVariant),
-  ReadinessState.optional => (Icons.info_outline, scheme.tertiary),
-  ReadinessState.blocked => (Icons.warning_amber_rounded, scheme.error),
-};
+(IconData, Color) _stateVisuals(ReadinessState state, ColorScheme scheme) =>
+    switch (state) {
+      ReadinessState.ready => (Icons.check_circle, scheme.primary),
+      ReadinessState.checking => (Icons.hourglass_top, scheme.onSurfaceVariant),
+      ReadinessState.optional => (Icons.info_outline, scheme.tertiary),
+      ReadinessState.blocked => (Icons.warning_amber_rounded, scheme.error),
+    };
 
 class _ReadinessRow extends StatelessWidget {
   final ReadinessItem item;

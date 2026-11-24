@@ -84,7 +84,12 @@ class SettingsService extends ChangeNotifier {
   String _gns3Endpoint = defaultGns3Endpoint();
   String _gns3User = 'admin';
   String _gns3Pass = '';
-  String _defaultTarget = 'gns3';
+  // Packet Tracer is what a fresh install can actually do: the bundled
+  // template library builds a real save offline, on every platform. GNS3
+  // needs a server and credentials the first-run user has not entered yet,
+  // so defaulting to it made the out-of-the-box workflow the second-class
+  // one. A user who configures GNS3 keeps it: this is only the first value.
+  String _defaultTarget = 'packet-tracer';
   String _packetTracerVersion = '';
   // The chat's context ceiling. Documented in one place
   // (ContextBudget.defaultContextTokens ~= 256k) and editable in Settings.

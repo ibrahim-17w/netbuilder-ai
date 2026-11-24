@@ -5978,8 +5978,8 @@
         {
           "index": 0,
           "type": "eCopperCoaxial",
-          "family": "",
-          "name": ""
+          "family": "coaxial",
+          "name": "Port0"
         }
       ],
       "source": "test.pkt (user-supplied)",
@@ -6046,6 +6046,6263 @@
       ],
       "source": "test.pkt (user-supplied)",
       "sourceName": "Wired End Device0",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Cloud-PT+PT-CLOUD-NM-1S+PT-CLOUD-NM-1AM+PT-CLOUD-NM-1CE+PT-CLOUD-NM-1CX",
+      "model": "Cloud-PT",
+      "kind": "Cloud",
+      "modules": [
+        "PT-CLOUD-NM-1S",
+        "PT-CLOUD-NM-1AM",
+        "PT-CLOUD-NM-1CE",
+        "PT-CLOUD-NM-1CX"
+      ],
+      "file": "devices/Cloud-PT+PT-CLOUD-NM-1S+PT-CLOUD-NM-1AM+PT-CLOUD-NM-1CE+PT-CLOUD-NM-1CX.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eSerial",
+          "family": "serial",
+          "name": "Serial0"
+        },
+        {
+          "index": 1,
+          "type": "eSerial",
+          "family": "serial",
+          "name": "Serial1"
+        },
+        {
+          "index": 2,
+          "type": "eSerial",
+          "family": "serial",
+          "name": "Serial2"
+        },
+        {
+          "index": 3,
+          "type": "eSerial",
+          "family": "serial",
+          "name": "Serial3"
+        },
+        {
+          "index": 4,
+          "type": "eModem",
+          "family": "modem",
+          "name": "Modem0"
+        },
+        {
+          "index": 5,
+          "type": "eModem",
+          "family": "modem",
+          "name": "Modem1"
+        },
+        {
+          "index": 6,
+          "type": "eCopperEthernet",
+          "family": "ethernet",
+          "name": "Ethernet0"
+        },
+        {
+          "index": 7,
+          "type": "eCopperCoaxial",
+          "family": "coaxial",
+          "name": "Coaxial7"
+        },
+        {
+          "index": 8,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 9,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 10,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 11,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 12,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 13,
+          "type": "",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\netbuilder\\build\\pt-harvest-2026-11-13\\missing-devices.pkt",
+      "sourceName": "Cloud0",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Cable-Modem-PT+PT-MODEM-NM-1CFE",
+      "model": "Cable-Modem-PT",
+      "kind": "CableModem",
+      "modules": [
+        "PT-MODEM-NM-1CFE"
+      ],
+      "file": "devices/Cable-Modem-PT+PT-MODEM-NM-1CFE.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperCoaxial",
+          "family": "coaxial",
+          "name": "Port 0"
+        },
+        {
+          "index": 1,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "Port 1"
+        }
+      ],
+      "source": "C:\\netbuilder\\build\\pt-harvest-2026-11-13\\missing-devices.pkt",
+      "sourceName": "Cable Modem0",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Switch-PT+PT-SWITCH-NM-1CFE+PT-SWITCH-NM-1FFE",
+      "model": "Switch-PT",
+      "kind": "Switch",
+      "modules": [
+        "PT-SWITCH-NM-1CFE",
+        "PT-SWITCH-NM-1FFE"
+      ],
+      "file": "devices/Switch-PT+PT-SWITCH-NM-1CFE+PT-SWITCH-NM-1FFE.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/1"
+        },
+        {
+          "index": 1,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet1/1"
+        },
+        {
+          "index": 2,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet2/1"
+        },
+        {
+          "index": 3,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet3/1"
+        },
+        {
+          "index": 4,
+          "type": "eFiberFastEthernet",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 5,
+          "type": "eFiberFastEthernet",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\netbuilder\\build\\pt-harvest-2026-11-13\\switch-dsl-harvest.pkt",
+      "sourceName": "Switch0",
+      "hasConfig": true,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Bridge-PT+PT-SWITCH-NM-1CE",
+      "model": "Bridge-PT",
+      "kind": "Bridge",
+      "modules": [
+        "PT-SWITCH-NM-1CE"
+      ],
+      "file": "devices/Bridge-PT+PT-SWITCH-NM-1CE.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperEthernet",
+          "family": "ethernet",
+          "name": "Ethernet0"
+        },
+        {
+          "index": 1,
+          "type": "eCopperEthernet",
+          "family": "ethernet",
+          "name": "Ethernet1"
+        }
+      ],
+      "source": "C:\\netbuilder\\build\\pt-harvest-2026-11-13\\switch-dsl-harvest.pkt",
+      "sourceName": "Bridge0",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "DSL-Modem-PT+PT-MODEM-NM-1CFE",
+      "model": "DSL-Modem-PT",
+      "kind": "DslModem",
+      "modules": [
+        "PT-MODEM-NM-1CFE"
+      ],
+      "file": "devices/DSL-Modem-PT+PT-MODEM-NM-1CFE.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eModem",
+          "family": "modem",
+          "name": "Modem0"
+        },
+        {
+          "index": 1,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0"
+        }
+      ],
+      "source": "C:\\netbuilder\\build\\pt-harvest-2026-11-13\\switch-dsl-harvest.pkt",
+      "sourceName": "DSL Modem0",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "5505+ASA-Cover",
+      "model": "5505",
+      "kind": "ASA",
+      "modules": [
+        "ASA-Cover"
+      ],
+      "file": "devices/5505+ASA-Cover.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperEthernet",
+          "family": "ethernet",
+          "name": "Ethernet0/0"
+        },
+        {
+          "index": 1,
+          "type": "eCopperEthernet",
+          "family": "ethernet",
+          "name": "Ethernet0/1"
+        },
+        {
+          "index": 2,
+          "type": "eCopperEthernet",
+          "family": "ethernet",
+          "name": "Ethernet0/2"
+        },
+        {
+          "index": 3,
+          "type": "eCopperEthernet",
+          "family": "ethernet",
+          "name": "Ethernet0/3"
+        },
+        {
+          "index": 4,
+          "type": "eCopperEthernet",
+          "family": "ethernet",
+          "name": "Ethernet0/4"
+        },
+        {
+          "index": 5,
+          "type": "eCopperEthernet",
+          "family": "ethernet",
+          "name": "Ethernet0/5"
+        },
+        {
+          "index": 6,
+          "type": "eCopperEthernet",
+          "family": "ethernet",
+          "name": "Ethernet0/6"
+        },
+        {
+          "index": 7,
+          "type": "eCopperEthernet",
+          "family": "ethernet",
+          "name": "Ethernet0/7"
+        }
+      ],
+      "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\03 Cybersecurity\\ASA\\asa_acl_nat.pkt",
+      "sourceName": "ASA0",
+      "hasConfig": true,
+      "hasPhysical": false,
+      "warnings": []
+    },
+    {
+      "key": "1841+WIC-2T",
+      "model": "1841",
+      "kind": "Router",
+      "modules": [
+        "WIC-2T"
+      ],
+      "file": "devices/1841+WIC-2T.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eSmartSerial",
+          "family": "serial",
+          "name": "Serial0/1/0"
+        },
+        {
+          "index": 1,
+          "type": "eSmartSerial",
+          "family": "serial",
+          "name": "Serial0/1/1"
+        },
+        {
+          "index": 2,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/0"
+        },
+        {
+          "index": 3,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/1"
+        }
+      ],
+      "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\01 Networking\\OSPF\\ospf_neighbor_with_framerelay.pkt",
+      "sourceName": "Router0",
+      "hasConfig": true,
+      "hasPhysical": false,
+      "warnings": []
+    },
+    {
+      "key": "2950T-24",
+      "model": "2950T-24",
+      "kind": "Switch",
+      "modules": [],
+      "file": "devices/2950T-24.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/1"
+        },
+        {
+          "index": 1,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/2"
+        },
+        {
+          "index": 2,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/3"
+        },
+        {
+          "index": 3,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/4"
+        },
+        {
+          "index": 4,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/5"
+        },
+        {
+          "index": 5,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/6"
+        },
+        {
+          "index": 6,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/7"
+        },
+        {
+          "index": 7,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/8"
+        },
+        {
+          "index": 8,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/9"
+        },
+        {
+          "index": 9,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/10"
+        },
+        {
+          "index": 10,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/11"
+        },
+        {
+          "index": 11,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/12"
+        },
+        {
+          "index": 12,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/13"
+        },
+        {
+          "index": 13,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/14"
+        },
+        {
+          "index": 14,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/15"
+        },
+        {
+          "index": 15,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/16"
+        },
+        {
+          "index": 16,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/17"
+        },
+        {
+          "index": 17,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/18"
+        },
+        {
+          "index": 18,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/19"
+        },
+        {
+          "index": 19,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/20"
+        },
+        {
+          "index": 20,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/21"
+        },
+        {
+          "index": 21,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/22"
+        },
+        {
+          "index": 22,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/23"
+        },
+        {
+          "index": 23,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/24"
+        },
+        {
+          "index": 24,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/1"
+        },
+        {
+          "index": 25,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/2"
+        }
+      ],
+      "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\01 Networking\\HSRP\\Hsrp_Ping_When_Router_Priority_Is_Higher.pkt",
+      "sourceName": "Switch1",
+      "hasConfig": true,
+      "hasPhysical": false,
+      "warnings": []
+    },
+    {
+      "key": "1841+WIC-1ENET",
+      "model": "1841",
+      "kind": "Router",
+      "modules": [
+        "WIC-1ENET"
+      ],
+      "file": "devices/1841+WIC-1ENET.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperEthernet",
+          "family": "ethernet",
+          "name": "Ethernet0/0/0"
+        },
+        {
+          "index": 1,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/0"
+        },
+        {
+          "index": 2,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/1"
+        }
+      ],
+      "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\01 Networking\\IPv6\\Ipv6Ip Tunneling\\IsatapPcClient.pkt",
+      "sourceName": "IPv4 Network",
+      "hasConfig": true,
+      "hasPhysical": false,
+      "warnings": []
+    },
+    {
+      "key": "2811+NM-4A-S",
+      "model": "2811",
+      "kind": "Router",
+      "modules": [
+        "NM-4A/S"
+      ],
+      "file": "devices/2811+NM-4A-S.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/0"
+        },
+        {
+          "index": 1,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/1"
+        },
+        {
+          "index": 2,
+          "type": "eSerial",
+          "family": "serial",
+          "name": "Serial1/0"
+        },
+        {
+          "index": 3,
+          "type": "eSerial",
+          "family": "serial",
+          "name": "Serial1/1"
+        },
+        {
+          "index": 4,
+          "type": "eSerial",
+          "family": "serial",
+          "name": "Serial1/2"
+        },
+        {
+          "index": 5,
+          "type": "eSerial",
+          "family": "serial",
+          "name": "Serial1/3"
+        }
+      ],
+      "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\01 Networking\\IPv6\\Ipv6Ip Tunneling\\ipv6ip_eigrp.pkt",
+      "sourceName": "R1",
+      "hasConfig": true,
+      "hasPhysical": false,
+      "warnings": []
+    },
+    {
+      "key": "1841+HWIC-8A+WIC-2T",
+      "model": "1841",
+      "kind": "Router",
+      "modules": [
+        "HWIC-8A",
+        "WIC-2T"
+      ],
+      "file": "devices/1841+HWIC-8A+WIC-2T.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eSmartSerial",
+          "family": "serial",
+          "name": "Serial0/1/0"
+        },
+        {
+          "index": 2,
+          "type": "eSmartSerial",
+          "family": "serial",
+          "name": "Serial0/1/1"
+        },
+        {
+          "index": 3,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/0"
+        },
+        {
+          "index": 4,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/1"
+        }
+      ],
+      "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\01 Networking\\Terminal Server\\cable_test.pkt",
+      "sourceName": "Router0",
+      "hasConfig": true,
+      "hasPhysical": false,
+      "warnings": []
+    },
+    {
+      "key": "2620XM",
+      "model": "2620XM",
+      "kind": "Router",
+      "modules": [],
+      "file": "devices/2620XM.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/0"
+        }
+      ],
+      "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\01 Networking\\Terminal Server\\cable_test.pkt",
+      "sourceName": "Router2",
+      "hasConfig": true,
+      "hasPhysical": false,
+      "warnings": []
+    },
+    {
+      "key": "2621XM",
+      "model": "2621XM",
+      "kind": "Router",
+      "modules": [],
+      "file": "devices/2621XM.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/0"
+        },
+        {
+          "index": 1,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/1"
+        }
+      ],
+      "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\01 Networking\\Terminal Server\\cable_test.pkt",
+      "sourceName": "Router3",
+      "hasConfig": true,
+      "hasPhysical": false,
+      "warnings": []
+    },
+    {
+      "key": "1841+HWIC-8A",
+      "model": "1841",
+      "kind": "Router",
+      "modules": [
+        "HWIC-8A"
+      ],
+      "file": "devices/1841+HWIC-8A.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/0"
+        },
+        {
+          "index": 2,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/1"
+        }
+      ],
+      "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\01 Networking\\Terminal Server\\ssh_test.pkt",
+      "sourceName": "TS",
+      "hasConfig": true,
+      "hasPhysical": false,
+      "warnings": []
+    },
+    {
+      "key": "2811+HWIC-AP-AG-B",
+      "model": "2811",
+      "kind": "Router",
+      "modules": [
+        "HWIC-AP-AG-B"
+      ],
+      "file": "devices/2811+HWIC-AP-AG-B.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eAccessPointWirelessG",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eAccessPointWirelessA",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/0"
+        },
+        {
+          "index": 3,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/1"
+        }
+      ],
+      "source": "C:\\Program Files\\Cisco Packet Tracer 9.0.0\\saves\\03 Cybersecurity\\Wireless LAN Security\\wpa_eap_test.pkt",
+      "sourceName": "Router0",
+      "hasConfig": true,
+      "hasPhysical": false,
+      "warnings": []
+    },
+    {
+      "key": "Humiture-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Humiture Sensor",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Humiture-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT0",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Humidity-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Humidity Sensor",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Humidity-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT1",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Generic-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Generic Sensor",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Generic-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT2",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Generic-Environment-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Generic Environment Sensor",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Generic-Environment-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT3",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Flex-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Flex Sensor",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Flex-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT4",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Motion-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Motion Sensor",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Motion-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT7",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Photo-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Photo Sensor",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Photo-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT8",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Smoke-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Smoke Sensor",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Smoke-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT13",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Toggle-Push-Button+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Toggle Push Button",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Toggle-Push-Button+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT16",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Trip-Wire+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Trip Wire",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Trip-Wire+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT17",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Water-Detector+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Water Detector",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Water-Detector+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT18",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Water-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Water Sensor",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Water-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT19",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Wind-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Wind Sensor",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Wind-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT20",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Air-Cooler+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Air Cooler",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Air-Cooler+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT21",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Alarm+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Alarm",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Alarm+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT22",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Ceiling-Sprinkler+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Ceiling Sprinkler",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Ceiling-Sprinkler+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT23",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Dimmable-LED+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Dimmable LED",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Dimmable-LED+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT24",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Floor-Sprinkler+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Floor Sprinkler",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Floor-Sprinkler+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT25",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Heating-Element+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Heating Element",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Heating-Element+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT26",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Servo+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Servo",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Servo+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT32",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Speaker+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Speaker",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Speaker+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT34",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Wind-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+      "model": "Wind Detector",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Wind-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT36",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Street-Lamp+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+      "model": "Street Lamp",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Street-Lamp+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT37",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Solar-Panel+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Solar Panel",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Solar-Panel+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT38",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "RFID-Reader+PT-IOT-NM-1CFE+PT-UNV-PWR-ADAPTER",
+      "model": "RFID Reader",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1CFE",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/RFID-Reader+PT-IOT-NM-1CFE+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT39",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Power-Meter+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Power Meter",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Power-Meter+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT40",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Fan+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Fan",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Fan+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT42",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Carbon-Monoxide-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+      "model": "Carbon Monoxide Detector",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Carbon-Monoxide-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT43",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Beacon+PT-UNV-PWR-ADAPTER",
+      "model": "Beacon",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Beacon+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT44",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Battery+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Battery",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Battery+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT45",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Atm-Pressure-Monitor+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Atm Pressure Monitor",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1CFE",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Atm-Pressure-Monitor+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT46",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Air-Conditioner+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Air Conditioner",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Air-Conditioner+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT47",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Appliance+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Appliance",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Appliance+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT48",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "ISA-3000+ISA3000-SFP-BUILTIN",
+      "model": "ISA-3000",
+      "kind": "ISA",
+      "modules": [
+        "ISA3000-SFP-BUILTIN"
+      ],
+      "file": "devices/ISA-3000+ISA3000-SFP-BUILTIN.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperGigabitManagement",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet0"
+        },
+        {
+          "index": 2,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1"
+        },
+        {
+          "index": 3,
+          "type": "eFiberGigabitEthernet",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "eFiberGigabitEthernet",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "ISA0",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "5506-X",
+      "model": "5506-X",
+      "kind": "ASA",
+      "modules": [],
+      "file": "devices/5506-X.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/1"
+        },
+        {
+          "index": 1,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/2"
+        },
+        {
+          "index": 2,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/3"
+        },
+        {
+          "index": 3,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/4"
+        },
+        {
+          "index": 4,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/5"
+        },
+        {
+          "index": 5,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/6"
+        },
+        {
+          "index": 6,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/7"
+        },
+        {
+          "index": 7,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/8"
+        },
+        {
+          "index": 8,
+          "type": "eCopperGigabitManagement",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "ASA1",
+      "hasConfig": true,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Bluetooth-Speaker+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+      "model": "Bluetooth Speaker",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Bluetooth-Speaker+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT49",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Carbon-Dioxide-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+      "model": "Carbon Dioxide Detector",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Carbon-Dioxide-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT50",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Door+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Door",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Door+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT53",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Furnace+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Furnace",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Furnace+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT55",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Garage-Door+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Garage Door",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Garage-Door+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT56",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Home-Speaker+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Home Speaker",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Home-Speaker+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT58",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Humidifier+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Humidifier",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Humidifier+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT59",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Humidity-Monitor+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+      "model": "Humidity Monitor",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Humidity-Monitor+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT60",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Humiture-Monitor+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+      "model": "Humiture Monitor",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Humiture-Monitor+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT61",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Lawn-Sprinkler+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Lawn Sprinkler",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Lawn-Sprinkler+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT62",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Light+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Light",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Light+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT63",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Motion-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+      "model": "Motion Detector",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Motion-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT64",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Portable-Music-Player+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+      "model": "Portable Music Player",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Portable-Music-Player+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT65",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Smoke-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+      "model": "Smoke Detector",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Smoke-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT67",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Siren+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Siren",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Siren+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT68",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Sound-Frequency-Detector+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Sound Frequency Detector",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Sound-Frequency-Detector+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT71",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Temperature-Monitor+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+      "model": "Temperature Monitor",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Temperature-Monitor+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT72",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Thermostat+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Thermostat",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Thermostat+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT73",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Water-Drain+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Water Drain",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Water-Drain+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT74",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Water-Level-Monitor+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
+      "model": "Water Level Monitor",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Water-Level-Monitor+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 2,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT75",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Webcam+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER+PT-IOT-NM-1CGE",
+      "model": "Webcam",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1W",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER",
+        "PT-IOT-NM-1CGE"
+      ],
+      "file": "devices/Webcam+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER+PT-IOT-NM-1CGE.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eHostWirelessN",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet0"
+        },
+        {
+          "index": 2,
+          "type": "eBluetooth",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 3,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 4,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 5,
+          "type": "",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT76",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Trip-Sensor+PT-IOT-NM-1CFE+PT-UNV-PWR-ADAPTER",
+      "model": "Trip Sensor",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1CFE",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Trip-Sensor+PT-IOT-NM-1CFE+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT81",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Blower+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
+      "model": "Blower",
+      "kind": "MCUComponent",
+      "modules": [
+        "PT-IOT-NM-1CFE",
+        "PT-IOT-CUSTOM-IO",
+        "PT-UNV-PWR-ADAPTER"
+      ],
+      "file": "devices/Blower+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D3",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D4",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "D5",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A0",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A1",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A2",
+          "namingEvidence": "PT custom-IO slot order"
+        },
+        {
+          "index": -1,
+          "type": "eCustomIO",
+          "family": "io",
+          "name": "A3",
+          "namingEvidence": "PT custom-IO slot order"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "IoT85",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "3650-24PS+C3650-BUILTIN+C3650-SFP-BUILTIN",
+      "model": "3650-24PS",
+      "kind": "MultiLayerSwitch",
+      "modules": [
+        "C3650-BUILTIN",
+        "C3650-SFP-BUILTIN"
+      ],
+      "file": "devices/3650-24PS+C3650-BUILTIN+C3650-SFP-BUILTIN.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/1"
+        },
+        {
+          "index": 1,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/2"
+        },
+        {
+          "index": 2,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/3"
+        },
+        {
+          "index": 3,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/4"
+        },
+        {
+          "index": 4,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/5"
+        },
+        {
+          "index": 5,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/6"
+        },
+        {
+          "index": 6,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/7"
+        },
+        {
+          "index": 7,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/8"
+        },
+        {
+          "index": 8,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/9"
+        },
+        {
+          "index": 9,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/10"
+        },
+        {
+          "index": 10,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/11"
+        },
+        {
+          "index": 11,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/12"
+        },
+        {
+          "index": 12,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/13"
+        },
+        {
+          "index": 13,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/14"
+        },
+        {
+          "index": 14,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/15"
+        },
+        {
+          "index": 15,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/16"
+        },
+        {
+          "index": 16,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/17"
+        },
+        {
+          "index": 17,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/18"
+        },
+        {
+          "index": 18,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/19"
+        },
+        {
+          "index": 19,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/20"
+        },
+        {
+          "index": 20,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/21"
+        },
+        {
+          "index": 21,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/22"
+        },
+        {
+          "index": 22,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/23"
+        },
+        {
+          "index": 23,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/24"
+        },
+        {
+          "index": 24,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/1/1"
+        },
+        {
+          "index": 25,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/1/2"
+        },
+        {
+          "index": 26,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/1/3"
+        },
+        {
+          "index": 27,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/1/4"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "Multilayer Switch0",
+      "hasConfig": true,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Switch-PT-Empty",
+      "model": "Switch-PT-Empty",
+      "kind": "Switch",
+      "modules": [],
+      "file": "devices/Switch-PT-Empty.xml",
+      "ports": [],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "Switch2",
+      "hasConfig": true,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "IE-9320+C9320-SFP-BUILTIN",
+      "model": "IE-9320",
+      "kind": "MultiLayerSwitch",
+      "modules": [
+        "C9320-SFP-BUILTIN"
+      ],
+      "file": "devices/IE-9320+C9320-SFP-BUILTIN.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/1"
+        },
+        {
+          "index": 1,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/2"
+        },
+        {
+          "index": 2,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/3"
+        },
+        {
+          "index": 3,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/4"
+        },
+        {
+          "index": 4,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/5"
+        },
+        {
+          "index": 5,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/6"
+        },
+        {
+          "index": 6,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/7"
+        },
+        {
+          "index": 7,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/8"
+        },
+        {
+          "index": 8,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/9"
+        },
+        {
+          "index": 9,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/10"
+        },
+        {
+          "index": 10,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/11"
+        },
+        {
+          "index": 11,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/12"
+        },
+        {
+          "index": 12,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/13"
+        },
+        {
+          "index": 13,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/14"
+        },
+        {
+          "index": 14,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/15"
+        },
+        {
+          "index": 15,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/16"
+        },
+        {
+          "index": 16,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/17"
+        },
+        {
+          "index": 17,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/18"
+        },
+        {
+          "index": 18,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/19"
+        },
+        {
+          "index": 19,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/20"
+        },
+        {
+          "index": 20,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/21"
+        },
+        {
+          "index": 21,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/22"
+        },
+        {
+          "index": 22,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/23"
+        },
+        {
+          "index": 23,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/24"
+        },
+        {
+          "index": 24,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/25"
+        },
+        {
+          "index": 25,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/26"
+        },
+        {
+          "index": 26,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/27"
+        },
+        {
+          "index": 27,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/28"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "Multilayer Switch5",
+      "hasConfig": true,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Repeater-PT+PT-REPEATER-NM-1CE",
+      "model": "Repeater-PT",
+      "kind": "Repeater",
+      "modules": [
+        "PT-REPEATER-NM-1CE"
+      ],
+      "file": "devices/Repeater-PT+PT-REPEATER-NM-1CE.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperEthernet",
+          "family": "ethernet",
+          "name": "Ethernet0"
+        },
+        {
+          "index": 1,
+          "type": "eCopperEthernet",
+          "family": "ethernet",
+          "name": "Ethernet1"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "Repeater0",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "CoAxialSplitter-PT",
+      "model": "CoAxialSplitter-PT",
+      "kind": "CoAxialSplitter",
+      "modules": [],
+      "file": "devices/CoAxialSplitter-PT.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperCoaxial",
+          "family": "coaxial",
+          "name": "Port 0",
+          "namingEvidence": "PT-authored tvcoaxiatpcserver.pkt cable endpoint"
+        },
+        {
+          "index": 1,
+          "type": "eCopperCoaxial",
+          "family": "coaxial",
+          "name": "Port 1",
+          "namingEvidence": "PT-authored tvcoaxiatpcserver.pkt cable endpoint"
+        },
+        {
+          "index": 2,
+          "type": "eCopperCoaxial",
+          "family": "coaxial",
+          "name": "Port 2",
+          "namingEvidence": "PT-authored tvcoaxiatpcserver.pkt cable endpoint"
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "Coaxial Splitter0",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Meraki-MX65W",
+      "model": "Meraki-MX65W",
+      "kind": "SecurityAppliance",
+      "modules": [],
+      "file": "devices/Meraki-MX65W.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet0"
+        },
+        {
+          "index": 1,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1"
+        },
+        {
+          "index": 2,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet2"
+        },
+        {
+          "index": 3,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet3"
+        },
+        {
+          "index": 4,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet4"
+        },
+        {
+          "index": 5,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet5"
+        },
+        {
+          "index": 6,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet6"
+        },
+        {
+          "index": 7,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet7"
+        },
+        {
+          "index": 8,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet8"
+        },
+        {
+          "index": 9,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet9"
+        },
+        {
+          "index": 10,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0"
+        },
+        {
+          "index": 11,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet1"
+        },
+        {
+          "index": 12,
+          "type": "eAccessPointWirelessAC",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "Security Appliance0",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "3702i",
+      "model": "3702i",
+      "kind": "LightWeightAccessPoint",
+      "modules": [],
+      "file": "devices/3702i.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet0"
+        },
+        {
+          "index": 1,
+          "type": "eAccessPointWirelessN",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "Light Weight Access Point1",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "AccessPoint-PT-AC+PT-REPEATER-NM-1CGE",
+      "model": "AccessPoint-PT-AC",
+      "kind": "AccessPoint",
+      "modules": [
+        "PT-REPEATER-NM-1CGE"
+      ],
+      "file": "devices/AccessPoint-PT-AC+PT-REPEATER-NM-1CGE.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet0"
+        },
+        {
+          "index": 1,
+          "type": "eAccessPointWirelessAC",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "Access Point2",
+      "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Cloud-PT-Empty",
+      "model": "Cloud-PT-Empty",
+      "kind": "Cloud",
+      "modules": [],
+      "file": "devices/Cloud-PT-Empty.xml",
+      "ports": [],
+      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sourceName": "Cloud0",
       "hasConfig": false,
       "hasPhysical": true,
       "warnings": []
@@ -8044,6 +14301,34 @@
       "sha256": "ac774c0e4d02315a07171cebf4ec3a7a4d38a77a2b2a17f6fce69f38d1e2e2f2",
       "version": "9.0.0.0810",
       "devices": 17,
+      "links": 0
+    },
+    {
+      "path": "C:\\netbuilder\\build\\pt-harvest-2026-11-13\\missing-devices.pkt",
+      "sha256": "b7827dff4261b25cacc007551e99c59aede82aa65e610624762e409be87d682a",
+      "version": "9.0.0.0810",
+      "devices": 5,
+      "links": 0
+    },
+    {
+      "path": "C:\\netbuilder\\build\\pt-harvest-2026-11-13\\switch-dsl-harvest.pkt",
+      "sha256": "dd23f643c8344a94b58e081ac17936848244c4cfe4cd30109fb161b1c8b9b7af",
+      "version": "9.0.0.0810",
+      "devices": 6,
+      "links": 1
+    },
+    {
+      "path": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sha256": "b7b1af1136e446322ffc3f7d11fc765c6ea53acec5064bbba57026e718131332",
+      "version": "9.0.0.0810",
+      "devices": 71,
+      "links": 0
+    },
+    {
+      "path": "C:\\Users\\L\\Desktop\\devices.pkt",
+      "sha256": "4265df2587bc2ebe2e23c4e96e81cff02df59599e952f1ccbfeaf0bdcb41e70a",
+      "version": "9.0.0.0810",
+      "devices": 145,
       "links": 0
     }
   ],

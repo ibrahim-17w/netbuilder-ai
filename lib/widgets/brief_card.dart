@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/design_brief.dart';
 import '../services/design_brief_service.dart';
+import '../services/validator_service.dart';
 import '../theme/app_theme.dart';
 
 /// The "what I know so far / what's still open" card: the conversation's
@@ -14,7 +15,12 @@ import '../theme/app_theme.dart';
 class BriefCardWidget extends StatelessWidget {
   final DesignBrief brief;
 
-  const BriefCardWidget({super.key, required this.brief});
+  /// The size of the plan this brief produced, when it has one. Used to keep
+  /// the card's "enough to build" line from contradicting the target's
+  /// device limit on the same screen.
+  final int? deviceCount;
+
+  const BriefCardWidget({super.key, required this.brief, this.deviceCount});
 
   @override
   Widget build(BuildContext context) {
@@ -113,11 +119,7 @@ class BriefCardWidget extends StatelessWidget {
           ],
           const SizedBox(height: 8),
           Text(
-            brief.ready
-                ? 'Enough to build - the planner has safe defaults for the '
-                      'rest. Say the word and I will compile it.'
-                : 'I will ask about the highlighted items before planning '
-                      'anything - nothing is built until you say so.',
+            _statusLine(),
             style: theme.textTheme.bodySmall?.copyWith(
               color: scheme.onSurfaceVariant,
             ),
@@ -125,6 +127,33 @@ class BriefCardWidget extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// What the brief can and cannot promise.
+  ///
+  /// "Enough to build" is a statement about the BRIEF, not about the target's
+  /// size limit. A 106-device lab is complete as a brief and still cannot be
+  /// built in one Packet Tracer scenario, and saying only the first made the
+  /// two answers on screen look like they disagreed.
+  String _statusLine() {
+    final count = deviceCount ?? 0;
+    if (count > ValidatorService.packetTracerOfflineMaxDevices) {
+      return 'Enough detail for the planner, but $count devices is past even '
+          'the ${ValidatorService.packetTracerOfflineMaxDevices}-device '
+          'offline .pkt builder. Split the lab into sites or build the pieces '
+          'separately.';
+    }
+    if (count > ValidatorService.packetTracerMaxDevices) {
+      return 'Enough detail for the planner, but $count devices is over the '
+          '${ValidatorService.packetTracerMaxDevices}-device live Packet '
+          'Tracer limit. The offline .pkt build allows '
+          '${ValidatorService.packetTracerOfflineMaxDevices}.';
+    }
+    return brief.ready
+        ? 'Enough to build - the planner has safe defaults for the rest. Say '
+              'the word and I will compile it.'
+        : 'I will ask about the highlighted items before planning anything - '
+              'nothing is built until you say so.';
   }
 
   Widget _factRow(BuildContext context, String slotId, BriefFact fact) {

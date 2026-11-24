@@ -5,7 +5,11 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/request_coverage.dart';
+import '../models/pkt_verification.dart';
 import 'pkt/on_device_pkt_builder.dart';
+import 'request_understanding/build_action_identity.dart';
+import 'request_understanding/artifact_evidence_service.dart';
 
 enum PktBuildJobStatus { idle, running, ready, failed, cancelled, saved }
 
@@ -30,6 +34,10 @@ class PktBuildJobEntry {
   final String planJson;
   final String target;
   final bool dismissed;
+  final BuildActionIdentity? actionIdentity;
+  final String artifactHash;
+  final CoverageReport? coverage;
+  final PktVerificationSummary? verification;
 
   const PktBuildJobEntry({
     required this.id,
@@ -47,6 +55,10 @@ class PktBuildJobEntry {
     this.planJson = '',
     this.target = 'packet-tracer',
     this.dismissed = false,
+    this.actionIdentity,
+    this.artifactHash = '',
+    this.coverage,
+    this.verification,
   });
 
   PktBuildJobEntry copyWith({
@@ -63,6 +75,9 @@ class PktBuildJobEntry {
     String? planJson,
     String? target,
     bool? dismissed,
+    String? artifactHash,
+    CoverageReport? coverage,
+    PktVerificationSummary? verification,
   }) => PktBuildJobEntry(
     id: id,
     project: project,
@@ -79,6 +94,10 @@ class PktBuildJobEntry {
     planJson: planJson ?? this.planJson,
     target: target ?? this.target,
     dismissed: dismissed ?? this.dismissed,
+    actionIdentity: actionIdentity,
+    artifactHash: artifactHash ?? this.artifactHash,
+    coverage: coverage ?? this.coverage,
+    verification: verification ?? this.verification,
   );
 
   Map<String, dynamic> toJson() => {
@@ -97,6 +116,9 @@ class PktBuildJobEntry {
     if (planJson.isNotEmpty) 'planJson': planJson,
     'target': target,
     'dismissed': dismissed,
+    if (actionIdentity != null) 'actionIdentity': actionIdentity!.toJson(),
+    if (artifactHash.isNotEmpty) 'artifactHash': artifactHash,
+    if (coverage != null) 'coverage': coverage!.toJson(),
   };
 
   factory PktBuildJobEntry.fromJson(Map<String, dynamic> json) {
@@ -123,8 +145,38 @@ class PktBuildJobEntry {
       planJson: json['planJson'] as String? ?? '',
       target: json['target'] as String? ?? 'packet-tracer',
       dismissed: json['dismissed'] == true,
+      actionIdentity: _readIdentity(json['actionIdentity']),
+      artifactHash: json['artifactHash'] is String
+          ? json['artifactHash'] as String
+          : '',
+      coverage: _readCoverage(json['coverage']),
     );
   }
+
+  static BuildActionIdentity? _readIdentity(Object? value) {
+    if (value == null) return null;
+    try {
+      return BuildActionIdentity.fromJson(value);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static CoverageReport? _readCoverage(Object? value) {
+    if (value == null) return null;
+    try {
+      return CoverageReport.fromJson(value);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Old JSON lacking an identity/hash remains history, never current proof.
+  bool matchesArtifact(BuildActionIdentity identity, String currentHash) =>
+      identity.isComplete &&
+      actionIdentity == identity &&
+      ArtifactEvidenceService.validHash(currentHash) &&
+      artifactHash == currentHash;
 }
 
 /// App-wide build state plus a small durable history for generated .pkt files.
@@ -166,6 +218,24 @@ class PktBuildJobService extends ChangeNotifier {
   String _planRevision = '';
   String _planJson = '';
   String _target = 'packet-tracer';
+  BuildActionIdentity? _actionIdentity;
+  String _artifactHash = '';
+  CoverageReport? _coverage;
+  PktVerificationSummary? _verification;
+  String? _activeKey;
+  Future<dynamic>? _exclusiveRun;
+  int _runSequence = 0;
+  String? _latestRunId;
+  BuildActionIdentity? get actionIdentity => _actionIdentity;
+  String? get activeKey => _activeKey;
+  bool get hasActiveBuild => _activeKey != null;
+  String? get currentJobId => _latestRunId ?? _currentJobId;
+
+  /// The active job's verification summary, as far as it actually got:
+  /// generation, on-device read-back, and - once a native run is bound -
+  /// the Packet Tracer observations. Nothing here is inferred; an unchecked
+  /// column stays notChecked.
+  PktVerificationSummary? get currentVerification => _verification;
 
   Future<OnDeviceBuild?> Function(
     void Function(String stage, double? progress) report,
@@ -174,31 +244,51 @@ class PktBuildJobService extends ChangeNotifier {
 
   Future<void> loadHistory() async {
     if (_historyLoaded) return;
+    final sequence = _runSequence;
     try {
       final prefs = await SharedPreferences.getInstance();
       final stored = prefs.getString(_storageKey);
+      final restored = <PktBuildJobEntry>[];
       if (stored != null && stored.isNotEmpty) {
         final decoded = jsonDecode(stored);
         if (decoded is List) {
-          _history
-            ..clear()
-            ..addAll(
-              decoded.whereType<Map>().map(
-                (entry) =>
-                    PktBuildJobEntry.fromJson(Map<String, dynamic>.from(entry)),
-              ),
-            );
+          for (final row in decoded.whereType<Map>()) {
+            try {
+              restored.add(
+                PktBuildJobEntry.fromJson(Map<String, dynamic>.from(row)),
+              );
+            } catch (_) {
+              // A malformed legacy row does not erase the rest of history.
+            }
+          }
         }
       }
-      for (var i = 0; i < _history.length; i++) {
-        final entry = _history[i];
+      for (var i = 0; i < restored.length; i++) {
+        var entry = restored[i];
+        if (entry.actionIdentity != null && entry.coverage != null) {
+          entry = entry.copyWith(
+            coverage: await ArtifactEvidenceService.refreshFile(
+              coverage: entry.coverage!,
+              currentAction: entry.actionIdentity!,
+              file: File(entry.filePath),
+            ),
+          );
+        }
         if (entry.status == PktBuildJobStatus.running) {
-          _history[i] = entry.copyWith(
+          entry = entry.copyWith(
             status: PktBuildJobStatus.failed,
             stage: 'Build interrupted',
             error: 'The app closed before this build finished.',
             updatedAt: DateTime.now(),
           );
+        }
+        restored[i] = entry;
+      }
+      // History loading can complete after a new build was started. Merge
+      // old rows without clearing a new job or adopting an old active banner.
+      for (final entry in restored) {
+        if (!_history.any((current) => current.id == entry.id)) {
+          _history.add(entry);
         }
       }
       _sortAndTrim();
@@ -209,7 +299,10 @@ class PktBuildJobService extends ChangeNotifier {
           break;
         }
       }
-      if (active != null &&
+      if (_runSequence == sequence &&
+          _activeKey == null &&
+          _currentJobId == null &&
+          active != null &&
           active.status != PktBuildJobStatus.failed &&
           active.status != PktBuildJobStatus.cancelled) {
         _restoreActive(active);
@@ -231,6 +324,14 @@ class PktBuildJobService extends ChangeNotifier {
     _stage = entry.stage;
     _error = entry.error;
     _savedLocation = entry.savedLocation;
+    _sourceRecordId = entry.sourceRecordId;
+    _planRevision = entry.planRevision;
+    _planJson = entry.planJson;
+    _target = entry.target;
+    _actionIdentity = entry.actionIdentity;
+    _artifactHash = entry.artifactHash;
+    _coverage = entry.coverage;
+    _verification = entry.verification;
     _progress =
         entry.status == PktBuildJobStatus.ready ||
             entry.status == PktBuildJobStatus.saved
@@ -268,13 +369,27 @@ class PktBuildJobService extends ChangeNotifier {
     String planRevision = '',
     String planJson = '',
     String target = 'packet-tracer',
+    BuildActionIdentity? actionIdentity,
     required Future<OnDeviceBuild?> Function(
       void Function(String stage, double? progress) report,
     )
     build,
   }) {
-    if (_status == PktBuildJobStatus.running && _activeRun != null) {
-      return _activeRun!;
+    final key =
+        actionIdentity?.key ??
+        _legacyKey(project, planRevision, planJson, target, sourceRecordId);
+    if (_activeKey != null) {
+      if (_activeKey == key && _activeRun != null) return _activeRun!;
+      return Future<OnDeviceBuild?>.error(
+        StateError(
+          'A different build is already active. Wait for it to finish or cancel it first.',
+        ),
+      );
+    }
+    if (actionIdentity != null && !actionIdentity.isComplete) {
+      return Future<OnDeviceBuild?>.error(
+        StateError('The build action identity is incomplete.'),
+      );
     }
     _lastBuild = build;
     _project = project.trim().isEmpty ? 'Network design' : project.trim();
@@ -282,21 +397,108 @@ class PktBuildJobService extends ChangeNotifier {
     _planRevision = planRevision;
     _planJson = planJson;
     _target = target;
-    return _begin(build);
+    _actionIdentity = actionIdentity;
+    return _begin(build, key: key);
+  }
+
+  static String _legacyKey(
+    String project,
+    String revision,
+    String planJson,
+    String target,
+    int? sourceRecordId,
+  ) => BuildActionIdentity.digestJson({
+    'project': project.trim(),
+    'revision': revision,
+    'planJson': planJson,
+    'target': target,
+    'sourceRecordId': sourceRecordId,
+  });
+
+  /// Desktop builds share the same reservation as phone jobs, without a new
+  /// queue or a fake OnDeviceBuild. Only an identical active key can join it.
+  Future<T> runExclusive<T>({
+    required BuildActionIdentity identity,
+    required Future<T> Function() build,
+  }) {
+    if (!identity.isComplete) {
+      return Future<T>.error(
+        StateError('The build action identity is incomplete.'),
+      );
+    }
+    if (_activeKey != null) {
+      final active = _exclusiveRun;
+      if (_activeKey == identity.key && active is Future<T>) return active;
+      return Future<T>.error(
+        StateError(
+          'A different build is already active. Wait for it to finish or cancel it first.',
+        ),
+      );
+    }
+    final token = ++_runSequence;
+    _latestRunId = '${DateTime.now().microsecondsSinceEpoch}-$token';
+    final completion = Completer<T>();
+    _activeKey = identity.key;
+    _exclusiveRun = completion.future;
+    notifyListeners();
+    () async {
+      try {
+        final value = await build();
+        if (token == _runSequence) {
+          _activeKey = null;
+          _exclusiveRun = null;
+        }
+        completion.complete(value);
+      } catch (error, stack) {
+        if (token == _runSequence) {
+          _activeKey = null;
+          _exclusiveRun = null;
+        }
+        completion.completeError(error, stack);
+      } finally {
+        notifyListeners();
+      }
+    }();
+    return completion.future;
   }
 
   Future<OnDeviceBuild?> retry() {
     final build = _lastBuild;
     if (build == null) return Future<OnDeviceBuild?>.value(null);
-    return _begin(build);
+    if (_activeKey != null) {
+      if (_activeRun != null) return _activeRun!;
+      return Future<OnDeviceBuild?>.error(
+        StateError('A different build is already active.'),
+      );
+    }
+    return _begin(
+      build,
+      key:
+          _actionIdentity?.key ??
+          _legacyKey(
+            _project,
+            _planRevision,
+            _planJson,
+            _target,
+            _sourceRecordId,
+          ),
+    );
   }
 
   Future<OnDeviceBuild?> _begin(
     Future<OnDeviceBuild?> Function(
       void Function(String stage, double? progress) report,
     )
-    build,
-  ) {
+    build, {
+    required String key,
+  }) {
+    final token = ++_runSequence;
+    final completion = Completer<OnDeviceBuild?>();
+    _activeKey = key;
+    _activeRun = completion.future;
+    _artifactHash = '';
+    _coverage = null;
+    _verification = null;
     _cancelRequested = false;
     _result = null;
     _error = '';
@@ -304,7 +506,8 @@ class PktBuildJobService extends ChangeNotifier {
     _status = PktBuildJobStatus.running;
     _stage = 'Preparing the phone build';
     _progress = 0.03;
-    _currentJobId = DateTime.now().microsecondsSinceEpoch.toString();
+    _currentJobId = '${DateTime.now().microsecondsSinceEpoch}-$token';
+    _latestRunId = _currentJobId;
     _upsert(
       PktBuildJobEntry(
         id: _currentJobId!,
@@ -317,13 +520,22 @@ class PktBuildJobService extends ChangeNotifier {
         updatedAt: DateTime.now(),
         deviceCount: 0,
         linkCount: 0,
+        sourceRecordId: _sourceRecordId,
+        planRevision: _planRevision,
+        planJson: _planJson,
+        target: _target,
+        actionIdentity: _actionIdentity,
       ),
     );
     notifyListeners();
 
-    final run = _execute(build);
-    _activeRun = run;
-    return run;
+    final jobId = _currentJobId!;
+    _execute(
+      build,
+      token,
+      jobId,
+    ).then(completion.complete, onError: completion.completeError);
+    return completion.future;
   }
 
   Future<OnDeviceBuild?> _execute(
@@ -331,9 +543,16 @@ class PktBuildJobService extends ChangeNotifier {
       void Function(String stage, double? progress) report,
     )
     build,
+    int token,
+    String jobId,
   ) async {
     try {
-      final result = await build(_reportProgress);
+      final result = await build((stage, progress) {
+        if (_runSequence == token && _currentJobId == jobId) {
+          _reportProgress(stage, progress);
+        }
+      });
+      if (_runSequence != token || _currentJobId != jobId) return null;
       if (_cancelRequested) {
         if (result != null) {
           if (await result.manifest.exists()) await result.manifest.delete();
@@ -348,6 +567,16 @@ class PktBuildJobService extends ChangeNotifier {
         _progress = 0;
       } else {
         _result = result;
+        // History records real saved bytes; a generator report is not evidence.
+        try {
+          _artifactHash = await ArtifactEvidenceService.contentHash(
+            result.file,
+          );
+        } catch (_) {
+          _artifactHash = '';
+        }
+        if (_runSequence != token || _currentJobId != jobId) return null;
+        if (_cancelRequested) throw const OnDeviceBuildCancelled();
         _status = PktBuildJobStatus.ready;
         _stage = 'The .pkt is ready to save';
         _progress = 1;
@@ -356,6 +585,7 @@ class PktBuildJobService extends ChangeNotifier {
       notifyListeners();
       return result;
     } catch (error) {
+      if (_runSequence != token || _currentJobId != jobId) return null;
       if (_cancelRequested || error is OnDeviceBuildCancelled) {
         _status = PktBuildJobStatus.cancelled;
         _stage = 'Build cancelled';
@@ -374,7 +604,10 @@ class PktBuildJobService extends ChangeNotifier {
       notifyListeners();
       return null;
     } finally {
-      _activeRun = null;
+      if (_runSequence == token && _currentJobId == jobId) {
+        _activeRun = null;
+        _activeKey = null;
+      }
     }
   }
 
@@ -431,32 +664,139 @@ class PktBuildJobService extends ChangeNotifier {
     String planRevision = '',
     String planJson = '',
     String target = 'packet-tracer',
+    BuildActionIdentity? actionIdentity,
+    String artifactHash = '',
+    CoverageReport? coverage,
+    Map<String, dynamic>? audit,
+    String? expectedJobId,
   }) {
     if (filePath.trim().isEmpty) return;
-    _upsert(
-      PktBuildJobEntry(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        project: project.trim().isEmpty ? 'Network design' : project.trim(),
-        status: PktBuildJobStatus.ready,
-        stage: 'Generated by Packet Tracer',
-        error: '',
-        filePath: filePath,
-        savedLocation: '',
-        updatedAt: DateTime.now(),
-        deviceCount: deviceCount,
-        linkCount: linkCount,
-        sourceRecordId: sourceRecordId,
-        planRevision: planRevision,
-        planJson: planJson,
-        target: target,
-        dismissed: true,
-      ),
+    if (expectedJobId != null && expectedJobId != _latestRunId) return;
+    if (actionIdentity != null && expectedJobId == null) return;
+    if (_activeKey != null && actionIdentity?.key != _activeKey) return;
+    final verification =
+        actionIdentity != null &&
+            ArtifactEvidenceService.validHash(artifactHash)
+        ? PktVerificationSummary.generated(
+            actionIdentity: actionIdentity,
+            artifactHash: artifactHash,
+            audit: audit,
+          )
+        : null;
+    final entry = PktBuildJobEntry(
+      id: expectedJobId ?? DateTime.now().microsecondsSinceEpoch.toString(),
+      project: project.trim().isEmpty ? 'Network design' : project.trim(),
+      status: PktBuildJobStatus.ready,
+      stage: 'Generated by Packet Tracer',
+      error: '',
+      filePath: filePath,
+      savedLocation: '',
+      updatedAt: DateTime.now(),
+      deviceCount: deviceCount,
+      linkCount: linkCount,
+      sourceRecordId: sourceRecordId,
+      planRevision: planRevision,
+      planJson: planJson,
+      target: target,
+      actionIdentity: actionIdentity,
+      artifactHash: artifactHash,
+      coverage: coverage == null || actionIdentity == null
+          ? coverage
+          : ArtifactEvidenceService.refresh(
+              coverage: coverage,
+              currentAction: actionIdentity,
+              currentArtifactHash: artifactHash,
+            ),
+      verification: verification,
+      dismissed: true,
     );
+    if (entry.id == _latestRunId) _verification = verification;
+    _upsert(entry);
     notifyListeners();
   }
 
+  /// Attach a finished phone audit without adding a second history row.
+  /// The build snapshot and saved-byte hash must both still match. A late
+  /// callback from an older job cannot overwrite a newer job's evidence.
+  bool updateEvidence({
+    required BuildActionIdentity actionIdentity,
+    required String artifactHash,
+    required CoverageReport coverage,
+    Map<String, dynamic>? audit,
+    String? jobId,
+  }) {
+    if (_currentJobId == null ||
+        jobId == null ||
+        jobId != _currentJobId ||
+        jobId != _latestRunId ||
+        _actionIdentity != actionIdentity ||
+        _artifactHash != artifactHash ||
+        !ArtifactEvidenceService.validHash(artifactHash) ||
+        (_status != PktBuildJobStatus.ready &&
+            _status != PktBuildJobStatus.saved)) {
+      return false;
+    }
+    _coverage = ArtifactEvidenceService.refresh(
+      coverage: coverage,
+      currentAction: actionIdentity,
+      currentArtifactHash: artifactHash,
+    );
+    if (audit != null) {
+      // The read-back facts ride on the verification summary. A native run
+      // already recorded is never rolled back by a late audit callback.
+      final current = _verification;
+      _verification = current == null || current.nativeRunId.isEmpty
+          ? PktVerificationSummary.generated(
+              actionIdentity: actionIdentity,
+              artifactHash: artifactHash,
+              audit: audit,
+            )
+          : current;
+    }
+    _recordCurrent();
+    notifyListeners();
+    return true;
+  }
+
+  /// Match a version only after reading the current file hash. Matching paths,
+  /// dates, names, or legacy semantic-only revisions are not sufficient.
+  PktBuildJobEntry? matchingArtifact({
+    required BuildActionIdentity actionIdentity,
+    required String currentArtifactHash,
+  }) {
+    for (final entry in _history) {
+      if ((entry.status == PktBuildJobStatus.ready ||
+              entry.status == PktBuildJobStatus.saved) &&
+          entry.matchesArtifact(actionIdentity, currentArtifactHash)) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  Future<PktBuildJobEntry?> matchingFile({
+    required BuildActionIdentity actionIdentity,
+    required File file,
+  }) async {
+    String hash;
+    try {
+      hash = await ArtifactEvidenceService.contentHash(file);
+    } catch (_) {
+      return null;
+    }
+    for (final entry in _history) {
+      if (entry.filePath == file.path &&
+          entry.matchesArtifact(actionIdentity, hash) &&
+          (entry.status == PktBuildJobStatus.ready ||
+              entry.status == PktBuildJobStatus.saved)) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
   void dismiss() {
-    if (_status == PktBuildJobStatus.running) return;
+    if (_activeKey != null) return;
     final current = _currentJobId;
     if (current != null) {
       final index = _history.indexWhere((entry) => entry.id == current);
@@ -475,6 +815,7 @@ class PktBuildJobService extends ChangeNotifier {
     _savedLocation = '';
     _lastBuild = null;
     _currentJobId = null;
+    _latestRunId = null;
     _persist();
     notifyListeners();
   }
@@ -499,8 +840,58 @@ class PktBuildJobService extends ChangeNotifier {
         planRevision: _planRevision,
         planJson: _planJson,
         target: _target,
+        actionIdentity: _actionIdentity,
+        artifactHash: _artifactHash,
+        coverage: _coverage,
+        verification: _verification,
       ),
     );
+  }
+
+  /// Bind a finished NATIVE Packet Tracer verification to its job.
+  ///
+  /// The report is only recorded when every binding holds: it names this
+  /// job, the run id the engine issued for it, a terminal state, and the
+  /// same action identity and saved-byte hash the job was built under
+  /// ([PktVerificationSummary.withNativeReport] arbitrates). Anything else
+  /// returns false and nothing changes - a report that cannot prove which
+  /// run and which file it belongs to is never quoted as evidence.
+  Future<bool> recordNativeVerification(
+    Map<String, dynamic> report, {
+    required String jobId,
+    required String expectedRunId,
+  }) async {
+    // The report must belong to the job that is still the app's latest run
+    // (an older job's late-arriving evidence cannot overwrite a newer one).
+    if (jobId.isEmpty || jobId != currentJobId || expectedRunId.isEmpty) {
+      return false;
+    }
+    final index = _history.indexWhere((item) => item.id == jobId);
+    if (index < 0) return false;
+    final entry = _history[index];
+    if (entry.actionIdentity == null ||
+        !ArtifactEvidenceService.validHash(entry.artifactHash)) {
+      return false;
+    }
+    try {
+      // withNativeReport arbitrates every binding: the report must name this
+      // run id, a terminal state, and the same action identity and saved-byte
+      // hash this entry was built under.
+      final summary =
+          (entry.verification ??
+                  PktVerificationSummary.generated(
+                    actionIdentity: entry.actionIdentity,
+                    artifactHash: entry.artifactHash,
+                  ))
+              .withNativeReport(report, expectedRunId: expectedRunId);
+      _history[index] = entry.copyWith(verification: summary);
+      if (jobId == _currentJobId) _verification = summary;
+      _persist();
+      notifyListeners();
+      return true;
+    } on FormatException {
+      return false;
+    }
   }
 
   void _updateCurrent(PktBuildJobEntry entry) {

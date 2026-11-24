@@ -1,4 +1,5 @@
 import '../../models/network_intent.dart';
+import '../plan_config_composer.dart';
 
 /// Compiles universal intent -> Cisco IOS running-config per device.
 class CiscoAdapter {
@@ -127,6 +128,10 @@ class CiscoAdapter {
         _renderInterVlan(sb, intent, n);
       }
       if (n.type == 'router') {
+        final dhcp = n.serviceRules['dhcp'];
+        if (dhcp is Map && dhcp['mode'] == 'server') {
+          sb.write(PlanConfigComposer.routerDhcpConfig(intent, n.name));
+        }
         _renderStaticRoutes(sb, intent, n);
         // A firewall on the WAN edge is the LAN's default way out: without
         // a default route through it the ASA sits in path but carries no
@@ -525,7 +530,10 @@ class CiscoAdapter {
     NetNode device,
   ) {
     final s = intent.security;
-    if (!s.requested) return;
+    final dhcpServerRequested = intent.nodes.any(
+      (n) => n.type == 'server' && n.services.contains('dhcp'),
+    );
+    if (!s.requested && !dhcpServerRequested) return;
 
     if (device.type == 'switch') {
       if (s.portSecurity) {
@@ -582,7 +590,9 @@ class CiscoAdapter {
               .where((a) => !_onTransitLink(intent, device.name, a.iface))
               .toList();
     final dhcpIp = _findNodeIp(intent, 'DHCP1');
-    if (dhcpIp != null && lan.isNotEmpty) {
+    final routerDhcp = device.serviceRules['dhcp'];
+    final localDhcp = routerDhcp is Map && routerDhcp['mode'] == 'server';
+    if (!localDhcp && dhcpIp != null && lan.isNotEmpty) {
       for (final a in lan) {
         sb.writeln('interface ${a.iface}');
         sb.writeln(' ip helper-address $dhcpIp');

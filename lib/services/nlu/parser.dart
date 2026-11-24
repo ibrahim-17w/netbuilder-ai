@@ -2,6 +2,7 @@ import 'package:net_builder/services/phrasing_memory_service.dart';
 
 import '../../models/network_intent.dart';
 import '../../models/normalized_message.dart';
+import '../casual_english.dart';
 import 'lexicon.dart';
 import '../packet_tracer/brief_reader.dart';
 import 'package:flutter/foundation.dart' show compute;
@@ -26,24 +27,9 @@ import 'package:flutter/foundation.dart' show compute;
 /// call site in the app moved when this file was created.
 
 final RegExp _bidiControls = RegExp(r'[‎‏\u202a-\u202e؜]');
-final RegExp _arabicDiacritics = RegExp(r'[ً-ِٰـ]');
-final RegExp _hamzaForms = RegExp(r'[آإٱا]');
-
-String _foldArabic(String s) => s
-    .replaceAll(_bidiControls, ' ')
-    .replaceAll(_arabicDiacritics, '')
-    .replaceAll(_hamzaForms, 'ا')
-    .replaceAll('ى', 'ي')
-    .replaceAll('ة', 'ه')
-    .replaceAll('،', ',');
-
+final RegExp _arabicDiacritics = RegExp(r'[\u064b-\u065f\u0670\u0640]');
+final RegExp _hamzaForms = RegExp(r'[آأإٱ]');
 final RegExp _arabicIndicDigits = RegExp(r'[٠-٩۰-۹]');
-
-/// ٢٣ (Arabic-Indic) and ۲۳ (Extended Arabic-Indic) are the same numbers.
-String _asciiDigits(String s) => s.replaceAllMapped(_arabicIndicDigits, (m) {
-  final c = m.group(0)!.codeUnitAt(0);
-  return '${c >= 0x06f0 ? c - 0x06f0 : c - 0x0660}';
-});
 
 /// The prefix length of a dotted mask, or null when it is not a mask.
 int? _maskToPrefix(String mask) {
@@ -73,36 +59,125 @@ final RegExp _maskPair = RegExp(
   r'(\d{1,3}(?:\.\d{1,3}){3})[\s,;:]*(?:/|subnet\s+mask|netmask|mask|prefix|qina3|قناع(?:\s+الشبكه)?)?[\s,;:]*(\d{1,3}(?:\.\d{1,3}){3})',
 );
 
-String _bridgeMasks(String s) => s.replaceAllMapped(_maskPair, (m) {
-  final prefix = _maskToPrefix(m.group(2)!);
-  if (prefix == null || prefix == 0) return m.group(0)!;
-  return '${m.group(1)!}/$prefix';
-});
-
 /// Arabic phrases -> the English words the rest of this parser already
-/// keys on.  Keys are written in folded form (see [_foldArabic]) and the
-/// table is applied longest-first, so 'جهاز التوجيه' (router) wins before
-/// the bare 'جهاز' (pc) underneath it.
+/// keys on. Keys use folded Arabic; longest-first matching keeps the mode,
+/// negation and scope together rather than translating only device nouns.
 const List<List<String>> _phraseBridge = [
   // Multi-word names must survive the spelled-out-number bridge: "single" is
   // also the number one, so "single board computer" became "1 1 board
   // computer" and lost its SBC meaning before the lexicon saw it.
   ['single board computer', 'SBC'],
   ['single-board computer', 'SBC'],
-  // devices
+  // Controlled Syrian/MSA commands. These carry meaning, not filler.
+  ['ولا تغير عناوين الباقي', 'and preserve remaining addresses'],
+  ['لا تغير عناوين الباقي', 'preserve remaining addresses'],
+  ['خلي عناوين الباقي متل ما هي', 'preserve remaining addresses'],
+  ['خلي عدد الاجهزه نفسه', 'preserve device counts'],
+  ['خلي عدد الاجهزه متل ما هو', 'preserve device counts'],
+  ['خلي عدد الاجهزه كما هو', 'preserve device counts'],
+  ['حافظ علي عدد الاجهزه', 'preserve device counts'],
+  ['ولا تعدل الشبكه', 'and do not change the network'],
+  ['لا تعدل الشبكه', 'do not change the network'],
+  ['ولا تغير الشبكه', 'and do not change the network'],
+  ['لا تغير الشبكه', 'do not change the network'],
+  ['من دون ما تعدل', 'without changing'],
+  ['بدون تعديل', 'without changes'],
+  ['لا تضيف', 'do not add'],
+  ['لا تضف', 'do not add'],
+  ['ما تضيف', 'do not add'],
+  ['لا تشيل', 'do not remove'],
+  ['لا تحذف', 'do not remove'],
+  ['لا تستخدم', 'do not use'],
+  ['ما تستخدم', 'do not use'],
+  ['لا تفعل', 'do not enable'],
+  ['لا تعدل', 'do not change'],
+  ['لا تغير', 'do not change'],
+  ['ولا', 'and do not'],
+  ['بدل من', 'instead of'],
+  ['بدلا من', 'instead of'],
+  ['استبدل', 'replace'],
+  ['بدل', 'replace'],
+  ['بـ', 'with'],
+  ['ب', 'with'],
+  ['اشرحلي الفرق بين', 'explain the difference between'],
+  ['اشرح لي الفرق بين', 'explain the difference between'],
+  ['اشرحلي', 'explain'],
+  ['اشرح لي', 'explain'],
+  ['اشرح', 'explain'],
+  ['شو الفرق بين', 'what is the difference between'],
+  ['ما الفرق بين', 'what is the difference between'],
+  ['شو بيصير لو', 'what if'],
+  ['ماذا لو', 'what if'],
+  ['شو رايك', 'what do you recommend'],
+  ['بتنصحني', 'would you recommend'],
+  ['خلينا نفترض', 'suppose'],
+  ['ممكن تضيف', 'can you add'],
+  ['فينا نضيف', 'can we add'],
+  ['فينا نعملها', 'could we do it'],
+  ['ممكن نعملها', 'could we do it'],
+  ['بدي', 'create'],
+  ['اريد', 'create'],
+  ['انشئ', 'create'],
+  ['اعمل', 'create'],
+  ['استخدم', 'use'],
+  ['ضيف', 'add'],
+  ['اضف', 'add'],
+  ['شيل', 'remove'],
+  ['احذف', 'remove'],
+  ['غير اسم', 'rename'],
+  ['غير', 'change'],
+  ['عدل', 'change'],
+  ['صدر الاعدادات', 'export the configurations'],
+  ['صدر التهيئه', 'export the configuration'],
+  ['ابني الملف', 'build the file'],
+  ['بجملتين', 'in two sentences'],
+  ['في جملتين', 'in two sentences'],
+  ['جملتين', 'two sentences'],
+  ['بدون شرح', 'no explanation'],
+  ['بلا شرح', 'no explanation'],
+  ['فقط الاعدادات', 'configuration only'],
+  ['الاعدادات فقط', 'configuration only'],
+  ['الاعدادات بس', 'configuration only'],
+  ['بالعربي', 'in Arabic'],
+  ['بالعربيه', 'in Arabic'],
+  ['بالانجليزي', 'in English'],
+  ['بالانجليزيه', 'in English'],
+  ['باختصار', 'briefly'],
+  ['شبكه واحده', 'one network'],
+  ['شبكه مسطحه', 'flat network'],
+  ['الشبكه', 'network'],
+  ['شبكه', 'network'],
+  ['فيها', 'with'],
+  ['من دون', 'without'],
+  ['بلا', 'without'],
+  ['فقط', 'only'],
+  ['بس', 'only'],
+  ['خلي', 'keep'],
+  ['حافظ علي', 'preserve'],
+  ['متل ما هو', 'as it is'],
+  ['متل ما هي', 'as it is'],
+  ['كما هو', 'as it is'],
+  ['بدون', 'without'],
+  ['لازم', 'must'],
+  ['يجب', 'must'],
+  ['الضيوف', 'guests'],
+  ['للموظفين', 'staff'],
+  ['الموظفين', 'staff'],
+  ['ما يوصلوا', 'must not reach'],
+  ['لا يصلوا', 'must not reach'],
+  ['اعزل', 'isolate'],
+  // devices and explicit site references
   ['عالفرع التاني', 'at the second branch'],
   ['عالفرع الثاني', 'at the second branch'],
   ['على الفرع التاني', 'at the second branch'],
   ['على الفرع الثاني', 'at the second branch'],
   ['الفرع التاني', 'the second branch'],
   ['الفرع الثاني', 'the second branch'],
-  ['ضيف', 'add'],
-  ['شيل', 'remove'],
-  ['احذف', 'remove'],
-  ['بس', 'only'],
-  ['خلي', 'keep'],
-  ['متل ما هو', 'as it is'],
-  ['بدون', 'without'],
+  ['عالفرع الاول', 'at the first branch'],
+  ['بالفرع التاني', 'at the second branch'],
+  ['بالفرع الثاني', 'at the second branch'],
+  ['الفرع الاول', 'the first branch'],
+  ['الفرع الثالث', 'the third branch'],
   ['اجهزه التوجيه', 'routers'],
   ['جهاز التوجيه', 'router'],
   ['الموجه الرئيسي', 'core router'],
@@ -277,20 +352,22 @@ const List<List<String>> _phraseBridge = [
 ];
 
 /// Numbers a brief may spell out instead of typing - English and Arabic.
-
 bool _isAscii(String s) => s.codeUnits.every((c) => c < 128);
 
-final RegExp _nonWordChars = RegExp(r'[^A-Za-z0-9\u0600-\u06ff]');
-
-/// "two switches" -> "2 switches", "اثنين موجه" -> "2 router".
-String _bridgeNumberWords(String s) => s
-    .split(' ')
-    .map((token) {
-      final bare = token.replaceAll(_nonWordChars, '').toLowerCase();
-      final n = numberWords[bare];
-      return n == null ? token : '$n';
-    })
-    .join(' ');
+// Split only the conjunction attached to a known word, digit or technical
+// token, not every Arabic word beginning with waw and never a literal value.
+final Set<String> _arabicConjunctionWords = {
+  for (final phrase in _phraseBridge)
+    if (!_isAscii(phrase[0])) phrase[0].split(' ').first,
+  for (final word in numberWords.keys)
+    if (!_isAscii(word)) word,
+};
+final RegExp _arabicConjunction = RegExp(
+  '(?<![A-Za-z0-9_\\u0621-\\u064a])و(?='
+  '(?:${_arabicConjunctionWords.map(RegExp.escape).join('|')})(?![\\u0621-\\u064a])|'
+  r'[0-9]|(?:OSPF|EIGRP|DNS|DHCP|PCs?|VLANs?)\b|\s)',
+  caseSensitive: false,
+);
 
 /// True when the brief ties this subnet to a site: "192.168.20.0/24 at the
 /// branch", "... for HQ".
@@ -389,25 +466,47 @@ Map<String, int>? perSiteCounts(String text) {
   final stop = clause.indexOf(_sentenceBreak);
   if (stop >= 0) clause = clause.substring(0, stop);
   final lower = clause.toLowerCase();
+  // The count often comes BEFORE the cue: "a server in each site", "3 pcs
+  // per site". Read the run-up to the cue as well (same sentence, and never
+  // the site count itself), so both word orders mean the same thing.
+  final lead = text.substring(0, cue.start);
+  var runUp = lead.substring(lead.lastIndexOf(RegExp(r'[.;\n]')) + 1);
+  if (runUp.length > 80) runUp = runUp.substring(runUp.length - 80);
+  final runUpLower = runUp.toLowerCase();
+  // Only a count the cue actually governs belongs to every site: "a server in
+  // each site" and "3 pcs per site" do, while the totals in "two sites with 4
+  // switches, each site has 2 pcs" are stated before a cue they are not part
+  // of.
+  final perCue = cue.group(0)!.toLowerCase().startsWith('per');
+  final introduced = RegExp(
+    r'\b(?:in|for|with|at|inside|within|to)\s+(?:the\s+|every\s+|its\s+)?$',
+  ).hasMatch(runUpLower);
+  final before = perCue || introduced ? runUpLower : '';
 
-  /// "3 pcs" and a bare "a switch" both mean something per site.
-  int countOf(List<String> words) {
+  int countIn(List<String> words, String text) {
     for (final w in words) {
       final pattern = _countPatternByWord[w]!;
-      for (final m in pattern.allMatches(lower)) {
+      for (final m in pattern.allMatches(text)) {
         // "VLAN 20 servers" names the VLAN - the 20 is an ID, not a count.
         // Taking it inflated every later lab: "4 switches with VLAN 20
         // servers" built twenty servers where the brief named none.
-        if (RegExp(r'vlan\s*$').hasMatch(lower.substring(0, m.start))) {
+        if (RegExp(r'vlan\s*$').hasMatch(text.substring(0, m.start))) {
           continue;
         }
         return int.parse(m.group(1)!);
       }
     }
     for (final w in words) {
-      if (_barePatternByWord[w]!.hasMatch(lower)) return 1;
+      if (_barePatternByWord[w]!.hasMatch(text)) return 1;
     }
     return 0;
+  }
+
+  /// "3 pcs" and a bare "a switch" both mean something per site; the clause
+  /// after the cue is read first, then the run-up that introduces it.
+  int countOf(List<String> words) {
+    final after = countIn(words, lower);
+    return after > 0 ? after : countIn(words, before);
   }
 
   final counts = <String, int>{
@@ -415,11 +514,7 @@ Map<String, int>? perSiteCounts(String text) {
   };
   counts['switch'] = countOf(['switch']);
   counts['pc'] = countOf(['pc', 'workstation', 'desktop']);
-  counts['server'] = countOf([
-    'server',
-    'nas',
-    'network attached storage',
-  ]);
+  counts['server'] = countOf(['server', 'nas', 'network attached storage']);
   for (final kind in deviceKinds) {
     if (const ['router', 'switch', 'pc', 'server'].contains(kind.type)) {
       continue;
@@ -456,22 +551,19 @@ final List<({RegExp? pattern, String from, String to})> _phraseBridgeTable = [
         to: e[1],
       )
     else
-      (pattern: null, from: e[0], to: e[1]),
+      (
+        pattern: RegExp(
+          '(?<![A-Za-z0-9_\\u0621-\\u064a])${RegExp.escape(e[0])}'
+          '(?![A-Za-z0-9_\\u0621-\\u064a])',
+          caseSensitive: false,
+        ),
+        from: e[0],
+        to: e[1],
+      ),
 ];
 
-/// Rewrite a brief into the wording this parser understands.
-String bridgeBrief(String raw) {
-  var s = _bridgeMasks(_asciiDigits(_foldArabic(raw)));
-  for (final e in _phraseBridgeTable) {
-    final pattern = e.pattern;
-    if (pattern != null) {
-      s = s.replaceAll(pattern, e.to);
-    } else if (s.contains(e.from)) {
-      s = s.replaceAll(e.from, e.to);
-    }
-  }
-  return _bridgeNumberWords(s).replaceAll(_extraSpaces, ' ');
-}
+/// The legacy parser and the request adapter share one literal-safe bridge.
+String bridgeBrief(String raw) => bridgeBriefWithMapping(raw).normalizedText;
 
 /// The same bridge pass as [bridgeBrief], retaining UTF-16 source offsets.
 /// Kept beside the legacy bridge so both readers use the same phrase table,
@@ -484,6 +576,8 @@ NormalizedMessage bridgeBriefWithMapping(String raw) {
   tracked.replaceAll(RegExp('ى'), (_) => 'ي');
   tracked.replaceAll(RegExp('ة'), (_) => 'ه');
   tracked.replaceAll(RegExp('،'), (_) => ',');
+  tracked.replaceAll(RegExp('؛'), (_) => ';');
+  tracked.replaceAll(RegExp('؟'), (_) => '?');
   tracked.replaceAll(_arabicIndicDigits, (match) {
     final code = match.group(0)!.codeUnitAt(0);
     return '${code >= 0x06f0 ? code - 0x06f0 : code - 0x0660}';
@@ -492,8 +586,19 @@ NormalizedMessage bridgeBriefWithMapping(String raw) {
     final prefix = _maskToPrefix(match.group(2)!);
     if (prefix == null || prefix == 0) return match.group(0)!;
     return '${match.group(1)!}/$prefix';
-  });
+  }, allowAddressPair: true);
+  tracked.replaceAll(_arabicConjunction, (_) => 'and ');
+  tracked.replaceAll(
+    RegExp(
+      r'(?<![A-Za-z0-9_\u0621-\u064a])ب(?=(?:OSPF|EIGRP|BGP|static)\b)',
+      caseSensitive: false,
+    ),
+    (_) => 'with ',
+  );
   for (final entry in _phraseBridgeTable) {
+    // Opening/request words carry mode. Keep them: deleting "i need" or
+    // "my network" makes exploration and do-not-change clauses unreadable.
+    if (entry.to.isEmpty) continue;
     final pattern = entry.pattern;
     if (pattern != null) {
       tracked.replaceAll(pattern, (_) => entry.to);
@@ -501,11 +606,20 @@ NormalizedMessage bridgeBriefWithMapping(String raw) {
       tracked.replaceAll(RegExp(RegExp.escape(entry.from)), (_) => entry.to);
     }
   }
-  tracked.replaceAll(RegExp(r'[^ ]+'), (match) {
-    final token = match.group(0)!;
-    final bare = token.replaceAll(_nonWordChars, '').toLowerCase();
-    return numberWords[bare]?.toString() ?? token;
-  });
+  tracked.replaceAll(
+    RegExp(r"(?<![A-Za-z0-9_])[A-Za-z]+(?:['’][A-Za-z]+)?(?![A-Za-z0-9_])"),
+    (match) => CasualEnglish.normalizeToken(match.group(0)!),
+  );
+  // Numbers retain punctuation/newlines and offsets; converting a whole
+  // space-delimited token used to swallow the comma after a spelled number.
+  tracked.replaceAll(
+    RegExp(
+      r'(?<![A-Za-z0-9_\u0621-\u064a])[A-Za-z\u0621-\u064a]+(?![A-Za-z0-9_\u0621-\u064a])',
+    ),
+    (match) =>
+        numberWords[match.group(0)!.toLowerCase()]?.toString() ??
+        match.group(0)!,
+  );
   tracked.replaceAll(_extraSpaces, (_) => ' ');
   return tracked.finish();
 }
@@ -529,7 +643,11 @@ class _TrackedText {
       _starts = [for (var i = 0; i < text.length; i++) i],
       _ends = [for (var i = 0; i < text.length; i++) i + 1];
 
-  void replaceAll(RegExp pattern, String Function(RegExpMatch) replacement) {
+  void replaceAll(
+    RegExp pattern,
+    String Function(RegExpMatch) replacement, {
+    bool allowAddressPair = false,
+  }) {
     final matches = pattern.allMatches(text).toList(growable: false);
     if (matches.isEmpty) return;
     final oldText = text;
@@ -554,14 +672,18 @@ class _TrackedText {
 
     for (final match in matches) {
       copyRange(cursor, match.start);
-      if (_isProtected(match.start, match.end)) {
+      if (_isProtected(
+        match.start,
+        match.end,
+        allowAddressPair: allowAddressPair,
+      )) {
         skipped.add(match);
         copyRange(match.start, match.end);
         cursor = match.end;
         continue;
       }
       final outputStart = outputLength;
-      var sourceStart = oldText.length;
+      var sourceStart = _original.length;
       var sourceEnd = 0;
       for (var i = match.start; i < match.end; i++) {
         if (oldStarts[i] < sourceStart) sourceStart = oldStarts[i];
@@ -573,9 +695,17 @@ class _TrackedText {
         if (removed.end > sourceEnd) sourceEnd = removed.end;
       }
       final value = replacement(match);
+      // A no-op must keep each code unit's original coordinates. Mapping an
+      // unchanged token to a single range loses exact named-device evidence.
+      if (value == match.group(0)) {
+        skipped.add(match);
+        copyRange(match.start, match.end);
+        cursor = match.end;
+        continue;
+      }
       buffer.write(value);
       if (value.isNotEmpty) {
-        if (sourceStart == oldText.length && sourceEnd == 0) {
+        if (sourceStart == _original.length && sourceEnd == 0) {
           sourceStart = match.start;
           sourceEnd = match.end;
         }
@@ -626,31 +756,48 @@ class _TrackedText {
     _deletions = deletions;
   }
 
-  bool _isProtected(int start, int end) {
+  bool _isProtected(int start, int end, {bool allowAddressPair = false}) {
     var sourceStart = _original.length;
     var sourceEnd = 0;
     for (var i = start; i < end; i++) {
       if (_starts[i] < sourceStart) sourceStart = _starts[i];
       if (_ends[i] > sourceEnd) sourceEnd = _ends[i];
     }
-    return _protected.any(
-      (range) => range.$1 < sourceEnd && range.$2 > sourceStart,
-    );
+    return _protected.any((range) {
+      if (range.$1 >= sourceEnd || range.$2 <= sourceStart) return false;
+      // Address+mask -> CIDR is an existing, semantic address-reader rule,
+      // not a fuzzy literal rewrite. Permit only two complete bare IPv4
+      // literals, never an address inside a quoted value/path/SSID/secret.
+      if (allowAddressPair &&
+          range.$1 >= sourceStart &&
+          range.$2 <= sourceEnd &&
+          RegExp(
+            r'^\d{1,3}(?:\.\d{1,3}){3}$',
+          ).hasMatch(_original.substring(range.$1, range.$2)) &&
+          !_opaque.any(
+            (opaque) => opaque.$1 < range.$2 && opaque.$2 > range.$1,
+          )) {
+        return false;
+      }
+      return true;
+    });
   }
 
   static List<(int, int)> _literalRanges(String text) {
     final ranges = <(int, int)>[];
     final patterns = <RegExp>[
-      RegExp(r'`[^`\n]*`'),
-      RegExp(r'"[^"\n]*[\\/][^"\n]*"|\x27[^\x27\n]*[\\/][^\x27\n]*\x27'),
+      RegExp(r'`[^`\n]*`|"[^"\n]*"|(?<!\w)\x27[^\x27\n]*\x27'),
       RegExp(r'(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]|\\\\|/)[^\s,;]+'),
+      RegExp(r'\b[A-Za-z_][A-Za-z0-9_.-]*\.[A-Za-z][A-Za-z0-9_.-]*\b'),
       RegExp(r'\b(?:\d{1,3}\.){3}\d{1,3}(?:/\d{1,3})?\b'),
       RegExp(r'\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b', caseSensitive: false),
       RegExp(
         r'(?<![A-Za-z0-9])(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}(?:/\d{1,3})?(?![A-Za-z0-9])',
         caseSensitive: false,
       ),
-      RegExp(r'\b(?:R|SW|PC|SRV)\d{1,3}\b', caseSensitive: false),
+      RegExp(r'\b[A-Za-z][A-Za-z0-9_.-]*\d[A-Za-z0-9_.-]*\b'),
+      // Case-sensitive names and explicitly named values stay byte-for-byte.
+      RegExp(r'\b[A-Za-z]*[a-z][A-Z][A-Za-z]*\b'),
       RegExp(
         r'\b(?:FastEthernet|GigabitEthernet|TenGigabitEthernet|TwentyFiveGigE|HundredGigE|Ethernet|Serial|Async|Fa|Gi|Te|Eth|Se|F|G|S|Vlan|Console|Aux(?:iliary)?|USB|Coax(?:ial)?|Port)\s*\d+(?:/\d+){0,3}\b',
         caseSensitive: false,
@@ -664,11 +811,15 @@ class _TrackedText {
     }
     final valuePatterns = <RegExp>[
       RegExp(
-        r'\b(?:ssid|network\s+name)\s*(?::|=|\bis\b)?\s*[`"\x27]?([^\r\n,;`"\x27]+)',
+        r'\b(?:rename\s+[A-Za-z][A-Za-z0-9_.-]*\s+to|(?:named|called|hostname))\s+([A-Za-z][A-Za-z0-9_.-]*)',
         caseSensitive: false,
       ),
       RegExp(
-        r'\b(?:password|passphrase|psk|pre-shared\s+key)\s*(?::|=|\bis\b)?\s*[`"\x27]?([^\s,;`"\x27]+)',
+        r'(?:\b(?:ssid|network\s+name)|اسم\s+الشبك[ةه])\s*(?::|=|\bis\b)?\s*[`"\x27]?([^\r\n,;`"\x27]+)',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'(?:\b(?:password|passphrase|secret|psk|pre-shared\s+key)|كلم[ةه]\s+(?:المرور|السر))\s*(?::|=|\bis\b)?\s*[`"\x27]?([^\s,;`"\x27]+)',
         caseSensitive: false,
       ),
     ];
@@ -687,13 +838,22 @@ class _TrackedText {
 
   static List<(int, int)> _opaqueValueRanges(String text) {
     final ranges = <(int, int)>[];
+    // Document/config quotations and file paths are data, not instructions.
+    for (final pattern in [
+      RegExp(r'`[^`\n]*`|"[^"\n]*"|(?<!\w)\x27[^\x27\n]*\x27'),
+      RegExp(r'(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]|\\\\|/)[^\s,;]+'),
+    ]) {
+      for (final match in pattern.allMatches(text)) {
+        ranges.add((match.start, match.end));
+      }
+    }
     final patterns = <RegExp>[
       RegExp(
-        r'\b(?:ssid|network\s+name)\s*(?::|=|\bis\b)?\s*[`"\x27]?([^\r\n,;`"\x27]+)',
+        r'(?:\b(?:ssid|network\s+name)|اسم\s+الشبك[ةه])\s*(?::|=|\bis\b)?\s*[`"\x27]?([^\r\n,;`"\x27]+)',
         caseSensitive: false,
       ),
       RegExp(
-        r'\b(?:password|passphrase|psk|pre-shared\s+key)\s*(?::|=|\bis\b)?\s*[`"\x27]?([^\s,;`"\x27]+)',
+        r'(?:\b(?:password|passphrase|secret|psk|pre-shared\s+key)|كلم[ةه]\s+(?:المرور|السر))\s*(?::|=|\bis\b)?\s*[`"\x27]?([^\s,;`"\x27]+)',
         caseSensitive: false,
       ),
     ];
@@ -711,6 +871,9 @@ class _TrackedText {
 
   NormalizedMessage finish() {
     final segments = <NormalizationSegment>[];
+    final opaqueBoundaries = {
+      for (final range in _opaque) ...[range.$1, range.$2],
+    };
     var i = 0;
     while (i < text.length) {
       final begin = i;
@@ -725,7 +888,8 @@ class _TrackedText {
         final joinsCopy =
             copied &&
             currentEnd == currentStart + 1 &&
-            currentStart == previousStart + 1;
+            currentStart == previousStart + 1 &&
+            !opaqueBoundaries.contains(currentStart);
         final joinsReplacement =
             !copied && currentStart == sourceStart && currentEnd == sourceEnd;
         if (!joinsCopy && !joinsReplacement) break;
@@ -803,8 +967,25 @@ bool namesAnyDeviceIn(String lower) =>
 /// A server label whose name says which service it runs: DHCP1, DNS1,
 /// WEB1, AAA1, FTP1, MAIL1, NTP1 ...
 
+/// An explicitly named lab/project wins over a conversation fallback.
+RegExpMatch? projectNameMention(String text) => RegExp(
+  r'\b(?:lab|project|topology|network)\s+(?:named|called)\s+'
+  r'(?:`([^`\r\n]+)`|"([^"\r\n]+)"|\x27([^\x27\r\n]+)\x27|([A-Za-z][A-Za-z0-9_.-]*))',
+  caseSensitive: false,
+).firstMatch(text);
+
+String? explicitProjectName(String text) {
+  final mention = projectNameMention(text);
+  if (mention == null) return null;
+  for (var group = 1; group <= 4; group++) {
+    if (mention.group(group) != null) return mention.group(group)!.trim();
+  }
+  return null;
+}
+
 /// The learned-phrasing hop, run once at the top of every parse.
 NetworkIntent parseBrief(String projectName, String rawText) {
+  projectName = explicitProjectName(rawText) ?? projectName;
   final request = PtBriefRequest.read(rawText);
   return request.apply(
     _parseGeneralBrief(
@@ -833,12 +1014,59 @@ Future<NetworkIntent> parseBriefAsync(
   );
 }
 
+/// The legacy service-slot reader treats a role word as positive inventory.
+/// Mask only explicitly negated service noun phrases for that reader. The
+/// source-mapped bridge itself retains the negative clause for requirements.
+String _serviceSafePlannerText(String text) {
+  final normalized = bridgeBriefWithMapping(text);
+  final source = normalized.normalizedText;
+  final units = source.codeUnits.toList();
+  final cuePattern = RegExp(
+    r'\b(?:without|no|exclude|do\s+not|don.t|never)\s+'
+    r'(?:(?:add|use|enable|include|create)\s+)?',
+    caseSensitive: false,
+  );
+  final boundary = RegExp(
+    r'[,;.\n]|\b(?:but|however)\b|\band\s+(?:add|use|enable|put|set|change|keep)\b',
+    caseSensitive: false,
+  );
+  for (final cue in cuePattern.allMatches(source)) {
+    final stop = boundary.firstMatch(source.substring(cue.end));
+    final end = stop == null ? source.length : cue.end + stop.start;
+    final clause = source.substring(cue.end, end);
+    if (normalized.overlapsOpaqueSource(start: cue.start, end: cue.end)) {
+      continue;
+    }
+    // Carry the negative verb until the next action, not through an unrelated
+    // condition such as "no need to change DHCP" or "no need for a DNS change".
+    if (!RegExp(
+      r'^(?:a\s+|an\s+|the\s+)?(?:dns|dhcp|https?|web|ftp|tftp|ntp|snmp|syslog|aaa|tacacs|radius)\b',
+      caseSensitive: false,
+    ).hasMatch(clause)) {
+      continue;
+    }
+    for (final service in RegExp(
+      r'\b(?:dns|dhcp|http|https|web|ftp|tftp|ntp|snmp|syslog|aaa|tacacs|radius)'
+      r'(?:\s+servers?)?\b',
+      caseSensitive: false,
+    ).allMatches(clause)) {
+      final start = cue.end + service.start;
+      final finish = cue.end + service.end;
+      if (normalized.overlapsOpaqueSource(start: start, end: finish)) continue;
+      for (var i = start; i < finish; i++) {
+        units[i] = 32;
+      }
+    }
+  }
+  return String.fromCharCodes(units);
+}
+
 NetworkIntent _parseGeneralBrief(
   String projectName,
   String rawText,
   String? routerModelHint,
 ) {
-  final bridged = bridgeBrief(rawText);
+  final bridged = _serviceSafePlannerText(rawText);
   // Learned phrasing: when this exact wording was clarified before, the
   // resolved brief replays - the parser reads it as if the user had typed
   // it. Exactly one hop: a replay is never looked up again, so the index
@@ -851,7 +1079,7 @@ NetworkIntent _parseGeneralBrief(
     if (replay.exact) {
       return NetworkIntent.parseBridged(
         projectName,
-        bridgeBrief(replay.rewrite),
+        _serviceSafePlannerText(replay.rewrite),
         rawText,
       );
     }
@@ -864,7 +1092,7 @@ NetworkIntent _parseGeneralBrief(
     final merged = '${replay.rewrite} $bridged';
     final intent = NetworkIntent.parseBridged(
       projectName,
-      bridgeBrief(merged),
+      _serviceSafePlannerText(merged),
       rawText,
     );
     final assumptions = [

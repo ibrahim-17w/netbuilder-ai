@@ -19,9 +19,9 @@ class StoredPrivacy {
     if (_secretField.hasMatch(key)) {
       return value.isEmpty ? value : NetworkIntent.redacted;
     }
-    if (key.endsWith('Json') ||
-        value.startsWith('{') ||
-        value.startsWith('[')) {
+    if (key.toLowerCase().endsWith('json') ||
+        value.trimLeft().startsWith('{') ||
+        value.trimLeft().startsWith('[')) {
       try {
         return jsonEncode(redact(jsonDecode(value)));
       } catch (_) {}

@@ -220,7 +220,7 @@ _PORT_ALIASES = {
     "w": "wireless", "wlan": "wireless",
 }
 _PORT_FAMILIES = ("fastethernet", "gigabitethernet", "ethernet", "serial",
-                  "fiber", "wireless")
+                  "fiber", "coaxial", "modem", "wireless")
 
 # Cable kind -> (link medium, cable type) as Packet Tracer names them.
 LINK_MEDIUMS = hardware.LINK_MEDIUMS
@@ -294,11 +294,44 @@ def _named_variant(variant: dict) -> dict:
     such failure mode.
     """
     named = dict(variant)
-    named["ports"] = _named_ports(variant.get("ports") or [])
+    named["ports"] = _named_ports(variant.get("ports") or [],
+                                  str(variant.get("kind") or ""))
     return named
 
 
-def _named_ports(ports: list) -> list:
+# Kinds whose copper ports Packet Tracer addresses by interface name: IOS
+# gear (routers, switches, ASAs) and end hosts, whose real names the saves
+# carry (FastEthernet0, GigabitEthernet1/1...).
+FAMILY_PORT_KINDS = frozenset({"router", "switch", "multilayerswitch",
+                               "asa", "isa", "pc", "laptop", "server",
+                               "printer", "wiredenddevice"})
+
+# Everything else - access points, IP phones, hubs, WLCs, clouds, consumer
+# routers, IoT modules - exposes generic module pins, and PT labels them
+# "Port 0", "Port 1"...  A save never writes those names down: the port only
+# appears as a <PORT> element and PT derives the label from the module.
+# Naming one of them "FastEthernet0" (the old family fallback) is what made
+# every generated .pkt that cabled an access point, an IP phone, a hub or a
+# WLC unopenable - PT answers "Incompatible File" and loads nothing at all.
+
+
+def generic_port_kind(kind: str) -> bool:
+    """True when PT labels this kind's copper pins "Port N"."""
+    name = kind.strip().lower()
+    return bool(name) and name not in FAMILY_PORT_KINDS
+
+# Only the copper-Ethernet pins of those kinds are labelled that way: a cloud's
+# coaxial and serial ports have PT-authored names (Coaxial7, Serial0) and must
+# keep them.
+GENERIC_ETHERNET_FAMILIES = frozenset({"ethernet", "fastethernet",
+                                      "gigabitethernet"})
+
+# A name the family fallback invented, as opposed to one PT authored: these
+# are the only names replaced on an existing library entry.
+_FAMILY_GUESS = re.compile(r"^(?:FastEthernet|GigabitEthernet|Ethernet)\d+$")
+
+
+def _named_ports(ports: list, kind: str = "") -> list:
     """Name the cableable ports the source save could not prove a name for.
 
     An access point's Ethernet port is one of them: Packet Tracer names it
@@ -308,18 +341,32 @@ def _named_ports(ports: list) -> list:
     the whole cable, leaving the device placed in the workspace cabled to
     nothing. That is what "the AP is floating" was.
 
-    ``FastEthernet0`` is what the links in a real save use (the convention
-    the extractor's HOST_FALLBACK_NAMES already applies to PCs and servers),
-    so every port gets its conventional name here, once, for every reader of
-    the library. ``sidecar/pkt_template_build.py`` does the same when the
-    library is regenerated.
+    PCs, laptops and servers keep ``FastEthernet0`` (the convention the
+    extractor's HOST_FALLBACK_NAMES records from real saves).  Kinds in
+    GENERIC_PORT_KINDS get PT's own generic label instead: cabling them by
+    an invented interface name makes Packet Tracer reject the whole file.
+    ``sidecar/pkt_template_build.py`` applies the same rule when the library
+    is regenerated.
     """
+    if generic_port_kind(kind):
+        renamed, slot = [], 0
+        for port in ports:
+            name = str(port.get("name") or "")
+            if port.get("family") in GENERIC_ETHERNET_FAMILIES:
+                if not name or _FAMILY_GUESS.match(name):
+                    port = dict(port)
+                    port["name"] = f"Port {slot}"
+                slot += 1
+            renamed.append(port)
+        return renamed
     prefixes = {
         "fastethernet": "FastEthernet",
         "gigabitethernet": "GigabitEthernet",
         "ethernet": "Ethernet",
         "serial": "Serial",
         "fiber": "Fiber",
+        "coaxial": "Coaxial",
+        "modem": "Modem",
         "wireless": "Wireless",
     }
     taken = {str(p.get("name") or "") for p in ports if p.get("name")}
@@ -440,9 +487,25 @@ def exact_port(variant: dict, spec: str) -> dict | None:
     want = normalize_port_name(spec)
     if not want or _SUBINTERFACE.match(str(spec or "").strip()):
         return None
-    for port in variant.get("ports") or []:
+    ports = variant.get("ports") or []
+    for port in ports:
         if port.get("name") and normalize_port_name(port["name"]) == want:
             return port
+    # A plan written before :func:`_named_ports` renamed these kinds still
+    # spells the invented interface name ("FastEthernet0"), while the file
+    # must cable PT's own label ("Port 0").  Same slot, same port.
+    if generic_port_kind(str(variant.get("kind") or "")):
+        digits = re.search(r"\d+$", str(spec or "").strip())
+        if digits and (_FAMILY_GUESS.match(str(spec).strip())
+                       or want.startswith("port")):
+            slot = int(digits.group(0))
+            seen = 0
+            for port in ports:
+                if port.get("family") not in GENERIC_ETHERNET_FAMILIES:
+                    continue
+                if seen == slot and str(port.get("name") or "").startswith("Port "):
+                    return port
+                seen += 1
     return None
 
 
@@ -533,6 +596,35 @@ def select_variant(library: dict, node: dict,
     wanted = [str(port) for port in (wanted_ports or []) if str(port).strip()]
     requested=hardware.MODELS.get(hardware.identity(node.get('model')))
     required_modules=node.get('modules') or []
+    variant_key = node.get('variantKey')
+    if variant_key is not None:
+        if not isinstance(variant_key, str):
+            raise BuildError(f"{node.get('name')}: variantKey must be a string. No fallback was made.")
+        pinned = next((entry for entry in library.get('devices', [])
+                       if entry.get('key') == variant_key), None)
+        if (pinned is None or not requested or requested['type'] != node_type
+                or hardware.identity(pinned.get('model')) != hardware.identity(requested['model'])
+                or not _kind_matches(pinned.get('kind', ''), node_type)):
+            raise BuildError(f"{node.get('name')}: pinned variant {variant_key!r} does not match a buildable {node_type} model {node.get('model')!r}. No fallback was made.")
+        if not all(any(hardware.identity(module) == hardware.identity(available)
+                       for available in pinned.get('modules', []))
+                   for module in required_modules):
+            raise BuildError(f"{node.get('name')}: pinned variant {variant_key!r} does not contain the requested modules. No fallback was made.")
+        mismatch = _template_identity_mismatch(library, pinned)
+        if mismatch:
+            raise BuildError(f"{node.get('name')}: pinned variant {variant_key!r} has an incompatible template: {mismatch}. No fallback was made.")
+        named = _named_variant(pinned)
+        for spec in [str(port) for port in (wanted_ports or [])]:
+            if exact_port(named, spec) is None:
+                raise BuildError(f"{node.get('name')}: exact port {spec!r} is unavailable on pinned variant {variant_key!r}. No port remap was made.")
+        for spec, cable_name in (node.get('portMedia') or {}).items():
+            cable = hardware.cable_for(cable_name)
+            port = exact_port(named, spec)
+            if (not cable or not port or hardware.port_medium(port) not in cable['families']
+                    or (cable['id'] in ('fiber-single', 'fiber-multi')
+                        and (cable['id'] == 'fiber-single') != hardware.single_mode(pinned.get('modules', [])))):
+                raise BuildError(f"{node.get('name')}: pinned variant {variant_key!r} cannot use {cable_name} on {spec}. No fallback was made.")
+        return pinned, []
     exact=bool(node.get('exactModel') or required_modules)
     if exact and (not requested or requested['type']!=node_type):
         raise BuildError(f"{node.get('name')}: unknown exact model {node.get('model')} for {node_type}")
@@ -907,9 +999,14 @@ def layout_positions(nodes: list[dict], links: list[dict] | None = None,
     for name, _kind in entries:
         uphill = [other for other in neighbours[name] if tier[other] < tier[name]]
         if uphill:
-            # Its uplink, not just any neighbour: the one closest to the core,
-            # ties broken in plan order so the drawing is stable.
-            parent = min(uphill, key=lambda other: (tier[other], order[other]))
+            # Its uplink, not just any neighbour: the one closest to the core.
+            # A device cabled to several anchors of that tier (a switch
+            # dual-homed to two routers) hangs under the one carrying the
+            # fewest children so far, so the default drawing balances itself;
+            # ties fall back to plan order and the comparator is a total
+            # order, so the drawing stays deterministic.
+            parent = min(uphill, key=lambda other: (
+                tier[other], len(children[other]), order[other]))
             children[parent].append(name)
         else:
             roots.append(name)
@@ -1387,6 +1484,63 @@ def _stable_guid(*parts: str) -> str:
     """A Packet Tracer UUID string that is unique and stable per device."""
     seed = "netbuilder-pkt:" + ":".join(str(part) for part in parts)
     return "{" + str(uuid.uuid5(uuid.NAMESPACE_URL, seed)) + "}"
+
+
+def _with_physical_workspace(library: dict, variant: dict, block: bytes
+                              ) -> tuple[bytes, str | None]:
+    """Give a template PT's physical-workspace fields when it has none.
+
+    Packet Tracer insists every cabled device have a physical leaf, and a
+    save whose device has no PHYSICAL_CPUR at all is refused as an invalid
+    file (a Cloud-PT built from such a template is the observed case).  The
+    placement record is X, Y, slot and ancestry - not module layout - so a
+    saved block of the same model supplies it verbatim, and a block of the
+    same kind is an honest donor when the model has no other variant.  No
+    field is invented: with no donor at all the device stays Logical-workspace
+    only (the older behaviour) and the caller warns.
+    """
+    if b"<PHYSICAL_CPUR" in block:
+        return block, None
+    model = hardware.identity(variant.get("model"))
+    kind = str(variant.get("kind") or "").strip().lower()
+    # Same model first (identical schema), then any template of the same kind:
+    # PHYSICAL_CPUR is a placement record - X, Y, slot and ancestry - and
+    # carries no model-specific fields, so a sibling of the same kind is a
+    # faithful donor when the only saved block of the model has none.
+    donors = []
+    for matcher in ("model", "kind"):
+        for entry in library.get("devices", []):
+            if entry.get("key") == variant.get("key"):
+                continue
+            if matcher == "model":
+                if hardware.identity(entry.get("model")) != model:
+                    continue
+            elif not kind or str(entry.get("kind") or "").strip().lower() != kind:
+                continue
+            donor_block = library.get("_blocks", {}).get(entry.get("file"))
+            if not donor_block:
+                continue
+            cpur = re.search(rb"<PHYSICAL_CPUR>.*?</PHYSICAL_CPUR>",
+                             donor_block, re.S)
+            if cpur:
+                donors.append((entry, cpur))
+        if donors:
+            break
+    for entry, cpur in donors:
+        # `<PHYSICAL>` is the leaf pointer the builder rewrites afterwards;
+        # a template with no workspace holds neither field, so both go in.
+        added = cpur.group(0)
+        if not re.search(rb"<PHYSICAL[\s/>]", block):
+            added = b"<PHYSICAL></PHYSICAL>" + added
+        if re.search(rb"</WORKSPACE>", block):
+            block = re.sub(rb"</WORKSPACE>", added + b"</WORKSPACE>",
+                           block, count=1)
+        else:
+            block = block.replace(
+                b"</DEVICE>",
+                b"<WORKSPACE>" + added + b"</WORKSPACE></DEVICE>", 1)
+        return block, str(entry.get("key") or entry.get("model") or "")
+    return block, None
 
 
 def _set_physical_identity(block: bytes, *, name: str, physical_path: str,
@@ -2342,7 +2496,7 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
         node_type = str(node.get("type") or "").strip().lower()
         device_report_services: dict = {}
         constraints={str(link.get(side+'If')):link['cable'] for link in sections['links']
-                     if link.get('exactPorts') and link.get('cable') for side in ('a','b') if link.get(side)==name}
+                     if (link.get('exactPorts') or node.get('variantKey') is not None) and link.get('cable') for side in ('a','b') if link.get(side)==name}
         requested_model = str(node.get('model') or '').strip()
         variant, notes = select_variant(library, {**node,'portMedia':constraints}, wanted.get(name, []))
         warnings.extend(notes)
@@ -2379,17 +2533,24 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
         # put in a <LINK>.
         variant = _named_variant(variant)
         for link in sections['links']:
-            if not link.get('exactPorts'):continue
+            if not link.get('exactPorts') and node.get('variantKey') is None:continue
             for side in ('a','b'):
                 if link.get(side)==name and exact_port(variant,str(link.get(side+'If') or '')) is None:
                     raise BuildError(f"{name}: exact port {link.get(side+'If')} is unavailable on {variant['key']}. No port remap was made.")
 
         block = library["_blocks"].get(variant["file"])
         if not block:
+            if node.get('variantKey') is not None:
+                raise BuildError(f"{name}: pinned template block {variant['file']} is missing. No fallback was made.")
             warnings.append(f"{name}: template block {variant['file']} is "
                             "missing from the library")
             continue
         variants_used[name] = variant
+        block, donor = _with_physical_workspace(library, variant, block)
+        if donor is not None:
+            warnings.append(f"{name}: its template carries no physical-workspace "
+                            f"data; the placement schema of {donor} is used so "
+                            "the save still loads in Packet Tracer")
         x, y = positions.get(name, (X_START, DEFAULT_ROW_Y))
         block = _set_name(block, name)
         ref = _ref_id(f"{project}:{name}", used_refs)
@@ -2527,14 +2688,18 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
                 warnings.append(f"{name}: no Ethernet port found for its IP "
                                 "settings")
             else:
-                fields = {"PORT_DHCP_ENABLE": "false"}
-                if settings.get("ip"):
+                dhcp = str(settings.get("dhcp", "")).lower() == "true"
+                fields = {"PORT_DHCP_ENABLE": "true" if dhcp else "false"}
+                if dhcp:
+                    fields.update({"IP": "0.0.0.0", "SUBNET": "0.0.0.0",
+                                   "PORT_GATEWAY": "0.0.0.0", "PORT_DNS": "0.0.0.0"})
+                if not dhcp and settings.get("ip"):
                     fields["IP"] = str(settings["ip"])
-                if settings.get("mask"):
+                if not dhcp and settings.get("mask"):
                     fields["SUBNET"] = str(settings["mask"])
-                if settings.get("gw"):
+                if not dhcp and settings.get("gw"):
                     fields["PORT_GATEWAY"] = str(settings["gw"])
-                if settings.get("dns"):
+                if not dhcp and settings.get("dns"):
                     fields["PORT_DNS"] = str(settings["dns"])
                 if str(settings.get("ipv6", "")).lower() == "true":
                     # Dual-stack: endpoints autoconfigure from the router's
@@ -2578,6 +2743,7 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
                if device_report_services else {}),
             "model": variant.get("model"),
             "template": variant.get("key"),
+            "variantKey": variant.get("key"),
             "x": x, "y": y,
             "configLines": len(config_lines),
             "ports": {spec: port["name"] for spec, port in plan_ports.items()},
@@ -2670,7 +2836,7 @@ def build_pkt(plan: dict, library: dict | None = None, *, project: str = "",
         raise BuildError("no device could be built from this plan; the "
                          "template library may not cover the planned models")
 
-    _validate(xml, refs)
+    _validate(xml, refs, physical_capable_models(library))
     # The single status the whole export is judged by.  A build is only VALID
     # when every planned device and every planned link is in the document; a
     # missing printer is EXPORT_INCOMPLETE even if the file itself is readable.
@@ -2779,8 +2945,9 @@ def _service_elements(services: dict, port_name: str, report: dict,
             + _svc(network) + b"</NETWORK><MASK>" + _svc(mask)
             + b"</MASK><DEFAULT_ROUTER>"
             + _svc(pool.get("gateway") or "0.0.0.0")
-            + b"</DEFAULT_ROUTER><TFTP_ADDRESS>0.0.0.0</TFTP_ADDRESS>"
-            b"<START_IP>" + _svc(start) + b"</START_IP><END_IP>"
+            + b"</DEFAULT_ROUTER><TFTP_ADDRESS>"
+            + _svc(pool.get("tftpAddress") or "0.0.0.0")
+            + b"</TFTP_ADDRESS><START_IP>" + _svc(start) + b"</START_IP><END_IP>"
             + _svc(end) + b"</END_IP><DNS_SERVER>"
             + _svc(pool.get("dnsServer") or "0.0.0.0")
             + b"</DNS_SERVER><MAX_USERS>"
@@ -3211,7 +3378,41 @@ def _dedupe(messages: list) -> list:
     return out
 
 
-def _validate(xml: bytes, refs: dict) -> None:
+def physical_capable_models(library: dict) -> set[str]:
+    """Models that can carry a Physical Workspace leaf somewhere in the library.
+
+    The library is the only honest source for this. A model that appears with
+    PHYSICAL_CPUR in at least one saved variant can be placed physically, so a
+    build must not quietly drop one of its devices into the Logical workspace.
+
+    Capability is matched the same way _with_physical_workspace matches a
+    donor: same model first, then same kind. Cloud-PT is the observed case - it
+    has no physical variant of its own, but Cloud-PT-Empty (same kind) does, so
+    dropping a Cloud-PT is exactly what produced the corrupt save.
+    """
+    capable_models: set[str] = set()
+    capable_kinds: set[str] = set()
+    for entry in library.get("devices", []):
+        block = library.get("_blocks", {}).get(str(entry.get("file") or ""))
+        if not block or b"<PHYSICAL_CPUR" not in block:
+            continue
+        identity = hardware.identity(entry.get("model"))
+        if identity:
+            capable_models.add(identity)
+        kind = str(entry.get("kind") or "").strip().lower()
+        if kind:
+            capable_kinds.add(kind)
+    models: set[str] = set()
+    for entry in library.get("devices", []):
+        identity = hardware.identity(entry.get("model"))
+        kind = str(entry.get("kind") or "").strip().lower()
+        if identity and (identity in capable_models or kind in capable_kinds):
+            models.add(identity)
+    return models
+
+
+def _validate(xml: bytes, refs: dict,
+              physical_models: set[str] | None = None) -> None:
     try:
         xml_guard.fromstring(xml)
     except ET.ParseError as exc:
@@ -3228,10 +3429,12 @@ def _validate(xml: bytes, refs: dict) -> None:
         if int(match.group(2)) not in present:
             raise BuildError("a link points at a device that is not in the "
                              "generated document")
-    _validate_physical_workspace(xml)
+    _validate_physical_workspace(xml, physical_models)
 
 
-def _validate_physical_workspace(xml: bytes) -> None:
+def _validate_physical_workspace(xml: bytes,
+                                 physical_models: set[str] | None = None
+                                 ) -> None:
     """Reject device/workspace UUID paths Packet Tracer cannot resolve."""
     try:
         root = xml_guard.fromstring(xml)
@@ -3314,6 +3517,21 @@ def _validate_physical_workspace(xml: bytes) -> None:
             if device.find(".//WORKSPACE/PHYSICAL_CPUR") is not None:
                 raise BuildError(f"{name or 'device'} has Physical Workspace "
                                  "data but no leaf path")
+            type_element = device.find("./ENGINE/TYPE")
+            model = ((type_element.get("model") if type_element is not None
+                      else "") or "").strip()
+            identity = hardware.identity(model)
+            if physical_models and identity and identity in physical_models:
+                # This is the check that would have refused the 48-device
+                # GUI-Services-48 save: its Cloud-PT was dropped to the
+                # Logical workspace although another saved Cloud-PT variant
+                # carries the placement schema, and Packet Tracer answered
+                # with "File contains corrupted Physical Workspace data."
+                raise BuildError(
+                    f"{name or 'device'}: no Physical Workspace leaf even "
+                    f"though its model ({model}) can carry one; Packet "
+                    "Tracer rejects such a save as corrupted Physical "
+                    "Workspace data")
             continue
         path = [part.strip() for part in physical.split(",") if part.strip()]
         unresolved = [part for part in path if part not in all_uuids]
@@ -3350,6 +3568,64 @@ def _validate_physical_workspace(xml: bytes) -> None:
             if device_position != leaf_position:
                 raise BuildError(f"{name or 'device'} physical {tag} does not "
                                  "match its workspace leaf")
+
+
+def repair_physical_workspace(xml: bytes, library: dict,
+                              project: str = "repair",
+                              notes: list | None = None
+                              ) -> tuple[bytes, list[str]]:
+    """Repair a save whose devices were dropped from the physical workspace.
+
+    Used on files built before the donor graft existed (and by the regression
+    fixture, which is such a file). Every device whose model can carry a
+    physical leaf either already has one or borrows the placement schema from
+    another saved variant of the same model; the workspace is then rebuilt so
+    the leaves and the device paths agree again.
+    """
+    warnings = list(notes or [])
+    raw_blocks = re.findall(rb"<DEVICE(?:\s[^>]*)?>.*?</DEVICE>", xml, re.S)
+    if not raw_blocks:
+        raise BuildError("the save has no device blocks to repair")
+    blocks: list[bytes] = []
+    reports: list[dict] = []
+    for raw in raw_blocks:
+        device = xml_guard.fromstring(raw)
+        name = (device.findtext(".//NAME") or "").strip()
+        type_element = device.find("./ENGINE/TYPE")
+        model = ((type_element.get("model") if type_element is not None
+                  else "") or "").strip()
+        kind = re.sub(r"[^a-z]", "",
+                      (device.findtext("./ENGINE/TYPE") or "").strip().lower())
+        if "wirelessrouter" in kind:
+            kind = "wireless-router"
+        elif "router" in kind:
+            kind = "router"
+        elif "switch" in kind:
+            kind = "switch"
+        elif "firewall" in kind:
+            kind = "firewall"
+        else:
+            kind = kind or "pc"
+        block = raw
+        if b"<PHYSICAL_CPUR" not in block:
+            block, donor = _with_physical_workspace(
+                library, {"key": None, "model": model, "kind": kind}, block)
+            if donor:
+                warnings.append(f"{name}: physical placement borrowed from "
+                                f"{donor}")
+        blocks.append(block)
+        reports.append({"name": name, "type": kind})
+    repaired, blocks = _rebuild_physical_workspace(
+        xml, blocks, reports, project, warnings)
+    devices_doc = b"\n".join(blocks)
+    if not re.search(rb"<DEVICES\s*>.*?</DEVICES>", repaired, re.S):
+        raise BuildError("the repaired save has no devices section")
+    repaired = re.sub(
+        rb"<DEVICES\s*>.*?</DEVICES>",
+        lambda _m: b"<DEVICES>\n" + devices_doc + b"\n  </DEVICES>",
+        repaired, count=1, flags=re.S)
+    _validate_physical_workspace(repaired, physical_capable_models(library))
+    return repaired, _dedupe(warnings)
 
 
 def _backup_existing(target: str) -> str:

@@ -25,6 +25,10 @@ const List<String> kLayoutStyles = <String>[
   'ring',
   'grid',
   'split',
+  'spine-leaf',
+  'hub-spoke',
+  'zones',
+  'mesh',
 ];
 
 /// The drawings that place every device from the plan's own shape - its
@@ -50,6 +54,10 @@ const List<String> kFlatLayoutStyles = <String>[
   'star',
   'backbone',
   'campus',
+  'spine-leaf',
+  'hub-spoke',
+  'zones',
+  'mesh',
 ];
 
 /// One group of devices parked at one edge, as the engine reads it.
@@ -82,6 +90,10 @@ const Map<String, LayoutShape> kLayoutStyleShapes = <String, LayoutShape>{
   'ring': LayoutShape(1.0, 4),
   'grid': LayoutShape(1.0, 4),
   'split': LayoutShape(1.0, 4),
+  'spine-leaf': LayoutShape(1.0, 4),
+  'hub-spoke': LayoutShape(1.0, 4),
+  'zones': LayoutShape(1.0, 4),
+  'mesh': LayoutShape(1.0, 4),
 };
 
 /// Geometry constants copied from `pkt_builder.py`.
@@ -136,6 +148,10 @@ String layoutStyleLabel(String style) => switch (style) {
   'ring' => 'Ring',
   'grid' => 'Even grid',
   'split' => 'One column per kind',
+  'spine-leaf' => 'Spine-leaf fabric',
+  'hub-spoke' => 'WAN hub and branches',
+  'zones' => 'Security zones',
+  'mesh' => 'Meshed core',
   _ => 'Site trees',
 };
 
@@ -154,6 +170,17 @@ String layoutStyleBlurb(String style) => switch (style) {
   'ring' => 'Switches alternate with endpoints on one ring, core in the middle',
   'grid' => 'An evenly spaced box, ignoring the topology',
   'split' => 'A vertical column per kind of device',
+  'spine-leaf' =>
+    'Spines across the top, leaves below, endpoints under their leaf - '
+        'the data-center fabric',
+  'hub-spoke' =>
+    'The WAN hub top-centre, each branch hanging under it as one column',
+  'zones' =>
+    'Outside, firewalls, DMZ and inside, each zone its own block - the '
+        'policy reads left to right',
+  'mesh' =>
+    'The meshed core at the centre, switches in a ring around it, '
+        'endpoints outside',
   _ => 'Each site a tree, hosts under the switch they use',
 };
 
@@ -282,9 +309,20 @@ LayoutSnapshot computeLayoutSnapshot(
         .where((o) => (tier[o] ?? kTierHosts) < (tier[name] ?? kTierHosts))
         .toList();
     if (uphill.isNotEmpty) {
+      // Its uplink, not just any neighbour: the one closest to the core. A
+      // device cabled to SEVERAL anchors of that tier - a switch dual-homed
+      // to two routers, the redundant-core design's whole point - hangs
+      // under the one carrying the fewest children so far, so the default
+      // drawing balances itself instead of piling every dual-homed subtree
+      // onto the first router plan order happens to name. Ties fall to plan
+      // order, and the comparator is a total order (the plan index is
+      // unique), so the drawing stays deterministic.
       uphill.sort((a, b) {
         final t = (tier[a] ?? 0).compareTo(tier[b] ?? 0);
-        return t != 0 ? t : (order[a] ?? 0).compareTo(order[b] ?? 0);
+        if (t != 0) return t;
+        final byLoad = children[a]!.length.compareTo(children[b]!.length);
+        if (byLoad != 0) return byLoad;
+        return (order[a] ?? 0).compareTo(order[b] ?? 0);
       });
       children[uphill.first]!.add(name);
     } else {
@@ -424,6 +462,36 @@ LayoutSnapshot computeLayoutSnapshot(
         bandStep,
         gridColumns,
       ),
+      'spine-leaf' => _spineLeafPositions(
+        entries,
+        tier,
+        children,
+        pitch,
+        gap,
+        rowStep,
+        bandStep,
+        gridColumns,
+      ),
+      'hub-spoke' => _hubSpokePositions(
+        entries,
+        tier,
+        children,
+        neighbours,
+        pitch,
+        gap,
+        rowStep,
+        bandStep,
+        gridColumns,
+      ),
+      'zones' => _zonePositions(
+        entries,
+        tier,
+        pitch,
+        gap,
+        rowStep,
+        gridColumns,
+      ),
+      'mesh' => _meshPositions(entries, tier, pitch),
       _ => _flatPositions(style, entries, tier, pitch, gap, rowStep),
     };
   } else if (style == 'layered') {
@@ -1128,6 +1196,413 @@ Map<String, List<double>> _campusPositions(
     }
   }
   return spots;
+}
+
+/// The `spine-leaf` drawing - the universal data-center fabric.
+///
+/// Spines (routers, firewalls, the WAN edge) spread across the top row,
+/// leaves (multilayer and access switches) across the row below, and every
+/// endpoint in a column under the leaf it hangs off. The spines spread over
+/// the WHOLE width rather than clustering at the centre - in a fabric every
+/// leaf reaches every spine, and centre-clustering them (the way `campus`
+/// draws its core) hides that. Endpoints no leaf claims take the last
+/// column; a fabric with no leaves draws its endpoints on the leaf row, and
+/// one with no spines just starts the leaf row at the top.
+Map<String, List<double>> _spineLeafPositions(
+  List<List<String>> entries,
+  Map<String, int> tier,
+  Map<String, List<String>> children,
+  double pitch,
+  double gap,
+  double rowStep,
+  double bandStep,
+  int gridColumns,
+) {
+  final spots = <String, List<double>>{};
+  final spines = <String>[];
+  final leaves = <String>[];
+  for (final e in entries) {
+    final t = tier[e[0]] ?? kTierHosts;
+    if (t == kTierCore) {
+      spines.add(e[0]);
+    } else if (t == kTierAggregation || t == kTierAccess) {
+      leaves.add(e[0]);
+    }
+  }
+
+  final endpointFan = <String, List<String>>{};
+  final claimed = <String>{};
+  for (final name in leaves) {
+    for (final kid in children[name] ?? const <String>[]) {
+      if ((tier[kid] ?? kTierHosts) >= kTierServices) {
+        endpointFan.putIfAbsent(name, () => <String>[]).add(kid);
+        claimed.add(kid);
+      }
+    }
+  }
+  final loose = <String>[
+    for (final e in entries)
+      if ((tier[e[0]] ?? kTierHosts) >= kTierServices &&
+          !claimed.contains(e[0]))
+        e[0],
+  ];
+
+  double fanWidth(int count) =>
+      math.max(pitch, math.min(count, gridColumns) * pitch);
+  final widths = <double>[
+    for (final name in leaves)
+      fanWidth((endpointFan[name] ?? const <String>[]).length),
+    if (loose.isNotEmpty) fanWidth(loose.length),
+  ];
+  var total = 0.0;
+  for (final width in widths) {
+    total += width;
+  }
+  total += gap * math.max(widths.length - 1, 0);
+  var cursor = kXStart + math.max((kCanvasWidth - 2 * kXStart - total) / 2, 0);
+
+  final ySpine = kRowTop;
+  final yLeaf = spines.isEmpty ? kRowTop : kRowTop + bandStep;
+  final yBase = yLeaf + bandStep;
+
+  // Spines spread across the whole field: the fabric's own promise, drawn.
+  for (var i = 0; i < spines.length; i++) {
+    final share = spines.length == 1 ? 0.5 : (i + 1) / (spines.length + 1);
+    spots[spines[i]] = [cursor + total * share, ySpine];
+  }
+
+  var block = 0;
+  for (final name in leaves) {
+    final width = widths[block];
+    final leafX = cursor + width / 2;
+    spots[name] = [leafX, yLeaf];
+    final fan = endpointFan[name] ?? const <String>[];
+    final columns = math.min(fan.length, gridColumns);
+    for (var index = 0; index < fan.length; index++) {
+      final row = index ~/ columns;
+      final column = index % columns;
+      final inRow = math.min(columns, fan.length - row * columns);
+      final gridWidth = columns * pitch;
+      final rowLeft = leafX - gridWidth / 2 + (gridWidth - inRow * pitch) / 2;
+      spots[fan[index]] = [
+        rowLeft + column * pitch + pitch / 2,
+        yBase + row * rowStep,
+      ];
+    }
+    cursor += width + gap;
+    block++;
+  }
+  if (loose.isNotEmpty) {
+    final width = widths[block];
+    final looseX = cursor + width / 2;
+    final columns = math.min(loose.length, gridColumns);
+    for (var index = 0; index < loose.length; index++) {
+      final row = index ~/ columns;
+      final column = index % columns;
+      final inRow = math.min(columns, loose.length - row * columns);
+      final gridWidth = columns * pitch;
+      final rowLeft = looseX - gridWidth / 2 + (gridWidth - inRow * pitch) / 2;
+      spots[loose[index]] = [
+        rowLeft + column * pitch + pitch / 2,
+        yBase + row * rowStep,
+      ];
+    }
+  }
+  return spots;
+}
+
+/// The `hub-spoke` drawing - the universal branch-WAN map.
+///
+/// The WAN hub sits top-centre and every branch hangs beneath it as ONE
+/// vertical stripe: its router, the switches under that router, and their
+/// hosts, so "what does the branch look like" is answered by reading down.
+/// The hub is the brief's WAN edge (cloud, modem, wireless router); without
+/// one, the router serving the most devices is the hub and the rest are
+/// branches - the same picture the universal hub-and-spoke WAN diagram
+/// draws, whatever the lab's hub turned out to be. Endpoints nothing claims
+/// take the last stripe.
+Map<String, List<double>> _hubSpokePositions(
+  List<List<String>> entries,
+  Map<String, int> tier,
+  Map<String, List<String>> children,
+  Map<String, List<String>> neighbours,
+  double pitch,
+  double gap,
+  double rowStep,
+  double bandStep,
+  int gridColumns,
+) {
+  final spots = <String, List<double>>{};
+  const wanEdgeKinds = {'cloud', 'modem', 'wireless-router'};
+  final hubs = <String>[
+    for (final e in entries)
+      if (wanEdgeKinds.contains(e[1])) e[0],
+  ];
+  final routers = <String>[
+    for (final e in entries)
+      if (e[1] == 'router') e[0],
+  ];
+  String? hub;
+  var hubStack = <String>[];
+  var branches = <String>[];
+  if (hubs.isNotEmpty) {
+    hub = hubs.first;
+    // The routers cabled straight to the WAN edge are the hub's own stack -
+    // they are its children in the tree - so the aggregator under the cloud
+    // belongs in the centre column with it, not in a branch stripe of its
+    // own.
+    // Same-tier peers are never tree children, so the neighbour map - not
+    // `children` - is what tells which routers the WAN edge is cabled to.
+    hubStack = <String>[
+      for (final name in neighbours[hub] ?? const <String>[])
+        if ((tier[name] ?? kTierHosts) == kTierCore) name,
+    ];
+    branches = routers
+        .where((name) => name != hub && !hubStack.contains(name))
+        .toList();
+  } else if (routers.isNotEmpty) {
+    // The busiest router is the hub: it is the one the others reach.
+    var best = routers.first;
+    var bestLoad = -1;
+    for (final name in routers) {
+      final load = (children[name] ?? const <String>[]).length;
+      if (load > bestLoad) {
+        best = name;
+        bestLoad = load;
+      }
+    }
+    hub = best;
+    branches = routers.where((name) => name != best).toList();
+  } else {
+    branches = <String>[
+      for (final e in entries)
+        if (e[1] == 'switch') e[0],
+    ];
+  }
+
+  // One stripe per branch: the router at the top, each switch it serves one
+  // row below that, and the branch's hosts gridded under them - the whole
+  // branch read top to bottom, with the grid keeping a 20-host branch from
+  // becoming a column twenty devices tall.
+  final stripeRouter = <String>[];
+  final stripeSwitches = <List<String>>[];
+  final stripeHosts = <List<String>>[];
+  final claimed = <String>{};
+  for (final branch in branches) {
+    stripeRouter.add(branch);
+    claimed.add(branch);
+    final switches = <String>[];
+    for (final kid in children[branch] ?? const <String>[]) {
+      final t = tier[kid] ?? kTierHosts;
+      if (t == kTierAggregation || t == kTierAccess) {
+        switches.add(kid);
+        claimed.add(kid);
+      }
+    }
+    stripeSwitches.add(switches);
+    final hosts = <String>[];
+    for (final name in switches) {
+      for (final grandkid in children[name] ?? const <String>[]) {
+        if ((tier[grandkid] ?? kTierHosts) >= kTierServices) {
+          hosts.add(grandkid);
+          claimed.add(grandkid);
+        }
+      }
+    }
+    stripeHosts.add(hosts);
+  }
+  final loose = <String>[
+    for (final e in entries)
+      if ((tier[e[0]] ?? kTierHosts) >= kTierAggregation &&
+          !claimed.contains(e[0]))
+        e[0],
+  ];
+
+  double stripeWidth(int hostCount) =>
+      math.max(pitch, math.min(hostCount, gridColumns) * pitch);
+  final widths = <double>[
+    for (final hosts in stripeHosts) stripeWidth(hosts.length),
+    if (loose.isNotEmpty) pitch,
+  ];
+  var total = 0.0;
+  for (final width in widths) {
+    total += width;
+  }
+  total += gap * math.max(widths.length - 1, 0);
+  var cursor = kXStart + math.max((kCanvasWidth - 2 * kXStart - total) / 2, 0);
+
+  if (hub != null) {
+    // The hub column sits top-centre: the WAN edge itself, with the routers
+    // cabled to it stacked right below.
+    final centreX = cursor + total / 2;
+    for (var i = 0; i < hubStack.length + 1; i++) {
+      spots[i == 0 ? hub : hubStack[i - 1]] = [centreX, kRowTop + i * rowStep];
+    }
+  }
+  final yBranch = hub == null
+      ? kRowTop
+      : kRowTop + math.max(bandStep, (hubStack.length + 1) * rowStep);
+  void parkGrid(List<String> fan, double centreX, int startRow) {
+    if (fan.isEmpty) return;
+    final columns = math.min(fan.length, gridColumns);
+    for (var index = 0; index < fan.length; index++) {
+      final row = index ~/ columns;
+      final column = index % columns;
+      final inRow = math.min(columns, fan.length - row * columns);
+      final gridWidth = columns * pitch;
+      final rowLeft = centreX - gridWidth / 2 + (gridWidth - inRow * pitch) / 2;
+      spots[fan[index]] = [
+        rowLeft + column * pitch + pitch / 2,
+        yBranch + (startRow + row) * rowStep,
+      ];
+    }
+  }
+
+  for (var i = 0; i < stripeRouter.length; i++) {
+    final width = widths[i];
+    final centreX = cursor + width / 2;
+    spots[stripeRouter[i]] = [centreX, yBranch];
+    // Each switch of the branch on its own row under the router.
+    for (var s = 0; s < stripeSwitches[i].length; s++) {
+      spots[stripeSwitches[i][s]] = [centreX, yBranch + (s + 1) * rowStep];
+    }
+    // The router occupies conceptual row 0, its switches rows 1..n, so the
+    // branch's hosts start a row below the last switch.
+    parkGrid(stripeHosts[i], centreX, stripeSwitches[i].length + 1);
+    cursor += width + gap;
+  }
+  if (loose.isNotEmpty) {
+    parkGrid(loose, cursor + pitch / 2, 0);
+  }
+  return spots;
+}
+
+/// The `zones` drawing - the universal security-zone picture.
+///
+/// Four blocks read left to right the way the policy does: OUTSIDE (the WAN
+/// edge), the FIREWALLS on the boundary, the DMZ (published servers), and
+/// INSIDE (routers, switches and everything that trusts them). Each zone is
+/// its own block, so "what is reachable from the internet" is answered by
+/// looking left. Empty zones vanish; the order of the ones left never does.
+Map<String, List<double>> _zonePositions(
+  List<List<String>> entries,
+  Map<String, int> tier,
+  double pitch,
+  double gap,
+  double rowStep,
+  int gridColumns,
+) {
+  final spots = <String, List<double>>{};
+  const outsideKinds = {'cloud', 'modem', 'wireless-router'};
+  final zones = <List<String>>[
+    [
+      for (final e in entries)
+        if (outsideKinds.contains(e[1])) e[0],
+    ],
+    [
+      for (final e in entries)
+        if (e[1] == 'firewall') e[0],
+    ],
+    [
+      for (final e in entries)
+        if (e[1] == 'server') e[0],
+    ],
+    [
+      for (final e in entries)
+        if (!outsideKinds.contains(e[1]) &&
+            e[1] != 'firewall' &&
+            e[1] != 'server')
+          e[0],
+    ],
+  ];
+
+  double zoneWidth(int count) =>
+      math.max(pitch, math.min(count, gridColumns) * pitch);
+  final live = zones.where((zone) => zone.isNotEmpty).toList();
+  final widths = <double>[for (final zone in live) zoneWidth(zone.length)];
+  var total = 0.0;
+  for (final width in widths) {
+    total += width;
+  }
+  total += gap * math.max(widths.length - 1, 0);
+  var cursor = kXStart + math.max((kCanvasWidth - 2 * kXStart - total) / 2, 0);
+
+  for (var i = 0; i < live.length; i++) {
+    final zone = live[i];
+    final width = widths[i];
+    final columns = math.min(zone.length, gridColumns);
+    for (var index = 0; index < zone.length; index++) {
+      final row = index ~/ columns;
+      final column = index % columns;
+      final inRow = math.min(columns, zone.length - row * columns);
+      final gridWidth = columns * pitch;
+      final rowLeft =
+          cursor + width / 2 - gridWidth / 2 + (gridWidth - inRow * pitch) / 2;
+      spots[zone[index]] = [
+        rowLeft + column * pitch + pitch / 2,
+        kRowTop + row * rowStep,
+      ];
+    }
+    cursor += width + gap;
+  }
+  return spots;
+}
+
+/// The `mesh` drawing - the universal redundant core.
+///
+/// The meshed core sits at the CENTRE as one tight cluster - the cluster is
+/// the mesh, and the cross-links between its members are the whole point of
+/// the design. Switches take one ring around it, endpoints the ring outside
+/// that. This is deliberately not `radial` (whose core rides the innermost
+/// ring, one ring per role): here the fabric owns the middle and everything
+/// else hangs off it, which is how a redundant-core design is read.
+Map<String, List<double>> _meshPositions(
+  List<List<String>> entries,
+  Map<String, int> tier,
+  double pitch,
+) {
+  final spots = <String, List<double>>{};
+  final core = <String>[];
+  final switches = <String>[];
+  final endpoints = <String>[];
+  for (final e in entries) {
+    final t = tier[e[0]] ?? kTierHosts;
+    if (t == kTierCore) {
+      core.add(e[0]);
+    } else if (t == kTierAggregation || t == kTierAccess) {
+      switches.add(e[0]);
+    } else {
+      endpoints.add(e[0]);
+    }
+  }
+
+  final centreX = kCanvasWidth / 2;
+  final centreY = kRowTop + pitch * 2.6;
+  _parkAtCentre(core, spots, centreX, centreY, pitch);
+
+  double ringRadius(int count, double floor) => math.max(
+    floor,
+    count > 0 ? pitch * (count / (2 * math.pi)) + pitch : 0.0,
+  );
+  var radius = ringRadius(switches.length, pitch * 2.0);
+  for (var i = 0; i < switches.length; i++) {
+    final angle = -math.pi / 2 + 2 * math.pi * i / switches.length;
+    spots[switches[i]] = [
+      centreX + radius * math.cos(angle),
+      centreY + radius * math.sin(angle),
+    ];
+  }
+  // The endpoint ring clears the switch ring, and grows with its own
+  // circumference so every endpoint keeps a pitch of its own.
+  radius = ringRadius(endpoints.length, radius + pitch * 1.4);
+  for (var i = 0; i < endpoints.length; i++) {
+    final angle = -math.pi / 2 + 2 * math.pi * (i + 0.5) / endpoints.length;
+    spots[endpoints[i]] = [
+      centreX + radius * math.cos(angle),
+      centreY + radius * math.sin(angle),
+    ];
+  }
+  return _keepOnCanvas(spots);
 }
 
 /// The industry hierarchical drawing, read left to right.

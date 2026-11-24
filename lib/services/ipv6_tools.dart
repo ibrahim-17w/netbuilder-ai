@@ -90,8 +90,9 @@ class Ipv6Tools {
   static String? expand(String input) {
     final bytes = parse(input);
     if (bytes == null) return null;
-    return [for (var i = 0; i < 8; i++) _group(bytes, i).padLeft(4, '0')]
-        .join(':');
+    return [
+      for (var i = 0; i < 8; i++) _group(bytes, i).padLeft(4, '0'),
+    ].join(':');
   }
 
   /// The canonical compressed form per RFC 5952: lowercase, leading zeros
@@ -120,9 +121,7 @@ class Ipv6Tools {
       // A lone zero group stays literal, and no run means no "::" at all.
       return groups.join(':');
     }
-    final head = bestStart < 0
-        ? groups
-        : groups.sublist(0, bestStart);
+    final head = bestStart < 0 ? groups : groups.sublist(0, bestStart);
     final tail = bestStart < 0
         ? const <String>[]
         : groups.sublist(bestStart + bestLen);
@@ -176,16 +175,7 @@ class Ipv6Tools {
   static List<int>? eui64(String mac) {
     final m = parseMac(mac);
     if (m == null) return null;
-    return [
-      m[0] ^ 0x02,
-      m[1],
-      m[2],
-      0xff,
-      0xfe,
-      m[3],
-      m[4],
-      m[5],
-    ];
+    return [m[0] ^ 0x02, m[1], m[2], 0xff, 0xfe, m[3], m[4], m[5]];
   }
 
   /// The address a host with [mac] gets inside [prefixCidr] (a /64 by the
@@ -222,9 +212,7 @@ class Ipv6Tools {
   static String? linkLocalFromMac(String mac) {
     final id = eui64(mac);
     if (id == null) return null;
-    return compress(
-      _fromBytes([0xfe, 0x80, 0, 0, 0, 0, 0, 0, ...id]),
-    );
+    return compress(_fromBytes([0xfe, 0x80, 0, 0, 0, 0, 0, 0, ...id]));
   }
 
   static String _fromBytes(List<int> bytes) =>
@@ -285,8 +273,7 @@ class Ipv6Tools {
         final byteIndex = b ~/ 8;
         final bitIndex = 7 - (b % 8);
         final set = (i >> (newPrefix - 1 - b)) & 1;
-        child[byteIndex] =
-            (child[byteIndex] | (set << bitIndex)) & 0xff;
+        child[byteIndex] = (child[byteIndex] | (set << bitIndex)) & 0xff;
       }
       out.add('${compress(_fromBytes(child))}/$newPrefix');
     }

@@ -1,4 +1,5 @@
 import '../../models/network_intent.dart';
+import '../human_language.dart';
 import 'catalog.dart';
 
 class PtHardwareIssue {
@@ -9,6 +10,32 @@ class PtHardwareIssue {
 
 /// Hardware checks use the same versioned catalog as recognition and selection.
 class PtHardwareCheck {
+  /// Catalog variants a node is allowed to use. A pin is an opaque exact key,
+  /// never a model hint or a module-derived identity. Invalid pins yield no
+  /// alternatives; unpinned modules keep their inclusion semantics.
+  static List<PtHardwareVariant> variantsForNode(NetNode node) {
+    final device = PacketTracerCatalog.instance.device(node.model ?? '');
+    if (device == null ||
+        (node.variantKey != null && device.type != node.type.toLowerCase())) {
+      return const [];
+    }
+    return device.variants
+        .where(
+          (variant) =>
+              (node.variantKey == null || variant.key == node.variantKey) &&
+              node.modules.every(
+                (module) => variant.modules.any(
+                  (available) => ptIdentity(available) == ptIdentity(module),
+                ),
+              ),
+        )
+        .toList();
+  }
+
+  static List<String> installedModules(NetNode node) => node.variantKey == null
+      ? node.modules
+      : variantsForNode(node).firstOrNull?.modules ?? const [];
+
   static List<PtHardwareIssue> inspect(NetworkIntent intent) {
     final catalog = PacketTracerCatalog.instance;
     final issues = <PtHardwareIssue>[];
@@ -23,7 +50,9 @@ class PtHardwareCheck {
         );
       }
       final device = catalog.device(node.model ?? '');
-      if (!node.exactModel && node.modules.isEmpty) continue;
+      if (!node.exactModel && node.modules.isEmpty && node.variantKey == null) {
+        continue;
+      }
       if (device == null || !device.placeable) {
         final model = (node.model ?? '').trim();
         final key = '${node.type.toLowerCase()}|${model.toLowerCase()}';
@@ -39,19 +68,22 @@ class PtHardwareCheck {
         }
         continue;
       }
-      final exactLinks = intent.links.where(
-        (l) => l.exactPorts && (l.a == node.name || l.b == node.name),
-      );
       final ports = {
-        for (final l in exactLinks)
+        for (final l in intent.links.where(
+          (l) =>
+              (l.exactPorts || node.variantKey != null) &&
+              (l.a == node.name || l.b == node.name),
+        ))
           ptPortName(l.a == node.name ? l.aIf : l.bIf),
+        if (node.variantKey != null)
+          for (final address in intent.addressing.where(
+            (a) => a.node == node.name,
+          ))
+            ptPortName(address.iface.split('.').first),
       };
-      final fitting = device.variants
+      final fitting = variantsForNode(node)
           .where(
             (v) =>
-                node.modules.every(
-                  (m) => v.modules.any((x) => ptIdentity(x) == ptIdentity(m)),
-                ) &&
                 ports.every((p) => v.ports.any((x) => ptPortName(x.name) == p)),
           )
           .toList();
@@ -59,7 +91,9 @@ class PtHardwareCheck {
       if (fitting.isEmpty) {
         issues.add(
           PtHardwareIssue(
-            '${node.name}: no ${device.model} variant has all requested ports and modules. Available variants: ${device.variants.map((v) => v.key).join(', ')}.',
+            node.variantKey == null
+                ? '${node.name}: no ${device.model} variant has all requested ports and modules. Available variants: ${device.variants.map((v) => v.key).join(', ')}.'
+                : '${node.name}: pinned variant "${node.variantKey}" is unavailable or does not match the model, modules or ports. No fallback was made.',
           ),
         );
       }
@@ -74,7 +108,8 @@ class PtHardwareCheck {
           : '`${unsupported.model}`';
       issues.add(
         PtHardwareIssue(
-          '${unsupported.names.length} ${unsupported.type} device(s) use '
+          '${HumanLanguage.count(unsupported.names.length, '${unsupported.type} device')} '
+          '${unsupported.names.length == 1 ? 'uses' : 'use'} '
           '$model, which has no buildable template in this library '
           '(for example $examples$rest). Choose a supported model or remove '
           'those devices.',

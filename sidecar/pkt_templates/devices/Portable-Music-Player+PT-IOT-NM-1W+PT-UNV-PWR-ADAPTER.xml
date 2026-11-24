@@ -1,0 +1,911 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="Portable Music Player" model="Portable Music Player">MCUComponent</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeNetworkModule</TYPE>
+        <MODEL>PT-IOT-NM-1W</MODEL>
+        <PORT>
+         <ACL_IN_ID></ACL_IN_ID>
+         <ACL_OUT_ID></ACL_OUT_ID>
+         <ACLv6_IN_ID></ACLv6_IN_ID>
+         <ACLv6_OUT_ID></ACLv6_OUT_ID>
+         <TIMEOUT>14400000</TIMEOUT>
+         <TYPE>eHostWirelessN</TYPE>
+         <POWER>true</POWER>
+         <MEDIATYPE>0</MEDIATYPE>
+         <PINS>false</PINS>
+         <FIBERMULTIMODE>true</FIBERMULTIMODE>
+         <BANDWIDTH>300000</BANDWIDTH>
+         <SPEED>100</SPEED>
+         <FULLDUPLEX>false</FULLDUPLEX>
+         <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+         <AUTONEGOTIATESPEED>true</AUTONEGOTIATESPEED>
+         <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+         <MACADDRESS>0000.0000.0000</MACADDRESS>
+         <BIA>0000.0000.0000</BIA>
+         <CLOCKRATE>2000000</CLOCKRATE>
+         <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+         <DESCRIPTION/>
+         <CHANNEL>0</CHANNEL>
+         <CHANNEL5GHZ>0</CHANNEL5GHZ>
+         <COVERAGERANGE>0</COVERAGERANGE>
+         <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+         <UP_METHOD>1</UP_METHOD>
+         <IP/>
+         <SUBNET/>
+         <PORT_GATEWAY/>
+         <PORT_DNS/>
+         <PORT_DHCP_ENABLE>false</PORT_DHCP_ENABLE>
+         <ND_SUPPRESSED>false</ND_SUPPRESSED>
+         <ND_IPV6_DNS_ADDRESSES/>
+         <PC_FIREWALL>false</PC_FIREWALL>
+         <PC_IPV6_FIREWALL>false</PC_IPV6_FIREWALL>
+         <IPV6_ENABLED>false</IPV6_ENABLED>
+         <IPV6_ADDRESS_AUTOCONFIG>false</IPV6_ADDRESS_AUTOCONFIG>
+         <IPV6_PORT_GATEWAY/>
+         <IPV6_PORT_DNS/>
+         <IPV6_LINK_LOCAL>FE80::260:5CFF:FE02:8B05</IPV6_LINK_LOCAL>
+         <IPV6_DEFAULT_LINK_LOCAL>FE80::260:5CFF:FE02:8B05</IPV6_DEFAULT_LINK_LOCAL>
+         <IPV6_PORT_DHCP_ENABLED>true</IPV6_PORT_DHCP_ENABLED>
+         <IPV6_ADDRESSES/>
+         <IP_UNNUMBERED/>
+         <DHCP_SERVER_IP>192.168.25.1</DHCP_SERVER_IP>
+        </PORT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+        <MODEL>PT-UNV-PWR-ADAPTER</MODEL>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAAAwAAABAAUABUAF8ATQBPAEQARQBMAAAACgAAAAAqAFAAbwByAHQAYQBiAGwAZQAgAE0AdQBzAGkAYwAgAFAAbABhAHkAZQByAAAAFABQAFQAXwBWAEUAUgBTAEkATwBOAAAACgAAAAAKADEALgAwAC4AMAAAAAoAcwB0AGEAdABlAAAACgAAAAACADA=</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1239.49</X_COORD>
+      <Y_COORD>1244.48</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT08102P2J</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:26280;cost:40;power source:0;rack units:1;wattage:5;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>1499967772573</TEMPLATE_CREATION_TIME>
+     <IGNORE_TEMPLATE_CREATION_TIME>0</IGNORE_TEMPLATE_CREATION_TIME>
+     <STARTTIME>730933869233</STARTTIME>
+     <STARTSIMTIME>210159</STARTSIMTIME>
+     <USER_APPS>
+      <RUNNING_APPS>
+       <USER_APP>Portable Music Player (JavaScript)</USER_APP>
+      </RUNNING_APPS>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <BLUETOOTH_PORT>
+      <PORT>
+       <ACL_IN_ID></ACL_IN_ID>
+       <ACL_OUT_ID></ACL_OUT_ID>
+       <ACLv6_IN_ID></ACLv6_IN_ID>
+       <ACLv6_OUT_ID></ACLv6_OUT_ID>
+       <TIMEOUT>14400000</TIMEOUT>
+       <TYPE>eBluetooth</TYPE>
+       <POWER>false</POWER>
+       <MEDIATYPE>0</MEDIATYPE>
+       <PINS>false</PINS>
+       <FIBERMULTIMODE>true</FIBERMULTIMODE>
+       <BANDWIDTH>25000</BANDWIDTH>
+       <SPEED>100</SPEED>
+       <FULLDUPLEX>false</FULLDUPLEX>
+       <AUTONEGOTIATEBANDWIDTH>true</AUTONEGOTIATEBANDWIDTH>
+       <AUTONEGOTIATESPEED>true</AUTONEGOTIATESPEED>
+       <AUTONEGOTIATEDUPLEX>true</AUTONEGOTIATEDUPLEX>
+       <MACADDRESS>0000.0000.0000</MACADDRESS>
+       <BIA>0000.0000.0000</BIA>
+       <CLOCKRATE>2000000</CLOCKRATE>
+       <CLOCKRATEFLAG>false</CLOCKRATEFLAG>
+       <DESCRIPTION/>
+       <CHANNEL>0</CHANNEL>
+       <CHANNEL5GHZ>0</CHANNEL5GHZ>
+       <COVERAGERANGE>10</COVERAGERANGE>
+       <SAVED_FULLDUPLEX>false</SAVED_FULLDUPLEX>
+       <UP_METHOD>5</UP_METHOD>
+       <IP/>
+       <SUBNET/>
+       <PORT_GATEWAY/>
+       <PORT_DNS/>
+       <PORT_DHCP_ENABLE>false</PORT_DHCP_ENABLE>
+       <ND_SUPPRESSED>false</ND_SUPPRESSED>
+       <ND_IPV6_DNS_ADDRESSES/>
+       <PC_FIREWALL>false</PC_FIREWALL>
+       <PC_IPV6_FIREWALL>false</PC_IPV6_FIREWALL>
+       <IPV6_ENABLED>false</IPV6_ENABLED>
+       <IPV6_ADDRESS_AUTOCONFIG>false</IPV6_ADDRESS_AUTOCONFIG>
+       <IPV6_PORT_GATEWAY/>
+       <IPV6_PORT_DNS/>
+       <IPV6_LINK_LOCAL/>
+       <IPV6_DEFAULT_LINK_LOCAL>FE80::202:4AFF:FEEB:25EC</IPV6_DEFAULT_LINK_LOCAL>
+       <IPV6_PORT_DHCP_ENABLED>false</IPV6_PORT_DHCP_ENABLED>
+       <IPV6_ADDRESSES/>
+       <IP_UNNUMBERED/>
+       <DHCP_SERVER_IP>0.0.0.0</DHCP_SERVER_IP>
+      </PORT>
+     </BLUETOOTH_PORT>
+     <SAVE_REF_ID>save-ref-id:0</SAVE_REF_ID>
+     <IGNORED_VERSION></IGNORED_VERSION>
+     <SYS_NAME></SYS_NAME>
+     <PTP_ENALBED>0</PTP_ENALBED>
+     <GATEWAY>192.168.25.1</GATEWAY>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP>
+       <PORT_DATA_ENTRY>
+        <PORT>Bluetooth</PORT>
+       </PORT_DATA_ENTRY>
+       <PORT_DATA_ENTRY>
+        <PORT>Wireless0</PORT>
+       </PORT_DATA_ENTRY>
+      </PORT_DATA_MAP>
+     </DHCP_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+       <STANDARD_CHANNEL5G>112</STANDARD_CHANNEL5G>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS>192.168.25.119</IP_ADDRESS>
+        <SUBNET_MASK>255.255.255.0</SUBNET_MASK>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS>192.168.25.119</IP_ADDRESS>
+        <SUBNET_MASK>255.255.255.0</SUBNET_MASK>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <GATEWAYV6/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>41-7E-36-D6-</PARTIAL_DUID>
+      <ENABLED_PORTS>
+       <PORT>
+        <PORT_NAME>Wireless0</PORT_NAME>
+        <DHCPV6_CLIENT>
+         <IAID>1085609789</IAID>
+         <STATE>1</STATE>
+         <DHCPV6_CLIENT_PORT_DATA>
+          <ENABLED>1</ENABLED>
+          <RAPID_COMMIT>0</RAPID_COMMIT>
+          <HINT>0</HINT>
+          <PREFIX_NAME></PREFIX_NAME>
+          <INITIAL_SOLICIT_TIME>Mon Mar 1 00:01:05 1993</INITIAL_SOLICIT_TIME>
+          <LAST_SOLICIT_TIME></LAST_SOLICIT_TIME>
+          <PRERX_SOLICIT_TIME>1</PRERX_SOLICIT_TIME>
+          <SOLICIT_MSG_COUNT>0</SOLICIT_MSG_COUNT>
+          <INITIAL_REQUEST_TIME></INITIAL_REQUEST_TIME>
+          <LAST_REQUEST_TIME></LAST_REQUEST_TIME>
+          <REQUEST_MSG_COUNT>0</REQUEST_MSG_COUNT>
+         </DHCPV6_CLIENT_PORT_DATA>
+        </DHCPV6_CLIENT>
+       </PORT>
+      </ENABLED_PORTS>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>3</FILE_NUMBER>
+           <NAME>Portable Music Player (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>var state = 0;
+var dstMac = "FFFF.FFFF.FFFF";
+var dstService = "{58c41a2f-5111-45b0-863c-0429591c81fd}";
+var btService = new BluetoothService();
+
+function setup()
+{
+	IoEClient.setup({
+		type: "Portable Music Player",
+		states: [{
+			name: "On",
+			type: "bool",
+			controllable: true
+		}]
+	});
+	
+	IoEClient.onInputReceive = function(input) {
+		processData(input, true);
+	};
+	
+	attachInterrupt(0, function() {
+		processData(customRead(0), false);
+	});
+	
+	state = restoreProperty("state", 0);
+	setState(state);
+
+	Bluetooth.init();
+	Bluetooth.setAcceptingPairRequest(true);
+	Bluetooth.setDiscoverable(true);
+
+    Serial.println(btService.start(dstService));
+}
+
+
+
+function restoreProperty(propertyName, defaultValue)
+{
+	var value = getDeviceProperty(getName(), propertyName);
+	if ( !(value === "" || value == "undefined") ){
+		if ( typeof(defaultValue) == "number" )
+			value = Number(value);
+		
+		setDeviceProperty(getName(), propertyName, value);
+		return value;
+	}
+	
+	return defaultValue;
+}
+
+
+
+function mouseEvent(pressed, x, y, firstPress)
+{
+	if (firstPress)
+		setState(state ? 0 : 1);
+}
+
+function processData(data, bIsRemote)
+{
+	if ( data.length &lt;= 0  )
+		return;
+	setState(parseInt(data));
+}
+
+function setState(newState)
+{
+	state = newState;
+	
+	if ( state === 0 )
+    {
+		digitalWrite(1, LOW);
+		
+		btService.send(dstMac, dstService, "");
+    }
+	else
+    {
+		digitalWrite(1, HIGH);
+        
+        if (dstMac)
+        	btService.send(dstMac, dstService, "/../Sounds/crickets.wav");
+    }
+	
+	IoEClient.reportStates(state);
+	setDeviceProperty(getName(), "state", state);
+}
+
+Bluetooth.onPairRequest = function(mac, deviceName) {
+	Serial.println("accepting pair request: " + mac);
+	Bluetooth.acceptPairRequest(mac, deviceName);
+};
+
+Bluetooth.onDevicePair = function(mac) {
+	Serial.println("paired: " + mac);
+};
+
+Bluetooth.onDeviceUnpair = function(mac) {
+	Serial.println("unpaired: " + mac);
+};
+
+Bluetooth.onDeviceConnect = function(mac) {
+	Serial.println("connected: " + mac);
+};
+
+Bluetooth.onDeviceDisconnect = function(mac) {
+	Serial.println("disconnected: " + mac);
+};</TEXT>
+           </FILE_CONTENT>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>4</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>var state = 0;
+var dstMac = "FFFF.FFFF.FFFF";
+var dstService = "{58c41a2f-5111-45b0-863c-0429591c81fd}";
+var btService = new BluetoothService();
+
+function setup()
+{
+	IoEClient.setup({
+		type: "Portable Music Player",
+		states: [{
+			name: "On",
+			type: "bool",
+			controllable: true
+		}]
+	});
+	
+	IoEClient.onInputReceive = function(input) {
+		processData(input, true);
+	};
+	
+	attachInterrupt(0, function() {
+		processData(customRead(0), false);
+	});
+	
+	state = restoreProperty("state", 0);
+	setState(state);
+
+	Bluetooth.init();
+	Bluetooth.setAcceptingPairRequest(true);
+	Bluetooth.setDiscoverable(true);
+
+    Serial.println(btService.start(dstService));
+}
+
+
+
+function restoreProperty(propertyName, defaultValue)
+{
+	var value = getDeviceProperty(getName(), propertyName);
+	if ( !(value === "" || value == "undefined") ){
+		if ( typeof(defaultValue) == "number" )
+			value = Number(value);
+		
+		setDeviceProperty(getName(), propertyName, value);
+		return value;
+	}
+	
+	return defaultValue;
+}
+
+
+
+function mouseEvent(pressed, x, y, firstPress)
+{
+	if (firstPress)
+		setState(state ? 0 : 1);
+}
+
+function processData(data, bIsRemote)
+{
+	if ( data.length &lt;= 0  )
+		return;
+	setState(parseInt(data));
+}
+
+function setState(newState)
+{
+	state = newState;
+	
+	if ( state === 0 )
+    {
+		digitalWrite(1, LOW);
+		
+		btService.send(dstMac, dstService, "");
+    }
+	else
+    {
+		digitalWrite(1, HIGH);
+        
+        if (dstMac)
+        	btService.send(dstMac, dstService, "/../Sounds/crickets.wav");
+    }
+	
+	IoEClient.reportStates(state);
+	setDeviceProperty(getName(), "state", state);
+}
+
+Bluetooth.onPairRequest = function(mac, deviceName) {
+	Serial.println("accepting pair request: " + mac);
+	Bluetooth.acceptPairRequest(mac, deviceName);
+};
+
+Bluetooth.onDevicePair = function(mac) {
+	Serial.println("paired: " + mac);
+};
+
+Bluetooth.onDeviceUnpair = function(mac) {
+	Serial.println("unpaired: " + mac);
+};
+
+Bluetooth.onDeviceConnect = function(mac) {
+	Serial.println("connected: " + mac);
+};
+
+Bluetooth.onDeviceDisconnect = function(mac) {
+	Serial.println("disconnected: " + mac);
+};</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>5</FILE_NUMBER>
+           <NAME>Portable Music Player (Python)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>from gpio import *
+from time import *
+from ioeclient import *
+from physical import *
+from bluetooth import *
+import math
+
+state = 0
+dstMac = "FFFF.FFFF.FFFF"
+dstService = "{58c41a2f-5111-45b0-863c-0429591c81fd}"
+btService = BluetoothService()
+
+def main():
+	setup()
+	while True:
+		sleep(3600)
+		
+def setup():
+    IoEClient.setup({
+        "type": "Portable Music Player",
+        "states": [{
+            "name": "On",
+            "type": "bool",
+            "controllable": True
+        }]
+    })
+
+    IoEClient.onInputReceive(onInputReceiveDone)
+    add_event_detect(0, detect)
+    global state
+    state = restoreProperty("state", 0)
+    setState(state)
+
+    Bluetooth.init()
+    Bluetooth.setAcceptingPairRequest(True)
+    Bluetooth.setDiscoverable(True)
+
+    print(btService.start(dstService))
+
+def detect():
+    processData(customRead(0), False)
+    
+def onInputReceiveDone(analogInput):
+    processData(analogInput, True)
+
+def restoreProperty(propertyName, defaultValue):
+    value = getDeviceProperty(getName(), propertyName)
+    if  not (value is "" or value is None):
+        if  type(defaultValue) is int :
+            value = int(value)
+
+        setDeviceProperty(getName(), propertyName, value)
+        return value
+    return defaultValue
+
+def mouseEvent(pressed, x, y, firstPress):
+    if firstPress:
+    	if state == 1:
+    		setState(0)
+    	else:
+    		setState(1)
+
+def processData(data, bIsRemote):
+    if len(data) &lt;= 0 :
+        return
+    setState(int(data))
+
+def setState(newState):
+    global state
+    state = newState
+
+    if state is 0:
+        digitalWrite(1, LOW)
+
+        btService.send(dstMac, dstService, "")
+    else:
+        digitalWrite(1, HIGH)
+
+        if dstMac:
+            btService.send(dstMac, dstService, "/../Sounds/crickets.wav")
+
+    IoEClient.reportStates(state)
+    setDeviceProperty(getName(), "state", state)
+
+def onPairRequestDone(mac, deviceName):
+    print("accepting pair request: " + str(mac))
+    Bluetooth.acceptPairRequest(mac, deviceName)
+    
+Bluetooth.onPairRequest(onPairRequestDone)
+
+def onDevicePairDone(mac):
+    print("paired: " + str(mac))
+    
+Bluetooth.onDevicePair(onDevicePairDone)
+
+def onDeviceUnpairDone(mac):
+    print("unpaired: " + str(mac))
+    
+Bluetooth.onDeviceUnpair(onDeviceUnpairDone)
+
+def onDeviceConnectDone(mac):
+    print("connected: " + str(mac))
+    
+Bluetooth.onDeviceConnect(onDeviceConnectDone)
+
+def onDeviceDisconnectDone(mac):
+    print("disconnected: " + str(mac))
+    
+Bluetooth.onDeviceDisconnect(onDeviceDisconnectDone)
+
+if __name__ == "__main__":
+    main()</TEXT>
+           </FILE_CONTENT>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>6</FILE_NUMBER>
+             <NAME>main.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>from gpio import *
+from time import *
+from ioeclient import *
+from physical import *
+from bluetooth import *
+import math
+
+state = 0
+dstMac = "FFFF.FFFF.FFFF"
+dstService = "{58c41a2f-5111-45b0-863c-0429591c81fd}"
+btService = BluetoothService()
+
+def main():
+	setup()
+	while True:
+		sleep(3600)
+		
+def setup():
+    IoEClient.setup({
+        "type": "Portable Music Player",
+        "states": [{
+            "name": "On",
+            "type": "bool",
+            "controllable": True
+        }]
+    })
+
+    IoEClient.onInputReceive(onInputReceiveDone)
+    add_event_detect(0, detect)
+    global state
+    state = restoreProperty("state", 0)
+    setState(state)
+
+    Bluetooth.init()
+    Bluetooth.setAcceptingPairRequest(True)
+    Bluetooth.setDiscoverable(True)
+
+    print(btService.start(dstService))
+
+def detect():
+    processData(customRead(0), False)
+    
+def onInputReceiveDone(analogInput):
+    processData(analogInput, True)
+
+def restoreProperty(propertyName, defaultValue):
+    value = getDeviceProperty(getName(), propertyName)
+    if  not (value is "" or value is None):
+        if  type(defaultValue) is int :
+            value = int(value)
+
+        setDeviceProperty(getName(), propertyName, value)
+        return value
+    return defaultValue
+
+def mouseEvent(pressed, x, y, firstPress):
+    if firstPress:
+    	if state == 1:
+    		setState(0)
+    	else:
+    		setState(1)
+
+def processData(data, bIsRemote):
+    if len(data) &lt;= 0 :
+        return
+    setState(int(data))
+
+def setState(newState):
+    global state
+    state = newState
+
+    if state is 0:
+        digitalWrite(1, LOW)
+
+        btService.send(dstMac, dstService, "")
+    else:
+        digitalWrite(1, HIGH)
+
+        if dstMac:
+            btService.send(dstMac, dstService, "/../Sounds/crickets.wav")
+
+    IoEClient.reportStates(state)
+    setDeviceProperty(getName(), "state", state)
+
+def onPairRequestDone(mac, deviceName):
+    print("accepting pair request: " + str(mac))
+    Bluetooth.acceptPairRequest(mac, deviceName)
+    
+Bluetooth.onPairRequest(onPairRequestDone)
+
+def onDevicePairDone(mac):
+    print("paired: " + str(mac))
+    
+Bluetooth.onDevicePair(onDevicePairDone)
+
+def onDeviceUnpairDone(mac):
+    print("unpaired: " + str(mac))
+    
+Bluetooth.onDeviceUnpair(onDeviceUnpairDone)
+
+def onDeviceConnectDone(mac):
+    print("connected: " + str(mac))
+    
+Bluetooth.onDeviceConnect(onDeviceConnectDone)
+
+def onDeviceDisconnectDone(mac):
+    print("disconnected: " + str(mac))
+    
+Bluetooth.onDeviceDisconnect(onDeviceDisconnectDone)
+
+if __name__ == "__main__":
+    main()</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>6</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>User:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>0</FILE_COUNTER>
+         <CAPACITY>10000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <THING_MODEL>
+      <NAME></NAME>
+      <WIDTH>49.5</WIDTH>
+      <HEIGHT>96.5</HEIGHT>
+      <ANALOG_SLOTS_COUNT>4</ANALOG_SLOTS_COUNT>
+      <DIGITAL_SLOTS_COUNT>6</DIGITAL_SLOTS_COUNT>
+      <SPECIFICATIONS>&lt;html>&lt;head>&lt;/head>&lt;body style="word-wrap: break-word; -webkit-nbsp-mode: space; -webkit-line-break: after-white-space; ">&lt;div>&lt;font class="Apple-style-span" face="'Arial Black'" size="5">Portable Music Player&lt;/font>&lt;/div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">Plays music through Bluetooth capabilities.&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>&lt;br>&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Features:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Bluetooth compatible&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Registration Server Compatible&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">On&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Off&lt;/font>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Usage:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Pair a Bluetooth Speaker with the Portable Music Player through Bluetooth using the Config tab. Enable the Portable Music Player by pressing ALT-click. The Portable Music Player will then send data to the Bluetooth Speaker through Bluetooth to play white noise music.&lt;/font>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Direct Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">ALT-click to interact&amp;nbsp;&lt;/span>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Local Control:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Connect device to MCU/SBC/Thing. Use the "customWrite" API per Data Specifications&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Remote Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Connect device to Registration Server using Config Tab&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Data Specifications:&lt;/u>&lt;/font>&lt;/div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;ul>&lt;li>N/A&lt;/li>&lt;/ul>&lt;/font>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Example:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">See Usage section.&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;/div>&lt;/body>&lt;/html></SPECIFICATIONS>
+      <ROTATION>0</ROTATION>
+      <SCALE>1</SCALE>
+      <PROXY_WIDTH>500</PROXY_WIDTH>
+      <PROXY_HEIGHT>500</PROXY_HEIGHT>
+      <IS_END_DEVICE>TRUE</IS_END_DEVICE>
+      <IS_DESKTOP_AVAILABLE>FALSE</IS_DESKTOP_AVAILABLE>
+      <IS_WORKSPACE_USERAPP>FALSE</IS_WORKSPACE_USERAPP>
+      <IS_TRANSPARENT_BACKGROUND>FALSE</IS_TRANSPARENT_BACKGROUND>
+      <WORKSPACE_OFFSET_X>0</WORKSPACE_OFFSET_X>
+      <WORKSPACE_OFFSET_Y>0</WORKSPACE_OFFSET_Y>
+      <WORKSPACE_Z_LEVEL>10000</WORKSPACE_Z_LEVEL>
+      <WORKSPACE_USERAPP_SHOW_IN_LOGICAL_VIEW>TRUE</WORKSPACE_USERAPP_SHOW_IN_LOGICAL_VIEW>
+      <WORKSPACE_USERAPP_SHOW_IN_PHYSICAL_VIEW>TRUE</WORKSPACE_USERAPP_SHOW_IN_PHYSICAL_VIEW>
+      <SUBCOMPONENTS>
+       <SUBCOMPONENT>
+        <NAME>Portable Music Player</NAME>
+        <X>0</X>
+        <Y>0</Y>
+        <Z_ORDER>1</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>0</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>1</SLOT_NUM>
+        <SLOT_TYPE>1</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/SmartDevices/portable_music_player_off.png]]></IMAGE>
+         <IMAGE><![CDATA[../art/IoE/SmartDevices/portable_music_player_on.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+      </SUBCOMPONENTS>
+      <RULES>
+       <RULE>
+        <SUBCOMPONENT>Portable Music Player</SUBCOMPONENT>
+        <IMAGE_INDEX>0</IMAGE_INDEX>
+        <DIGITAL_VALUE>0</DIGITAL_VALUE>
+        <ANALOG_LOW>0</ANALOG_LOW>
+        <ANALOG_HIGH>0</ANALOG_HIGH>
+       </RULE>
+       <RULE>
+        <SUBCOMPONENT>Portable Music Player</SUBCOMPONENT>
+        <IMAGE_INDEX>1</IMAGE_INDEX>
+        <DIGITAL_VALUE>1000</DIGITAL_VALUE>
+        <ANALOG_LOW>0</ANALOG_LOW>
+        <ANALOG_HIGH>0</ANALOG_HIGH>
+       </RULE>
+      </RULES>
+     </THING_MODEL>
+     <IOE_CLIENT>
+      <CLIENT_MODE>NO_SERVER</CLIENT_MODE>
+      <SERVER_ADDRESS></SERVER_ADDRESS>
+      <USERNAME></USERNAME>
+      <PASSWORD></PASSWORD>
+     </IOE_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME></NAME>
+      <MAIL_ID></MAIL_ID>
+      <POP3_SERVER></POP3_SERVER>
+      <SMTP_SERVER></SMTP_SERVER>
+      <USER></USER>
+      <PASSWORD></PASSWORD>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+     <NTP_SERVER>
+      <ENABLED>0</ENABLED>
+      <ENABLED_SERVER_AUTHENTICATE>0</ENABLED_SERVER_AUTHENTICATE>
+      <KEY>0</KEY>
+      <MD5PASSWORD></MD5PASSWORD>
+      <SERVER_IP_LIST/>
+     </NTP_SERVER>
+     <BLUETOOTH_MANAGER>
+      <DISCOVERABLE>true</DISCOVERABLE>
+      <PAIRED_DEVICES/>
+      <BEACON_BROADCASTING>false</BEACON_BROADCASTING>
+      <BEACON_FREQUENCY>10</BEACON_FREQUENCY>
+      <BEACON_UUID>{c79f7c51-b5d6-4897-9ca5-f609ad63c7ff}</BEACON_UUID>
+      <BEACON_DATA></BEACON_DATA>
+      <TETHER>false</TETHER>
+      <TETHERED_MAC>false</TETHERED_MAC>
+     </BLUETOOTH_MANAGER>
+     <PTP_PROCESS>
+      <PTP_CLOCK_ID>0xff:FF:FF:FF:FE:FF:FF:F0</PTP_CLOCK_ID>
+      <PTP_CLOCK_TIME>1301449149242</PTP_CLOCK_TIME>
+     </PTP_PROCESS>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL>{d6dbaf92-2466-400e-92a4-fcb5bb5fe3b1},{f01e07a4-d79f-4bb0-b2ce-994eb8fb5d05},{98d41f5f-2f24-44f3-973c-18aea7d83db3},{20a88330-787f-4bf9-aa7c-ef559e46c764}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.0998839</X_PN>
+      <Y_PN>0.201123</Y_PN>
+      <X>344</X>
+      <Y>430</Y>
+      <SLOT>0</SLOT>
+      <SUBSLOT>0</SUBSLOT>
+      <PARENT_PATH>{d6dbaf92-2466-400e-92a4-fcb5bb5fe3b1},{f01e07a4-d79f-4bb0-b2ce-994eb8fb5d05},{98d41f5f-2f24-44f3-973c-18aea7d83db3}</PARENT_PATH>
+      <CONTAINER_ID>{98d41f5f-2f24-44f3-973c-18aea7d83db3}</CONTAINER_ID>
+      <ICP_CONTAINER_SCENE_X>0</ICP_CONTAINER_SCENE_X>
+      <ICP_CONTAINER_SCENE_Y>0</ICP_CONTAINER_SCENE_Y>
+      <ORIGINAL_DEVICE_UUID>{0eaefe8f-6f55-e4e5-3ac5-023a588d8744}</ORIGINAL_DEVICE_UUID>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

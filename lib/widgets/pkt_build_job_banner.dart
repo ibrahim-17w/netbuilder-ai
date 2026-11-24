@@ -1,12 +1,23 @@
 import 'package:flutter/material.dart';
 
 import '../services/pkt_build_job_service.dart';
+import 'pkt_verification_status.dart';
 
 /// A small, persistent notice for phone builds that outlive their screen.
-class PktBuildJobBanner extends StatelessWidget {
+class PktBuildJobBanner extends StatefulWidget {
   final VoidCallback onSave;
 
   const PktBuildJobBanner({super.key, required this.onSave});
+
+  @override
+  State<PktBuildJobBanner> createState() => _PktBuildJobBannerState();
+}
+
+class _PktBuildJobBannerState extends State<PktBuildJobBanner> {
+  /// The four evidence stages are one tap away rather than always on show.
+  /// At a laptop-sized window the always-open list took almost a third of the
+  /// column and left the conversation itself with fifteen pixels to draw in.
+  bool _details = false;
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +99,7 @@ class PktBuildJobBanner extends StatelessWidget {
                       )
                     else if (ready)
                       TextButton.icon(
-                        onPressed: onSave,
+                        onPressed: widget.onSave,
                         icon: const Icon(Icons.save_alt_rounded, size: 18),
                         label: const Text('Save .pkt'),
                       )
@@ -98,6 +109,16 @@ class PktBuildJobBanner extends StatelessWidget {
                         visualDensity: VisualDensity.compact,
                         onPressed: jobs.retry,
                         icon: const Icon(Icons.refresh_rounded),
+                      ),
+                    if (ready || saved)
+                      IconButton(
+                        tooltip: _details
+                            ? 'Hide build details'
+                            : 'Build details',
+                        visualDensity: VisualDensity.compact,
+                        isSelected: _details,
+                        onPressed: () => setState(() => _details = !_details),
+                        icon: const Icon(Icons.fact_check_outlined, size: 19),
                       ),
                     if (!running)
                       IconButton(
@@ -109,6 +130,13 @@ class PktBuildJobBanner extends StatelessWidget {
                   ],
                 ),
               ),
+              if (_details && (ready || saved))
+                Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 8),
+                  child: PktVerificationStatus(
+                    verification: jobs.currentVerification,
+                  ),
+                ),
               if (running)
                 LinearProgressIndicator(
                   value: jobs.progress,

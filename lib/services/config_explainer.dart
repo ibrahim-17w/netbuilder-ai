@@ -1,3 +1,5 @@
+import 'human_language.dart';
+
 /// A plain-English review of a pasted device config - offline, no model.
 ///
 /// The reader half ([ConfigPasteReader]) decides that a message IS a config
@@ -41,10 +43,16 @@ class ConfigReport {
 
   String toMarkdown() {
     final b = StringBuffer()
-      ..writeln('**Config review - $device** ($lines config line(s))')
+      ..writeln(
+        '**Config review - $device** '
+        '(${HumanLanguage.count(lines, 'config line')})',
+      )
       ..writeln();
     for (final s in sections) {
-      b.writeln('- **${s.section}** (${s.lines} line(s)): ${s.explanation}');
+      b.writeln(
+        '- **${s.section}** (${HumanLanguage.count(s.lines, 'line')}): '
+        '${s.explanation}',
+      );
     }
     if (findings.isEmpty) {
       b
@@ -103,20 +111,21 @@ class ConfigExplainer {
       'Interfaces',
       RegExp(r'^interface\s+\S', caseSensitive: false),
       (n) =>
-          '$n interface block(s). Each `ip address` line gives the '
+          '${HumanLanguage.count(n, 'interface block')}. Each `ip address` line gives the '
           'interface its IPv4; `switchport mode access|trunk` decides whether '
           'the port serves one VLAN or carries them all.',
     );
     section(
       'VLANs',
       RegExp(r'^vlan\s+\d', caseSensitive: false),
-      (n) => '$n VLAN definition(s): broadcast domains separated at layer 2.',
+      (n) =>
+          '${HumanLanguage.count(n, 'VLAN definition')}: broadcast domains separated at layer 2.',
     );
     section(
       'Static routes',
       RegExp(r'^ip\s+route\s', caseSensitive: false),
       (n) =>
-          '$n static route(s): traffic for those networks is forwarded to '
+          '${HumanLanguage.count(n, 'static route')}: traffic for those networks is forwarded to '
           'the next hop by hand - fine for a small lab, a burden at scale '
           '(a routing protocol advertises them instead).',
     );
@@ -124,14 +133,14 @@ class ConfigExplainer {
       'Routing protocols',
       RegExp(r'^router\s+(ospf|eigrp|rip|bgp)\b', caseSensitive: false),
       (n) =>
-          '$n routing process(es): routes are learned from neighbors, so '
+          '${HumanLanguage.count(n, 'routing process', 'routing processes')}: routes are learned from neighbors, so '
           'a new network needs no hand-written route on every device.',
     );
     section(
       'Lines (vty/console)',
       RegExp(r'^line\s+(vty|con|console|aux)\b', caseSensitive: false),
       (n) =>
-          '$n line block(s): who may connect to this device and how '
+          '${HumanLanguage.count(n, 'line block')}: who may connect to this device and how '
           '(SSH, telnet, the console).',
     );
     section(
@@ -145,19 +154,21 @@ class ConfigExplainer {
       'Crypto / VPN',
       RegExp(r'^crypto\s+\S+', caseSensitive: false),
       (n) =>
-          '$n crypto line(s): tunnel or keying configuration - on Packet '
+          '${HumanLanguage.count(n, 'crypto line')}: tunnel or keying configuration - on Packet '
           'Tracer ISR images the crypto block needs the security license '
           'before the device accepts it.',
     );
     section(
       'Access lists',
       RegExp(r'^(?:ip\s+)?access-list\s+\S+', caseSensitive: false),
-      (n) => '$n ACL line(s): the permit/deny rules traffic is judged by.',
+      (n) =>
+          '${HumanLanguage.count(n, 'ACL line')}: the permit/deny rules traffic is judged by.',
     );
     section(
       'Banners',
       RegExp(r'^banner\s+\S+', caseSensitive: false),
-      (n) => '$n banner(s): the legal notice shown before login.',
+      (n) =>
+          '${HumanLanguage.count(n, 'banner')}: the legal notice shown before login.',
     );
 
     // --- findings: the classic mistakes, each with its reason --------------

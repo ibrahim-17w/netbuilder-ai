@@ -21,6 +21,7 @@
 
 import '../models/network_intent.dart';
 import 'fuzzy_match.dart';
+import 'human_language.dart';
 import 'network_tools.dart';
 
 /// One rung of the deterministic check ladder: what was checked and what the
@@ -777,7 +778,8 @@ class TopologyReasoner {
         ReasonStep(
           check: 'Cables',
           detail:
-              'Serial link(s) on the path terminate on serial-capable '
+              '${HumanLanguage.count(serialLinks.length, 'serial link')} on the path '
+              '${serialLinks.length == 1 ? 'terminates' : 'terminate'} on serial-capable '
               'ends: ${serialLinks.map((l) => '${l.a}-${l.b}').join(', ')}.',
         ),
       );

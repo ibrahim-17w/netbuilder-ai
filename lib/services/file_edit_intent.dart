@@ -1,5 +1,7 @@
 import 'package:net_builder/models/chat_message.dart';
 
+import 'human_language.dart';
+
 /// What the user means when they talk about "the file" after a build.
 ///
 /// The bug this exists to stop: "edit it" was read as a fresh build request,
@@ -202,11 +204,11 @@ class FileEditIntentReader {
     String writtenAt = '',
   }) {
     final shape = devices > 0
-        ? ' The plan on the table has $devices device(s)'
-              '${links > 0 ? ' and $links link(s)' : ''}.'
+        ? ' The plan on the table has ${HumanLanguage.count(devices, 'device')}'
+              '${links > 0 ? ' and ${HumanLanguage.count(links, 'link')}' : ''}.'
         : '';
     final when = writtenAt.isEmpty ? '' : ' (written $writtenAt)';
-    return 'I have `$name`$when already, so I am not going to quietly build a '
+    return 'I have `$name`$when already, so I\'m not going to quietly build a '
         'second file and leave the first one behind.$shape\n\n'
         'Do you want me to **edit that file** (a timestamped backup is kept '
         'first), or **create a new .pkt** from the same plan?';

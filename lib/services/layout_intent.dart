@@ -120,6 +120,10 @@ class LayoutRequest {
     'ring',
     'radial',
     'circle',
+    'spine-leaf',
+    'hub-spoke',
+    'zones',
+    'mesh',
     'grid',
   ];
 
@@ -205,6 +209,16 @@ class LayoutRequest {
       'radial' => 'radial - the core in the middle, endpoints outside',
       'circle' => 'one circle - every device on a single ring',
       'grid' => 'an even grid - a box of devices, topology ignored',
+      'spine-leaf' =>
+        'spine-leaf - spines across the top, leaves below, the data-center '
+            'fabric',
+      'hub-spoke' =>
+        'hub-spoke - the WAN hub up top, each branch a column beneath it',
+      'zones' =>
+        'zones - outside, firewalls, DMZ and inside, each its own block',
+      'mesh' =>
+        'mesh - the meshed core at the centre, switches around it, endpoints '
+            'outside',
       _ => 'site trees - every device under the one it connects to',
     };
   }
@@ -230,6 +244,15 @@ class LayoutRequest {
     'radial' => 'radial - the core in the middle, endpoints outside',
     'circle' => 'one circle - every device on a single ring',
     'grid' => 'an even grid - a box of devices, topology ignored',
+    'spine-leaf' =>
+      'spine-leaf - spines across the top, leaves below, the data-center '
+          'fabric',
+    'hub-spoke' =>
+      'hub-spoke - the WAN hub up top, each branch a column beneath it',
+    'zones' => 'zones - outside, firewalls, DMZ and inside, each its own block',
+    'mesh' =>
+      'mesh - the meshed core at the centre, switches around it, endpoints '
+          'outside',
     _ => 'site trees - every device under the one it connects to',
   };
 
@@ -248,6 +271,10 @@ class LayoutRequest {
     'radial' => 'Draw it as rings around the core',
     'circle' => 'Put every device in one circle',
     'grid' => 'Lay it out as an even grid',
+    'spine-leaf' => 'Draw it as a spine-leaf fabric',
+    'hub-spoke' => 'Draw it as a WAN hub with branches',
+    'zones' => 'Draw it as security zones',
+    'mesh' => 'Draw it as a meshed core',
     _ => 'Draw it as site trees',
   };
 
@@ -347,6 +374,32 @@ class LayoutRequest {
   static final RegExp _namedCampus = RegExp(
     r'\b(campus|two-?\s?tier|three-?\s?tier|multi-?\s?tier|'
     r'distribution\s+(?:layer|switches?))\b',
+    caseSensitive: false,
+  );
+  // The universal designs. Each stays narrow enough that an ordinary
+  // networking sentence cannot trip it: "mesh wifi" is a build brief, and
+  // "hub and spoke" stays with `star` (pinned by test), so the WAN map is
+  // reached through its own words.
+  static final RegExp _namedSpineLeaf = RegExp(
+    r'\b(spine-?\s?leaf|leaf-?\s?spine|spines?\s+and\s+leaf|'
+    r'data-?\s?cent(?:er|re)\s+(?:fabric|layout|drawing|design))\b',
+    caseSensitive: false,
+  );
+  static final RegExp _namedHubSpoke = RegExp(
+    r'\b(hub-?\s?spoke\s+(?:wan|map|layout|drawing)|'
+    r'wan\s+(?:map|hub|layout|drawing)|isp\s+(?:map|layout|drawing)|'
+    r'branch\s+(?:map|layout)|hub\s+router\s+(?:up\s+)?top)\b',
+    caseSensitive: false,
+  );
+  static final RegExp _namedZones = RegExp(
+    r'\b(security\s+zones?|zone-?\s?based\s+(?:layout|drawing)|'
+    r'dmz\s+(?:layout|drawing)|outside\s+and\s+dmz|inside\s+and\s+dmz|'
+    r'dmz\s+and\s+inside)\b',
+    caseSensitive: false,
+  );
+  static final RegExp _namedMesh = RegExp(
+    r'\b(full\s+mesh|meshed\s+core|mesh\s+(?:topology|core|layout|drawing)|'
+    r'meshed\s+(?:core|network))\b',
     caseSensitive: false,
   );
   static final RegExp _namedStar = RegExp(
@@ -542,6 +595,14 @@ class LayoutRequest {
       named = 'backbone';
     } else if (_namedCampus.hasMatch(t)) {
       named = 'campus';
+    } else if (_namedSpineLeaf.hasMatch(t)) {
+      named = 'spine-leaf';
+    } else if (_namedHubSpoke.hasMatch(t)) {
+      named = 'hub-spoke';
+    } else if (_namedZones.hasMatch(t)) {
+      named = 'zones';
+    } else if (_namedMesh.hasMatch(t)) {
+      named = 'mesh';
     } else if (_namedStar.hasMatch(t)) {
       named = 'star';
     } else if (_namedRing.hasMatch(t)) {
@@ -782,10 +843,12 @@ class LayoutRequest {
   }
 
   /// The drawing a file's note says it was built with ("layout: wide"), so a
-  /// vague request after a restart still changes something.
+  /// vague request after a restart still changes something. Hyphenated style
+  /// names ("layout: spine-leaf") read back whole - a `[a-z]+` there silently
+  /// reverted every hyphenated drawing to the default on the next build.
   static String styleFromNote(String note) {
     final match = RegExp(
-      r'layout:\s*([a-z]+)',
+      r'layout:\s*([a-z][a-z-]*)',
       caseSensitive: false,
     ).firstMatch(note);
     final style = match?.group(1)?.toLowerCase() ?? '';

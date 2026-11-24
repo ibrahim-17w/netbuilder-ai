@@ -97,7 +97,12 @@ class VerificationReport extends StatelessWidget {
   }
 
   Widget _row(BuildContext context, Map<String, dynamic> t) {
-    final status = (t['status'] as String? ?? 'skipped').toLowerCase();
+    final rawStatus = (t['status'] as String? ?? 'skipped').toLowerCase();
+    final status = switch (rawStatus) {
+      'pass' => 'passed',
+      'fail' => 'failed',
+      _ => rawStatus,
+    };
     final glyph = switch (status) {
       'passed' => 'PASS',
       'failed' => 'FAIL',

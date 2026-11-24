@@ -85,6 +85,63 @@ class OpenAiChatService {
     }
   }
 
+  /// A schema/JSON-only interpretation call never retries implicitly: its
+  /// caller owns the single repair budget and validates every returned field.
+  Future<String> completeStructured({
+    required List<Map<String, dynamic>> messages,
+    required Map<String, Object?> schema,
+    required StructuredOutputCapability capability,
+    Future<void>? abortTrigger,
+    bool Function()? abortProbe,
+    int? maxOutputTokens,
+  }) async {
+    _requireKey();
+    if (capability == StructuredOutputCapability.unsupported) {
+      throw const FormatException(
+        'Structured output is unsupported by this endpoint.',
+      );
+    }
+    final signal = AbortSignal(abortTrigger, isAbortedNow: abortProbe);
+    signal.throwIfAborted();
+    final request = http.AbortableRequest(
+      'POST',
+      _endpoint(),
+      abortTrigger: abortTrigger,
+    );
+    request.headers.addAll(_headers());
+    request.body = jsonEncode({
+      ..._body(messages, false),
+      'response_format': capability == StructuredOutputCapability.schema
+          ? {
+              'type': 'json_schema',
+              'json_schema': {
+                'name': 'request_interpretation',
+                'strict': true,
+                'schema': schema,
+              },
+            }
+          : {'type': 'json_object'},
+      'max_tokens': ?maxOutputTokens,
+    });
+    try {
+      final streamed = await _client
+          .send(request)
+          .timeout(StreamDeadlines.firstByte);
+      final response = await http.Response.fromStream(
+        streamed,
+      ).timeout(StreamDeadlines.oneShot);
+      signal.throwIfAborted();
+      if (response.statusCode != 200) {
+        throw StateError(
+          'Structured output refused (HTTP ${response.statusCode}); no unstructured mutation fallback was used.',
+        );
+      }
+      return textOf(response.body);
+    } on http.RequestAbortedException {
+      throw const AbortedException();
+    }
+  }
+
   /// The answer as it arrives: OpenAI sends `data: {choices:[{delta:{...}}]}`.
   ///
   /// Text-only turns. [streamMessages] is the same call for a turn that also
@@ -112,6 +169,7 @@ class OpenAiChatService {
     Duration? firstByteTimeout,
     Duration? idleTimeout,
     Duration? totalTimeout,
+    int? maxOutputTokens,
   }) async* {
     _requireKey();
     final signal = AbortSignal(
@@ -130,7 +188,10 @@ class OpenAiChatService {
         abortTrigger: abortTrigger,
       );
       request.headers.addAll(_headers());
-      request.body = jsonEncode(_body(messages, true));
+      request.body = jsonEncode({
+        ..._body(messages, true),
+        'max_tokens': ?maxOutputTokens,
+      });
       return request;
     }
 

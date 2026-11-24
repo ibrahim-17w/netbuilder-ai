@@ -1,5 +1,6 @@
 import '../models/network_intent.dart';
 import 'adapters/gns3_adapter.dart';
+import 'human_language.dart';
 import 'network_math.dart';
 import 'network_tools.dart';
 import 'planner_suggestions_service.dart';
@@ -267,9 +268,9 @@ class ChatCapabilities {
       plan.assumptions.any((a) => a.contains('small-office pair was assumed'));
 
   static String _noPlan(String what) =>
-      'I do not have a plan yet, so there is nothing to $what. Describe the '
+      'I don\'t have a plan yet, so there\'s nothing to $what. Describe the '
       'lab first (for example "2 routers, 1 switch and 4 PCs with OSPF") and '
-      'I will hold it for checks like this. The same check is also an Action '
+      'I\'ll hold it for checks like this. The same check is also an Action '
       'Hub button once a plan is open.';
 
   static String _validate(NetworkIntent? plan, String target) {
@@ -279,25 +280,26 @@ class ChatCapabilities {
     final issues = ValidatorService.validate(plan, target: target);
     final head =
         'Checked "${plan.projectName}" '
-        '(${plan.nodes.length} device(s), ${plan.links.length} link(s)) with '
-        'the same validator a build runs - read-only, nothing was changed.';
+        '(${HumanLanguage.list([HumanLanguage.count(plan.nodes.length, 'device'), HumanLanguage.count(plan.links.length, 'link')])}) with the same validator a build runs - read-only, nothing was '
+        'changed.';
     if (issues.isEmpty) {
       return '$head\n\nThe plan is clean - no issues found.';
     }
     final errors = issues.where((i) => i.severity == 'error').toList();
+    final warnings = issues.length - errors.length;
     final b = StringBuffer()
       ..writeln(head)
       ..writeln()
       ..writeln(
-        '${issues.length} finding(s): ${errors.length} error(s), '
-        '${issues.length - errors.length} warning(s).',
+        '${HumanLanguage.count(issues.length, 'finding')}: '
+        '${HumanLanguage.list([HumanLanguage.count(errors.length, 'error'), HumanLanguage.count(warnings, 'warning')])}.',
       );
     for (final issue in issues.take(10)) {
-      b.writeln('- [${issue.severity}] ${issue.message}');
+      b.writeln('- ${HumanLanguage.finding(issue.severity, issue.message)}');
     }
     if (issues.length > 10) {
       b.writeln(
-        '... and ${issues.length - 10} more - "${hubButton[ChatCapability.validatePlan]}" '
+        '...and ${issues.length - 10} more - "${hubButton[ChatCapability.validatePlan]}" '
         'in the Action Hub shows the full list.',
       );
     }
@@ -324,7 +326,7 @@ class ChatCapabilities {
     }
     final b = StringBuffer()
       ..writeln(
-        '${rows.length} duplicate address(es) in '
+        '${HumanLanguage.count(rows.length, 'duplicate address')} in '
         '"${plan.projectName}" (read-only check, nothing changed):',
       );
     for (final d in rows.take(10)) {
@@ -351,13 +353,13 @@ class ChatCapabilities {
     }.toList();
     final pairs = NetworkMath.overlappingPairs(cidrs);
     if (pairs.isEmpty) {
-      return 'No overlapping subnets among the ${cidrs.length} distinct '
-          'subnet(s) in "${plan.projectName}" (read-only check, nothing '
-          'changed).';
+      return 'No overlapping subnets among the '
+          '${HumanLanguage.count(cidrs.length, 'distinct subnet')} in '
+          '"${plan.projectName}" (read-only check, nothing changed).';
     }
     final b = StringBuffer()
       ..writeln(
-        '${pairs.length} overlapping subnet pair(s) in '
+        '${HumanLanguage.count(pairs.length, 'overlapping subnet pair')} in '
         '"${plan.projectName}" (read-only check, nothing changed):',
       );
     for (final pair in pairs.take(10)) {
@@ -388,7 +390,7 @@ class ChatCapabilities {
     }
     final b = StringBuffer()
       ..writeln(
-        '${suggestions.length} suggestion(s) for '
+        '${HumanLanguage.count(suggestions.length, 'suggestion')} for '
         '"${plan.projectName}" (read-only review, nothing changed):',
       );
     for (final s in suggestions.take(8)) {
@@ -396,7 +398,7 @@ class ChatCapabilities {
     }
     if (suggestions.length > 8) {
       b.writeln(
-        '... and ${suggestions.length - 8} more in the Action Hub '
+        '...and ${suggestions.length - 8} more in the Action Hub '
         'button "${hubButton[ChatCapability.improvePlan]}".',
       );
     }
@@ -413,8 +415,9 @@ class ChatCapabilities {
       final planBit = plan == null || plan.nodes.isEmpty
           ? ''
           : ' The current plan ("${plan.projectName}", '
-                '${plan.nodes.length} device(s)) is ready to build.';
-      return 'This conversation has not produced a file yet.$planBit\n\n'
+                '${HumanLanguage.count(plan.nodes.length, 'device')}) is '
+                'ready to build.';
+      return 'This conversation hasn\'t produced a file yet.$planBit\n\n'
           'Every save is listed in the Files view (Action Hub ▸ Files) with '
           'its audits and repairs; the Import screen can open any .pkt for a '
           'read-only audit.';
@@ -441,9 +444,8 @@ class ChatCapabilities {
     final lines = json.split('\n');
     final preview = lines.take(14).join('\n');
     return 'The GNS3 export for "${plan.projectName}" is ready to generate '
-        '(${plan.nodes.length} device(s), ${plan.links.length} link(s)) - '
-        'produced by the same adapter the Action Hub uses. Read-only preview '
-        'of its first lines:\n\n```\n$preview\n'
+        '(${HumanLanguage.list([HumanLanguage.count(plan.nodes.length, 'device'), HumanLanguage.count(plan.links.length, 'link')])}) - produced by the same adapter the Action Hub uses. Read-only '
+        'preview of its first lines:\n\n```\n$preview\n'
         '${lines.length > 14 ? '... (${lines.length - 14} more lines)\n' : ''}```\n\n'
         'Create the actual file with the Action Hub button '
         '"${hubButton[ChatCapability.exportGns3]}". Pushing it to a live GNS3 '

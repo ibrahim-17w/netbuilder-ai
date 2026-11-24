@@ -78,16 +78,26 @@ def describe_format(path: str) -> str:
     try:
         with open(path, "rb") as handle:
             head = handle.read(64)
+            if head[:4] in PCAP_MAGIC:
+                return "pcap"
+            if head[:4] == PCAPNG_MAGIC:
+                return "pcapng"
+            if head.lstrip()[:1] == b"<":
+                # A scrambled container can start with '<' too. Decode the
+                # complete file, not just the head, before calling it XML.
+                # Read one byte past the cap to detect oversized input, even
+                # if the file grows while being read.
+                raw = head + handle.read(MAX_BYTES - len(head) + 1)
+                if len(raw) <= MAX_BYTES:
+                    try:
+                        pkt_codec.decrypt_pkt(raw)
+                        return "pkt"
+                    except pkt_codec.PktFormatError:
+                        pass
+                return "xml"
     except OSError:
         return "unknown"
-    if head[:4] in PCAP_MAGIC:
-        return "pcap"
-    if head[:4] == PCAPNG_MAGIC:
-        return "pcapng"
-    stripped = head.lstrip()
-    if stripped[:1] == b"<":
-        return "xml"
-    if len(head) >= 40 and not stripped[:1] == b"<":
+    if len(head) >= 40:
         return "pkt"
     return "unknown"
 

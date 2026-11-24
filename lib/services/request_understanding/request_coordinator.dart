@@ -4,13 +4,19 @@ import 'dart:convert';
 import '../../models/network_intent.dart';
 import '../../models/plan_operation.dart';
 import '../../models/request_contract_utils.dart';
+import '../../models/request_coverage.dart';
 import '../../models/request_interpretation.dart';
 import '../../models/request_requirement.dart';
 import 'normalizer.dart';
+import 'model_proposal_service.dart';
+import '../human_language.dart';
+import 'coverage_checker.dart';
 import 'operation_applier.dart';
 import 'requirement_merger.dart';
+import 'requirement_validator.dart';
 import '../validator_service.dart';
 import '../network_tools.dart';
+import '../packet_tracer/catalog.dart';
 import '../topology_edit_service.dart';
 
 enum CoordinatedRequestRoute { answerOnly, legacyPlan, typedMutation, blocked }
@@ -26,8 +32,9 @@ class RequestCoordinatorOutcome {
   final RequestDisposition disposition;
   final CoordinatedRequestRoute route;
   final String brief;
+  final CoverageReport coverage;
 
-  const RequestCoordinatorOutcome({
+  RequestCoordinatorOutcome({
     required this.interpretation,
     required this.merge,
     required this.candidate,
@@ -35,7 +42,17 @@ class RequestCoordinatorOutcome {
     required this.disposition,
     required this.route,
     required this.brief,
-  });
+    required String target,
+    NetworkIntent? base,
+    CoverageReport? coverage,
+  }) : coverage =
+           coverage ??
+           CoverageChecker.check(
+             plan: candidate,
+             requirements: interpretation.requirements,
+             target: target,
+             base: base,
+           );
 
   bool get isBlocked => route == CoordinatedRequestRoute.blocked;
 
@@ -46,6 +63,7 @@ class RequestCoordinatorOutcome {
     interpretation: interpretation,
     candidatePlan: candidate,
     changeSet: changeSet,
+    coverage: coverage,
     clarifications: interpretation.issues,
     requestedActions: interpretation.requestedActions,
     disposition: disposition,
@@ -62,6 +80,56 @@ class RequestCoordinatorOutcome {
 class RequestCoordinator {
   const RequestCoordinator._();
 
+  /// Revalidate a provider proposal at the commit boundary. Its schema result
+  /// never bypasses deterministic application, preservation, or coverage.
+  static RequestCoordinatorOutcome acceptProposal({
+    required RequestCoordinatorOutcome local,
+    required ProposalResult proposal,
+    required NetworkIntent base,
+    required String target,
+  }) {
+    final interpretation = proposal.interpretation;
+    if (interpretation == null ||
+        interpretation.projectId != local.interpretation.projectId ||
+        interpretation.turnId != local.interpretation.turnId ||
+        interpretation.basePlanRevision != base.revision ||
+        interpretation.issues.isNotEmpty ||
+        interpretation.unresolvedFragments.isNotEmpty) {
+      return local;
+    }
+    final applied = OperationApplier.apply(
+      base: base,
+      baseRevision: base.revision,
+      projectId: interpretation.projectId,
+      operations: interpretation.operations,
+      target: target,
+    );
+    if (!applied.canCommit) return local;
+    final requirements = RequirementMerger.bindToBase(
+      requirements: interpretation.requirements,
+      base: base,
+      operations: interpretation.operations,
+    );
+    final merge = RequirementMerger.merge(
+      RequirementMerger.rebindAcceptedRenames(
+        requirements: requirements,
+        operations: interpretation.operations,
+      ),
+    );
+    if (merge.conflicts.isNotEmpty) return local;
+    return RequestCoordinatorOutcome(
+      interpretation: interpretation.copyWith(requirements: merge.requirements),
+      merge: merge,
+      candidate: applied.candidate,
+      changeSet: applied.changeSet,
+      disposition: RequestDisposition.commit,
+      route: CoordinatedRequestRoute.typedMutation,
+      brief: local.brief,
+      target: target,
+      base: base,
+    );
+  }
+
   static RequestCoordinatorOutcome coordinate({
     required String text,
     required String turnId,
@@ -73,6 +141,7 @@ class RequestCoordinator {
     required String legacyBrief,
     String? baseBrief,
     Iterable<Requirement> existingRequirements = const [],
+    Iterable<PendingRequestQuestion> existingPendingQuestions = const [],
     String messageId = 'current-message',
   }) {
     final identityRevision = base?.revision ?? legacyCandidate?.revision ?? '';
@@ -86,6 +155,79 @@ class RequestCoordinator {
       messageId: messageId,
     );
 
+    if (const {
+      RequestMode.social,
+      RequestMode.explain,
+      RequestMode.advise,
+      RequestMode.compare,
+      RequestMode.explore,
+    }.contains(interpretation.mode)) {
+      final merge = RequirementMergeResult(
+        requirements: existingRequirements.toList(),
+        conflicts: const [],
+      );
+      return RequestCoordinatorOutcome(
+        interpretation: interpretation.copyWith(
+          requirements: merge.requirements,
+          operations: const [],
+          issues: const [],
+          unresolvedFragments: const [],
+          pendingQuestions: existingPendingQuestions.toList(),
+          mutationPolicy: MutationPolicy.none,
+        ),
+        merge: merge,
+        candidate: base,
+        changeSet: null,
+        disposition: RequestDisposition.answerOnly,
+        route: CoordinatedRequestRoute.answerOnly,
+        brief: baseBrief ?? legacyBrief,
+        target: target,
+        base: base,
+      );
+    }
+    final confirmationTargets = existingPendingQuestions
+        .where(
+          (question) =>
+              question.targetKind == PendingQuestionTargetKind.requirement,
+        )
+        .map((question) => question.targetId)
+        .toSet();
+    final confirmed = <String>{};
+    final currentFacts = interpretation.requirements.map((fact) {
+      final matches = existingRequirements
+          .where(
+            (prior) =>
+                confirmationTargets.contains(prior.id) &&
+                prior.origin == RequirementOrigin.imported &&
+                prior.state == RequirementState.unresolved &&
+                prior.property == fact.property &&
+                prior.subject == fact.subject &&
+                prior.scope == fact.scope &&
+                fact.origin == RequirementOrigin.currentExplicit &&
+                fact.state == RequirementState.active &&
+                fact.value != null,
+          )
+          .toList();
+      if (matches.length != 1) return fact;
+      confirmed.add(matches.single.id);
+      return fact.copyWith(supersedesId: matches.single.id);
+    }).toList();
+    interpretation = interpretation.copyWith(
+      pendingQuestions: [
+        ...existingPendingQuestions.where(
+          (question) =>
+              !confirmed.contains(question.targetId) &&
+              question.targetId != 'attachment-action' &&
+              !question.targetId.endsWith('-incomplete'),
+        ),
+        ...interpretation.pendingQuestions,
+      ],
+      requirements: RequirementMerger.bindToBase(
+        requirements: currentFacts,
+        base: base,
+        operations: interpretation.operations,
+      ),
+    );
     final priorRequirements = [
       for (final requirement in existingRequirements)
         requirement.origin == RequirementOrigin.currentExplicit &&
@@ -122,6 +264,8 @@ class RequestCoordinator {
         issues: [issue],
       );
       return RequestCoordinatorOutcome(
+        target: target,
+        base: base,
         interpretation: interpretation,
         merge: emptyMerge,
         candidate: null,
@@ -133,6 +277,16 @@ class RequestCoordinator {
     }
 
     final issues = <RequestIssue>[
+      ...interpretation.issues,
+      ...const RequirementValidator()
+          .validate(merge.active)
+          .where(
+            (issue) => !interpretation.issues.any(
+              (existing) => existing.requirementIds.toSet().containsAll(
+                issue.requirementIds,
+              ),
+            ),
+          ),
       for (var index = 0; index < merge.conflicts.length; index++)
         _conflictIssue(
           merge.conflicts[index],
@@ -147,6 +301,8 @@ class RequestCoordinator {
         issues: issues,
       );
       return RequestCoordinatorOutcome(
+        target: target,
+        base: base,
         interpretation: interpretation,
         merge: merge,
         candidate: null,
@@ -185,6 +341,8 @@ class RequestCoordinator {
       );
       interpretation = interpretation.copyWith(issues: [issue]);
       return RequestCoordinatorOutcome(
+        target: target,
+        base: base,
         interpretation: interpretation,
         merge: merge,
         candidate: null,
@@ -201,6 +359,8 @@ class RequestCoordinator {
         mutationPolicy: MutationPolicy.none,
       );
       return RequestCoordinatorOutcome(
+        target: target,
+        base: base,
         interpretation: interpretation,
         merge: merge,
         candidate: base,
@@ -212,6 +372,50 @@ class RequestCoordinator {
     }
 
     if (interpretation.operations.isNotEmpty && base != null) {
+      final replacingRouting =
+          interpretation.operations.any(
+            (operation) => operation.kind == PlanOperationKind.setRouting,
+          ) &&
+          RegExp(
+            r'\b(?:replace|substitute|swap)\b|(?:بدل|بدّل|استبدل)',
+            caseSensitive: false,
+          ).hasMatch(text);
+      final replacedProtocol = interpretation.requirements
+          .where(
+            (requirement) =>
+                requirement.property == 'routing_protocol' &&
+                requirement.comparator == RequirementComparator.forbidden &&
+                requirement.value is String,
+          )
+          .firstOrNull;
+      if (replacingRouting &&
+          replacedProtocol != null &&
+          base.routing.toLowerCase() !=
+              (replacedProtocol.value as String).toLowerCase()) {
+        final issue = RequestIssue(
+          id: 'request-$turnId-routing-replacement-base',
+          kind: RequestIssueKind.conflict,
+          code: 'routing_replacement_source_missing',
+          message:
+              'The saved plan uses ${base.routing}, not ${replacedProtocol.value}. Confirm whether to replace the current protocol; no part of this edit was applied.',
+          requirementIds: [replacedProtocol.id],
+          sourceSpans: replacedProtocol.sourceSpans,
+        );
+        return RequestCoordinatorOutcome(
+          target: target,
+          base: base,
+          interpretation: interpretation.copyWith(
+            requirements: merge.requirements,
+            issues: [issue],
+          ),
+          merge: merge,
+          candidate: null,
+          changeSet: null,
+          disposition: RequestDisposition.ask,
+          route: CoordinatedRequestRoute.blocked,
+          brief: legacyBrief,
+        );
+      }
       final applied = OperationApplier.apply(
         base: base,
         projectId: projectId,
@@ -248,6 +452,8 @@ class RequestCoordinator {
             mutationPolicy: MutationPolicy.commitIfValid,
           );
           return RequestCoordinatorOutcome(
+            target: target,
+            base: base,
             interpretation: interpretation,
             merge: merge,
             candidate: candidate,
@@ -257,11 +463,19 @@ class RequestCoordinator {
             brief: legacyBrief,
           );
         }
+        final capacityIssue = _routerTotalCapacityIssue(
+          base: base,
+          operations: interpretation.operations,
+          applicationIssues: applied.issues,
+          turnId: turnId,
+        );
         interpretation = interpretation.copyWith(
           requirements: merge.requirements,
-          issues: applied.issues,
+          issues: capacityIssue == null ? applied.issues : [capacityIssue],
         );
         return RequestCoordinatorOutcome(
+          target: target,
+          base: base,
           interpretation: interpretation,
           merge: merge,
           candidate: null,
@@ -304,6 +518,8 @@ class RequestCoordinator {
           issues: [issue],
         );
         return RequestCoordinatorOutcome(
+          target: target,
+          base: base,
           interpretation: interpretation,
           merge: merge,
           candidate: null,
@@ -315,6 +531,13 @@ class RequestCoordinator {
       }
 
       final candidate = applied.candidate!;
+      merge = RequirementMerger.merge(
+        RequirementMerger.rebindAcceptedRenames(
+          requirements: merge.requirements,
+          operations:
+              applied.changeSet?.operations ?? interpretation.operations,
+        ),
+      );
       final disposition = _sameSnapshot(candidate, base)
           ? RequestDisposition.answerOnly
           : RequestDisposition.commit;
@@ -325,6 +548,8 @@ class RequestCoordinator {
             : MutationPolicy.none,
       );
       return RequestCoordinatorOutcome(
+        target: target,
+        base: base,
         interpretation: interpretation,
         merge: merge,
         candidate: candidate,
@@ -335,7 +560,27 @@ class RequestCoordinator {
       );
     }
 
-    final candidate = legacyCandidate;
+    final onlySatisfiedBounds =
+        base != null &&
+        interpretation.requirements.isNotEmpty &&
+        interpretation.requirements.every(
+          (requirement) =>
+              requirement.property == 'device_count' &&
+              const {
+                RequirementComparator.atLeast,
+                RequirementComparator.atMost,
+              }.contains(requirement.comparator),
+        ) &&
+        CoverageChecker.check(
+          plan: base,
+          requirements: interpretation.requirements,
+          target: target,
+        ).requirements.every(
+          (entry) => entry.planning == PlanningStatus.satisfied,
+        );
+    // A lower/upper bound is not an instruction to resize a plan already
+    // within it. In particular, "at least 10" must keep an existing 12 PCs.
+    final candidate = onlySatisfiedBounds ? base : legacyCandidate;
     final disposition =
         candidate != null && (base == null || !_sameSnapshot(candidate, base))
         ? RequestDisposition.commit
@@ -347,6 +592,8 @@ class RequestCoordinator {
           : MutationPolicy.none,
     );
     return RequestCoordinatorOutcome(
+      target: target,
+      base: base,
       interpretation: interpretation,
       merge: merge,
       candidate: candidate,
@@ -356,6 +603,41 @@ class RequestCoordinator {
           ? CoordinatedRequestRoute.answerOnly
           : CoordinatedRequestRoute.legacyPlan,
       brief: legacyBrief,
+    );
+  }
+
+  /// Recheck after the caller chooses a named design or applies a final
+  /// deterministic repair. This does not reapply deltas or reuse delivery
+  /// evidence from a different candidate.
+  static RequestCoordinatorOutcome recomputeCoverage({
+    required RequestCoordinatorOutcome outcome,
+    required NetworkIntent candidate,
+    required String target,
+    NetworkIntent? base,
+  }) {
+    final old = outcome.changeSet;
+    final changed = old == null
+        ? null
+        : PlanChangeSet(
+            projectId: old.projectId,
+            baseRevision: old.baseRevision,
+            candidateRevision: candidate.revision,
+            operations: old.operations,
+            oldValues: old.oldValues,
+            newValues: {'plan': candidate.toJson(includeSecrets: false)},
+            incidentalChanges: old.incidentalChanges,
+            reasons: old.reasons,
+          );
+    return RequestCoordinatorOutcome(
+      target: target,
+      base: base,
+      interpretation: outcome.interpretation,
+      merge: outcome.merge,
+      candidate: candidate,
+      changeSet: changed,
+      disposition: outcome.disposition,
+      route: outcome.route,
+      brief: outcome.brief,
     );
   }
 
@@ -388,6 +670,70 @@ class RequestCoordinator {
       message: conflict.reason,
       requirementIds: conflict.requirementIds,
       sourceSpans: [for (final item in selected) ...item.sourceSpans],
+    );
+  }
+
+  /// A total correction is not implicit permission to unplug a full router
+  /// or replace its model. Explain this concrete capacity case before asking
+  /// the caller to choose recabling or hardware changes.
+  static RequestIssue? _routerTotalCapacityIssue({
+    required NetworkIntent base,
+    required List<PlanOperation> operations,
+    required List<RequestIssue> applicationIssues,
+    required String turnId,
+  }) {
+    if (operations.isEmpty ||
+        operations.any(
+          (operation) =>
+              operation.kind != PlanOperationKind.setDeviceCount ||
+              operation.scope.kind != RequirementScopeKind.project ||
+              operation.payload['kind'] != 'router',
+        ) ||
+        applicationIssues.isEmpty ||
+        applicationIssues.any(
+          (issue) => issue.code != 'candidate_validation_failed',
+        )) {
+      return null;
+    }
+    final routers = base.nodes
+        .where((node) => node.type.toLowerCase() == 'router')
+        .toList();
+    final requested = operations.last.payload['total'];
+    if (routers.isEmpty || requested is! int || requested <= routers.length) {
+      return null;
+    }
+    final catalog = PacketTracerCatalog.instance;
+    for (final router in routers) {
+      final device = catalog.device(router.model ?? '');
+      if (device == null) return null;
+      final occupied = {
+        for (final link in base.links)
+          if (link.a == router.name) ptPortName(link.aIf),
+        for (final link in base.links)
+          if (link.b == router.name) ptPortName(link.bIf),
+      };
+      final routedCopper = device.ports
+          .where((port) => port.medium == 'copper')
+          .toList();
+      if (routedCopper.isEmpty ||
+          routedCopper.any(
+            (port) => !occupied.contains(ptPortName(port.name)),
+          )) {
+        return null;
+      }
+    }
+    return RequestIssue(
+      id: 'request-$turnId-router-total-capacity',
+      kind: RequestIssueKind.conflict,
+      code: 'router_total_requires_capacity_decision',
+      message:
+          'The requested total is $requested routers, but ${routers.map((router) => router.name).join(', ')} have no free routed copper ports while their existing links are preserved. The previous plan is unchanged. Allow recabling the existing topology, or choose a compatible router/model module with additional routed ports before applying this total.',
+      requirementIds: {
+        for (final operation in operations) ...operation.requirementIds,
+      }.toList(),
+      sourceSpans: [
+        for (final operation in operations) ...operation.sourceSpans,
+      ],
     );
   }
 
@@ -671,11 +1017,11 @@ class RequestCoordinator {
 
     final incidental = <String>[
       if (candidate.links.length > base.links.length)
-        'Added ${candidate.links.length - base.links.length} link(s) needed by the new devices.',
+        'Added ${HumanLanguage.count(candidate.links.length - base.links.length, 'link')} needed by the new devices.',
       if (candidate.addressing.length > base.addressing.length)
-        'Added ${candidate.addressing.length - base.addressing.length} address assignment(s) for the new devices.',
+        'Added ${HumanLanguage.count(candidate.addressing.length - base.addressing.length, 'address assignment')} for the new devices.',
       if (candidate.layout.length > base.layout.length)
-        'Added layout positions for ${candidate.layout.length - base.layout.length} new device(s).',
+        'Added layout positions for ${HumanLanguage.count(candidate.layout.length - base.layout.length, 'new device')}.',
     ];
     return _SupplementedAddition(candidate, incidental);
   }

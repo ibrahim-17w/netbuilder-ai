@@ -8,6 +8,7 @@ import '../models/build_record.dart';
 import '../models/network_intent.dart';
 import '../services/adapters/packet_tracer_adapter.dart';
 import '../services/build_artifact_service.dart';
+import '../services/human_language.dart';
 import '../services/layout_engine.dart' show layoutStyleLabel, resolveSideNames;
 import '../services/layout_intent.dart';
 import '../services/pkt/on_device_pkt_builder.dart';
@@ -15,11 +16,17 @@ import '../services/pkt_build_job_service.dart';
 import '../services/pkt/pkt_export_service.dart';
 import '../services/planner_suggestions_service.dart';
 import '../services/settings_service.dart';
+import '../services/plan_version_service.dart';
+import '../services/request_understanding/build_readiness.dart';
+import '../services/request_understanding/build_action_identity.dart';
+import '../services/request_understanding/artifact_evidence_service.dart';
+import '../models/request_requirement.dart';
 import '../services/validator_service.dart';
 import '../theme/app_kit.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_dialogs.dart';
+import '../widgets/pkt_verification_status.dart';
 import 'builder_detail_screen.dart';
 import 'chat_screen.dart';
 import 'layout_gallery_screen.dart';
@@ -33,6 +40,24 @@ String _chosenLayoutStyle(NetworkIntent intent) {
   }
   return '';
 }
+
+BuildReadinessResult _workspaceReadiness(
+  NetworkIntent intent,
+  BuildRecord record,
+) {
+  final outcome = PlanVersionService.requestOutcomeOf(record);
+  return BuildReadiness.evaluate(
+    plan: intent,
+    target: record.target,
+    offlineBuild: true,
+    requirements: outcome?.interpretation.requirements ?? const <Requirement>[],
+    interpretation: outcome?.interpretation,
+  );
+}
+
+List<Requirement> _workspaceRequirements(BuildRecord record) =>
+    PlanVersionService.requestOutcomeOf(record)?.interpretation.requirements ??
+    const <Requirement>[];
 
 /// One screen for the whole build: the **thinking** (why the plan looks like
 /// this), the **execution** (running it and proving it on screen) and the
@@ -163,12 +188,9 @@ class _BuildWorkspaceScreenState extends State<BuildWorkspaceScreen> {
 
   Widget _statusStrip() {
     final intent = _intent;
-    final issues = ValidatorService.validate(
-      intent,
-      target: widget.record.target,
-    );
-    final errors = issues.where((i) => i.severity == 'error').length;
-    final warnings = issues.where((i) => i.severity == 'warning').length;
+    final readiness = _workspaceReadiness(intent, widget.record);
+    final errors = readiness.blockers.length;
+    final warnings = readiness.warnings.length;
     final needsDesign = !_hasChosenDesign;
     final tone = errors > 0
         ? AppTone.danger
@@ -188,14 +210,15 @@ class _BuildWorkspaceScreenState extends State<BuildWorkspaceScreen> {
           ? Icons.warning_amber_rounded
           : Icons.verified_outlined,
       title: errors > 0
-          ? 'The validator blocks this plan'
+          ? 'Requirements or validation block this build'
           : needsDesign
           ? 'Choose a network design'
           : 'Ready to build',
       message:
           '${intent.nodes.length} devices, ${intent.links.length} links, '
           'routing ${intent.routing.isEmpty ? 'none' : intent.routing}  ·  '
-          '$errors error(s), $warnings warning(s)  ·  '
+          '${HumanLanguage.count(errors, 'error')}, '
+          '${HumanLanguage.count(warnings, 'warning')}  ·  '
           'target ${widget.record.target}',
       actions: [
         if (errors > 0)
@@ -314,11 +337,8 @@ class _PhoneBuildPanelState extends State<_PhoneBuildPanel> {
       await _chooseDesign();
       return;
     }
-    final errors = ValidatorService.validate(
-      intent,
-      target: widget.record.target,
-    ).where((issue) => issue.severity == 'error').toList();
-    if (errors.isNotEmpty) {
+    final readiness = _workspaceReadiness(intent, widget.record);
+    if (!readiness.canBuild) {
       await showLinesDialog(
         context,
         title: 'Fix these plan errors first',
@@ -326,20 +346,44 @@ class _PhoneBuildPanelState extends State<_PhoneBuildPanel> {
             '${intent.nodes.length} devices, ${intent.links.length} links',
         icon: Icons.error_outline,
         warn: true,
-        lines: [for (final issue in errors) issue.message],
+        lines: [for (final blocker in readiness.blockers) blocker.reason],
       );
       return;
     }
 
+    final requirements = _workspaceRequirements(widget.record);
+    final storedAction = PlanVersionService.actionIdentityOf(widget.record);
+    final outcomeProject = PlanVersionService.requestOutcomeOf(
+      widget.record,
+    )?.interpretation.projectId;
+    final projectId = storedAction?.projectId.isNotEmpty == true
+        ? storedAction!.projectId
+        : outcomeProject?.isNotEmpty == true
+        ? outcomeProject!
+        : PlanVersionService.projectKeyOf(widget.record);
+    final actionIdentity = BuildActionIdentity.forPlan(
+      plan: intent,
+      requirements: requirements,
+      target: widget.record.target,
+      projectId: projectId,
+    );
+    bool current() =>
+        mounted &&
+        widget.intent.buildRevision == intent.buildRevision &&
+        BuildActionIdentity.digestRequirements(
+              _workspaceRequirements(widget.record),
+            ) ==
+            actionIdentity.requirementsDigest;
     setState(() => _busy = true);
     final layout = PacketTracerAdapter.intentLayoutFromNotes(intent);
     final plan = PacketTracerAdapter.autopilotPlan(intent, layout: layout);
     final jobs = PktBuildJobService.instance;
-    final built = await jobs.start(
+    final buildFuture = jobs.start(
       project: intent.projectName,
       sourceRecordId: widget.record.id,
       planRevision: intent.revision,
       planJson: jsonEncode(intent.toPlannerJson()),
+      actionIdentity: actionIdentity,
       build: (reportProgress) async {
         final appDir = await getApplicationDocumentsDirectory();
         final outputDir = OnDevicePktBuilder.outDirIn(appDir);
@@ -365,17 +409,39 @@ class _PhoneBuildPanelState extends State<_PhoneBuildPanel> {
         );
       },
     );
+    final jobId = jobs.currentJobId;
+    final built = await buildFuture;
     if (!mounted) return;
     if (built == null) {
       setState(() => _busy = false);
       return;
     }
 
+    final evidence = await ArtifactEvidenceService.completeOnDevice(
+      file: built.file,
+      action: actionIdentity,
+      requirements: requirements,
+      planning: readiness.coverage,
+    );
+    if (!current()) {
+      if (mounted) setState(() => _busy = false);
+      return;
+    }
+    jobs.updateEvidence(
+      actionIdentity: actionIdentity,
+      artifactHash: evidence.artifactHash,
+      coverage: evidence.coverage,
+      audit: evidence.audit,
+      jobId: jobId,
+    );
     final exported = await PktExportService.saveToChosenFolder(
       built.file,
       suggestedName: built.file.uri.pathSegments.last,
     );
-    if (!mounted) return;
+    if (!current()) {
+      if (mounted) setState(() => _busy = false);
+      return;
+    }
     if (!exported.cancelled && exported.path.isNotEmpty) {
       jobs.markSaved(exported.path);
     }
@@ -388,10 +454,17 @@ class _PhoneBuildPanelState extends State<_PhoneBuildPanel> {
     final saved = !exported.cancelled && exported.path.isNotEmpty;
     final reportLayout = report['layout'];
     final layoutName = reportLayout is Map ? reportLayout['style'] : null;
+    if (!mounted) return;
     await showArtifactDialog(
       context,
       title: saved ? 'The .pkt is saved' : 'The .pkt is ready',
       subtitle: exported.message,
+      contentHeader: PktVerificationStatus(
+        verification: jobs.history
+            .where((entry) => entry.id == jobId)
+            .firstOrNull
+            ?.verification,
+      ),
       text: [
         'Built on this phone using the bundled Packet Tracer device library.',
         'Devices: ${report['deviceCount'] ?? intent.nodes.length}',
@@ -401,6 +474,9 @@ class _PhoneBuildPanelState extends State<_PhoneBuildPanel> {
         if (!saved)
           'The built file remains in app storage at ${built.file.path}. '
               'Choose a save location to make it visible in Android Files.',
+        ...evidence.lines,
+        if (requirements.isEmpty)
+          'Legacy build: the original requirement provenance was not recorded; no full request-delivery claim is available.',
         if (warnings.isNotEmpty) '',
         if (warnings.isNotEmpty) 'Warnings:',
         ...warnings.map((warning) => '- $warning'),
@@ -577,12 +653,16 @@ class _ThinkingPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final issues = ValidatorService.validate(intent, target: record.target);
+    final issues = ValidatorService.validate(
+      intent,
+      target: record.target,
+      offlineBuild: true,
+    );
     final suggestions = PlannerSuggestionsService.forIntent(
       intent,
       target: record.target,
     );
-    final errors = issues.where((i) => i.severity == 'error').length;
+    final errors = _workspaceReadiness(intent, record).blockers.length;
 
     return AppPage(
       maxWidth: 900,
@@ -634,9 +714,9 @@ class _ThinkingPanel extends StatelessWidget {
               tone: AppTone.info,
             ),
             AppMetric(
-              label: 'Confidence',
-              value: '${(intent.confidence * 100).round()}%',
-              icon: Icons.insights_outlined,
+              label: 'Readiness',
+              value: errors == 0 ? 'Plan checks pass' : '$errors blockers',
+              icon: Icons.fact_check_outlined,
               tone: AppTone.accent,
             ),
           ],
@@ -662,7 +742,7 @@ class _ThinkingPanel extends StatelessWidget {
               ),
             if (intent.nodes.length > 24)
               Text(
-                '+ ${intent.nodes.length - 24} more device(s)',
+                '+ ${HumanLanguage.count(intent.nodes.length - 24, 'more device')}',
                 style: theme.textTheme.bodySmall,
               ),
             if (intent.links.isNotEmpty) ...[

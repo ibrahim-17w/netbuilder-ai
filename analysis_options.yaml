@@ -9,6 +9,16 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+# Generated and scratch material is not source. `build/` holds release
+# artifacts and one-off diagnostic scripts (diagnose_*_test.dart) written
+# during investigations; analysing them made `flutter analyze` report the
+# lints of throwaway code and hid the app's own result.
+analyzer:
+  exclude:
+    - build/**
+    - dist/**
+    - .dart_tool/**
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`

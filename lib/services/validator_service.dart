@@ -1,5 +1,6 @@
 import '../models/network_intent.dart';
 import 'nlu/lexicon.dart';
+import 'human_language.dart';
 import 'packet_tracer/hardware_check.dart';
 
 /// Pure-Dart pre-deploy validator. No plugins, fully unit-testable.
@@ -25,10 +26,12 @@ class ValidationIssue {
 }
 
 class ValidatorService {
-  /// Largest plan the in-app Packet Tracer builder will accept. Keep the
-  /// planner, repair pass and validator on one limit so an oversized plan is
-  /// stopped before repair starts moving hundreds of devices around.
+  /// Live placement remains bounded separately from offline file generation.
   static const int packetTracerMaxDevices = 50;
+  static const int packetTracerOfflineMaxDevices = 120;
+
+  static int packetTracerDeviceLimit({bool offlineBuild = false}) =>
+      offlineBuild ? packetTracerOfflineMaxDevices : packetTracerMaxDevices;
 
   static bool isPacketTracerTarget(String target) =>
       const {'packet-tracer', 'packet_tracer', 'pt'}.contains(target);
@@ -39,6 +42,21 @@ class ValidatorService {
   static final _interfacePattern = RegExp(
     r'^[A-Za-z][A-Za-z0-9-]*\d+(?:/\d+){0,2}(?:\.\d+)?$',
   );
+
+  /// Packet Tracer's own label for the generic module pins on access points,
+  /// IP phones and the IoT family: `Port 0`, `Port 1`. The template library
+  /// names those ports exactly this way, so a plan that cables one is right,
+  /// not malformed.
+  static final _genericPortPattern = RegExp(
+    r'^Port \d+$',
+    caseSensitive: false,
+  );
+
+  static bool _isInterfaceName(String raw) {
+    final name = raw.trim();
+    return _interfacePattern.hasMatch(name) ||
+        _genericPortPattern.hasMatch(name);
+  }
 
   /// FastEthernet and above on a switch: `f0/1`, `fa0/1`, `gi0/1`. Used to
   /// count how many distinct switch ports a plan cables.
@@ -84,6 +102,7 @@ class ValidatorService {
   static List<ValidationIssue> validate(
     NetworkIntent intent, {
     String target = 'gns3',
+    bool offlineBuild = false,
   }) {
     final issues = <ValidationIssue>[];
     if (isPacketTracerTarget(target)) {
@@ -148,8 +167,7 @@ class ValidatorService {
           ),
         );
       }
-      if (a.iface.trim().isEmpty ||
-          !_interfacePattern.hasMatch(a.iface.trim())) {
+      if (a.iface.trim().isEmpty || !_isInterfaceName(a.iface)) {
         issues.add(
           ValidationIssue(
             'error',
@@ -219,8 +237,11 @@ class ValidatorService {
       if (!(deviceKindOf(node.type)?.ipConfig ?? false)) continue;
       // A wireless laptop with an SSID profile is configured by its WLAN
       // client profile and receives DHCP; it does not have a wired Desktop
-      // static-address row to validate here.
-      if ((node.serviceRules['wireless'] as Map?)?['mode'] == 'client') {
+      // static-address row to validate here. The same holds for any endpoint
+      // whose addressing rule says DHCP: its address arrives from the DHCP
+      // server at runtime, so an empty static row is the correct plan state.
+      if ((node.serviceRules['wireless'] as Map?)?['mode'] == 'client' ||
+          (node.serviceRules['addressing'] as Map?)?['mode'] == 'dhcp') {
         continue;
       }
       final addrs = addrByNode[node.name.toLowerCase()] ?? const [];
@@ -279,7 +300,7 @@ class ValidatorService {
       }
       for (final endpoint in [MapEntry(l.a, l.aIf), MapEntry(l.b, l.bIf)]) {
         final iface = endpoint.value.trim();
-        if (iface.isEmpty || !_interfacePattern.hasMatch(iface)) {
+        if (iface.isEmpty || !_isInterfaceName(iface)) {
           issues.add(
             ValidationIssue(
               'error',
@@ -377,9 +398,11 @@ class ValidatorService {
         ValidationIssue(
           everything ? 'error' : 'warning',
           everything
-              ? 'No links are defined, so all ${intent.nodes.length} '
-                    'device(s) (${islands.take(3).join(', ')}...) would ship '
-                    'standing alone; cable the plan before building it.'
+              ? 'Nothing is cabled yet, so '
+                    '${HumanLanguage.list(islands.take(3).toList())}'
+                    '${islands.length > 3 ? ' and ${islands.length - 3} more' : ''} '
+                    'would open floating in the workspace. Cable the lab '
+                    'before building it.'
               : '${islands.join(', ')} '
                     '${islands.length == 1 ? 'has' : 'have'} no link in the '
                     'plan, so '
@@ -411,13 +434,11 @@ class ValidatorService {
         issues.add(
           ValidationIssue(
             'warning',
-            '${endpoint.key} requests serial interface $iface, but a '
-                'default Packet Tracer $model has no serial module; the '
-                'cable will be remapped to a spare routed port at build '
-                'time, so the result is not the requested exact interface. '
-                'Remedy: open the router Physical tab, power it off, drag '
-                'an HWIC-2T into an empty HWIC slot, power it back on, then '
-                're-run - $iface exists after that and no remap is needed.',
+            '${endpoint.key} asks for $iface, but a stock Packet Tracer '
+                '$model has no serial module. The cable will move to a spare '
+                'routed port when it builds, so it will not be $iface. To '
+                'keep $iface: power ${endpoint.key} off in the Physical tab, '
+                'add an HWIC-2T, power it back on, then build again.',
             // The build DOES the remap, so this cannot be a decision only the
             // user can make: with it blocking, every serial WAN brief was
             // unbuildable and "fix the plan" answered with a hardware note.
@@ -454,7 +475,8 @@ class ValidatorService {
           'error',
           '${node.name} is cabled to ${used.length} devices but a Packet '
               'Tracer ${node.model ?? '2960'} has only $capacity ports; '
-              '$over cable(s) land on interfaces the switch does not have. '
+              '${HumanLanguage.count(over, 'cable')} '
+              '${over == 1 ? 'lands' : 'land'} on interfaces the switch does not have. '
               'Remedy: add another switch, or use a model with more ports '
               '(a 3560 has 24 FastEthernet plus 4 GigabitEthernet).',
         ),
@@ -487,7 +509,8 @@ class ValidatorService {
               '${node.name} requests $service service but is not a server.',
             ),
           );
-        } else if (node.type == 'server' && !_serviceNames.contains(normalized)) {
+        } else if (node.type == 'server' &&
+            !_serviceNames.contains(normalized)) {
           issues.add(
             ValidationIssue(
               'warning',
@@ -662,7 +685,8 @@ class ValidatorService {
           issues.add(
             const ValidationIssue(
               'error',
-              'AAA is requested but its server is missing from the plan.',
+              'AAA is switched on, but there is no server in the plan to hold '
+                  'the accounts. Add one and I will configure it.',
             ),
           );
         }
@@ -671,7 +695,8 @@ class ValidatorService {
           issues.add(
             const ValidationIssue(
               'error',
-              'AAA is requested but its router is missing from the plan.',
+              'AAA needs a router to apply the logins to, and this plan has '
+                  'none. Add a router and I will configure the AAA commands on it.',
             ),
           );
         }
@@ -690,11 +715,12 @@ class ValidatorService {
                 (security.aaaAccountPassword ?? '').isNotEmpty);
         if (!hasAccount) {
           issues.add(
-            const ValidationIssue(
+            ValidationIssue(
               'warning',
-              'The AAA server holds no account, so no login can be verified. '
-                  'Add one - for example "AAA client name admin password 123" - '
-                  'and it is written into the server\'s Services tab.',
+              '${server?.name ?? 'The AAA server'} has no AAA login yet, so '
+                  'nobody could sign in. Tell me a user name and password - for '
+                  'example "username admin password 123" - and I will add it '
+                  'to the server\'s Services tab.',
             ),
           );
         }
@@ -819,11 +845,13 @@ class ValidatorService {
           ),
         );
       }
-      if (intent.nodes.length > packetTracerMaxDevices) {
+      final deviceLimit = packetTracerDeviceLimit(offlineBuild: offlineBuild);
+      if (intent.nodes.length > deviceLimit) {
         issues.add(
-          const ValidationIssue(
+          ValidationIssue(
             'error',
-            'Packet Tracer plan contains more than 50 devices; refusing to run an unsafe or likely misparsed plan.',
+            'Packet Tracer ${offlineBuild ? 'offline build' : 'live autopilot'} '
+                'contains more than $deviceLimit devices; refusing an oversized plan.',
           ),
         );
       }
@@ -866,6 +894,7 @@ class ValidatorService {
   /// whole topology on every call - the very cost the cache exists to avoid.
   static NetworkIntent? _cachedIntent;
   static String? _cachedTarget;
+  static bool? _cachedOfflineBuild;
   static String? _cachedRevision;
   static List<ValidationIssue>? _cachedIssues;
 
@@ -905,19 +934,24 @@ class ValidatorService {
   static List<ValidationIssue> validateCached(
     NetworkIntent intent, {
     String? target,
+    bool offlineBuild = false,
   }) {
     final issues = _cachedIssues;
     if (issues != null &&
         identical(_cachedIntent, intent) &&
         _cachedTarget == target &&
+        _cachedOfflineBuild == offlineBuild &&
         _cachedRevision == intent.revision) {
       return List.of(issues);
     }
-    final fresh = target == null
-        ? validate(intent)
-        : validate(intent, target: target);
+    final fresh = validate(
+      intent,
+      target: target ?? 'gns3',
+      offlineBuild: offlineBuild,
+    );
     _cachedIntent = intent;
     _cachedTarget = target;
+    _cachedOfflineBuild = offlineBuild;
     _cachedRevision = intent.revision;
     _cachedIssues = fresh;
     return List.of(fresh);
@@ -927,6 +961,7 @@ class ValidatorService {
   static void clearCacheForTest() {
     _cachedIntent = null;
     _cachedTarget = null;
+    _cachedOfflineBuild = null;
     _cachedRevision = null;
     _cachedIssues = null;
   }
@@ -938,9 +973,19 @@ class ValidatorService {
   /// place the setting could live. Reporting it as "rules for a service it did
   /// not request; the rules will be ignored" told the user something was
   /// wrong with the only thing that device exists to do.
-  static bool _roleIsIntrinsicTo(String role, String type) =>
-      role == 'wireless' &&
-      (type == 'wireless' || type == 'wireless-router' || type == 'ap');
+  static bool _roleIsIntrinsicTo(String role, String type) {
+    if (role == 'wireless' &&
+        (type == 'wireless' || type == 'wireless-router' || type == 'ap')) {
+      return true;
+    }
+    // An endpoint's addressing rule (for example DHCP client mode) is
+    // configuration the device itself carries, not a Services-tab role.
+    if (role == 'addressing' &&
+        const {'pc', 'laptop', 'server', 'printer'}.contains(type)) {
+      return true;
+    }
+    return false;
+  }
 
   /// True when this node+interface pair is an endpoint of a
   /// router-to-router link (the deterministic "transit" definition both

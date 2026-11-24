@@ -485,8 +485,17 @@ def xml_safe(data: bytes) -> bytes:
 
 
 def is_pkt(data: bytes) -> bool:
-    """True when the buffer looks like a Packet Tracer save container."""
-    return len(data) >= MIN_PKT_BYTES and not data.startswith(b"<?xml")
+    """Cheap container hint; decode XML-looking prefixes to disambiguate them."""
+    if len(data) < MIN_PKT_BYTES:
+        return False
+    if data.lstrip()[:1] != b"<":
+        return True
+    # The outer scramble has no magic bytes: even '<' can be ciphertext.
+    try:
+        decrypt_pkt(data)
+        return True
+    except PktFormatError:
+        return False
 
 
 def decrypt_pkt(data: bytes) -> bytes:
@@ -500,8 +509,6 @@ def decrypt_pkt(data: bytes) -> bytes:
     data = bytes(data)
     if len(data) < MIN_PKT_BYTES:
         raise PktFormatError(f"file is too small ({len(data)} bytes)")
-    if data.lstrip()[:1] == b"<":
-        raise PktFormatError("this file is plain XML, not an encrypted save")
     stage1 = _stage_outer_decode(data)
     key_state = _twofish(PT_KEY)
     body, tag = stage1[:-BLOCK], stage1[-BLOCK:]
@@ -517,6 +524,9 @@ def decrypt_pkt(data: bytes) -> bytes:
         return _qt_uncompress(_stage_inner(decrypted))
     except Exception as exc:  # noqa: BLE001 - reported together below
         errors.append(f"CBC: {exc}")
+    # Only diagnose plain XML after both container formats have failed.
+    if data.lstrip()[:1] == b"<":
+        raise PktFormatError("this file is plain XML, not an encrypted save")
     raise PktFormatError("could not decode the file (" + "; ".join(errors) + ")")
 
 

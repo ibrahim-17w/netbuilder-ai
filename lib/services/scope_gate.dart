@@ -1,3 +1,5 @@
+import 'nlu/parser.dart' show bridgeBrief;
+
 /// The networking-only scope gate.
 ///
 /// NetBuilder answers networking questions and builds networks - nothing
@@ -94,7 +96,7 @@ class ScopeGate {
   /// True when the message carries networking vocabulary (or looks like a
   /// networking brief: device counts, labels, CIDR, IP addresses).
   static bool isNetworking(String text) {
-    final t = text.toLowerCase().trim();
+    final t = bridgeBrief(text).toLowerCase().trim();
     if (t.isEmpty) return true; // nothing to decline
 
     // Whole-token word hits.
@@ -207,6 +209,11 @@ class ScopeGate {
     if (t.isEmpty) return false;
     if (isNetworking(t)) return false;
     if (isOffTopic(t)) return false;
+    if (RegExp(
+      r'^(?:مرحبا|مرحباً|اهلا|أهلا|أهلاً|السلام عليكم|شكرا|شكراً|شكراً لك|تمام)[.!؟\s]*$',
+    ).hasMatch(t)) {
+      return true;
+    }
     if (_identityAsk.hasMatch(t)) return true;
     // A greeting is only small talk when it is ONLY a greeting: "thanks,
     // now add a server" carries the request and must not be swallowed.
@@ -238,6 +245,11 @@ class ScopeGate {
   /// The one-line decline. Short, says what this app IS, and points at the
   /// very thing it can do instead - a refusal with no door through it is
   /// just a wall.
+  static String declineFor(String text) =>
+      RegExp(r'[\u0621-\u064a]').hasMatch(text)
+      ? 'أساعد في تخطيط الشبكات وبناء مختبراتها وشرحها فقط. صف الشبكة التي تريدها أو اسأل عن تقنية شبكية.'
+      : decline;
+
   static const String decline =
       'I only do networking: planning, building and explaining Packet Tracer '
       'and GNS3 labs, and helping design real networks. I do not write code, '

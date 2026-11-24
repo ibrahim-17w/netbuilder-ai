@@ -14,6 +14,7 @@ library;
 import 'dart:convert';
 import 'dart:typed_data';
 
+import '../human_language.dart';
 import 'pkt_codec.dart';
 import 'seed_library.dart';
 
@@ -238,7 +239,9 @@ class PktBuilder {
     final template = _seedLinkBlock(seed.document);
     if (template == null) {
       warnings.add(
-        'The seed save has no cable to copy, so ${links.length} link(s) were '
+        'The seed save has no cable to copy, so '
+        '${HumanLanguage.count(links.length, 'link')} '
+        '${links.length == 1 ? 'was' : 'were'} '
         'left out. Import a save that has at least one cable.',
       );
       return '';

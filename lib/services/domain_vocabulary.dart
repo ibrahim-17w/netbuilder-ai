@@ -23,6 +23,38 @@ import '../models/network_intent.dart';
 class DomainVocabulary {
   const DomainVocabulary._();
 
+  // --- what the app calls each service role --------------------------------
+
+  /// The label shown for a service role. ONE table, so the build guide, the
+  /// chat summary and any future surface cannot describe the same server two
+  /// different ways ("email" in one place, "Email" in another).
+  static const Map<String, String> serviceRoleLabels = <String, String>{
+    'dhcp': 'DHCP',
+    'dhcpv6': 'DHCPv6',
+    'dns': 'DNS',
+    'http': 'HTTP',
+    'https': 'HTTPS',
+    'aaa': 'AAA',
+    'email': 'Email',
+    'ftp': 'FTP',
+    'ntp': 'NTP',
+    'tftp': 'TFTP',
+    'syslog': 'Syslog',
+    'iot': 'IoT registration',
+    'snmp': 'SNMP',
+    'vm': 'Voicemail',
+    'cme': 'Call Manager Express',
+    'radiuseap': 'RADIUS EAP',
+    'prp': 'PRP',
+  };
+
+  /// The label for [role], with an upper-cased fallback for a role the table
+  /// has not learned yet.
+  static String serviceRoleLabel(String role) {
+    final key = role.trim().toLowerCase();
+    return serviceRoleLabels[key] ?? key.toUpperCase();
+  }
+
   // --- everyday words that mean a device ------------------------------------
 
   /// Words that stand for a device kind, keyed by the kind they stand for.

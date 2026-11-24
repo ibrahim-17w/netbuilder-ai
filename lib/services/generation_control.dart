@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'human_language.dart';
+
 /// The stop signal for ONE turn.
 ///
 /// [cancel] completes it, which is what the transports watch: an
@@ -146,8 +148,9 @@ class StreamDeadlines {
     return gap <= Duration.zero ? watched : watched.timeout(gap);
   }
 
-  static String _human(Duration d) =>
-      d.inMinutes >= 1 ? '${d.inMinutes} minute(s)' : '${d.inSeconds}s';
+  static String _human(Duration d) => d.inMinutes >= 1
+      ? HumanLanguage.count(d.inMinutes, 'minute')
+      : '${d.inSeconds}s';
 }
 
 /// Cancels a streaming answer without unwinding anything else.

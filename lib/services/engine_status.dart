@@ -551,5 +551,15 @@ class EngineStatus extends ChangeNotifier {
   static Future<Map<String, dynamic>> _defaultProbe(
     String base,
     Duration timeout,
-  ) => AutopilotService(base: base).healthDetails(timeout: timeout);
+  ) {
+    // A widget/unit test has no engine to ask. A real request would also leave
+    // its timeout timer pending in the fake-async test clock, which `flutter
+    // test` reports as a failure after the tree is disposed. Answer what the
+    // app answers when nothing is listening, without opening a socket. Tests
+    // that need a live or fake engine build their own [EngineStatus].
+    if (Platform.environment['FLUTTER_TEST'] == 'true') {
+      return Future.value(const <String, dynamic>{'ok': false});
+    }
+    return AutopilotService(base: base).healthDetails(timeout: timeout);
+  }
 }

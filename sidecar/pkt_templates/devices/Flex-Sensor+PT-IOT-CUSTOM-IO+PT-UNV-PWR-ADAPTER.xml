@@ -1,0 +1,634 @@
+<DEVICE>
+    <ENGINE>
+     <TYPE customModel="Flex Sensor" model="Flex Sensor">MCUComponent</TYPE>
+     <NAME translate="true">Device</NAME>
+     <POWER>true</POWER>
+     <DESCRIPTION></DESCRIPTION>
+     <MODULE>
+      <TYPE>eNonRemovableModule</TYPE>
+      <MODEL/>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+      <SLOT>
+       <TYPE>eNonRemovableModule</TYPE>
+       <MODULE>
+        <TYPE>eNonRemovableModule</TYPE>
+        <MODEL/>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeDigitalModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+         <MODULE>
+          <TYPE>ePtIoeCustomIOModule</TYPE>
+          <MODEL>PT-IOT-CUSTOM-IO</MODEL>
+         </MODULE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+        <SLOT>
+         <TYPE>ePtIoeAnalogModule</TYPE>
+        </SLOT>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+       <MODULE>
+        <TYPE>ePtIoeMcuComponentPowerAdapter</TYPE>
+        <MODEL>PT-UNV-PWR-ADAPTER</MODEL>
+       </MODULE>
+      </SLOT>
+      <SLOT>
+       <TYPE>ePtIoeNetworkModule</TYPE>
+      </SLOT>
+     </MODULE>
+     <CUSTOM_VARS>AAAAAwAAABAAUABUAF8ATQBPAEQARQBMAAAACgAAAAAWAEYAbABlAHgAIABTAGUAbgBzAG8AcgAAABQAUABUAF8AVgBFAFIAUwBJAE8ATgAAAAoAAAAACgAxAC4AMAAuADAAAAAKAGEAbgBnAGwAZQAAAAoAAAAAAgAw</CUSTOM_VARS>
+     <CUSTOM_INTERFACE></CUSTOM_INTERFACE>
+     <SYS_CONTACT></SYS_CONTACT>
+     <SYS_LOCATION></SYS_LOCATION>
+     <COORD_SETTINGS>
+      <X_COORD>1244.48</X_COORD>
+      <Y_COORD>1232</Y_COORD>
+      <Z_COORD>0</Z_COORD>
+     </COORD_SETTINGS>
+     <SERIALNUMBER>PTT0810TIO5</SERIALNUMBER>
+     <EXT_ATTRIBUTES>MTBF:26280;cost:5;power source:0;rack units:1;wattage:1;</EXT_ATTRIBUTES>
+     <USB_PORT_COUNT>0</USB_PORT_COUNT>
+     <TEMPLATE_CREATION_TIME>1491534431678</TEMPLATE_CREATION_TIME>
+     <IGNORE_TEMPLATE_CREATION_TIME>0</IGNORE_TEMPLATE_CREATION_TIME>
+     <STARTTIME>731021006917</STARTTIME>
+     <STARTSIMTIME>4894183</STARTSIMTIME>
+     <USER_APPS>
+      <RUNNING_APPS>
+       <USER_APP>Flex Sensor (JavaScript)</USER_APP>
+      </RUNNING_APPS>
+      <DESKTOP_APPS/>
+     </USER_APPS>
+     <SAVE_REF_ID>save-ref-id:0</SAVE_REF_ID>
+     <IGNORED_VERSION></IGNORED_VERSION>
+     <SYS_NAME></SYS_NAME>
+     <PTP_ENALBED>0</PTP_ENALBED>
+     <GATEWAY/>
+     <DNS_CLIENT>
+      <SERVER_IP/>
+      <SERVER_IPV6/>
+     </DNS_CLIENT>
+     <DHCP_CLIENT>
+      <PORT_DATA_MAP/>
+     </DHCP_CLIENT>
+     <WIRELESS_CLIENT>
+      <WIRELESS_COMMON>
+       <NETWORK_MODE>7</NETWORK_MODE>
+       <SSID>HomeGateway</SSID>
+       <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+       <AUTHEN_TYPE>0</AUTHEN_TYPE>
+       <RADIO_BAND>0</RADIO_BAND>
+       <WIDE_CHANNEL>0</WIDE_CHANNEL>
+       <STANDARD_CHANNEL>0</STANDARD_CHANNEL>
+       <STANDARD_CHANNEL5G>112</STANDARD_CHANNEL5G>
+      </WIRELESS_COMMON>
+      <PROFILES>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </PROFILES>
+      <CURRENT_PROFILE>
+       <WIRELESS_PROFILE>
+        <NAME>HomeGateway</NAME>
+        <SSID>HomeGateway</SSID>
+        <NETWORK_TYPE>7</NETWORK_TYPE>
+        <RADIO_BAND>0</RADIO_BAND>
+        <AUTHEN_TYPE>0</AUTHEN_TYPE>
+        <ENCRYPT_TYPE>0</ENCRYPT_TYPE>
+        <WEP_KEY></WEP_KEY>
+        <WPA_EAP_USERID></WPA_EAP_USERID>
+        <WPA_EAP_PASSWORD></WPA_EAP_PASSWORD>
+        <DHCP_ENABLED>1</DHCP_ENABLED>
+        <DHCPV6_ENABLED>1</DHCPV6_ENABLED>
+        <IP_ADDRESS/>
+        <SUBNET_MASK/>
+        <DEFAULT_GATEWAY/>
+        <DNS/>
+        <CHANNEL>1</CHANNEL>
+        <VLAN>1</VLAN>
+       </WIRELESS_PROFILE>
+      </CURRENT_PROFILE>
+     </WIRELESS_CLIENT>
+     <GATEWAYV6/>
+     <DHCPV6_MAIN>
+      <PARTIAL_DUID>77-4D-5E-0E-</PARTIAL_DUID>
+      <ENABLED_PORTS/>
+     </DHCPV6_MAIN>
+     <NDV6>
+      <ENABLED_HOST/>
+      <ENABLED_ROUTER>0</ENABLED_ROUTER>
+      <SERVER_ROUTER_PORT_DATA_HEAD/>
+     </NDV6>
+     <FILE_MANAGER>
+      <FILE class="CDirectory">
+       <FILE_NUMBER>0</FILE_NUMBER>
+       <NAME></NAME>
+       <DATE_TIME>0</DATE_TIME>
+       <PERMISSION>6</PERMISSION>
+       <FILE_CONTENT/>
+       <FILES>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>Dev:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>1</FILE_NUMBER>
+           <NAME>Flex Sensor (JavaScript)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>// Purpose:&#xd;
+// This object checks the click position in the object, converts it to an angle and bends the flexible component to that angle.&#xd;
+// It writes an analog value from 0 to 100, with 0 being no bend and 100 being full bend.  A 90 degree angle is considered a full bend.&#xd;
+&#xd;
+var pressedHere = false;&#xd;
+&#xd;
+function setup() {&#xd;
+	analogWrite(A0, 0);&#xd;
+	setComponentRotation("flexEnd", 0);&#xd;
+	setDeviceProperty(getName(), "angle", 0);&#xd;
+}&#xd;
+&#xd;
+// Purpose:&#xd;
+// Update function.  Put your controls in here.&#xd;
+function mouseEvent(pressed, x, y, firstPress) {&#xd;
+	&#xd;
+	if (firstPress)&#xd;
+		pressedHere = true;&#xd;
+		&#xd;
+	if (pressed &amp;&amp; pressedHere) {&#xd;
+		// Calculate the angle between the vectors, one vector made by the touch point and a static vector.&#xd;
+		// For these images 120, 120 is the join point of the two.&#xd;
+		var v1 = {x: 1, y: 0}, v2 = {x: x - 120, y: y - 120};&#xd;
+&#xd;
+		var angle = angleAs360(v1.x, v1.y, v2.x, v2.y);&#xd;
+		&#xd;
+		var bend = Math.abs(findAngle(v1.x, v1.y, v2.x, v2.y));&#xd;
+		var percent = bend / 90;&#xd;
+		if(percent > 1)&#xd;
+			percent = 1;&#xd;
+&#xd;
+		var result = percent * 100;&#xd;
+		analogWrite(A0, result);&#xd;
+		setComponentRotation("flexEnd", angle);&#xd;
+		setDeviceProperty(getName(), "angle", angle);&#xd;
+		&#xd;
+	} else {&#xd;
+		pressedHere = false;&#xd;
+		analogWrite(A0, 0);&#xd;
+		setComponentRotation("flexEnd", 0);&#xd;
+		setDeviceProperty(getName(), "angle", 0);&#xd;
+	}&#xd;
+	&#xd;
+	&#xd;
+}&#xd;
+&#xd;
+// Purpose:&#xd;
+// Takes two vectors and finds the angle between them.  Value is in degrees [-180, 180].&#xd;
+function findAngle(cx, cy, ex, ey)&#xd;
+{&#xd;
+	var dy = ey - cy;&#xd;
+	var dx = ex - cx;&#xd;
+	var theta = Math.atan2(dy, dx);&#xd;
+  	theta *= 180 / Math.PI;&#xd;
+  	return theta;	&#xd;
+}&#xd;
+&#xd;
+// Purpose:&#xd;
+// Takes two vectors and finds the angle between them.  Value is in degrees [0, 360].&#xd;
+function angleAs360(cx, cy, ex, ey) &#xd;
+{&#xd;
+	var theta = findAngle(cx, cy, ex, ey);&#xd;
+	if (theta &lt; 0) &#xd;
+		theta = 360 + theta;&#xd;
+	&#xd;
+	return theta;&#xd;
+}&#xd;
+&#xd;
+</TEXT>
+           </FILE_CONTENT>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>2</FILE_NUMBER>
+             <NAME>main.js</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>// Purpose:&#xd;
+// This object checks the click position in the object, converts it to an angle and bends the flexible component to that angle.&#xd;
+// It writes an analog value from 0 to 100, with 0 being no bend and 100 being full bend.  A 90 degree angle is considered a full bend.&#xd;
+&#xd;
+var pressedHere = false;&#xd;
+&#xd;
+function setup() {&#xd;
+	analogWrite(A0, 0);&#xd;
+	setComponentRotation("flexEnd", 0);&#xd;
+	setDeviceProperty(getName(), "angle", 0);&#xd;
+}&#xd;
+&#xd;
+// Purpose:&#xd;
+// Update function.  Put your controls in here.&#xd;
+function mouseEvent(pressed, x, y, firstPress) {&#xd;
+	&#xd;
+	if (firstPress)&#xd;
+		pressedHere = true;&#xd;
+		&#xd;
+	if (pressed &amp;&amp; pressedHere) {&#xd;
+		// Calculate the angle between the vectors, one vector made by the touch point and a static vector.&#xd;
+		// For these images 120, 120 is the join point of the two.&#xd;
+		var v1 = {x: 1, y: 0}, v2 = {x: x - 120, y: y - 120};&#xd;
+&#xd;
+		var angle = angleAs360(v1.x, v1.y, v2.x, v2.y);&#xd;
+		&#xd;
+		var bend = Math.abs(findAngle(v1.x, v1.y, v2.x, v2.y));&#xd;
+		var percent = bend / 90;&#xd;
+		if(percent > 1)&#xd;
+			percent = 1;&#xd;
+&#xd;
+		var result = percent * 100;&#xd;
+		analogWrite(A0, result);&#xd;
+		setComponentRotation("flexEnd", angle);&#xd;
+		setDeviceProperty(getName(), "angle", angle);&#xd;
+		&#xd;
+	} else {&#xd;
+		pressedHere = false;&#xd;
+		analogWrite(A0, 0);&#xd;
+		setComponentRotation("flexEnd", 0);&#xd;
+		setDeviceProperty(getName(), "angle", 0);&#xd;
+	}&#xd;
+	&#xd;
+	&#xd;
+}&#xd;
+&#xd;
+// Purpose:&#xd;
+// Takes two vectors and finds the angle between them.  Value is in degrees [-180, 180].&#xd;
+function findAngle(cx, cy, ex, ey)&#xd;
+{&#xd;
+	var dy = ey - cy;&#xd;
+	var dx = ex - cx;&#xd;
+	var theta = Math.atan2(dy, dx);&#xd;
+  	theta *= 180 / Math.PI;&#xd;
+  	return theta;	&#xd;
+}&#xd;
+&#xd;
+// Purpose:&#xd;
+// Takes two vectors and finds the angle between them.  Value is in degrees [0, 360].&#xd;
+function angleAs360(cx, cy, ex, ey) &#xd;
+{&#xd;
+	var theta = findAngle(cx, cy, ex, ey);&#xd;
+	if (theta &lt; 0) &#xd;
+		theta = 360 + theta;&#xd;
+	&#xd;
+	return theta;&#xd;
+}&#xd;
+&#xd;
+</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+          <FILE class="CDirectory">
+           <FILE_NUMBER>3</FILE_NUMBER>
+           <NAME>Flex Sensor (Python)</NAME>
+           <DATE_TIME>0</DATE_TIME>
+           <PERMISSION>6</PERMISSION>
+           <FILE_CONTENT class="CTextFileContent">
+            <TEXT>from environment import *
+from physical import *
+from gpio import *
+from time import *
+import math
+# Purpose:
+# This object checks the click position in the object, converts it to an angle and bends the flexible component to that angle.
+# It writes an analog value from 0 to 100, with 0 being no bend and 100 being full bend.  A 90 degree angle is considered a full bend.
+
+pressedHere = False
+
+def main():
+    analogWrite(A0, 0)
+    setComponentRotation("flexEnd", 0)
+    setDeviceProperty(getName(), "angle", 0)
+    while True:
+	    delay(1000)
+
+
+# Purpose:
+# Update function.  Put your controls in here.
+def mouseEvent(pressed, x, y, firstPress):
+    global pressedHere
+    if firstPress == True:
+        pressedHere = True
+
+    if pressed == True and pressedHere == True:
+        # Calculate the angle between the vectors, one vector made by the touch point and a static vector.
+        # For these images 120, 120 is the join point of the two.
+        v1x = 1
+        v1y = 0
+        v2x = x - 120
+        v2y = y - 120
+
+        angle = angleAs360(v1x, v1y, v2x, v2y)
+
+        newAngle = findAngle(v1x, v1y, v2x, v2y)
+        bend = abs(newAngle)
+        percent = float(bend) / 90
+        if percent > 1:
+            percent = 1
+
+        result = percent * 100
+        analogWrite(A0, result)
+        
+        setComponentRotation("flexEnd", angle)
+        setDeviceProperty(getName(), "angle", angle)
+
+    else:
+        pressedHere = False
+        analogWrite(A0, 0)
+        setComponentRotation("flexEnd", 0)
+        setDeviceProperty(getName(), "angle", 0)
+
+
+
+
+
+# Purpose:
+# Takes two vectors and finds the angle between them.  Value is in degrees [-180, 180].
+def findAngle(cx, cy, ex, ey):
+    
+    dy = ey - cy
+    dx = ex - cx
+    theta = math.atan2(dy, dx)
+    temp = float(180) / math.pi
+    theta = theta * temp
+    return theta
+
+# Purpose:
+# Takes two vectors and finds the angle between them.  Value is in degrees [0, 360].
+def angleAs360(cx, cy, ex, ey):
+    theta = findAngle(cx, cy, ex, ey)
+    if float(theta) &lt; 0:
+        theta = 360 + theta
+    return theta
+
+if __name__ == "__main__":
+    main()</TEXT>
+           </FILE_CONTENT>
+           <FILES>
+            <FILE class="CFile">
+             <FILE_NUMBER>4</FILE_NUMBER>
+             <NAME>main.py</NAME>
+             <DATE_TIME>0</DATE_TIME>
+             <PERMISSION>6</PERMISSION>
+             <FILE_CONTENT class="CTextFileContent">
+              <TEXT>from environment import *
+from physical import *
+from gpio import *
+from time import *
+import math
+# Purpose:
+# This object checks the click position in the object, converts it to an angle and bends the flexible component to that angle.
+# It writes an analog value from 0 to 100, with 0 being no bend and 100 being full bend.  A 90 degree angle is considered a full bend.
+
+pressedHere = False
+
+def main():
+    analogWrite(A0, 0)
+    setComponentRotation("flexEnd", 0)
+    setDeviceProperty(getName(), "angle", 0)
+    while True:
+	    delay(1000)
+
+
+# Purpose:
+# Update function.  Put your controls in here.
+def mouseEvent(pressed, x, y, firstPress):
+    global pressedHere
+    if firstPress == True:
+        pressedHere = True
+
+    if pressed == True and pressedHere == True:
+        # Calculate the angle between the vectors, one vector made by the touch point and a static vector.
+        # For these images 120, 120 is the join point of the two.
+        v1x = 1
+        v1y = 0
+        v2x = x - 120
+        v2y = y - 120
+
+        angle = angleAs360(v1x, v1y, v2x, v2y)
+
+        newAngle = findAngle(v1x, v1y, v2x, v2y)
+        bend = abs(newAngle)
+        percent = float(bend) / 90
+        if percent > 1:
+            percent = 1
+
+        result = percent * 100
+        analogWrite(A0, result)
+        
+        setComponentRotation("flexEnd", angle)
+        setDeviceProperty(getName(), "angle", angle)
+
+    else:
+        pressedHere = False
+        analogWrite(A0, 0)
+        setComponentRotation("flexEnd", 0)
+        setDeviceProperty(getName(), "angle", 0)
+
+
+
+
+
+# Purpose:
+# Takes two vectors and finds the angle between them.  Value is in degrees [-180, 180].
+def findAngle(cx, cy, ex, ey):
+    
+    dy = ey - cy
+    dx = ex - cx
+    theta = math.atan2(dy, dx)
+    temp = float(180) / math.pi
+    theta = theta * temp
+    return theta
+
+# Purpose:
+# Takes two vectors and finds the angle between them.  Value is in degrees [0, 360].
+def angleAs360(cx, cy, ex, ey):
+    theta = findAngle(cx, cy, ex, ey)
+    if float(theta) &lt; 0:
+        theta = 360 + theta
+    return theta
+
+if __name__ == "__main__":
+    main()</TEXT>
+             </FILE_CONTENT>
+            </FILE>
+           </FILES>
+          </FILE>
+         </FILES>
+         <FILE_COUNTER>4</FILE_COUNTER>
+         <CAPACITY>100000000</CAPACITY>
+        </FILE>
+        <FILE class="CFileSystem">
+         <FILE_NUMBER>0</FILE_NUMBER>
+         <NAME>User:</NAME>
+         <DATE_TIME>0</DATE_TIME>
+         <PERMISSION>6</PERMISSION>
+         <FILE_CONTENT/>
+         <FILES/>
+         <FILE_COUNTER>0</FILE_COUNTER>
+         <CAPACITY>10000000</CAPACITY>
+        </FILE>
+       </FILES>
+      </FILE>
+     </FILE_MANAGER>
+     <THING_MODEL>
+      <NAME></NAME>
+      <WIDTH>241.5</WIDTH>
+      <HEIGHT>245.5</HEIGHT>
+      <ANALOG_SLOTS_COUNT>4</ANALOG_SLOTS_COUNT>
+      <DIGITAL_SLOTS_COUNT>6</DIGITAL_SLOTS_COUNT>
+      <SPECIFICATIONS>&lt;html>&lt;head>&lt;/head>&lt;body style="word-wrap: break-word; -webkit-nbsp-mode: space; -webkit-line-break: after-white-space; ">&lt;font class="Apple-style-span" size="5">&lt;font class="Apple-style-span" size="5">&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="'Arial Black'" size="5">Flex Sensor&lt;/font>&lt;/div>&lt;/font>&lt;/font>&lt;font class="Apple-style-span" size="5">&lt;font class="Apple-style-span" size="5">&lt;div>&lt;div>&lt;div>&lt;div>&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">A sensor that detects the angle at which it was bent.&lt;/font>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial">&lt;br>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Features:&lt;/u>&lt;/font>&lt;/div>&lt;div style="font-size: medium; font-family: 'Times New Roman'; ">&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Output is in a range [0,100].&lt;/font>&lt;/li>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">0 === No bend&lt;/font>&lt;/li>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">100 === 90 degree or more bend&lt;/span>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Usage:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">Use&amp;nbsp;&lt;/font>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">ALT-Click to activate.&lt;/span>&lt;/li>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">While holding on to ALT, drag mouse up and down to bend the sensor.&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Direct Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;div style="font-size: medium; font-family: 'Times New Roman'; ">&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">ALT-Click and drag to bend&lt;/span>&lt;/li>&lt;/ul>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Local Control:&lt;/u>&lt;/font>&lt;/div>&lt;div>&lt;ul>&lt;li>&lt;font class="Apple-style-span" face="Arial" size="5">N/A&lt;/font>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial" size="5">&lt;u>Remote Control:&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;ul>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">N/A&lt;/span>&lt;/li>&lt;/ul>&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Data Specifications:&lt;/u>&lt;/span>&lt;/div>&lt;/div>&lt;div>&lt;ul style="font-family: 'Times New Roman'; font-size: medium; ">&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Output Slot: A0&lt;/span>&lt;/li>&lt;/ul>&lt;div style="font-family: 'Times New Roman'; font-size: medium; ">&lt;div>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">&lt;u>Example:&lt;/u>&lt;/span>&lt;/div>&lt;/div>&lt;div>&lt;ul style="font-family: 'Times New Roman'; font-size: medium; ">&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Connect Flex Sensor to an LED. Change the LED to use the sensor value and convert value to [0,256] in the light.&lt;/span>&lt;/li>&lt;li>&lt;span class="Apple-style-span" style="font-family: Arial; font-size: x-large; ">Alt-Click the sensor to bend it and watch the light get brighter the more the sensor is bent.&lt;/span>&lt;/li>&lt;/ul>&lt;/div>&lt;div>&lt;font class="Apple-style-span" face="Arial">&lt;u>&lt;br>&lt;/u>&lt;/font>&lt;/div>&lt;/div>&lt;/div>&lt;/font>&lt;/font>&lt;/body>&lt;/html></SPECIFICATIONS>
+      <ROTATION>0</ROTATION>
+      <SCALE>1</SCALE>
+      <PROXY_WIDTH>500</PROXY_WIDTH>
+      <PROXY_HEIGHT>500</PROXY_HEIGHT>
+      <IS_END_DEVICE>FALSE</IS_END_DEVICE>
+      <IS_DESKTOP_AVAILABLE>FALSE</IS_DESKTOP_AVAILABLE>
+      <IS_WORKSPACE_USERAPP>FALSE</IS_WORKSPACE_USERAPP>
+      <IS_TRANSPARENT_BACKGROUND>FALSE</IS_TRANSPARENT_BACKGROUND>
+      <WORKSPACE_OFFSET_X>0</WORKSPACE_OFFSET_X>
+      <WORKSPACE_OFFSET_Y>0</WORKSPACE_OFFSET_Y>
+      <WORKSPACE_Z_LEVEL>10000</WORKSPACE_Z_LEVEL>
+      <WORKSPACE_USERAPP_SHOW_IN_LOGICAL_VIEW>TRUE</WORKSPACE_USERAPP_SHOW_IN_LOGICAL_VIEW>
+      <WORKSPACE_USERAPP_SHOW_IN_PHYSICAL_VIEW>TRUE</WORKSPACE_USERAPP_SHOW_IN_PHYSICAL_VIEW>
+      <SUBCOMPONENTS>
+       <SUBCOMPONENT>
+        <NAME>flexStart</NAME>
+        <X>0</X>
+        <Y>0</Y>
+        <Z_ORDER>1</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>0</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>-1</SLOT_NUM>
+        <SLOT_TYPE>0</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/Components/flex_start1.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+       <SUBCOMPONENT>
+        <NAME>flexEnd</NAME>
+        <X>0</X>
+        <Y>4</Y>
+        <Z_ORDER>2</Z_ORDER>
+        <CURRENT_IMAGE_INDEX>0</CURRENT_IMAGE_INDEX>
+        <SLOT_NUM>-1</SLOT_NUM>
+        <SLOT_TYPE>0</SLOT_TYPE>
+        <OPACITY>1</OPACITY>
+        <FILL_COLOR>#000000</FILL_COLOR>
+        <ROTATION>0</ROTATION>
+        <IMAGES>
+         <IMAGE><![CDATA[../art/IoE/Components/flex_end1.png]]></IMAGE>
+        </IMAGES>
+       </SUBCOMPONENT>
+      </SUBCOMPONENTS>
+      <RULES/>
+     </THING_MODEL>
+     <IOE_CLIENT>
+      <CLIENT_MODE>NO_SERVER</CLIENT_MODE>
+      <SERVER_ADDRESS></SERVER_ADDRESS>
+      <USERNAME></USERNAME>
+      <PASSWORD></PASSWORD>
+     </IOE_CLIENT>
+     <EMAIL_CLIENT>
+      <ENABLED>0</ENABLED>
+      <NAME></NAME>
+      <MAIL_ID></MAIL_ID>
+      <POP3_SERVER></POP3_SERVER>
+      <SMTP_SERVER></SMTP_SERVER>
+      <USER></USER>
+      <PASSWORD></PASSWORD>
+      <NO_OF_MAILS>0</NO_OF_MAILS>
+     </EMAIL_CLIENT>
+     <NTP_SERVER>
+      <ENABLED>0</ENABLED>
+      <ENABLED_SERVER_AUTHENTICATE>0</ENABLED_SERVER_AUTHENTICATE>
+      <KEY>0</KEY>
+      <MD5PASSWORD></MD5PASSWORD>
+      <SERVER_IP_LIST/>
+     </NTP_SERVER>
+     <PTP_PROCESS>
+      <PTP_CLOCK_ID>0xff:FF:FF:FF:FE:FF:FF:F0</PTP_CLOCK_ID>
+      <PTP_CLOCK_TIME>1301536286920</PTP_CLOCK_TIME>
+     </PTP_PROCESS>
+    </ENGINE>
+    <WORKSPACE>
+     <LOGICAL>
+      <X>0</X>
+      <Y>0</Y>
+      <DEVCLUSTERID>1-1</DEVCLUSTERID>
+      <CUSTOM_IMAGE_LOGICAL></CUSTOM_IMAGE_LOGICAL>
+      <CUSTOM_IMAGE_PHYSICAL></CUSTOM_IMAGE_PHYSICAL>
+      <MEM_ADDR>0</MEM_ADDR>
+      <DEV_ADDR>0</DEV_ADDR>
+     </LOGICAL>
+     <PHYSICAL>{d6dbaf92-2466-400e-92a4-fcb5bb5fe3b1},{f01e07a4-d79f-4bb0-b2ce-994eb8fb5d05},{98d41f5f-2f24-44f3-973c-18aea7d83db3},{508ff8fd-328c-45fa-9a81-fb9343dd37b1}</PHYSICAL>
+     <PHYSICAL_CPUR>
+      <X_PN>0.215</X_PN>
+      <Y_PN>0.1075</Y_PN>
+      <X>430</X>
+      <Y>215</Y>
+      <SLOT>0</SLOT>
+      <SUBSLOT>0</SUBSLOT>
+      <PARENT_PATH>{d6dbaf92-2466-400e-92a4-fcb5bb5fe3b1},{f01e07a4-d79f-4bb0-b2ce-994eb8fb5d05},{98d41f5f-2f24-44f3-973c-18aea7d83db3}</PARENT_PATH>
+      <CONTAINER_ID>{98d41f5f-2f24-44f3-973c-18aea7d83db3}</CONTAINER_ID>
+      <ICP_CONTAINER_SCENE_X>0</ICP_CONTAINER_SCENE_X>
+      <ICP_CONTAINER_SCENE_Y>0</ICP_CONTAINER_SCENE_Y>
+      <ORIGINAL_DEVICE_UUID>{81eb765f-e40e-bcc3-490f-a97c1f087795}</ORIGINAL_DEVICE_UUID>
+     </PHYSICAL_CPUR>
+    </WORKSPACE>
+   </DEVICE>

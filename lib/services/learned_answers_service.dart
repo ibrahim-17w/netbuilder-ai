@@ -357,6 +357,11 @@ class LearnedAnswers {
     'made',
   };
 
+  /// The stopword set, public for sibling matchers ([ConceptKnowledge]
+  /// scores query overlap with the same content-token definition, so the
+  /// two tiers never disagree about what a word weighs).
+  static const Set<String> stopwords = _stopwords;
+
   static Set<String> _contentTokens(String text) {
     final out = <String>{};
     for (final w in text.toLowerCase().split(RegExp(r'[^a-z0-9#/]+'))) {

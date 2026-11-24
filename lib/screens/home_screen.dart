@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../models/build_record.dart';
 import '../models/network_intent.dart';
+import '../services/human_language.dart';
 import '../services/memory_service.dart';
 import '../services/plan_version_diff.dart';
 import '../services/plan_version_service.dart';
@@ -294,7 +295,8 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.refresh),
             ),
           ],
-          count: '${visible.length} of ${_items.length} network(s)',
+          count:
+              '${visible.length} of ${HumanLanguage.count(_items.length, 'network')}',
         ),
         Expanded(
           child: AppPage(
@@ -802,9 +804,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final now = DateTime.now();
     final diff = now.difference(when);
     if (diff.inMinutes < 1) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} minute(s) ago';
-    if (diff.inHours < 24) return '${diff.inHours} hour(s) ago';
-    if (diff.inDays < 7) return '${diff.inDays} day(s) ago';
+    if (diff.inMinutes < 60) {
+      return '${HumanLanguage.count(diff.inMinutes, 'minute')} ago';
+    }
+    if (diff.inHours < 24) {
+      return '${HumanLanguage.count(diff.inHours, 'hour')} ago';
+    }
+    if (diff.inDays < 7) {
+      return '${HumanLanguage.count(diff.inDays, 'day')} ago';
+    }
     return _whenFull(when).split(' ').first;
   }
 

@@ -25,12 +25,33 @@ on-device. Remote engine control from a phone is experimental and unsupported.
 | Dart | ^3.12 (from `pubspec.yaml`) |
 | Python | 3.12 for the engine |
 | JDK | 17 for Android builds |
-| Packet Tracer | Desktop 8.x with a visible window for autopilot |
+| Packet Tracer | Windows desktop installation with a visible window for autopilot; exact version recorded by native verification |
 | GNS3 | Current 2.x server with its API reachable |
 
-The exact Packet Tracer build varies by installation. The autopilot verifies
-each action against the screen and reports anything it cannot prove, so an
-unexpected build is a reported failure rather than a guessed success.
+The exact Packet Tracer build varies by installation. Bundled device templates
+and save-format/version metadata are not a compatibility promise. There is **no
+cross-version guarantee**: a native result applies only to the recorded Packet
+Tracer version, exact saved bytes and build action. Offline decoder/fixture tests
+do not establish that a generated file opens in Packet Tracer or works there.
+The autopilot reports actions it cannot prove rather than guessing success.
+
+### Packet Tracer evidence stages
+
+- **Generated** records creation of the file, not target acceptance.
+- **File read-back checked** records a bound read of the saved bytes, not a
+  native Packet Tracer open or live network result. Request-delivery comparisons
+  remain separate and can still report missing or mismatched fields.
+- **Opened in Packet Tracer** requires native evidence for the current file and
+  action, including matching loaded-file/topology evidence and the exact version.
+- **Connectivity tested** is independent of opening the file. Only actual
+  completed native probes with evidence count as passes; skipped/manual checks
+  leave coverage partial, and no tests means NOT CHECKED.
+
+A running report is not complete even if it contains tests. Reports are tied to
+an explicit run ID; missing file/action binding, stale bytes, stop, timeout, or
+missing native proof must not become a pass. Legacy history without evidence
+starts at NOT CHECKED. DHCP, HTTP, wireless association, routing/security
+semantics and isolation stay manual/unverified unless separately evidenced.
 
 ## Providers and targets
 
@@ -44,6 +65,33 @@ unexpected build is a reported failure rather than a guessed success.
 | Packet Tracer autopilot | Windows desktop only |
 | Cisco over SSH | Yes, target-dependent |
 | AWS VPC / Terraform export | Yes, export only; credentials stay local |
+
+## Request and evidence limits
+
+- English, Arabic-Indic digits and a controlled set of Arabic/Syrian and mixed
+  networking phrases are supported offline. Exact names, interfaces, addresses
+  and quoted SSIDs remain literals; this is not a general translation service.
+- A valid plan is not sufficient to claim that every explicit request is met.
+  Exact counts/models, exclusions, scope and preserve constraints are checked
+  separately; a declined alternative does not erase the original constraint.
+- Arbitrary guest/staff isolation is unresolved without a faithful typed policy
+  and evidence. Generic ACL/VLAN flags and probe timeouts do not prove isolation.
+- Saved-artifact evidence covers fields actually observed by the decoder. Missing
+  or ambiguous interface names, IPv6-only evidence, unobserved routing/security
+  fields and automatic layout-style claims remain unverified. Offline file checks
+  never establish live DHCP, adjacency, reachability or isolation.
+- GNS3 hardware remapping does not satisfy an exact Packet Tracer model request;
+  server Services-tab settings are not treated as a faithful GNS3 export.
+  IOS configuration export does not provision or prove a hardware model.
+- Optional model interpretation supports a closed subset of operations and is
+  locally validated. Provider schema refusal, timeout, cancellation and malformed
+  proposals retain the local interpretation. JSON-only endpoints receive the
+  same local validation; no provider API migration or account setup is required.
+- The OCR backend returns text without reliable confidence/coverage metadata.
+  Critical values therefore require user confirmation before an image changes
+  a project. Imported facts and uncertain readings keep their own provenance.
+- Legacy projects without stored request provenance can be edited and inspected,
+  but their history does not gain a retroactive full-delivery verification claim.
 
 ## Security boundary
 

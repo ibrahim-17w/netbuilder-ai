@@ -11,6 +11,7 @@ import '../services/adapters/packet_tracer_adapter.dart';
 import '../services/adapters/terraform_adapter.dart';
 import '../services/address_table.dart';
 import '../services/diagnostics_service.dart';
+import '../services/human_language.dart';
 import '../services/ipv6_tools.dart';
 import '../services/network_math.dart';
 import '../services/network_tools.dart';
@@ -405,7 +406,8 @@ class _ProbeLog extends StatelessWidget {
     return AppPanel(
       icon: Icons.checklist_rtl,
       title: 'Results',
-      subtitle: '${entries.length} probe(s) · newest first',
+      subtitle:
+          '${HumanLanguage.count(entries.length, 'probe')} · newest first',
       actions: [
         TextButton.icon(
           onPressed: () =>
@@ -747,12 +749,12 @@ class _Ipv6ToolState extends State<_Ipv6Tool> {
             title: 'Address facts',
             children: [
               AppKeyValue(label: 'Canonical (RFC 5952)', value: canonical),
-              AppKeyValue(label: 'Fully expanded', value: Ipv6Tools.expand(address)!),
-              AppKeyValue(label: 'Type', value: kind!),
               AppKeyValue(
-                label: 'Solicited-node multicast',
-                value: solicited!,
+                label: 'Fully expanded',
+                value: Ipv6Tools.expand(address)!,
               ),
+              AppKeyValue(label: 'Type', value: kind!),
+              AppKeyValue(label: 'Solicited-node multicast', value: solicited!),
             ],
           ),
           AppPanel(
@@ -779,7 +781,10 @@ class _Ipv6ToolState extends State<_Ipv6Tool> {
               else ...[
                 AppKeyValue(label: 'Network', value: prefixInfo['network']!),
                 AppKeyValue(label: 'Prefix', value: prefixInfo['prefix']!),
-                AppKeyValue(label: 'Host bits', value: prefixInfo['host bits']!),
+                AppKeyValue(
+                  label: 'Host bits',
+                  value: prefixInfo['host bits']!,
+                ),
                 AppKeyValue(
                   label: 'Total addresses',
                   value: prefixInfo['total addresses']!,
@@ -820,10 +825,7 @@ class _Ipv6ToolState extends State<_Ipv6Tool> {
                   ),
                 )
               else if (hasMac) ...[
-                AppKeyValue(
-                  label: 'Link-local (fe80::/64)',
-                  value: linkLocal!,
-                ),
+                AppKeyValue(label: 'Link-local (fe80::/64)', value: linkLocal!),
                 AppKeyValue(
                   label: 'Solicited-node of the link-local',
                   value: Ipv6Tools.solicitedNode(linkLocal)!,
@@ -1017,7 +1019,7 @@ class _VlsmToolState extends State<_VlsmTool> {
                 ? 'All ${used.length} sites fit in ${baseFacts['network']}/${baseFacts['prefix']}.\n'
                       'Unallocated space left: ${1 << (32 - (baseFacts['prefix'] as int))} - '
                       '${used.fold<int>(0, (sum, a) => sum + (1 << (32 - a.prefix)))} addresses.'
-                : '${_plan.length - used.length} site(s) do not fit. '
+                : '${HumanLanguage.count(_plan.length - used.length, 'site')} do not fit. '
                       'Use a bigger block, or split a requirement.',
             error: used.length != _plan.length,
           ),
@@ -1025,7 +1027,8 @@ class _VlsmToolState extends State<_VlsmTool> {
             Padding(
               padding: const EdgeInsets.only(top: AppTheme.s12),
               child: Text(
-                '$wasted address(es) of ${baseFacts['totalAddresses']} stay '
+                '${HumanLanguage.count(wasted, 'address')} of '
+                '${baseFacts['totalAddresses']} stay '
                 'unused with this allocation order.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
@@ -1126,7 +1129,7 @@ class _SummarizeToolState extends State<_SummarizeTool> {
         _Result(
           title: range.isEmpty
               ? 'CIDRs'
-              : '${range.length} prefix(es) cover the range',
+              : '${HumanLanguage.count(range.length, 'prefix')} cover the range',
           body: range.join('\n'),
           error: range.isEmpty,
         ),
@@ -1182,7 +1185,7 @@ class _PortBudgetPanel extends StatelessWidget {
           AppKeyValue(
             label:
                 '${r['name']} (${r['model']}${r['known'] == true ? '' : ', '
-                    'unknown model'})',
+                          'unknown model'})',
             value: "${r['used']} of ${r['total']} ports used",
           ),
       ],
@@ -1190,7 +1193,8 @@ class _PortBudgetPanel extends StatelessWidget {
   }
 }
 
-class _AddressingTool extends StatefulWidget {  final NetworkIntent? intent;
+class _AddressingTool extends StatefulWidget {
+  final NetworkIntent? intent;
   final FutureOr<void> Function(NetworkIntent)? onSavePlan;
 
   const _AddressingTool({this.intent, this.onSavePlan});
@@ -1308,10 +1312,10 @@ class _AddressingToolState extends State<_AddressingTool> {
           _Result(
             title: issues.isEmpty
                 ? 'Validator: clean'
-                : 'Validator: ${issues.length} finding(s)',
+                : 'Validator: ${HumanLanguage.count(issues.length, 'finding')}',
             body: [
               for (final issue in issues)
-                '[${issue.severity}] ${issue.message}',
+                HumanLanguage.finding(issue.severity, issue.message),
             ].join('\n'),
             error: issues.any((i) => i.severity == 'error'),
           ),
@@ -1330,7 +1334,7 @@ class _AddressingToolState extends State<_AddressingTool> {
         _Result(
           title: manualOverlaps.isEmpty
               ? 'No overlaps in this list'
-              : '${manualOverlaps.length} overlap(s) found',
+              : '${HumanLanguage.count(manualOverlaps.length, 'overlap')} found',
           body: manualOverlaps.isEmpty
               ? ''
               : [
@@ -2006,7 +2010,7 @@ class _AddressTablePanelState extends State<_AddressTablePanel> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              '${rows.length} row(s) copied as CSV - paste '
+                              '${HumanLanguage.count(rows.length, 'row')} copied as CSV - paste '
                               'into any spreadsheet.',
                             ),
                           ),

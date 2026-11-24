@@ -1,5 +1,7 @@
 import '../../models/network_intent.dart';
+import '../../models/request_requirement.dart';
 import 'lexicon.dart';
+import 'requirement_scope_reader.dart';
 import '../domain_vocabulary.dart';
 
 /// One extracted slot: what was found and where it was said.
@@ -58,6 +60,13 @@ class ExtractedQuantity {
   final bool maximum;
   final String? role;
 
+  /// An explicit project inventory total, as opposed to its site breakdown.
+  final bool total;
+
+  /// A site's share of project inventory or a server's role allocation.
+  final bool allocation;
+  final RequirementScope? scope;
+
   /// True when the number describes how many existing devices a connection
   /// uses ("connect 5 PCs to Switch 1"), not how many to create.
   final bool distribution;
@@ -73,6 +82,9 @@ class ExtractedQuantity {
     this.minimum = false,
     this.maximum = false,
     this.role,
+    this.total = false,
+    this.allocation = false,
+    this.scope,
     this.distribution = false,
   });
 }
@@ -154,6 +166,7 @@ class BriefSlotPipeline {
   ) {
     final lower = normalizedText.toLowerCase();
     final clauses = _clauses(lower);
+    final scopeReader = RequirementScopeReader(normalizedText);
     return [
       for (final quantity in _quantityRecords(lower))
         if (quantity.end > quantity.at)
@@ -185,6 +198,22 @@ class BriefSlotPipeline {
                 r'(?:at\s+most|no\s+more\s+than|not\s+more\s+than|up\s+to|under|below|fewer\s+than|less\s+than|maximum\s+of)\s*$',
               ).hasMatch(clause.text.substring(0, quantity.at - clause.start)),
               role: quantity.role,
+              total: quantity.total,
+              allocation:
+                  quantity.site != null ||
+                  (quantity.kind == 'server' &&
+                      (quantity.role ?? '').isNotEmpty),
+              scope: quantity.site != null
+                  ? RequirementScope(
+                      kind: RequirementScopeKind.site,
+                      scopeId: quantity.site!,
+                      siteId: quantity.site!,
+                    )
+                  : scopeReader.scopeAt(
+                      quantity.at,
+                      end: quantity.end,
+                      includeService: false,
+                    ),
               distribution: quantity.distribution,
             ),
     ];
@@ -210,6 +239,19 @@ class BriefSlotPipeline {
   static final _switchLabel = RegExp(r'\bSW(\d+)\b');
   static final _pcLabel = RegExp(r'\bPC(\d+)\b');
   static final _serverLabel = RegExp(r'\bSRV(\d+)\b');
+
+  /// Router-owned DHCP is not a request to provision a Server-PT.
+  static bool routerDhcpRequested(String text) => RegExp(
+    r'\b(?:router\s+dhcp|dhcp\s+(?:server\s+)?(?:on|from|by)\s+(?:the\s+)?(?:router|r\d+)\b|'
+    r'(?:router|r\d+)\s+(?:provides?|serves?|runs?|hosts?)\s+dhcp|'
+    r'(?:router|r\d+)\s+(?:as\s+(?:a\s+)?|for\s+)dhcp)',
+    caseSensitive: false,
+  ).hasMatch(text);
+
+  static bool _serversExcluded(String text) => RegExp(
+    r'\b(?:no|without|zero|0)\s+servers?\b|\bdo\s+not\s+(?:add|include|create|use)\s+servers?\b',
+    caseSensitive: false,
+  ).hasMatch(text);
 
   /// Device counts - the offline parser's own rules, in the parser's own
   /// order, so the app has ONE implementation of "what did this brief ask
@@ -255,6 +297,7 @@ class BriefSlotPipeline {
       pcCount = 1;
     }
     var serverCount = _quantityTotal(records, 'server') ?? 0;
+    serverCount = _additiveRoleServer(records, lower, serverCount);
     if (serverCount == 0 &&
         _mentionedBeyondHowMany(lower, const [
           'server',
@@ -266,12 +309,21 @@ class BriefSlotPipeline {
     // An AAA/TACACS+/RADIUS ask with no server named still means an AAA
     // server exists to configure - without it the role had no owner.
     if (serverCount == 0 &&
+        !_serversExcluded(lower) &&
         (lower.contains('aaa') || _tacacsOrRadius.hasMatch(lower))) {
       serverCount = 1;
     }
-    // Any service role named with no server count still provisions one -
-    // "1 router with dns and http" must not silently drop the services.
-    if (serverCount == 0 && _roleWords.keys.any(lower.contains)) {
+    // A role with an explicit router owner is not server inventory. Other
+    // named roles still provision a server unless the brief excludes servers.
+    // Start-anchored (no trailing boundary) so everyday compounds like
+    // "website" still carry their role word ("web") into this check.
+    if (serverCount == 0 &&
+        !_serversExcluded(lower) &&
+        _roleWords.keys.any(
+          (word) =>
+              !(word == 'dhcp' && routerDhcpRequested(lower)) &&
+              RegExp('\\b${RegExp.escape(word)}').hasMatch(lower),
+        )) {
       serverCount = 1;
     }
     counts['router'] = routerCount;
@@ -304,6 +356,9 @@ class BriefSlotPipeline {
         : NetworkIntent.perSiteCounts(normText);
     if (perSite != null) {
       int perSiteTotal(String type) {
+        if (records.any((r) => r.kind == type && r.site == null && r.total)) {
+          return counts[type] ?? 0;
+        }
         final per = perSite[type] ?? 0;
         if (per <= 0) return counts[type] ?? 0;
         final total = per * sites!;
@@ -340,6 +395,9 @@ class BriefSlotPipeline {
 
     // explicit labels are authoritative when the user names devices
     void raiseByLabel(String type, RegExp pattern) {
+      if (records.any((r) => r.kind == type && r.site == null && r.total)) {
+        return;
+      }
       final highest = pattern
           .allMatches(normText)
           .map((m) => int.tryParse(m.group(1) ?? '') ?? 0)
@@ -355,8 +413,24 @@ class BriefSlotPipeline {
     // Servers the brief names one by one ("DHCP1, DNS1, WEB1, AAA1, FTP1
     // and MAIL1") are the authoritative count as well as the names.
     final namedServers = NetworkIntent.namedServerLabels(normText);
-    if (namedServers.length > (counts['server'] ?? 0)) {
+    if (!records.any((r) => r.kind == 'server' && r.site == null && r.total) &&
+        namedServers.length > (counts['server'] ?? 0)) {
       counts['server'] = namedServers.length;
+    }
+
+    // A brief of only servers describes a lab, not a row of floating boxes:
+    // a Server-PT has one Ethernet port and nothing to plug into. Give it the
+    // switch a person would draw, and - when the brief asks for AAA - the
+    // router those logins are applied to. A correction fragment opts out: it
+    // adjusts a standing lab that already has its own gear.
+    if (tinyOfficeDefault &&
+        (counts['server'] ?? 0) > 0 &&
+        (counts['router'] ?? 0) == 0 &&
+        (counts['switch'] ?? 0) == 0) {
+      counts['switch'] = 1;
+      if (lower.contains('aaa') || _tacacsOrRadius.hasMatch(lower)) {
+        counts['router'] = 1;
+      }
     }
 
     // all-empty default: a tiny office. Only the four kinds count here,
@@ -489,29 +563,15 @@ class BriefSlotPipeline {
       final counts = <String, int>{};
       for (final kind in deviceKinds.map((item) => item.type)) {
         final own = records
-            .where((record) =>
-                !record.distribution &&
-                record.site == site &&
-                record.kind == kind)
+            .where(
+              (record) =>
+                  !record.distribution &&
+                  record.site == site &&
+                  record.kind == kind,
+            )
             .toList();
         if (own.isEmpty) continue;
-        var total = 0;
-        final roles = <String>{};
-        for (final record in own) {
-          final role = record.role ?? '';
-          if (record.correction) {
-            total = record.value;
-            roles.clear();
-            if (role.isNotEmpty) roles.add(role);
-            continue;
-          }
-          final distinctRole =
-              role.isNotEmpty && roles.isNotEmpty && !roles.contains(role);
-          total = record.add || distinctRole
-              ? total + record.value
-              : (record.value > total ? record.value : total);
-          if (role.isNotEmpty) roles.add(role);
-        }
+        final total = _inventoryTotal(own);
         if (total > 0) counts[kind] = total;
       }
       if (counts.isNotEmpty) result[site] = counts;
@@ -522,7 +582,7 @@ class BriefSlotPipeline {
   // --- quantities across clauses ------------------------------------------
 
   static final _routerQty = RegExp(
-    r'\b(\d{1,3})\s*(?:(?:more|extra|additional|further)\s+)?'
+    r'\b(\d{1,3}|a|an)\s*(?:(?:more|extra|additional|further)\s+)?'
     r'((?:(?:core|edge|distribution|backbone|wan|hq|branch|main|central)\s+)*)'
     r'routers?\b',
   );
@@ -534,8 +594,8 @@ class BriefSlotPipeline {
   );
 
   static final _pcQty = RegExp(
-    r'(\d+)\s*(?:(?:more|extra|additional|further)\s+)?'
-    r'(?:pcs?|computers?|workstations?)',
+    r'(?<![\d./])\b(\d+)\s*(?:(?:more|extra|additional|further)\s+)?'
+    r'(?:pcs?|computers?|workstations?)\b',
   );
 
   static final _serverQty = RegExp(
@@ -583,16 +643,23 @@ class BriefSlotPipeline {
 
   static List<_Qty> _quantityRecords(String lower) {
     final clauses = _clauses(lower);
-    final anchors = _siteAnchors(lower);
+    final scopeReader = RequirementScopeReader(lower);
     final records = <_Qty>[];
 
     void scan(String type, RegExp pattern) {
       for (final m in pattern.allMatches(lower)) {
         final at = m.start;
+        // "domain controller" is a software role, not Packet Tracer's generic
+        // controller device: counting one invented a CTRL1 nobody asked for.
+        if (_softwareControllerAt(lower, at)) continue;
         // "VLAN 20 servers" names the VLAN - the 20 is an ID, not a count.
         // Reading it inflated every later lab: "4 switches with VLAN 20
         // servers" built twenty servers where the brief named none.
-        if (RegExp(r'vlan\s*$').hasMatch(lower.substring(0, at))) continue;
+        if (RegExp(
+          r'\bvlans?\s+(?:\d+\s*(?:,|and|&)?\s*)*$',
+        ).hasMatch(lower.substring(0, at))) {
+          continue;
+        }
         final clause = _clauseOf(clauses, at);
         final local = at - clause.start;
         // "not 6 access points" states a number to REJECT, not a count.
@@ -606,7 +673,11 @@ class BriefSlotPipeline {
             value: (int.tryParse(m.group(1)!) ?? 1) + (moreThan ? 1 : 0),
             at: at,
             end: m.end,
-            site: _siteAt(lower, anchors, at, end: m.end),
+            site: scopeReader.siteAt(at, end: m.end),
+            total: _explicitTotalAt(lower, scopeReader, at, m.end),
+            add: RegExp(
+              r'\b(?:more|extra|additional|further)\b',
+            ).hasMatch(m.group(0)!),
             correction: _correctionBefore(clause.text, local),
             role: m.groupCount > 1 ? m.group(2)?.trim() : null,
             distribution: _distributionAt(
@@ -642,6 +713,17 @@ class BriefSlotPipeline {
           }
       }
     }
+    // The longest technical compound owns a quantity. Otherwise "2 analog
+    // phones" becomes both 2 phones and 2 analog phones, and the fallback
+    // "2 wireless" below can shadow "2 wireless controllers".
+    final shadowed = records
+        .where(
+          (short) => records.any(
+            (long) => long.at == short.at && long.end > short.end,
+          ),
+        )
+        .toSet();
+    records.removeWhere(shadowed.contains);
     final each = RegExp(r'\beach\b').firstMatch(lower);
     if (each != null) {
       final explicit = RegExp(
@@ -659,28 +741,8 @@ class BriefSlotPipeline {
       if (repetitions > 1 && repetitions <= 25) {
         final stop = lower.indexOf(RegExp(r'[.;\n]'), each.end);
         final end = stop < 0 ? lower.length : stop;
-        // A trailing site qualifier ("plus one server at HQ") belongs to
-        // that site, rather than to the preceding "each branch" list.
-        for (var i = 0; i < records.length; i++) {
-          final r = records[i];
-          if (r.at < each.end || r.at >= end) continue;
-          final clause = _clauseOf(clauses, r.at);
-          final trailing = anchors.where(
-            (a) => a.at > r.at && a.at <= clause.start + clause.text.length,
-          );
-          if (trailing.isNotEmpty) {
-            records[i] = _Qty(
-              kind: r.kind,
-              value: r.value,
-              at: r.at,
-              end: r.end,
-              site: trailing.first.label,
-              correction: r.correction,
-              add: r.add,
-              role: r.role,
-            );
-          }
-        }
+        // A trailing site qualifier is already owned by the shared reader;
+        // only quantities in the repeated site's list are expanded.
         final candidates = records
             .where((r) => r.at >= each.end && r.at < end)
             .toList();
@@ -697,7 +759,10 @@ class BriefSlotPipeline {
                 end: r.end,
                 site: '${r.site ?? 'site'}#${i + 1}',
                 correction: r.correction,
+                add: r.add,
                 role: r.role,
+                distribution: r.distribution,
+                total: r.total,
               ),
             );
           }
@@ -833,6 +898,9 @@ class BriefSlotPipeline {
         final pattern = _everydayPattern(word);
         for (final m in pattern.allMatches(lower)) {
           final at = m.start;
+          if (records.any((record) => record.at == at && record.end >= m.end)) {
+            continue;
+          }
           final clause = _clauseOf(clauses, at);
           final local = at - clause.start;
           if (_negationBefore(clause.text, local)) continue;
@@ -844,7 +912,7 @@ class BriefSlotPipeline {
             value: int.parse(m.group(1)!) + (moreThan ? 1 : 0),
             at: at,
             end: m.end,
-            site: _siteAt(lower, _siteAnchors(lower), at),
+            site: RequirementScopeReader(lower).siteAt(at, end: m.end),
             correction: _correctionBefore(clause.text, local),
           ));
         }
@@ -880,6 +948,9 @@ class BriefSlotPipeline {
           at: c.at,
           end: c.end,
           site: c.site,
+          userLoad: RegExp(
+            r'\b(?:users?|people|employees?|staff|headcount|students?)\b',
+          ).hasMatch(lower.substring(c.at, c.end)),
           correction: c.correction,
         ),
       );
@@ -901,99 +972,142 @@ class BriefSlotPipeline {
   ///   sites distribute it exactly ("6 access points: 3 upstairs and 3
   ///   downstairs" is still 6);
   /// * an unlabeled repeat is a restatement and adds nothing.
+  static bool _explicitTotalAt(
+    String lower,
+    RequirementScopeReader reader,
+    int start,
+    int end,
+  ) {
+    final context = reader.contextAt(start, end: end);
+    if (context.siteId != null) return false;
+    if (context.globalTotal) return true;
+    final prefix = lower.substring(start > 60 ? start - 60 : 0, start);
+    final suffix = lower.substring(
+      end,
+      end + 30 < lower.length ? end + 30 : lower.length,
+    );
+    return RegExp(
+          r'\b(?:total(?:\s+of)?|overall|global(?:\s+total)?)\s*[:=]?\s*$',
+        ).hasMatch(prefix) ||
+        RegExp(r'^\s*(?:in\s+total|total|overall)\b').hasMatch(suffix);
+  }
+
+  /// Merge one site's inventory independently of its role allocations. If a
+  /// generic inventory count exists, the role list describes those devices,
+  /// not additional devices, even when its sum disagrees with the inventory.
+  static int _inventoryTotal(List<_Qty> own) {
+    final inventory = own.where((r) => (r.role ?? '').isEmpty).toList();
+    if (inventory.isNotEmpty) {
+      var total = inventory.first.value;
+      for (final r in inventory.skip(1)) {
+        total = r.correction
+            ? r.value
+            : r.add
+            ? total + r.value
+            : (r.value > total ? r.value : total);
+      }
+      // A role phrase said as an ADDITION ("2 servers and 2 more web
+      // servers") is another box even though a plain total exists. Without
+      // "more" the role list is how the stated total is allocated, not extra
+      // inventory, and stays ignored here.
+      for (final r in own.where((r) => (r.role ?? '').isNotEmpty && r.add)) {
+        total += r.value;
+      }
+      return total;
+    }
+    final byRole = <String, int>{};
+    for (final r in own) {
+      final role = r.role ?? '';
+      final before = byRole[role] ?? 0;
+      byRole[role] = r.correction
+          ? r.value
+          : r.add
+          ? before + r.value
+          : (r.value > before ? r.value : before);
+    }
+    return byRole.values.fold(0, (sum, value) => sum + value);
+  }
+
+  /// "2 servers and an HTTP server" asks for three boxes: the HTTP one is a
+  /// separate device, not a role assigned to one of the two.
+  ///
+  /// The shape is deliberately narrow, because the opposite reading is just as
+  /// common and is the one the reported brief used: "2 servers 1 AAA server
+  /// ... and an http server" ENUMERATES the two servers, one role each, and
+  /// must stay two. Only a plain server total followed by exactly one
+  /// role-named server joined with "and"/"plus" adds. Several role phrases
+  /// are an enumeration of the total ("3 servers: 1 AAA server and 1 HTTP
+  /// server" is still three), and a role phrase with no connector at all
+  /// ("2 servers, one with AAA") is an allocation of the stated total.
+  static int _additiveRoleServer(List<_Qty> records, String lower, int total) {
+    if (total <= 0) return total;
+    bool isServer(_Qty r) =>
+        r.kind == 'server' && r.site == null && !r.distribution;
+    final plain = records
+        .where((r) => isServer(r) && (r.role ?? '').isEmpty)
+        .toList();
+    final named = records
+        .where((r) => isServer(r) && (r.role ?? '').isNotEmpty)
+        .toList();
+    if (plain.isEmpty || named.length != 1) return total;
+    final role = named.single;
+    // "and 2 MORE web servers" was already added by the merge rules; adding
+    // it again here would count four servers behind one phrase.
+    if (role.add) return total;
+    bool afterConnector(_Qty q) {
+      final head = lower.substring(0, q.at.clamp(0, lower.length));
+      final tail = head.length > 32 ? head.substring(head.length - 32) : head;
+      return RegExp(r'\b(?:and|plus)\b[^,;.]{0,24}$').hasMatch(tail);
+    }
+
+    if (!afterConnector(role) && !plain.any(afterConnector)) return total;
+    // A numbered role phrase BEFORE this one ("3 servers: 1 dhcp, 1 dns and
+    // 1 http server") means the brief is enumerating the roles of the total
+    // it already stated. There the connector joins list items; it does not
+    // introduce another box.
+    final head = lower.substring(0, role.at.clamp(0, lower.length));
+    final enumerated = RegExp(
+      r'\b(?:\d{1,2}|a|an|one|two|three|four|five|six|seven|eight|nine|ten)\s+'
+      r'(?:dhcp|dhcpv6|dns|http|https|web|aaa|radius|tacacs\+?|ftp|mail|email|'
+      r'ntp|tftp|syslog)\b',
+    ).hasMatch(head);
+    if (enumerated) return total;
+    return total + role.value;
+  }
+
   static int? _quantityTotal(List<_Qty> records, String type) {
-    // Distribution phrases ("connect 5 PCs to Switch 1") describe how the
-    // devices already counted are cabled.  Counting them as inventory both
-    // inflated the total and, because the parser treats a repeat as a
-    // restatement, could shrink a stated 25 PCs to 5.  They are not
-    // quantities of new devices and never enter a total.
-    final own = [
-      for (final r in records)
-        if (r.kind == type && !r.distribution) r,
-    ];
+    final candidates = records
+        .where((r) => r.kind == type && !r.distribution)
+        .toList();
+    final own = candidates.any((r) => !r.userLoad)
+        ? candidates.where((r) => !r.userLoad).toList()
+        : candidates;
     if (own.isEmpty) return null;
-    var base = own.first.value;
-    String? baseLabel = own.first.site;
-    final roles = <String>{
-      if ((own.first.role ?? '').isNotEmpty) own.first.role!,
-    };
-    final sites = <String, int>{};
-    var extra = 0;
-    for (final r in own.skip(1)) {
-      if (r.correction) {
-        if (r.site != null && baseLabel != null) {
-          if (r.site == baseLabel) {
-            base = r.value;
-            roles.clear();
-          } else {
-            sites[r.site!] = r.value;
-          }
-          continue;
-        }
-        base = r.value;
-        if (r.site != null) baseLabel = r.site;
-        sites.clear();
-        extra = 0;
-        roles.clear();
-        continue;
-      }
-      if (baseLabel != null && r.site == baseLabel) {
-        // A repeat inside the SAME site is a restatement, so it replaces the
-        // number - but it may never make the lab smaller. A parenthetical role
-        // list ("3 Server-PT devices (1 DHCP server, 1 AAA server, 1 DNS
-        // server)") states how many devices there are and then which roles
-        // they run; reading the "1"s as restatements replaced 3 with 1 and
-        // threw two requested servers away. Shrinking on purpose is still
-        // possible - it is what a correction says, and that is handled above.
-        final distinctRole =
-            (r.role ?? '').isNotEmpty &&
-            roles.isNotEmpty &&
-            !roles.contains(r.role);
-        base = r.add || distinctRole
-            ? base + r.value
-            : (r.value > base ? r.value : base);
-        if ((r.role ?? '').isNotEmpty) roles.add(r.role!);
-        continue;
-      }
-      if (r.add) {
-        final site = r.site;
-        if (site != null) {
-          sites[site] = (sites[site] ?? 0) + r.value;
-        } else {
-          extra += r.value;
-        }
-        continue;
-      }
-      final site = r.site;
-      if (site != null) {
-        // An unlabeled total restated as a site count of the same number is
-        // a restatement, not a new site.
-        if (baseLabel == null && r.value == base) continue;
-        sites[site] = r.value;
-        continue;
-      }
-      // Unlabeled repeat: a restatement, deliberately not counted twice.
-      if ((r.role ?? '').isNotEmpty &&
-          roles.isNotEmpty &&
-          !roles.contains(r.role)) {
-        extra += r.value;
-        roles.add(r.role!);
-      }
+    final project = own.where((r) => r.site == null).toList();
+    final scoped = <String, List<_Qty>>{};
+    for (final r in own) {
+      if (r.site != null) scoped.putIfAbsent(r.site!, () => []).add(r);
     }
-    if (baseLabel == null && extra == 0 && sites.isNotEmpty) {
-      var sum = 0;
-      for (final v in sites.values) {
-        sum += v;
-      }
-      // The sites exactly distribute the stated total ("6 access points: 3
-      // upstairs, 3 downstairs") - the total stands, nothing is added.
-      if (sum == base) return base;
+    if (project.isNotEmpty) {
+      // Explicit project totals are authoritative, including mismatches. The
+      // requirement validator, not the generator, reconciles allocations.
+      final explicit = project.where((r) => r.total).toList();
+      if (explicit.isNotEmpty) return _inventoryTotal(explicit);
+      final total = _inventoryTotal(project);
+      if (scoped.isEmpty) return total;
+      // An unqualified inventory followed by named site shares is a project
+      // total too ("3 routers: HQ has 1, North has 1, South has 1").
+      if (project.any((r) => (r.role ?? '').isEmpty && !r.add)) return total;
+      return total +
+          scoped.values.fold<int>(
+            0,
+            (sum, site) => sum + _inventoryTotal(site),
+          );
     }
-    var total = base + extra;
-    for (final v in sites.values) {
-      total += v;
-    }
-    return total;
+    return scoped.values.fold<int>(
+      0,
+      (sum, site) => sum + _inventoryTotal(site),
+    );
   }
 
   static void _dedupeAt(List<_Qty> records) {
@@ -1031,89 +1145,6 @@ class BriefSlotPipeline {
       if (c.start <= at) best = c;
     }
     return best;
-  }
-
-  /// A site/space phrase: "second floor", "ground floor", "branch
-  /// offices", "Site A". The leading word keeps two sites of the same kind
-  /// distinct, and a short trailing designator keeps "Site A" and "Site B"
-  /// apart - without it two labelled sites collapsed onto one label and the
-  /// second site's count replaced the first instead of adding to it.
-  static final RegExp _siteWord = RegExp(
-    r'\b(?:(ground|first|second|third|fourth|fifth|sixth|seventh|eighth|'
-    r'ninth|tenth|top|upper|lower|main|front|back|branch|left|right|north|'
-    r'south|east|west)\s+)?'
-    r'(floor|office|branch|site|building|classroom|room|department|location)'
-    r'(?:es|s)?(?:\s+([a-z0-9]{1,2})\b)?',
-    caseSensitive: false,
-  );
-
-  /// Every place the brief named a site, with the label it named.
-  static List<({int at, String label})> _siteAnchors(String lower) {
-    final out = <({int at, String label})>[];
-    for (final m in RegExp(r'\b(?:hq|headquarters)\b').allMatches(lower)) {
-      out.add((at: m.end, label: 'hq'));
-    }
-    for (final m in _siteWord.allMatches(lower)) {
-      final adj = m.group(1);
-      final site = m.group(2)!;
-      final designator = m.group(3);
-      out.add((
-        at: m.end,
-        label: designator == null
-            ? (adj == null ? site : '$adj $site')
-            : '${adj == null ? site : '$adj $site'} $designator',
-      ));
-    }
-    out.sort((a, b) => a.at.compareTo(b.at));
-    return out;
-  }
-
-  static final _sentenceBreak = RegExp(r'[.;\n]');
-
-  /// The site a quantity at [at] belongs to, or null when it names none.
-  ///
-  /// A site's device list is split across clauses by the commas and the "and"
-  /// ("Site A has 2 routers, 2 switches, 3 servers and 15 PCs"), and only the
-  /// fragment that happens to contain the site word kept its label.  Every
-  /// later fragment was read as an unlabeled repeat - a restatement - and
-  /// dropped, so 15 of 25 PCs silently vanished.  The label therefore travels
-  /// FORWARD through the fragments of one sentence, and a full stop ends it:
-  /// "…at HQ. The branch has 2 PCs" is a second site, not a restatement of
-  /// the first, and that distinction is what keeps them from being merged.
-  static String? _siteAt(
-    String lower,
-    List<({int at, String label})> anchors,
-    int at, {
-    int? end,
-  }) {
-    for (var i = anchors.length - 1; i >= 0; i--) {
-      final anchor = anchors[i];
-      if (anchor.at > at) continue;
-      if (_sentenceBreak.hasMatch(lower.substring(anchor.at, at))) break;
-      return anchor.label;
-    }
-    // A site qualifier can follow its quantity (for example, "add 3 PCs at
-    // the second branch"). Bind it only when a local preposition explicitly
-    // connects it to this quantity; a later unrelated site stays separate.
-    if (end != null) {
-      for (final anchor in anchors) {
-        if (anchor.at < end) continue;
-        if (anchor.at - end > 48) break;
-        final labelStart = anchor.at - anchor.label.length;
-        if (labelStart < end ||
-            lower.substring(labelStart, anchor.at) != anchor.label) {
-          continue;
-        }
-        final connector = lower.substring(end, labelStart);
-        if (_sentenceBreak.hasMatch(connector)) break;
-        if (RegExp(
-          r'\b(?:at|in|for|within|to)\s+(?:the\s+)?$',
-        ).hasMatch(connector)) {
-          return anchor.label;
-        }
-      }
-    }
-    return null;
   }
 
   /// "actually", "make it", "use" - the number that follows restates or
@@ -1202,6 +1233,18 @@ class BriefSlotPipeline {
         w: RegExp('\\b${RegExp.escape(w)}(?:es|s)?\\b'),
   };
 
+  /// True when a "... controller" word names a software role rather than a
+  /// controller appliance: "domain controller", "Active Directory domain
+  /// controller", "AD controller". Those are service-model requests
+  /// (reported as unsupported), not inventory.
+  static bool _softwareControllerAt(String lower, int at) {
+    final before = lower.substring(0, at);
+    return RegExp(
+      r'\b(?:domain|directory|active\s+directory|ad)\s+$',
+      caseSensitive: false,
+    ).hasMatch(before);
+  }
+
   /// A short keyword inside a longer device phrase belongs to the longer
   /// kind, not to both. Without this, "wireless lan controller" was counted
   /// as a WLC and a generic controller, "wireless router" as a wireless
@@ -1235,6 +1278,7 @@ class BriefSlotPipeline {
     for (final k in keywords) {
       for (final m in _mentionByWord[k]!.allMatches(lower)) {
         if (_shadowedByLongerKeyword(lower, k, m.start, m.end)) continue;
+        if (_softwareControllerAt(lower, m.start)) continue;
         final from = m.start - 40 < 0 ? 0 : m.start - 40;
         if (!_howManyWord.hasMatch(lower.substring(from, m.start))) {
           final clauses = _clauses(lower);
@@ -1398,6 +1442,8 @@ class _Qty {
   final bool add;
   final String? role;
   final bool distribution;
+  final bool total;
+  final bool userLoad;
   const _Qty({
     required this.kind,
     required this.value,
@@ -1408,5 +1454,7 @@ class _Qty {
     this.add = false,
     this.role,
     this.distribution = false,
+    this.total = false,
+    this.userLoad = false,
   }) : end = end ?? at;
 }

@@ -1,0 +1,7 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- The adaptive-icon background, sampled from the edge of
+     assets/app_icon.png by tool/generate_android_icons.ps1 so the
+     launcher mask blends with the logo's own dark plate. -->
+<resources>
+    <color name="ic_launcher_background">#0F192E</color>
+</resources>

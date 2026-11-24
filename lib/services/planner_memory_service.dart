@@ -324,17 +324,20 @@ class PlannerMemoryService {
   }
 
   static NetNode _withModel(NetNode n, String model, {bool exact = false}) =>
-      NetNode(
-        name: n.name,
-        type: n.type,
-        model: model,
-        exactModel: exact,
-        modules: n.model == model ? n.modules : const [],
-        mgmtIp: n.mgmtIp,
-        siteId: n.siteId,
-        services: n.services,
-        serviceRules: n.serviceRules,
-      );
+      n.variantKey != null && !exact
+      ? n
+      : NetNode(
+          name: n.name,
+          type: n.type,
+          model: model,
+          exactModel: exact,
+          modules: n.model == model ? n.modules : const [],
+          variantKey: n.model == model ? n.variantKey : null,
+          mgmtIp: n.mgmtIp,
+          siteId: n.siteId,
+          services: n.services,
+          serviceRules: n.serviceRules,
+        );
 
   static Map<String, String> _explicitModelsForNodes(
     String instruction,
@@ -412,6 +415,7 @@ class PlannerMemoryService {
       model: node.model,
       exactModel: node.exactModel,
       modules: node.modules,
+      variantKey: node.variantKey,
       mgmtIp: node.mgmtIp,
       siteId: node.siteId,
       services: [...node.services, service],
@@ -442,6 +446,7 @@ class PlannerMemoryService {
         model: node.model,
         exactModel: node.exactModel,
         modules: node.modules,
+        variantKey: node.variantKey,
         mgmtIp: node.mgmtIp,
         siteId: node.siteId,
         services: node.services

@@ -5,6 +5,7 @@ import 'package:flutter/gestures.dart' show DragStartBehavior;
 
 import '../models/network_intent.dart';
 import '../services/adapters/packet_tracer_adapter.dart';
+import '../services/human_language.dart';
 import '../services/packet_tracer/catalog.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
@@ -1111,11 +1112,11 @@ class _TopologyCanvasState extends State<TopologyCanvas> {
     final bad = positions.keys.where((n) => (issues[n] ?? const []).isNotEmpty);
     final serial = intent.links.where((l) => l.isSerial).length;
     return 'Topology of ${intent.projectName}: '
-        '${positions.length} device(s), '
-        '${intent.links.length} cable(s)'
+        '${HumanLanguage.count(positions.length, 'device')}, '
+        '${HumanLanguage.count(intent.links.length, 'cable')}'
         '${serial == 0 ? '' : ', $serial serial'}${serial == 1 ? '' : 's'}, '
-        '${vlans.values.toSet().where((v) => v > 0).length} VLAN(s), '
-        '${bad.length} device(s) with issues. '
+        '${HumanLanguage.count(vlans.values.toSet().where((v) => v > 0).length, 'VLAN')}, '
+        '${HumanLanguage.count(bad.length, 'device')} with issues. '
         'Each device is a separate stop; activate one for its details.';
   }
 
@@ -1137,7 +1138,7 @@ class _TopologyCanvasState extends State<TopologyCanvas> {
         : 'runs ${node.services.join(", ")}';
     final issueText = issues.isEmpty
         ? 'no issues'
-        : '${issues.length} issue(s): ${issues.join("; ")}';
+        : '${HumanLanguage.count(issues.length, 'issue')}: ${issues.join("; ")}';
     return [
       '${node?.type ?? 'device'} $name',
       vlan > 0 ? 'VLAN $vlan' : 'no VLAN assigned',

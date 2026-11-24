@@ -62,12 +62,7 @@ const List<DeviceKind> deviceKinds = [
   ),
   DeviceKind(
     type: 'printer',
-    keywords: [
-      'printer',
-      'mfp',
-      'multifunction printer',
-      'network printer',
-    ],
+    keywords: ['printer', 'mfp', 'multifunction printer', 'network printer'],
     models: ['Printer-PT'],
     port: 'f0',
     ipConfig: true,
@@ -101,11 +96,11 @@ const List<DeviceKind> deviceKinds = [
       'ap',
     ],
     models: ['AccessPoint-PT', 'AccessPoint-PT-A', 'AccessPoint-PT-N'],
-    // The AP's Ethernet port: Packet Tracer names it from the host module and
-    // never writes it into a save, so the manifest recorded it empty and every
-    // cable to an AP was dropped ("port1 not usable on AP1" - the AP floated).
-    // The library now names it FastEthernet0, which is what a real save uses.
-    port: 'FastEthernet0',
+    // The AP's Ethernet port has no <NAME> of its own: Packet Tracer labels it
+    // from the host module and shows "Port 0". Asking for FastEthernet0 here
+    // made every cable to an AP need the spare-port remap, and a link that
+    // names a port the model does not have is how the AP ended up floating.
+    port: 'Port 0',
     wireless: true,
   ),
   DeviceKind(
@@ -118,9 +113,9 @@ const List<DeviceKind> deviceKinds = [
     type: 'phone',
     keywords: ['ip phone', 'voip phone', 'phone', 'telephone', 'desk phone'],
     models: ['7960', '7961', '7962'],
-    // Same shape as the access point: the port is named from the host module,
-    // so the library's FastEthernet0 is the name a real save uses.
-    port: 'FastEthernet0',
+    // Same shape as the access point: a 7960/7961/7962 exposes a generic
+    // module pin that PT labels "Port 0", not an interface name.
+    port: 'Port 0',
   ),
   DeviceKind(
     type: 'tablet',
@@ -209,12 +204,7 @@ const List<DeviceKind> deviceKinds = [
   // The kinds below have real Packet Tracer templates AND a taught live
   // palette path (see DEVICE_PALETTE in sidecar/catalog.py): they build
   // offline and place live.
-  DeviceKind(
-    type: 'hub',
-    keywords: ['hub'],
-    models: ['Hub-PT'],
-    port: 'f0',
-  ),
+  DeviceKind(type: 'hub', keywords: ['hub'], models: ['Hub-PT'], port: 'f0'),
   DeviceKind(
     type: 'bridge',
     keywords: ['bridge', 'bridge'],
@@ -318,6 +308,10 @@ const List<DeviceKind> deviceKinds = [
 /// The set is not empty: these nine real templates still have no live
 /// click-path. Remove a kind only after its palette and executor exist.
 const Set<String> offlineOnlyDeviceKinds = {
+  // Bridge-PT has a harvested template (2026-11-14); the live autopilot has
+  // no palette click-path for it yet, so it compiles offline and reports
+  // offline_only on a live run.
+  'bridge',
   'meraki-server',
   'wired-end-device',
   'wireless-end-device',
@@ -337,10 +331,10 @@ const Set<String> offlineOnlyDeviceKinds = {
 /// this list in `pt_autopilot.UNSUPPORTED_DEVICE_KINDS`
 /// (`sidecar/test_device_palette.py` keeps the two equal). Do not put a kind
 /// here once its palette and executor exist; add it to `DEVICE_PALETTE`.
-const Set<String> unsupportedDeviceKinds = {
-  'bridge',
-  'repeater',
-};
+/// Bridge-PT left it in 2026-11-14 (a harvested template makes the offline
+/// build work; it moved to [offlineOnlyDeviceKinds]). Do not put a kind
+/// here once its palette and executor exist; add it to `DEVICE_PALETTE`.
+const Set<String> unsupportedDeviceKinds = {'repeater'};
 
 /// The device kinds a Packet Tracer build can actually place today.
 final Set<String> supportedDeviceKinds = Set.unmodifiable({
@@ -393,10 +387,19 @@ const Map<String, int> numberWords = {
   'eight': 8,
   'nine': 9,
   'ten': 10,
+  'eleven': 11,
+  'twelve': 12,
+  'twenty': 20,
+  'thirty': 30,
+  'forty': 40,
+  'fifty': 50,
   'pair': 2,
   'pairs': 2,
   'dozen': 12,
   'واحد': 1,
+  'واحده': 1,
+  'تنين': 2,
+  'اتنين': 2,
   'اثنان': 2,
   'اثنين': 2,
   'اثنتين': 2,
@@ -416,6 +419,14 @@ const Map<String, int> numberWords = {
   'تسع': 9,
   'عشره': 10,
   'عشر': 10,
+  'عشرين': 20,
+  'عشرون': 20,
+  'ثلاثين': 30,
+  'ثلاثون': 30,
+  'اربعين': 40,
+  'اربعون': 40,
+  'خمسين': 50,
+  'خمسون': 50,
 };
 
 /// Irregular plurals. "pcs" has no regular English plural, so the

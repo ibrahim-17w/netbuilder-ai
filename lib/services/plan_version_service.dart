@@ -2,7 +2,9 @@ import 'dart:convert';
 
 import '../models/build_record.dart';
 import '../models/network_intent.dart';
+import '../models/request_interpretation.dart';
 import 'memory_service.dart';
+import 'request_understanding/build_action_identity.dart';
 
 /// Persists topology edits as a new history row before the app switches to
 /// it, and reads a project's versions back as a chain.
@@ -23,23 +25,43 @@ class PlanVersionService {
     required NetworkIntent intent,
     required String target,
     required String instruction,
+    RequestOutcome? requestOutcome,
+    BuildActionIdentity? actionIdentity,
   }) async {
     if (memory == null || !memory.ready) return null;
+    final identity =
+        actionIdentity ??
+        (requestOutcome == null
+            ? null
+            : BuildActionIdentity.forPlan(
+                plan: intent,
+                requirements: requestOutcome.interpretation.requirements,
+                target: target,
+                projectId: requestOutcome.interpretation.projectId.isEmpty
+                    ? null
+                    : requestOutcome.interpretation.projectId,
+              ));
     final previous = await memory.latestBuildNamed(intent.projectName);
     if (previous != null &&
-        previous.target == target &&
-        NetworkIntent.fromJson(
-              Map<String, dynamic>.from(jsonDecode(previous.intentJson)),
-            ).revision ==
-            intent.revision) {
+        matchesBuildPlan(
+          previous,
+          intent: intent,
+          target: target,
+          actionIdentity: identity,
+        )) {
       return previous.id;
     }
     return memory.logBuild(
       BuildRecord(
         projectName: intent.projectName,
         instruction: instruction,
-        // MemoryService moves secrets to the vault and redacts the stored row.
-        intentJson: jsonEncode(intent.toJson()),
+        // Reserved envelopes are ignored by NetworkIntent.fromJson. History
+        // can restore requirements without fabricating provenance from prose.
+        intentJson: jsonEncode({
+          ...intent.toJson(),
+          if (requestOutcome != null) 'requestOutcome': requestOutcome.toJson(),
+          if (identity != null) 'buildActionIdentity': identity.toJson(),
+        }),
         target: target,
         success: false,
         status: 'planned',
@@ -48,6 +70,68 @@ class PlanVersionService {
         parentVersionId: previous?.id,
       ),
     );
+  }
+
+  static Map<String, dynamic>? _envelope(BuildRecord record) {
+    try {
+      final value = jsonDecode(record.intentJson);
+      return value is Map ? Map<String, dynamic>.from(value) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static RequestOutcome? requestOutcomeOf(BuildRecord record) {
+    final value = _envelope(record)?['requestOutcome'];
+    if (value == null) return null;
+    try {
+      return RequestOutcome.fromJson(value);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static BuildActionIdentity? actionIdentityOf(BuildRecord record) {
+    final value = _envelope(record)?['buildActionIdentity'];
+    if (value == null) return null;
+    try {
+      return BuildActionIdentity.fromJson(value);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Reuse is safe only for the same semantic AND build/layout revision.
+  /// When requirements were supplied, legacy rows without that binding cannot
+  /// satisfy them. Malformed older rows append a new version rather than crash.
+  static bool matchesBuildPlan(
+    BuildRecord record, {
+    required NetworkIntent intent,
+    required String target,
+    BuildActionIdentity? actionIdentity,
+  }) {
+    if (record.target != target) return false;
+    final json = _envelope(record);
+    if (json == null) return false;
+    try {
+      final old = NetworkIntent.fromJson(json);
+      if (old.revision != intent.revision ||
+          old.buildRevision != intent.buildRevision ||
+          BuildActionIdentity.digestJson({
+                for (final node in old.nodes) node.name: node.siteId,
+              }) !=
+              BuildActionIdentity.digestJson({
+                for (final node in intent.nodes) node.name: node.siteId,
+              })) {
+        return false;
+      }
+      final storedIdentity = actionIdentityOf(record);
+      return actionIdentity == null
+          ? storedIdentity == null
+          : actionIdentity.isComplete && storedIdentity == actionIdentity;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// The key a project's versions share: the parent's key when it has one,
@@ -72,6 +156,10 @@ class PlanVersionService {
     }
     final createdAt = now ?? DateTime.now();
     final json = intent.toPlannerJson();
+    final priorOutcome = previous == null ? null : requestOutcomeOf(previous);
+    // Keep the old interpretation/evidence for forensics. Its action identity
+    // is deliberately not copied onto a changed plan as current proof.
+    if (priorOutcome != null) json['requestOutcome'] = priorOutcome.toJson();
     final row = BuildRecord(
       projectName: intent.projectName,
       instruction:
@@ -144,7 +232,11 @@ class PlanVersionService {
       instruction:
           'Restored version #${original.id ?? '?'} · '
           '${latest?.instruction ?? 'manual plan'}',
-      intentJson: jsonEncode(intent.toPlannerJson()),
+      intentJson: jsonEncode({
+        ...intent.toPlannerJson(),
+        if (requestOutcomeOf(original) != null)
+          'requestOutcome': requestOutcomeOf(original)!.toJson(),
+      }),
       target: latest?.target ?? original.target,
       success: false,
       status: 'planned',

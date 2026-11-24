@@ -29,7 +29,9 @@ class RequestedActionReader {
 
   static final _exportConfiguration = RegExp(
     r'\bexport\s+(?:(?:the|my|these|all|current|device|router|switch|network)\s+)*'
-    r'(?:configs?\b|configurations?\b)',
+    r'(?:(Cisco\s+IOS|IOS|GNS3|Packet\s+Tracer)\s+)?'
+    r'(?:configs?\b|configurations?\b)'
+    r'(?:\s+(?:in|as|for)\s+(Cisco\s+IOS|IOS|GNS3|Packet\s+Tracer)\b)?',
     caseSensitive: false,
   );
 
@@ -65,6 +67,7 @@ class RequestedActionReader {
           _ActionCandidate(
             match.start,
             RequestedActionKind.exportConfiguration,
+            format: _configurationFormat(match.group(1) ?? match.group(2)),
           ),
         );
       }
@@ -79,7 +82,12 @@ class RequestedActionReader {
       if (actions.any(
         (action) =>
             action.kind == candidate.kind &&
-            action.target == _targetFor(candidate.kind),
+            action.target == _targetFor(candidate.kind) &&
+            action.outputOptions['format'] ==
+                (candidate.format ??
+                    (candidate.kind == RequestedActionKind.exportConfiguration
+                        ? 'text'
+                        : 'pkt')),
       )) {
         continue;
       }
@@ -91,8 +99,8 @@ class RequestedActionReader {
           outputOptions: switch (candidate.kind) {
             RequestedActionKind.build ||
             RequestedActionKind.exportPacketTracer => const {'format': 'pkt'},
-            RequestedActionKind.exportConfiguration => const {
-              'format': 'text',
+            RequestedActionKind.exportConfiguration => {
+              'format': candidate.format ?? 'text',
               'scope': 'supported-device-configurations',
             },
             _ => const {},
@@ -102,6 +110,14 @@ class RequestedActionReader {
     }
     return List.unmodifiable(actions);
   }
+
+  static String? _configurationFormat(String? qualifier) =>
+      switch (qualifier?.toLowerCase().replaceAll(RegExp(r'\s+'), ' ')) {
+        'cisco ios' || 'ios' => 'cisco-ios',
+        'gns3' => 'gns3',
+        'packet tracer' => 'packet-tracer',
+        _ => null,
+      };
 
   static bool _isActionClause(String text, int start, int end) {
     var clauseStart = 0;
@@ -129,6 +145,7 @@ class RequestedActionReader {
 class _ActionCandidate {
   final int start;
   final RequestedActionKind kind;
+  final String? format;
 
-  const _ActionCandidate(this.start, this.kind);
+  const _ActionCandidate(this.start, this.kind, {this.format});
 }

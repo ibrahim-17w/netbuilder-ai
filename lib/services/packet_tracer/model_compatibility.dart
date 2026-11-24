@@ -1,4 +1,5 @@
 import '../../models/network_intent.dart';
+import '../human_language.dart';
 import 'catalog.dart';
 
 /// A requested exact model that this app can identify but cannot serialize
@@ -65,7 +66,8 @@ class PacketTracerModelCompatibility {
         : 'Available compatible models: ${choices.map((value) => '`$value`').join(', ')}.';
     return 'Before I show network designs, I checked the exact requested model. '
         '`${group.model}` is not buildable by this app for ${group.count} '
-        '${group.type} device(s) ($examples$remainder). $options Which model '
+        '${HumanLanguage.count(group.count, '${group.type} device')} '
+        '($examples$remainder). $options Which model '
         'should I use for all ${group.count}? The device count and names stay '
         'as requested; I have not substituted, removed, or added devices.';
   }
@@ -117,6 +119,11 @@ class PacketTracerModelCompatibility {
               ...node.toJson(),
               'model': model,
               'exactModel': true,
+              // A model replacement is not a selection of its old hardware.
+              'variantKey': null,
+              'modules': node.variantKey != null
+                  ? const <String>[]
+                  : node.modules,
             })
           else
             node,

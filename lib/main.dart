@@ -16,6 +16,7 @@ import 'screens/import_screen.dart';
 import 'screens/pkt_files_screen.dart';
 import 'services/app_diagnostics.dart';
 import 'services/capability_registry.dart';
+import 'services/human_language.dart';
 import 'services/app_version.dart';
 import 'services/context_budget.dart';
 import 'services/autopilot_service.dart';
@@ -139,6 +140,8 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
   NetworkIntent? _openIntent;
   String _openConfig = '';
   String _activeProject = 'default';
+  String _chatConversation = 'default';
+  ChatActiveContext? _chatContext;
 
   /// Text the chat composer should open with, when a hub action sends the
   /// user there to ask something specific.
@@ -309,14 +312,62 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
   void _openChat({required String project, String prefill = ''}) {
     setState(() {
       final name = project.trim().isEmpty ? 'default' : project.trim();
-      final isNew = name != _activeProject;
+      final conversation = name == _activeProject && _chatContext != null
+          ? _chatContext!.conversationId
+          : name;
+      final isNew = conversation != _chatConversation;
       _activeProject = name;
+      _chatConversation = conversation;
       _chatDraft = prefill;
-      if (isNew) _chatEpoch++;
+      if (isNew) {
+        _chatEpoch++;
+        _chatContext = null;
+        _openIntent = null;
+        _openRecord = null;
+        _openConfig = '';
+      }
       if (_destination != AppDestination.chat) {
         unawaited(AppDiagnostics.instance.record('nav', 'chat'));
       }
       _destination = AppDestination.chat;
+    });
+  }
+
+  void _onChatContextChanged(ChatActiveContext snapshot, int epoch) {
+    // The chat is the live source of the open plan, on every destination.
+    // Ignoring its updates while the user was on another screen left the
+    // workspace header and "No open plan" card describing an older lab than
+    // the one the chat, preview and export were acting on.
+    if (!mounted || epoch != _chatEpoch) return;
+    final plan = snapshot.intent;
+    final samePlan =
+        _chatContext?.conversationId == snapshot.conversationId &&
+        _openIntent?.revision == plan?.revision;
+    setState(() {
+      _chatContext = snapshot;
+      _chatConversation = snapshot.conversationId;
+      _activeProject = snapshot.title;
+      _openIntent = plan;
+      if (plan == null) {
+        _openRecord = null;
+        _openConfig = '';
+      } else {
+        // A chat edit has no verified artifact/evidence. Never inherit the
+        // previously opened build's record after a revision or chat changes.
+        if (!samePlan || _openRecord == null) {
+          _openRecord = BuildRecord(
+            projectName: snapshot.title,
+            instruction: snapshot.brief,
+            intentJson: jsonEncode(plan.toJson(includeSecrets: false)),
+            target: snapshot.target,
+            status: 'planned',
+            success: false,
+            createdAt: DateTime.now(),
+            projectKey: snapshot.conversationId,
+          );
+        }
+        _openConfig = BuildArtifactService.renderLocal(plan, snapshot.target);
+      }
     });
   }
 
@@ -390,7 +441,19 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
   void _onOpenIntentChanged(NetworkIntent intent) {
     final previousIntent = _openIntent;
     final previousRecord = _openRecord;
-    setState(() => _openIntent = intent);
+    setState(() {
+      _openIntent = intent;
+      if (_chatContext != null) {
+        final current = _chatContext!;
+        _chatContext = ChatActiveContext(
+          conversationId: current.conversationId,
+          title: intent.projectName,
+          intent: intent,
+          brief: current.brief,
+          target: current.target,
+        );
+      }
+    });
     if (_layoutStyleOf(previousIntent) == _layoutStyleOf(intent)) return;
     if (previousRecord == null) return;
     final memory = context.read<MemoryService>();
@@ -575,11 +638,15 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
           intent: _openIntent,
         );
       case AppDestination.chat:
+        final chatEpoch = _chatEpoch;
         return ChatScreen(
-          // Keyed by conversation so switching chats rebuilds the screen with
-          // that conversation's transcript instead of reusing the old state.
-          key: ValueKey('chat-$_activeProject-$_chatEpoch'),
-          initialProject: _activeProject,
+          // Conversation identity is not the plan's display title. A committed
+          // explicit name must update the header without remounting the chat.
+          key: ValueKey('chat-$chatEpoch'),
+          initialProject: _chatConversation,
+          activeContext: _chatContext,
+          onActiveContextChanged: (snapshot) =>
+              _onChatContextChanged(snapshot, chatEpoch),
           initialDraft: _chatDraft,
           onOpenSettings: () => _go(AppDestination.settings),
           onOpenProject: (project) => setState(() {
@@ -681,139 +748,191 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
         },
         child: Focus(
           autofocus: true,
-          child: Scaffold(
-            // ONE header for every screen: the destination's name and what
-            // it is for, the engine's live state, and the feature index. The
-            // toolkit's calculator used to sit here AND on the rail AND in
-            // the drawer - it now has one home (the sidebar), and this bar
-            // shows state instead of repeating navigation.
-            appBar: AppBar(
-              title: _DestinationHeader(destination: _destination),
-              actions: [
-                Builder(
-                  builder: (context) {
-                    // On a narrow Windows window, the two status pills and
-                    // the navigation/settings buttons used to compete for
-                    // the same 360 pixels and overflow the app bar. The
-                    // status stays available in the feature hub; the two
-                    // primary controls remain visible at every width.
-                    final compact = MediaQuery.sizeOf(context).width < 520;
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (!compact)
-                          const Padding(
-                            padding: EdgeInsets.only(right: AppTheme.s8),
-                            child: _AiPill(),
-                          ),
-                        if (!compact && !SettingsService.isMobile)
-                          const Padding(
-                            padding: EdgeInsets.only(right: AppTheme.s8),
-                            child: _EnginePill(),
-                          ),
-                        Padding(
-                          padding: const EdgeInsets.only(right: AppTheme.s4),
-                          child: IconButton(
-                            tooltip: 'All features (Ctrl+K)',
-                            icon: const Icon(Icons.grid_view_rounded),
-                            onPressed: _showHub,
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(right: AppTheme.s8),
-                          child: IconButton(
-                            tooltip: 'Settings',
-                            icon: const Icon(Icons.settings_outlined),
-                            onPressed: () => _go(AppDestination.settings),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
-            body: Column(
-              children: [
-                if (widget.startup != null)
-                  StartupBanner(
-                    startup: widget.startup!,
-                    onDetails: _storeError == null
-                        ? null
-                        : () => _showStoreError(_storeError!),
-                  ),
-                PktBuildJobBanner(onSave: _savePhoneBuildJob),
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      // The sidebar on a desktop, a compact rail on a laptop, the
-                      // drawer and the hub on a phone. This is how "every screen is
-                      // reachable" is visible rather than merely true.
-                      final width = constraints.maxWidth;
-                      if (width < 1000) return _shellBody();
-                      final expanded = width >= 1240;
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (expanded)
-                            AppSidebar(
-                              current: _destination,
-                              onSelect: _go,
-                              onHub: _showHub,
-                              onToolkit: () => _push(
-                                NetworkToolkitScreen(
-                                  intent: _openIntent,
-                                  onSavePlan: _savePlanEdit,
+          child: Builder(
+            builder: (context) {
+              // A phone gets real navigation instead of only the hub button.
+              final width = MediaQuery.sizeOf(context).width;
+              return PopScope(
+                // Android back is the most-used control on a phone. From any
+                // other destination it returns to the conversation instead of
+                // closing the app; Chat is the root, so back there still
+                // leaves.
+                canPop: _destination == AppDestination.chat,
+                onPopInvokedWithResult: (didPop, result) {
+                  if (didPop) return;
+                  _go(AppDestination.chat);
+                },
+                child: Scaffold(
+                  // ONE header for every screen: the destination's name and what
+                  // it is for, the engine's live state, and the feature index. The
+                  // toolkit's calculator used to sit here AND on the rail AND in
+                  // the drawer - it now has one home (the sidebar), and this bar
+                  // shows state instead of repeating navigation.
+                  appBar: AppBar(
+                    title: _DestinationHeader(destination: _destination),
+                    actions: [
+                      Builder(
+                        builder: (context) {
+                          // On a narrow Windows window, the two status pills and
+                          // the navigation/settings buttons used to compete for
+                          // the same 360 pixels and overflow the app bar. The
+                          // status stays available in the feature hub; the two
+                          // primary controls remain visible at every width.
+                          final compact =
+                              MediaQuery.sizeOf(context).width < 520;
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (!compact)
+                                const Padding(
+                                  padding: EdgeInsets.only(right: AppTheme.s8),
+                                  child: _AiPill(),
+                                ),
+                              if (!compact && !SettingsService.isMobile)
+                                const Padding(
+                                  padding: EdgeInsets.only(right: AppTheme.s8),
+                                  child: _EnginePill(),
+                                ),
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  right: AppTheme.s4,
+                                ),
+                                child: IconButton(
+                                  tooltip: 'All features (Ctrl+K)',
+                                  icon: const Icon(Icons.grid_view_rounded),
+                                  onPressed: _showHub,
                                 ),
                               ),
-                              planProject: _openIntent == null
-                                  ? ''
-                                  : _activeProject,
-                              planSummary: _openIntent == null
-                                  ? ''
-                                  : '${_openIntent!.nodes.length} device(s), '
-                                        '${_openIntent!.links.length} link(s)',
-                              planTarget: _openIntent == null
-                                  ? ''
-                                  : _openRecord?.target ?? '',
-                              onOpenWorkspace: _openIntent == null
-                                  ? null
-                                  : () => _go(AppDestination.execution),
-                            )
-                          else
-                            AppRail(
-                              current: _destination,
-                              onSelect: _go,
-                              onHub: _showHub,
-                              onToolkit: () => _push(
-                                NetworkToolkitScreen(
-                                  intent: _openIntent,
-                                  onSavePlan: _savePlanEdit,
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  right: AppTheme.s8,
+                                ),
+                                child: IconButton(
+                                  tooltip: 'Settings',
+                                  icon: const Icon(Icons.settings_outlined),
+                                  onPressed: () => _go(AppDestination.settings),
                                 ),
                               ),
-                              hasPlan: _openIntent != null,
-                            ),
-                          // The sidebar and the rail carry their own edge; the
-                          // content starts with a clean line instead of a second
-                          // divider a pixel away from the first.
-                          Expanded(child: _shellBody()),
-                        ],
-                      );
-                    },
+                            ],
+                          );
+                        },
+                      ),
+                    ],
                   ),
+                  body: Column(
+                    children: [
+                      if (widget.startup != null)
+                        StartupBanner(
+                          startup: widget.startup!,
+                          onDetails: _storeError == null
+                              ? null
+                              : () => _showStoreError(_storeError!),
+                        ),
+                      PktBuildJobBanner(onSave: _savePhoneBuildJob),
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            // The sidebar on a desktop, a compact rail on a laptop, the
+                            // drawer and the hub on a phone. This is how "every screen is
+                            // reachable" is visible rather than merely true.
+                            final width = constraints.maxWidth;
+                            if (width < 700) return _shellBody();
+                            final expanded = width >= 1240;
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (expanded)
+                                  AppSidebar(
+                                    current: _destination,
+                                    onSelect: _go,
+                                    onHub: _showHub,
+                                    onToolkit: () => _push(
+                                      NetworkToolkitScreen(
+                                        intent: _openIntent,
+                                        onSavePlan: _savePlanEdit,
+                                      ),
+                                    ),
+                                    planProject: _openIntent == null
+                                        ? ''
+                                        : _activeProject,
+                                    planSummary: _openIntent == null
+                                        ? ''
+                                        : '${HumanLanguage.count(_openIntent!.nodes.length, 'device')}, '
+                                              '${HumanLanguage.count(_openIntent!.links.length, 'link')}',
+                                    planTarget: _openIntent == null
+                                        ? ''
+                                        : _openRecord?.target ?? '',
+                                    onOpenWorkspace: _openIntent == null
+                                        ? null
+                                        : () => _go(AppDestination.execution),
+                                  )
+                                else
+                                  AppRail(
+                                    current: _destination,
+                                    onSelect: _go,
+                                    onHub: _showHub,
+                                    onToolkit: () => _push(
+                                      NetworkToolkitScreen(
+                                        intent: _openIntent,
+                                        onSavePlan: _savePlanEdit,
+                                      ),
+                                    ),
+                                    hasPlan: _openIntent != null,
+                                  ),
+                                // The sidebar and the rail carry their own edge; the
+                                // content starts with a clean line instead of a second
+                                // divider a pixel away from the first.
+                                Expanded(child: _shellBody()),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Run controls are FLOATING buttons, so they are shown only
+                  // on tabs with no bottom composer, and the chat composer's send
+                  // button owns the bottom-right corner there. Chat is the screen
+                  // the app opens on, so no float is rendered at all: Pause/Stop
+                  // live in the chat header and in the sidebar.
+                  floatingActionButton: null,
+                  // Portrait phones get the bar. Landscape phones (700-1000)
+                  // get the compact rail below instead, so navigation never
+                  // costs the transcript its height.
+                  bottomNavigationBar: width < 700 ? _phoneNav() : null,
                 ),
-              ],
-            ),
-            // Run controls are FLOATING buttons, so they are shown only
-            // on tabs with no bottom composer, and the chat composer's send
-            // button owns the bottom-right corner there. Chat is the screen
-            // the app opens on, so no float is rendered at all: Pause/Stop
-            // live in the chat header and in the sidebar.
-            floatingActionButton: null,
-            bottomNavigationBar: null,
+              );
+            },
           ),
         ),
       ),
+    );
+  }
+
+  /// The four places a phone needs in one tap. Everything else stays in the
+  /// hub, one tap away in the app bar. A destination reached from the hub is
+  /// appended, so the bar shows where the person actually is instead of
+  /// pretending they are still on Chat.
+  Widget _phoneNav() {
+    final items = <AppDestination>[
+      AppDestination.chat,
+      AppDestination.execution,
+      AppDestination.history,
+      AppDestination.analyze,
+    ];
+    if (!items.contains(_destination)) items.add(_destination);
+    return NavigationBar(
+      key: const ValueKey('phone-navigation'),
+      selectedIndex: items.indexOf(_destination),
+      onDestinationSelected: (index) => _go(items[index]),
+      destinations: [
+        for (final destination in items)
+          NavigationDestination(
+            icon: Icon(destination.icon),
+            selectedIcon: Icon(destination.icon),
+            label: destination.shortTitle,
+          ),
+      ],
     );
   }
 }

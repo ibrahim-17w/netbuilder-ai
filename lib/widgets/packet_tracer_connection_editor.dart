@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/network_intent.dart';
 import '../services/packet_tracer/catalog.dart';
+import '../services/packet_tracer/hardware_check.dart';
 
 class PacketTracerConnectionEditor extends StatefulWidget {
   final NetworkIntent intent;
@@ -63,8 +64,8 @@ class _PacketTracerConnectionEditorState
                   cable.mismatch(
                     a,
                     b,
-                    modulesA: node(widget.a).modules,
-                    modulesB: node(widget.b).modules,
+                    modulesA: PtHardwareCheck.installedModules(node(widget.a)),
+                    modulesB: PtHardwareCheck.installedModules(node(widget.b)),
                   ) ==
                   null,
             ),
@@ -88,14 +89,7 @@ class _PacketTracerConnectionEditorState
       widget.intent.nodes.firstWhere((n) => n.name == name);
   PtDevice? device(String name) => _catalog.device(node(name).model ?? '');
   List<PtPort> ports(String name) {
-    final n = node(name), d = device(name);
-    final variants =
-        d?.variants
-            .where(
-              (v) => n.modules.isEmpty || n.modules.every(v.modules.contains),
-            )
-            .toList() ??
-        [];
+    final variants = PtHardwareCheck.variantsForNode(node(name));
     final byName = <String, PtPort>{};
     for (final variant in variants) {
       for (final port in variant.ports) {
@@ -129,6 +123,15 @@ class _PacketTracerConnectionEditorState
       setState(() => _error = 'Select a known cable type before saving.');
       return;
     }
+    if ([node(widget.a), node(widget.b)].any(
+      (n) => n.variantKey != null && PtHardwareCheck.variantsForNode(n).isEmpty,
+    )) {
+      setState(
+        () => _error =
+            'The pinned hardware is invalid. Select a valid variant before saving.',
+      );
+      return;
+    }
     final cable = _catalog.cable(_cable)!;
     final a = ports(
       widget.a,
@@ -141,15 +144,18 @@ class _PacketTracerConnectionEditorState
       error = 'Select a port at each end.';
     } else if (occupied(widget.a, _a.text) || occupied(widget.b, _b.text)) {
       error = 'A selected port already carries another cable.';
-    } else if (cable.templateAvailable && (a == null || b == null)) {
+    } else if ((cable.templateAvailable ||
+            node(widget.a).variantKey != null ||
+            node(widget.b).variantKey != null) &&
+        (a == null || b == null)) {
       error =
           'This hardware has no compatible free port. Choose another model or module.';
     } else if (a != null && b != null) {
       error = cable.mismatch(
         a,
         b,
-        modulesA: node(widget.a).modules,
-        modulesB: node(widget.b).modules,
+        modulesA: PtHardwareCheck.installedModules(node(widget.a)),
+        modulesB: PtHardwareCheck.installedModules(node(widget.b)),
       );
     }
     if (error != null) {

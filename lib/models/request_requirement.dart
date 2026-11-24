@@ -1,6 +1,9 @@
 import 'package:net_builder/models/network_intent.dart';
 
+import 'chat_message.dart' show AttachmentSource;
 import 'request_contract_utils.dart';
+
+export 'chat_message.dart' show AttachmentSource;
 
 enum RequirementComparator { equals, atLeast, atMost, forbidden, preserve }
 
@@ -17,6 +20,7 @@ enum RequirementScopeKind {
 enum RequirementOrigin {
   currentExplicit,
   establishedProject,
+  imported,
   scopedRememberedPreference,
   environmentProfile,
   derivedDefault,
@@ -37,6 +41,7 @@ enum QuantityRole {
   maximum,
   userLoad,
   deviceInventory,
+  allocation,
 }
 
 /// A redacted excerpt from a message, using UTF-16 code-unit offsets.
@@ -46,11 +51,16 @@ class SourceSpan {
   final int end;
   final String excerpt;
 
+  /// Null for legacy/user-message spans. Attachment offsets refer to the
+  /// original reader output, not the shortened display quote.
+  final AttachmentSource? attachment;
+
   SourceSpan({
     required this.messageId,
     required this.start,
     required this.end,
     required String excerpt,
+    this.attachment,
   }) : excerpt = NetworkIntent.redactSecrets(excerpt) {
     if (messageId.trim().isEmpty) {
       throw const FormatException('SourceSpan messageId must not be empty.');
@@ -65,6 +75,7 @@ class SourceSpan {
     required String originalText,
     required int start,
     required int end,
+    AttachmentSource? attachment,
   }) {
     if (start < 0 || end < start || end > originalText.length) {
       throw const FormatException(
@@ -76,6 +87,7 @@ class SourceSpan {
       start: start,
       end: end,
       excerpt: originalText.substring(start, end),
+      attachment: attachment,
     );
   }
 
@@ -86,12 +98,18 @@ class SourceSpan {
       'start',
       'end',
       'excerpt',
+      'attachment',
     }, 'SourceSpan');
     return SourceSpan(
       messageId: readString(json, 'messageId', allowEmpty: false),
       start: readInt(json, 'start', minimum: 0),
       end: readInt(json, 'end', minimum: 0),
       excerpt: readString(json, 'excerpt'),
+      attachment: json['attachment'] == null
+          ? null
+          : AttachmentSource.fromMap(
+              strictJsonObject(json['attachment'], 'SourceSpan attachment'),
+            ),
     );
   }
 
@@ -103,6 +121,12 @@ class SourceSpan {
         'SourceSpan range is outside the original message.',
       );
     }
+    if (excerpt !=
+        NetworkIntent.redactSecrets(originalText.substring(start, end))) {
+      throw const FormatException(
+        'SourceSpan excerpt does not match its source.',
+      );
+    }
   }
 
   Map<String, dynamic> toJson() => {
@@ -110,6 +134,7 @@ class SourceSpan {
     'start': start,
     'end': end,
     'excerpt': NetworkIntent.redactSecrets(excerpt),
+    if (attachment != null) 'attachment': attachment!.toMap(),
   };
 
   @override
@@ -127,14 +152,54 @@ class RequirementScope {
   final RequirementScopeKind kind;
   final String scopeId;
 
-  const RequirementScope({required this.kind, this.scopeId = ''});
+  /// Optional ancestry/context. Local names remain compatible with old saved
+  /// requests; VLAN 10 at HQ is distinct from VLAN 10 at a branch.
+  final RequirementScope? parent;
+  final String siteId;
+  final String deviceId;
+  final String networkRole;
+
+  const RequirementScope({
+    required this.kind,
+    this.scopeId = '',
+    this.parent,
+    this.siteId = '',
+    this.deviceId = '',
+    this.networkRole = '',
+  });
+
+  String get owningSiteId => siteId.isNotEmpty
+      ? siteId
+      : kind == RequirementScopeKind.site
+      ? scopeId
+      : parent?.owningSiteId ?? '';
+
+  String get owningDeviceId => deviceId.isNotEmpty
+      ? deviceId
+      : kind == RequirementScopeKind.device
+      ? scopeId
+      : parent?.owningDeviceId ?? '';
+
+  Iterable<RequirementScope> get ancestry sync* {
+    if (parent != null) {
+      yield* parent!.ancestry;
+      yield parent!;
+    }
+  }
 
   factory RequirementScope.project(String projectId) =>
       RequirementScope(kind: RequirementScopeKind.project, scopeId: projectId);
 
   factory RequirementScope.fromJson(Object? value) {
     final json = strictJsonObject(value, 'RequirementScope');
-    rejectUnknownFields(json, {'kind', 'scopeId'}, 'RequirementScope');
+    rejectUnknownFields(json, {
+      'kind',
+      'scopeId',
+      'parent',
+      'siteId',
+      'deviceId',
+      'networkRole',
+    }, 'RequirementScope');
     return RequirementScope(
       kind: readEnum(
         json['kind'],
@@ -143,10 +208,23 @@ class RequirementScope {
         defaultValue: RequirementScopeKind.project,
       ),
       scopeId: readString(json, 'scopeId', defaultValue: ''),
+      parent: json['parent'] == null
+          ? null
+          : RequirementScope.fromJson(json['parent']),
+      siteId: readString(json, 'siteId', defaultValue: ''),
+      deviceId: readString(json, 'deviceId', defaultValue: ''),
+      networkRole: readString(json, 'networkRole', defaultValue: ''),
     );
   }
 
-  Map<String, dynamic> toJson() => {'kind': kind.name, 'scopeId': scopeId};
+  Map<String, dynamic> toJson() => {
+    'kind': kind.name,
+    'scopeId': scopeId,
+    if (parent != null) 'parent': parent!.toJson(),
+    if (siteId.isNotEmpty) 'siteId': siteId,
+    if (deviceId.isNotEmpty) 'deviceId': deviceId,
+    if (networkRole.isNotEmpty) 'networkRole': networkRole,
+  };
 
   @override
   bool operator ==(Object other) =>

@@ -1,5 +1,6 @@
 import '../models/environment_profile.dart';
 import '../models/network_intent.dart';
+import 'human_language.dart';
 
 /// A deterministic advisor for the questions the builder never answers:
 /// which gear to use, how much of it, which of two designs fits, and how a
@@ -649,11 +650,11 @@ class AdvisorService {
             'layer 3 (routing) decides how subnets reach each other. VLANs '
             'are how one switch keeps those subnets apart.',
         if (c.hasPlan)
-          'Your plan has ${c.count('router')} router(s) and '
-              '${c.count('switch')} switch(es): in Packet Tracer, '
-              'router-on-a-stick is a 2911/4331 plus a 2960, and inter-VLAN '
-              'routing on the switch itself needs a 3560 (or another L3 '
-              'switch).',
+          'Your plan has ${HumanLanguage.count(c.count('router'), 'router')} '
+              'and ${HumanLanguage.count(c.count('switch'), 'switch')}: in '
+              'Packet Tracer, router-on-a-stick is a 2911/4331 plus a 2960, '
+              'and inter-VLAN routing on the switch itself needs a 3560 (or '
+              'another L3 switch).',
       ],
       questions: const [
         'How many VLANs/subnets do you expect to route between?',
@@ -787,9 +788,9 @@ class AdvisorService {
       reasons: [
         if (aps != null)
           'About $scale active devices: at the dense end (one AP per ~25 '
-              'devices) that is $aps AP(s); for lighter use assume ~50 per '
-              'AP. Then add APs for coverage - one per 2-4 rooms, or per '
-              'floor in open plan.',
+              'devices) that is ${HumanLanguage.count(aps, 'AP')}; for lighter '
+              'use assume ~50 per AP. Then add APs for coverage - one per '
+              '2-4 rooms, or per floor in open plan.',
         'Wi-Fi is a shared medium: more APs on the same channel do not add '
             'capacity, they add interference. Place by coverage first, then '
             'tune channels.',
@@ -2025,8 +2026,11 @@ class AdvisorService {
   /// grounded in the plan when there is one.
   static AdviceAnswer _designReview(_AdvisorContext c) {
     final counts = c.hasPlan
-        ? '${c.count('router')} router(s), ${c.count('switch')} switch(es), '
-              '${c.count('pc')} PC(s)'
+        ? HumanLanguage.list([
+            HumanLanguage.count(c.count('router'), 'router'),
+            HumanLanguage.count(c.count('switch'), 'switch'),
+            HumanLanguage.count(c.count('pc'), 'PC'),
+          ])
         : '';
     return AdviceAnswer(
       topic: 'design_review',
@@ -2185,8 +2189,24 @@ class AdviceAnswer {
   /// The chat text: recommendation first, then the options and their
   /// trade-offs, then why it fits, then one next step. Markdown, because
   /// the chat renders it (tables included).
-  String toText() {
-    final b = StringBuffer()..writeln('**What I would do:** $recommendation');
+  ///
+  /// [seed] picks among equivalent wordings the way the offline assistant's
+  /// `_pick` does, so two advice turns in one conversation do not open and
+  /// close with the same sentence every time. [tone] is the user's stored
+  /// style ("casual"/"formal"), which picks the closing voice; and a
+  /// "shorter answers" preference ([concise]) drops the why-it-fits notes
+  /// and the closing line, leaving the recommendation, the options and the
+  /// next step. The defaults keep the original shape for callers that
+  /// render once (tests, previews).
+  String toText({int seed = 0, String tone = '', bool concise = false}) {
+    final openers = const [
+      'What I would do',
+      'Short answer',
+      'Here is my take',
+    ];
+    final closer = concise ? '' : _pickClosing(seed, tone: tone);
+    final b = StringBuffer()
+      ..writeln('**${openers[seed.abs() % openers.length]}:** $recommendation');
     if (options.isNotEmpty) {
       b
         ..writeln()
@@ -2196,7 +2216,7 @@ class AdviceAnswer {
         b.writeln('| ${o.label} | ${o.chooseWhen} | ${o.tradeOff} |');
       }
     }
-    if (reasons.isNotEmpty) {
+    if (reasons.isNotEmpty && !concise) {
       b
         ..writeln()
         ..writeln('Why this fits here:');
@@ -2217,13 +2237,49 @@ class AdviceAnswer {
         ..writeln()
         ..writeln('To narrow it down: ${questions.join(' ')}');
     }
-    b
-      ..writeln()
-      ..writeln(
-        'Nothing about your plan changed - advice never edits the lab. '
-        'If you want this in the build, say the word and I will plan it.',
-      );
+    if (closer.isNotEmpty) {
+      b
+        ..writeln()
+        ..writeln(closer);
+    }
     return b.toString().trimRight();
+  }
+
+  /// The one-line way back into the planner, or '' when there is nothing to
+  /// plan. The advice card's "Plan this" button and the quick replies carry
+  /// the same action, so the prose keeps it to a single sentence - the old
+  /// fixed paragraph repeated verbatim under every advice answer, which is
+  /// what made advice read like a form.
+  /// The one-line way back into the planner, or '' when there is nothing to
+  /// plan. The advice card's "Plan this" button and the quick replies carry
+  /// the same action, so the prose keeps it to a single sentence - the old
+  /// fixed paragraph repeated verbatim under every advice answer, which is
+  /// what made advice read like a form.
+  ///
+  /// A planBrief only exists when NO lab stands (the advisor never re-plans
+  /// one silently), so there is no "with a plan standing" variant: a
+  /// standing lab is context the continuity line already names, and the
+  /// closer would only repeat it.
+  String _pickClosing(int seed, {String tone = ''}) {
+    if (planBrief == null || planBrief!.trim().isEmpty) return '';
+    const neutral = [
+      'Want it as a lab? Tap "Plan this" below and I will plan it.',
+      'Say "plan it" and this becomes a plan you can build.',
+    ];
+    const casual = [
+      'Want it as a lab? "Plan this" below and I\'m on it.',
+      'Say "plan it" and I\'ll turn this into a plan you can build.',
+    ];
+    const formal = [
+      'Should this become a lab, "Plan this" below will plan it.',
+      'Say "plan it" and this recommendation becomes a buildable plan.',
+    ];
+    final pool = tone == 'casual'
+        ? casual
+        : tone == 'formal'
+        ? formal
+        : neutral;
+    return pool[seed.abs() % pool.length];
   }
 }
 
@@ -2421,7 +2477,9 @@ class _AdvisorContext {
       if (count('server') > 0) many(count('server'), 'server', 'servers'),
       if (p.vlans.isNotEmpty) 'VLANs ${p.vlans.join(', ')}',
     ];
-    return bits.isEmpty ? '${p.nodes.length} device(s)' : bits.join(', ');
+    return bits.isEmpty
+        ? HumanLanguage.count(p.nodes.length, 'device')
+        : HumanLanguage.list(bits);
   }
 
   /// The plan-able sentence the answer can offer as a one-tap next step,

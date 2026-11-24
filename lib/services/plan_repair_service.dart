@@ -120,7 +120,7 @@ class PlanRepairService {
         m.contains('is cabled to') && m.contains('devices but')) {
       return 'switch_overflow';
     }
-    if (m.contains('aaa server holds no account')) {
+    if (m.contains('has no aaa login yet')) {
       return 'aaa_account_missing';
     }
     if (m.contains('ipsec tunnel with no pre-shared key') ||
@@ -528,6 +528,7 @@ class PlanRepairService {
           model: node.model,
           exactModel: node.exactModel,
           modules: node.modules,
+          variantKey: node.variantKey,
           mgmtIp: node.mgmtIp,
           siteId: node.siteId,
           services: node.services,
@@ -554,7 +555,7 @@ class PlanRepairService {
   /// These two findings used to be a dead end. "Fix the plan" repaired cables
   /// and addresses but not these, so the answer was "each one needs a choice
   /// only you can make" - and the choice it offered, 'Add one - for example
-  /// "AAA client name admin password 123"', did NOTHING when typed: no phrase
+  /// "username admin password 123"', did NOTHING when typed: no phrase
   /// in the parser turns that sentence into an account. The user pressed Fix
   /// again, and again, and the plan never changed.
   ///
@@ -597,10 +598,9 @@ class PlanRepairService {
         fixes.add(
           const RepairFix(
             'aaa_account_missing',
-            'The AAA server holds no account, so no login can be verified: '
-                'write a placeholder one and say so, rather than leaving a '
-                'finding that only a sentence the parser does not read can '
-                'clear.',
+            'The AAA server has no login yet: write a placeholder account '
+                'and say so, rather than leaving a finding that only a '
+                'sentence the parser does not read can clear.',
           ),
         );
       }

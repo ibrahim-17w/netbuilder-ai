@@ -385,7 +385,9 @@ def shape_results(rows: List[dict], tests: List[dict],
             else:
                 out.append({
                     **t,
-                    "status": "passed" if row.get("ok") else "failed",
+                    "status": row.get("status") if row.get("status") in
+                              ("passed", "failed", "timeout", "cancelled", "skipped") else
+                              "passed" if row.get("ok") else "failed",
                     "detail": str(row.get("evidence") or
                                   (f"{query} resolved to {t.get('expectedIp')}" if row.get("ok")
                                    else f"{query} did not resolve to {t.get('expectedIp')}")),
@@ -398,7 +400,10 @@ def shape_results(rows: List[dict], tests: List[dict],
         if row is not None:
             out.append({
                 **t,
-                "status": "passed" if row.get("ok") else "failed",
+                "status": "skipped" if row.get("available") is False else
+                          row.get("status") if row.get("status") in
+                          ("passed", "failed", "timeout", "cancelled", "skipped") else
+                          "passed" if row.get("ok") else "failed",
                 "detail": (f"ping {row.get('target')}: "
                            + ("replies" if row.get("ok") else "no reply")
                            + f" ({int(row.get('attempts') or 1)} attempt(s))"),
@@ -417,9 +422,12 @@ def summarize(results: List[dict]) -> dict:
                   if r.get("status") == "skipped" and r.get("kind") != "custom")
     manual = sum(1 for r in results if r.get("status") == "manual" or
                  (r.get("status") == "skipped" and r.get("kind") == "custom"))
+    timeout = sum(1 for r in results if r.get("status") == "timeout")
+    cancelled = sum(1 for r in results if r.get("status") == "cancelled")
     return {
         "passed": passed, "failed": failed, "skipped": skipped, "manual": manual,
-        "total": len(results),
+        "timeout": timeout, "cancelled": cancelled, "total": len(results),
         "summary": f"{passed} passed, {failed} failed, {skipped} skipped, {manual} manual",
-        "ok": failed == 0 and passed > 0,
+        # Partial, manual-only and zero-test reports are never a global pass.
+        "ok": bool(results) and passed == len(results),
     }

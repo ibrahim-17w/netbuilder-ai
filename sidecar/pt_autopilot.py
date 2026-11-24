@@ -42,6 +42,7 @@ from __future__ import annotations
 import base64
 import json
 import hashlib
+import hmac
 import os
 import re
 import shutil
@@ -140,8 +141,50 @@ try:
 except ImportError:  # pragma: no cover - package import fallback
     from . import net_tools
 
+try:
+    import model_gateway
+except ImportError:  # pragma: no cover - package import fallback
+    from . import model_gateway
+
 HOST = "127.0.0.1"
 PORT = 5005
+
+# ---------------------------------------------------------------------------
+# Request guard: loopback is not the same thing as trusted.
+#
+# Any page in the user's browser can send a request to 127.0.0.1, and a page
+# on a rebinding domain can even read the answer. This handler drives the
+# mouse and keyboard for Packet Tracer, so an unauthenticated POST is a way to
+# click inside the app, or to point the LLM config at another server. Three
+# cheap checks close that class of request before any handler runs:
+#
+#   * a request carrying an Origin header did not come from this app (the
+#     native client never sends one), so it is refused;
+#   * Host must name this loopback interface, which defeats DNS rebinding;
+#   * a POST body has a ceiling, so a caller cannot make the process read
+#     arbitrary bytes into memory.
+#
+# NETBUILDER_SIDECAR_TOKEN additionally requires a bearer token on every
+# route but /health. It stays opt-in: the client has to send it, and a
+# hand-started engine has to keep working without one.
+MAX_BODY_BYTES = 32 * 1024 * 1024
+VERIFY_BODY_BYTES = 2 * 1024 * 1024
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
+def _host_name(value: str) -> str:
+    """The host part of a Host header, without its port."""
+    text = str(value or "").strip().lower()
+    if text.startswith("["):            # [::1]:5005
+        end = text.find("]")
+        return text[1:end] if end > 0 else text
+    if text.count(":") == 1:            # 127.0.0.1:5005
+        return text.split(":", 1)[0]
+    return text                          # bare IPv6, no brackets
+
+
+def _sidecar_token() -> str:
+    return str(os.environ.get("NETBUILDER_SIDECAR_TOKEN") or "").strip()
 SHOTS = os.path.join(os.path.dirname(__file__), "shots")
 
 # GLOBAL HOTKEYS: off unless the operator asks for them.
@@ -269,7 +312,7 @@ def _run_hidden(command, **kwargs):
 # Bump on every behaviour change. Served on /health so a stale process
 # (old code, old port-holder, double instance) is detectable remotely
 # instead of producing "nothing changed" mystery runs.
-VERSION = "2026-11-07-audit-dangling-export-status"
+VERSION = "2026-11-23-physical-workspace-gate-v1"
 
 # The /health contract. Bump only for an incompatible route/shape change; the
 # app blocks an engine whose schema it does not speak, so a mixed installer
@@ -1356,7 +1399,12 @@ def llm_configure(api_key=None, model: str = "",
                     AUTO_LEARN[name] = bool(value)
             if off_device:
                 AUTO_LEARN["autoTeach"] = False
-    return llm_status()
+    state = llm_status()
+    if not state["enabled"]:
+        # Privacy mode, or a key cleared by the app: drop the gateway that was
+        # built with the old credential rather than leave it in memory.
+        model_gateway.reset()
+    return state
 
 
 def llm_status() -> dict:
@@ -1370,6 +1418,9 @@ def llm_status() -> dict:
         "calls": LLM["calls"],
         "applied": LLM["applied"],
         "rejected": LLM["rejected"],
+        # Where the last answer would come from: the in-process gateway, or the
+        # direct request when the wheel is missing or the config needs headers.
+        "transport": "gateway" if model_gateway.available() else "direct",
         "autoLearn": auto,
     }
 
@@ -1416,13 +1467,78 @@ def _llm_parse_commands(answer: str) -> list:
     return out
 
 
+def _llm_gateway_ready(config: dict) -> bool:
+    """Whether this configuration can be carried by the in-process gateway.
+
+    A provider with extra headers keeps the direct request: the gateway's
+    provider config takes one credential (a key, or one auth header), and
+    thinning the user's headers out to force the gateway would be worse than
+    the extra path.
+    """
+    if not model_gateway.available() or config.get("extraHeaders"):
+        return False
+    if config.get("provider") == "openai":
+        return bool(str(config.get("baseUrl") or "").strip())
+    return True
+
+
+def _llm_revision_changed(config: dict) -> bool:
+    """True when the app pushed new AI settings while a call was in flight."""
+    with LOCK:
+        return (not LLM["enabled"]
+                or LLM.get("configRevision") != config.get("configRevision"))
+
+
 def _llm_request(prompt: str) -> str:
-    """POST one prompt to the selected provider; reject obsolete responses."""
-    import urllib.request
+    """Ask the selected model provider, through the local gateway.
+
+    The gateway is the normal path: one OpenAI chat shape for both provider
+    kinds, with the vendor chosen by the config [model_gateway.config_for]
+    builds.  [_llm_request_direct] stays the fallback for an install without
+    the wheel, and for a configuration the gateway cannot express.
+    """
     with LOCK:
         config = dict(LLM)
     if not config["enabled"]:
         raise RuntimeError("AI requests are disabled")
+    text = llm_redact(prompt)
+    if _llm_revision_changed(config):
+        raise RuntimeError("AI request cancelled because settings changed")
+    if _llm_gateway_ready(config):
+        try:
+            answer = model_gateway.complete(
+                text,
+                provider=config.get("provider", "gemini"),
+                model=config.get("model", ""),
+                base_url=config.get("baseUrl", ""),
+                api_key=config.get("apiKey", ""),
+                timeout=LLM_TIMEOUT_S)
+        except model_gateway.GatewayUnavailable as exc:
+            # Private mode arriving mid-call closes the gateway on purpose:
+            # falling back would re-send the prompt the user just cut off.
+            if _llm_revision_changed(config):
+                raise RuntimeError("AI request cancelled because settings changed")
+            # Otherwise worth a line in the log: a gateway that cannot carry
+            # the call is a fact about this install, and the direct request
+            # still answers.
+            log(f"Model gateway unavailable ({str(exc)[:90]}); "
+                "asking the provider directly")
+            answer = _llm_request_direct(config, text)
+    else:
+        answer = _llm_request_direct(config, text)
+    if _llm_revision_changed(config):
+        raise RuntimeError("AI request cancelled because settings changed")
+    return answer
+
+
+def _llm_request_direct(config: dict, text: str) -> str:
+    """The request as the engine built it before the gateway: one urllib POST.
+
+    ``text`` is already redacted.  Kept so an install that cannot load the
+    gateway wheel - or a provider that needs extra headers - behaves exactly
+    as it did before.
+    """
+    import urllib.request
     openai = config.get("provider") == "openai"
     if openai:
         from urllib.parse import urlparse
@@ -1430,27 +1546,22 @@ def _llm_request(prompt: str) -> str:
         if urlparse(base).scheme not in {"http", "https"} or not urlparse(base).hostname:
             raise RuntimeError("Invalid model provider address")
         url = base + "/chat/completions"
-        content = {"model": config["model"], "messages": [{"role": "user", "content": llm_redact(prompt)}], "stream": False}
+        content = {"model": config["model"], "messages": [{"role": "user", "content": text}], "stream": False}
         headers = {"Content-Type": "application/json", **config.get("extraHeaders", {})}
         if config["apiKey"]:
             headers["Authorization"] = "Bearer " + config["apiKey"]
     else:
         url = ("https://generativelanguage.googleapis.com/v1beta/models/"
                + str(config["model"]).strip() + ":generateContent")
-        content = {"contents": [{"parts": [{"text": llm_redact(prompt)}]}]}
+        content = {"contents": [{"parts": [{"text": text}]}]}
         headers = {"Content-Type": "application/json", "x-goog-api-key": config["apiKey"]}
     payload = json.dumps(content).encode("utf-8")
     req = urllib.request.Request(
         url, data=payload, method="POST",
         headers=headers,
     )
-    with LOCK:
-        if not LLM["enabled"] or LLM.get("configRevision") != config.get("configRevision"):
-            raise RuntimeError("AI request cancelled because settings changed")
     with urllib.request.urlopen(req, timeout=LLM_TIMEOUT_S) as resp:
         data = json.loads(resp.read().decode("utf-8"))
-    if not LLM["enabled"] or LLM.get("configRevision") != config.get("configRevision"):
-        raise RuntimeError("AI request cancelled because settings changed")
     if openai:
         choices = data.get("choices") or []
         return str(((choices[0] if choices else {}).get("message") or {}).get("content") or "").strip()
@@ -10885,6 +10996,7 @@ def _pc_ping(rect, dev: str, slot: int, targets: list,
             RUN["pings_failed"] = RUN.get("pings_failed", 0) + len(targets)
         for target in targets:
             row = {"source": dev, "target": target, "ok": False,
+                   "available": False, "status": "skipped",
                    "attempts": 0, "evidence": reason}
             if results is not None:
                 results.append(row)
@@ -10915,9 +11027,13 @@ def _pc_ping(rect, dev: str, slot: int, targets: list,
 
         click_body()
         for t in targets:
+            if stopped():
+                break
             ok = False
             tail = ""
             for attempt in (1, 2):
+                if stopped():
+                    break
                 typed = _type_line(f"ping {t}", 25, win=win, dev=dev)
                 _interruptible_sleep(3.5)  # let the 4 echo requests finish
                 _OCR_CACHE.clear()
@@ -10949,6 +11065,8 @@ def _pc_ping(rect, dev: str, slot: int, targets: list,
                     "source": dev,
                     "target": t,
                     "ok": ok,
+                    "status": "cancelled" if stopped() else "passed" if ok else
+                              "timeout" if "timed out" in tail.lower() else "failed",
                     "attempts": attempt,
                     "evidence": tail[-260:],
                 })
@@ -11000,8 +11118,14 @@ def _pc_dns_lookups(rect, dev: str, slot: int, tests: list,
 
         click_body()
         for test in tests:
+            if stopped():
+                break
             query = str(test["query"]).strip()
             expected = str(test["expectedIp"]).strip().split("/")[0]
+            import native_verify
+            if not native_verify.safe_dns_name(query) or not native_verify.safe_probe_ip(expected):
+                unavailable("Invalid DNS probe input; no command was typed.")
+                continue
             ok = False
             tail = ""
             attempt = 0
@@ -11022,6 +11146,8 @@ def _pc_dns_lookups(rect, dev: str, slot: int, tests: list,
             evidence = tail[-260:] or "No DNS response was readable from the client."
             results.append({"source": dev, "target": query, "ok": ok,
                             "available": True, "attempts": attempt,
+                            "status": "cancelled" if stopped() else "passed" if ok else
+                                      "timeout" if "timed out" in evidence.lower() else "failed",
                             "evidence": evidence})
             record_event("dns_test", f"nslookup {query} from {dev}",
                          device=dev, recovered=ok)
@@ -11101,24 +11227,208 @@ _SVC_TITLES = {"dhcp": "dhcp", "dns": "dns", "http": "http",
                "ntp": "ntp", "tftp": "tftp", "syslog": "syslog",
                "dhcpv6": "dhcpv6", "iot": "iot", "prp": "prp"}
 
-# Post-build verification state (one at a time; the PT UI is single-owner).
-VERIFY_STATE: dict = {"running": False, "report": None}
+# Post-build verification state and bounded run-specific history. Never return
+# the newest report in response to a different runId.
+VERIFY_STATE: dict = {"running": False, "runId": None, "report": None}
+VERIFY_REPORTS: dict = {}
+VERIFY_LOCK = threading.Lock()
+_VERIFY_HISTORY_LIMIT = 40
 
 
-def _verify_run_async(plan: dict) -> None:
-    """Thread body for /verify/run: keep VERIFY_STATE fresh, never crash."""
+def _verify_report_payload(run_id=None) -> tuple[dict, int]:
+    import copy
+    import native_verify
+    if run_id is not None:
+        try:
+            native_verify.validate_run_id(run_id)
+        except ValueError as exc:
+            return {"ok": False, "running": False, "runId": run_id,
+                    "report": None, "error": str(exc)}, 400
+    with VERIFY_LOCK:
+        selected = run_id if run_id is not None else VERIFY_STATE.get("runId")
+        report = VERIFY_REPORTS.get(selected) if selected else VERIFY_STATE.get("report")
+        if run_id is not None and report is None:
+            return {"ok": False, "running": False, "runId": run_id,
+                    "report": None, "error": "unknown or expired verification runId"}, 404
+        history = copy.deepcopy(report)
+        if run_id is None and history:
+            # Compatibility retrieval is history, never identity-bound proof.
+            history.update(opened=False, hashBinding="", historyOnly=True)
+        return {"ok": True, "running": bool(report and report.get("state") == "running"),
+                "runId": selected, "report": history}, 200
+
+
+def _verify_start(req: dict) -> tuple[dict, int]:
+    """Validate before acquiring the UI; reserve ownership before responding."""
+    import native_verify
     try:
-        VERIFY_STATE["report"] = verify_plan_live(plan)
-    except Exception as e:  # noqa: BLE001 - report, don't kill the thread
-        import pt_verify
-        log(f"VERIFY thread failed: {e}")
-        VERIFY_STATE["report"] = {"ok": False, "error": str(e),
-                                  **pt_verify.summarize([]), "tests": []}
+        plan, context = native_verify.validate_request(req)
+    except (ValueError, OSError, TypeError, AttributeError, KeyError) as exc:
+        return {"ok": False, "error": str(exc)}, 400
+    with VERIFY_LOCK:
+        if VERIFY_STATE.get("running"):
+            return {"ok": False, "error": "verification already running",
+                    "runId": VERIFY_STATE.get("runId")}, 409
+        acquired, busy = begin_activity("audit")
+        if not acquired:
+            return {"ok": False, "error": f"busy - {busy} active",
+                    "activity": activity_snapshot()}, 409
+        run_id = context["runId"]
+        report = native_verify.normalize_report(context)
+        VERIFY_STATE.update(running=True, runId=run_id, report=report)
+        VERIFY_REPORTS[run_id] = report
+        while len(VERIFY_REPORTS) > _VERIFY_HISTORY_LIMIT:
+            del VERIFY_REPORTS[next(iter(VERIFY_REPORTS))]
+    try:
+        threading.Thread(target=_verify_run_async, args=(plan, context, True),
+                         daemon=True).start()
+    except Exception as exc:
+        report = native_verify.normalize_report(context, state="failed", error=str(exc))
+        with VERIFY_LOCK:
+            VERIFY_REPORTS[run_id] = report
+            VERIFY_STATE.update(running=False, report=report)
+            end_activity("audit")
+        return {"ok": False, "runId": run_id, "error": str(exc)}, 500
+    return {"ok": True, "running": True, "runId": run_id,
+            "msg": "verification running - poll /verify/report?runId=" + run_id}, 200
+
+
+def _verify_run_async(plan: dict, context: dict | None = None,
+                      activity_owned: bool = False) -> None:
+    """Run under one UI owner and publish only to this exact immutable runId."""
+    import native_verify
+    if context is None:  # legacy internal call; never a bound badge
+        _, context = native_verify.validate_request({"plan": plan})
+    raw, before, after = {}, "", ""
+    state = "completed"
+    try:
+        path = context.get("artifactPath")
+        if path:
+            _, before = native_verify.artifact_snapshot(path)
+            if before != context["artifactHash"]:
+                raise ValueError("Artifact bytes changed before native verification started.")
+        raw = verify_plan_live(plan, activity_owned=activity_owned,
+                               native_context=context)
+        state = "cancelled" if stopped() or raw.get("cancelled") else \
+            "failed" if raw.get("errorKind") in ("exception", "timeout") else "completed"
+    except Exception as exc:  # noqa: BLE001 - settle every admitted run
+        log(f"VERIFY thread failed: {exc}")
+        state = "cancelled" if stopped() else "failed"
+        raw = {"error": str(exc), "errorKind": "cancelled" if state == "cancelled" else
+               "timeout" if isinstance(exc, TimeoutError) else "exception"}
     finally:
-        VERIFY_STATE["running"] = False
+        if context.get("artifactPath"):
+            try:
+                _, after = native_verify.artifact_snapshot(context["artifactPath"])
+                if after != context["artifactHash"]:
+                    state = "failed" if state != "cancelled" else state
+                    raw["error"] = "Artifact bytes changed during native verification."
+                    raw["errorKind"] = "artifact-changed"
+            except Exception as exc:
+                state = "failed" if state != "cancelled" else state
+                raw["error"] = f"Artifact read-back failed: {exc}"
+                raw["errorKind"] = "artifact-changed"
+        report = native_verify.normalize_report(context, raw, state=state,
+                                                hash_before=before, hash_after=after)
+        with VERIFY_LOCK:
+            VERIFY_REPORTS[context["runId"]] = report
+            if VERIFY_STATE.get("runId") == context["runId"]:
+                VERIFY_STATE.update(running=False, report=report)
+            if activity_owned:
+                end_activity("audit")
 
 
-def verify_plan_live(plan: dict) -> dict:
+def _verify_native_observations(path: str, plan: dict, window, rect) -> dict:
+    """Fresh read-only observations. Canvas labels are NOT full topology proof.
+
+    Neither the companion manifest nor DEV_MEM identifies the loaded document.
+    Until PT exposes authoritative live model/port/link read-back, don't infer
+    topologyMatches from a window, labels, old coordinates, or decoded bytes.
+    """
+    import native_verify
+    handle = _ui_window_handle(window)
+    title = _win32_window_title(handle)
+    if not title:
+        try:
+            title = window.window_text()
+        except Exception:
+            title = ""
+    process = _win32_process_path(_win32_window_pid(handle))
+    version = _verify_observed_version(process)
+    normalized_title = title.replace("\\", "/").casefold()
+    normalized_path = path.replace("\\", "/").casefold()
+    path_at = normalized_title.find(normalized_path)
+    path_end = path_at + len(normalized_path)
+    loaded = bool(path_at >= 0 and
+                  (path_end == len(normalized_title) or normalized_title[path_end] in " ]\"')")
+                  and "*" not in title)
+    words = _canvas_ocr_words(rect)
+    observed = sorted({str(word.get("text") or "") for word in words})
+    expected = sorted(str(node.get("name") or "") for node in plan.get("nodes", []))
+    evidence = {"observedAt": native_verify.utc_now(), "windowTitle": title,
+                "windowHandle": handle, "processPath": process,
+                "loadedFileMatches": loaded, "topologyMatches": False,
+                "observedLabels": observed, "expectedNodes": expected,
+                "labelsMatch": bool(expected and all(name in observed for name in expected)),
+                "topologyObservationComplete": False,
+                "versionSource": "running-process-file-version" if version else "unavailable",
+                "reason": "Full live device model/port/link identity is not observable; canvas labels alone are unverified."}
+    # Reuse the saved topology decoder and safe XML reader without audit writes
+    # or executing any RUNNINGCONFIG, steps, scripts or service definitions.
+    try:
+        import xml_guard
+        data, digest = native_verify.artifact_snapshot(path)
+        xml = pkt_builder.pkt_codec.decrypt_pkt(data)
+        root = xml_guard.fromstring(xml)
+        if root.tag != "PACKETTRACER5":
+            raise ValueError("Artifact is not a Packet Tracer topology document.")
+        nodes = pkt_audit.devices(xml)
+        links = pkt_audit.links(xml)
+        evidence["savedTopology"] = {
+            "artifactHash": digest,
+            "devices": [{"name": node["name"], "kind": node["kind"], "model": node["model"]} for node in nodes],
+            "links": links,
+            "source": "saved-artifact-only-not-live-proof",
+        }
+    except Exception as exc:
+        evidence["savedTopologyError"] = str(exc)[:240]
+    return {"packetTracerVersion": version, "openEvidence": evidence}
+
+
+def _verify_observed_version(process_path: str) -> str:
+    """Read the version resource of the executable owning the observed window."""
+    if os.name != "nt" or not process_path or os.path.basename(process_path).lower() not in _PT_PROCESS_NAMES:
+        return ""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        version = ctypes.WinDLL("version", use_last_error=True)
+        version.GetFileVersionInfoSizeW.argtypes = [wintypes.LPCWSTR, ctypes.POINTER(wintypes.DWORD)]
+        version.GetFileVersionInfoSizeW.restype = wintypes.DWORD
+        version.GetFileVersionInfoW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p]
+        version.VerQueryValueW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(wintypes.UINT)]
+        unused = wintypes.DWORD()
+        size = version.GetFileVersionInfoSizeW(process_path, ctypes.byref(unused))
+        if not size:
+            return ""
+        data = ctypes.create_string_buffer(size)
+        if not version.GetFileVersionInfoW(process_path, 0, size, data):
+            return ""
+        pointer, length = ctypes.c_void_p(), wintypes.UINT()
+        if not version.VerQueryValueW(data, "\\", ctypes.byref(pointer), ctypes.byref(length)) or length.value < 52:
+            return ""
+        values = ctypes.cast(pointer, ctypes.POINTER(wintypes.DWORD))
+        if values[0] != 0xFEEF04BD:
+            return ""
+        major_minor, patch_build = values[2], values[3]
+        return ".".join(str(part) for part in (major_minor >> 16, major_minor & 0xFFFF,
+                                               patch_build >> 16, patch_build & 0xFFFF))
+    except Exception:
+        return ""
+
+
+def verify_plan_live(plan: dict, *, activity_owned: bool = False,
+                     native_context: dict | None = None) -> dict:
     """Post-build verification: run the plan's derived test list against the
     live Packet Tracer canvas and report pass/fail per test.
 
@@ -11126,29 +11436,50 @@ def verify_plan_live(plan: dict) -> dict:
     result carries real screen evidence.  Never mutates configuration.
     """
     import pt_verify
+    import native_verify
 
+    plan = native_verify.validate_plan(plan)
     tests = pt_verify.derive_tests(plan)
     if not tests:
-        return {"ok": False,
-                "error": "no testable devices: the plan has no PCs or laptops",
-                **pt_verify.summarize([]), "tests": []}
+        return {"error": "no testable devices: the plan has no PCs or laptops",
+                "errorKind": "no-tests", **pt_verify.summarize([]), "tests": []}
     if not any(t.get("kind") not in ("custom", "manual") for t in tests):
-        # There is nothing to automate in Packet Tracer; return the honest
-        # service/security checklist without focusing or touching its window.
         manual = pt_verify.shape_results([], tests)
-        return {"ok": False,
-                "project": str(plan.get("project") or plan.get("projectName") or "default"),
-                **pt_verify.summarize(manual), "tests": manual}
+        return {"project": str(plan.get("project") or plan.get("projectName") or "default"),
+                "errorKind": "manual-only", **pt_verify.summarize(manual), "tests": manual}
 
-    acquired, busy = begin_activity("audit")
-    if not acquired:
-        return {"ok": False, "error": f"busy - {busy} active",
-                "activity": activity_snapshot(), **pt_verify.summarize([]),
-                "tests": []}
+    if not activity_owned:
+        acquired, busy = begin_activity("audit")
+        if not acquired:
+            return {"error": f"busy - {busy} active", "errorKind": "busy",
+                    "activity": activity_snapshot(), **pt_verify.summarize([]), "tests": []}
     project = str(plan.get("project") or plan.get("projectName") or "default")
+    observations = {}
     try:
+        if stopped():
+            return {"cancelled": True, "error": "Verification cancelled.",
+                    "tests": pt_verify.shape_results([], tests)}
+        path = (native_context or {}).get("artifactPath")
+        if path:
+            _pkt_open(path, make_backup=False)
+            if not _interruptible_sleep(1.0):
+                return {"cancelled": True, "error": "Verification cancelled while opening artifact.",
+                        "tests": pt_verify.shape_results([], tests)}
         w = focus_pt()
         rect = rect_of(w)
+        if path:
+            observations = _verify_native_observations(path, plan, w, rect)
+            proof = observations["openEvidence"]
+            if (proof.get("loadedFileMatches") is not True
+                    or proof.get("topologyMatches") is not True
+                    or not observations.get("packetTracerVersion")):
+                shaped = pt_verify.shape_results([], tests)
+                for row in shaped:
+                    if row["kind"] not in ("manual", "custom"):
+                        row["evidence"] = "Not run: the requested loaded artifact/version/topology identity is unverified."
+                return {**observations, "project": project, "errorKind": "unverified",
+                        "error": "Requested loaded file/version/topology could not be independently observed; no opened badge.",
+                        **pt_verify.summarize(shaped), "tests": shaped}
         log(f"VERIFY: {len(tests)} test(s) on '{project}'")
         devs = DEV_MEM.get(project, {})
         names = sorted(devs) if devs else \
@@ -11182,8 +11513,11 @@ def verify_plan_live(plan: dict) -> dict:
                     ip = pt_verify.gateway_ip_for(plan, src, dst)
                 else:
                     ip = ips.get(dst)
-                t["_dstIp"] = ip or dst
-                targets.append(t["_dstIp"])
+                t["_dstIp"] = ip or ""
+                # Native probes type only validated IP literals. A plan name
+                # (including newline/config injection) is never a command target.
+                if native_verify.safe_probe_ip(t["_dstIp"]):
+                    targets.append(t["_dstIp"])
             targets = [t for i, t in enumerate(targets)
                        if t and targets.index(t) == i][:6]
             if targets:
@@ -11193,9 +11527,27 @@ def verify_plan_live(plan: dict) -> dict:
             if dns_by_src.get(src):
                 _pc_dns_lookups(rect, src, slot, dns_by_src[src], project, rows)
 
+        if path and not stopped():
+            # Observe the document again after probes. A different document
+            # switched into the same PT window must invalidate earlier results.
+            final_window = focus_pt()
+            final_observation = _verify_native_observations(path, plan, final_window, rect_of(final_window))
+            old_proof = observations.get("openEvidence") or {}
+            new_proof = final_observation.get("openEvidence") or {}
+            unchanged = all(old_proof.get(key) == new_proof.get(key)
+                            for key in ("windowHandle", "processPath"))
+            final_observation["openEvidence"]["initialObservation"] = old_proof
+            if (not unchanged or new_proof.get("loadedFileMatches") is not True
+                    or new_proof.get("topologyMatches") is not True
+                    or observations.get("packetTracerVersion") != final_observation.get("packetTracerVersion")):
+                final_observation["openEvidence"]["topologyMatches"] = False
+                for row in rows:
+                    row.update(ok=False, status="skipped", evidence="Loaded document identity changed or became unverified during native probes.")
+            observations = final_observation
         shaped = pt_verify.shape_results(rows, tests, ips=ips)
-        report = {"ok": True, "project": project,
-                  **pt_verify.summarize(shaped), "tests": shaped}
+        report = {**observations, "project": project,
+                  **pt_verify.summarize(shaped), "tests": shaped,
+                  "cancelled": stopped()}
         # ledger: one compact verification row per run
         try:
             RUN_LEDGER.record(project, ok=report["ok"] and not report["failed"],
@@ -11208,10 +11560,12 @@ def verify_plan_live(plan: dict) -> dict:
         return report
     except Exception as e:  # noqa: BLE001 - report, don't crash the sidecar
         log(f"VERIFY failed: {e}")
-        return {"ok": False, "error": str(e), **pt_verify.summarize([]),
-                "tests": []}
+        return {**observations, "error": str(e),
+                "errorKind": "timeout" if isinstance(e, TimeoutError) else "exception",
+                **pt_verify.summarize([]), "ok": False, "tests": []}
     finally:
-        end_activity("audit")
+        if not activity_owned:
+            end_activity("audit")
 
 
 def _win_words(win, psm: int = 6) -> tuple:
@@ -13963,6 +14317,8 @@ def _pkt_interface_facts(block: bytes) -> dict:
             "power": val(port, "POWER").lower() == "true",
             "ip": val(port, "IP"),
             "subnet": val(port, "SUBNET"),
+            "ip_observed": bool(re.search(rb"<IP(?:\s[^>]*)?\s*(?:>|/>)", port)),
+            "mask_observed": bool(re.search(rb"<SUBNET(?:\s[^>]*)?\s*(?:>|/>)", port)),
         })
     by_family: dict[str, list[dict]] = {}
     for port in ports:
@@ -13985,11 +14341,18 @@ def _pkt_interface_facts(block: bytes) -> dict:
         family = pkt_builder._family_from_request(
             pkt_builder.normalize_port_name(name))
         siblings = by_family.get(family, [])
-        # nth interface of this family in the config -> nth port element
-        ordinal = sum(1 for known in facts
-                      if pkt_builder._family_from_request(
-                          pkt_builder.normalize_port_name(known)) == family)
-        port = siblings[ordinal] if ordinal < len(siblings) else None
+        # A sub-interface/virtual interface is config, not another physical
+        # PORT. Pair only complete one-to-one physical families; an incomplete
+        # config must not attribute a different raw port's IP to this name.
+        physical = [known for known in blocks
+                    if "." not in known and pkt_builder._family_from_request(
+                        pkt_builder.normalize_port_name(known)) == family]
+        ordinal = physical.index(name) if name in physical else -1
+        port = (siblings[ordinal] if family and ordinal >= 0
+                and len(physical) == len(siblings) else None)
+        # Preserve the existing advisory power/clock diagnostics. The added
+        # address proof flags below are stricter and never use this fallback.
+        advisory_port = siblings[ordinal] if 0 <= ordinal < len(siblings) else None
         clock = ""
         for text in sub:
             m = re.match(r"^clock rate\s+(\d+)$", text, re.I)
@@ -13998,9 +14361,11 @@ def _pkt_interface_facts(block: bytes) -> dict:
         facts[name] = {
             "family": family,
             "index": ordinal,
-            "power": port["power"] if port else None,
+            "power": advisory_port["power"] if advisory_port else None,
             "ip": port["ip"] if port else "",
             "subnet": port["subnet"] if port else "",
+            "ip_observed": port["ip_observed"] if port else False,
+            "mask_observed": port["mask_observed"] if port else False,
             "clock": clock,
             "shutdown": "shutdown" in lowered and "no shutdown" not in lowered,
             "no_shutdown": "no shutdown" in lowered,
@@ -14015,6 +14380,40 @@ def _cli_kind(kind: str) -> bool:
                                                "multilayer switch")
 
 
+def _pkt_saved_service_states(block: bytes) -> dict:
+    """Only actual saved enabled flags; missing is unknown, never off.
+
+    Kept separate from the older service/detail inventory, which intentionally
+    omitted several disabled panels and is still used by the audit UI.
+    """
+    panels = {
+        "dhcp": "DHCP_SERVER", "dns": "DNS_SERVER", "http": "HTTP_SERVER",
+        "https": "HTTPS_SERVER", "aaa": "ACS_SERVER", "ftp": "FTP_SERVER",
+        "email": "EMAIL_SERVER", "syslog": "SYSLOG_SERVER", "ntp": "NTP_SERVER",
+        "tftp": "TFTP_SERVER", "dhcpv6": "DHCPV6_SERVER", "snmp": "SNMP_MANAGER",
+        "iot": "REGISTRATION_SEVER", "vm": "IOX_VM_MANAGER",
+    }
+    states = {}
+    for role, tag in panels.items():
+        bodies = re.findall(rb"<" + tag.encode() + rb"(?:\s[^>]*)?>(.*?)</" + tag.encode() + rb">", block, re.S)
+        if not bodies:
+            continue
+        flag_tag = b"SMTP_ENABLED" if role == "email" else b"ENABLED"
+        flags = []
+        for body in bodies:
+            match = re.search(rb"<" + flag_tag + rb">\s*([^<]*)\s*</" + flag_tag + rb">", body)
+            value = match.group(1).strip().lower() if match else b""
+            flags.append(True if value in (b"1", b"true") else False if value in (b"0", b"false") else None)
+        states[role] = True if True in flags else False if all(flag is False for flag in flags) else None
+    if "https" not in states:
+        http = re.search(rb"<HTTP_SERVER(?:\s[^>]*)?>(.*?)</HTTP_SERVER>", block, re.S)
+        match = re.search(rb"<HTTPSENABLED>\s*([^<]*)</HTTPSENABLED>", http.group(1)) if http else None
+        if match:
+            value = match.group(1).strip().lower()
+            states["https"] = True if value in (b"1", b"true") else False if value in (b"0", b"false") else None
+    return states
+
+
 def pkt_audit_network(path: str, project: str = "") -> dict:
     """Audit a saved .pkt OFFLINE: no Packet Tracer, no window, no clicks.
 
@@ -14027,7 +14426,19 @@ def pkt_audit_network(path: str, project: str = "") -> dict:
     """
     path = _pkt_path(path, must_exist=True)
     project = (project or "default").strip() or "default"
-    xml = pkt_builder.decode_pkt_file(path)
+    # One read supplies BOTH the decoder and digest. A path may be replaced
+    # while the audit runs; a second independent hash read could bind old
+    # observations to new bytes and falsely refresh an old success.
+    with open(path, "rb") as stream:
+        saved_bytes = stream.read()
+    xml = pkt_builder.pkt_codec.decrypt_pkt(saved_bytes)
+    artifact_hash = hashlib.sha256(saved_bytes).hexdigest()
+    inventory_complete = bool(
+        re.search(rb"<PACKETTRACER5(?:\s[^>]*)?>", xml)
+        and b"</PACKETTRACER5>" in xml
+        and len(re.findall(rb"<DEVICE(?:\s[^>]*)?>", xml))
+        == len(re.findall(rb"<DEVICE>.*?</DEVICE>", xml, re.S))
+        == len(re.findall(rb"</DEVICE\s*>", xml)))
     # FINDINGS THIS PROJECT HAS ALREADY FIXED.  The read side of the repair
     # loop: a class a re-audit once proved cleared is reported as proven, so
     # the answer to "have we seen this before?" comes from what actually
@@ -14080,11 +14491,14 @@ def pkt_audit_network(path: str, project: str = "") -> dict:
             status = ("up" if power else "administratively down") \
                 if power is not None else "unknown"
             interfaces.append({"name": ifname, "status": status,
-                               "ip": fact["ip"],
+                               "ip": fact["ip"], "mask": fact["subnet"],
+                               "ipObserved": fact["ip_observed"],
+                               "maskObserved": fact["mask_observed"],
+                               "source": "saved-port",
                                "clock": fact["clock"]})
             if not _cli_kind(kind):
                 continue
-            if fact["ip_in_config"] and not fact["ip"]:
+            if fact["ip_in_config"] and fact["ip_observed"] and not fact["ip"]:
                 match = re.search(
                     rf"interface\s+{re.escape(ifname)}.*?ip address\s+(\S+)\s+(\S+)",
                     "\n".join(config_lines), re.I | re.S)
@@ -14099,14 +14513,29 @@ def pkt_audit_network(path: str, project: str = "") -> dict:
                 add("info", f"{ifname} carries saved IP {fact['ip']} but the "
                             "running config has no 'ip address' for it")
 
+        logical = re.search(rb"<LOGICAL(?:\s[^>]*)?>(.*?)</LOGICAL>", block, re.S)
+        position = {}
+        if logical:
+            for axis in ("x", "y"):
+                value = re.search(rb"<" + axis.upper().encode() + rb">([^<]+)</" + axis.upper().encode() + rb">", logical.group(1))
+                if value:
+                    try:
+                        coordinate = float(value.group(1))
+                        if coordinate == coordinate and abs(coordinate) != float("inf"):
+                            position[axis] = coordinate
+                    except ValueError:
+                        pass
         devices_report.append({
             "name": name,
             "type": kind or "device",
             "model": model,
             "interfaces": interfaces,
+            "interfacesComplete": bool(interfaces) and all(f["ipObserved"] for f in interfaces),
             "config_lines": len(config_lines),
             "findings": findings,
             "services": [],
+            "serviceStates": _pkt_saved_service_states(block),
+            **({"position": position} if len(position) == 2 else {}),
             "probes": [],
             "ipcfg": {},
         })
@@ -14373,6 +14802,11 @@ def pkt_audit_network(path: str, project: str = "") -> dict:
     summary = _audit_summary(devices_report, red_indicators)
     return {
         "mode": "offline",
+        "artifactHash": artifact_hash,
+        "hashBinding": "saved-bytes-v1",
+        "inventoryComplete": inventory_complete and (
+            len(re.findall(rb"<LINK(?:\s[^>]*)?>", xml))
+            == len(cable_rows) == len(re.findall(rb"</LINK\s*>", xml))),
         "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
         "path": path,
         "project": project,
@@ -16599,6 +17033,35 @@ class H(BaseHTTPRequestHandler):
     # read turns both into one timed-out request.
     timeout = 30
 
+    def _guard(self, *, allow_without_token: bool = False) -> bool:
+        """Refuse a request this app could not have sent. True = keep going.
+
+        Runs before every handler, because the handlers click and type. The
+        checks are intentionally blunt: the only client that needs to talk to
+        this server is the Flutter app on this machine, and it sends no
+        Origin header at all.
+        """
+        if self.headers.get("Origin") is not None:
+            self._json({"ok": False,
+                        "error": "Cross-origin requests are not accepted."},
+                       403)
+            return False
+        host = self.headers.get("Host")
+        if host and _host_name(host) not in _LOOPBACK_HOSTS:
+            self._json({"ok": False,
+                        "error": "This engine only answers on the loopback "
+                                 "interface."}, 403)
+            return False
+        token = _sidecar_token()
+        if token and not allow_without_token:
+            supplied = (self.headers.get("Authorization") or "").strip()
+            if not hmac.compare_digest(supplied.encode(),
+                                       ("Bearer " + token).encode()):
+                self._json({"ok": False,
+                            "error": "Missing or invalid engine token."}, 401)
+                return False
+        return True
+
     def _json(self, obj, code=200):
         b = json.dumps(obj).encode()
         self.send_response(code)
@@ -16608,6 +17071,8 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(b)
 
     def do_GET(self):
+        if not self._guard(allow_without_token=(self.path == "/health")):
+            return
         if self.path == "/health":
             self._json({"ok": True, "rpa": HAS_RPA,
                         "ocr": bool(TESSERACT_CMD), "version": VERSION,
@@ -16745,6 +17210,19 @@ class H(BaseHTTPRequestHandler):
                 self._json({"ok": True, "running": AUDIT["running"],
                             "activity": _active_activity_locked() or None,
                             "report": AUDIT["report"]})
+        elif self.path.split("?", 1)[0] == "/verify/report":
+            from urllib.parse import urlparse, parse_qs
+            try:
+                query = parse_qs(urlparse(self.path).query, keep_blank_values=True, max_num_fields=8)
+            except ValueError:
+                self._json({"ok": False, "error": "Too many report query fields."}, 400)
+                return
+            ids = query.get("runId")
+            if ids is not None and len(ids) != 1:
+                self._json({"ok": False, "error": "Specify one runId."}, 400)
+                return
+            payload, code = _verify_report_payload(ids[0] if ids else None)
+            self._json(payload, code)
         elif self.path == "/pkt/status":
             with LOCK:
                 self._json({"ok": True, **dict(PKT_STATE),
@@ -16762,7 +17240,32 @@ class H(BaseHTTPRequestHandler):
             self._json({"error": "not found"}, 404)
 
     def do_POST(self):
-        n = int(self.headers.get("Content-Length", 0))
+        if not self._guard():
+            return
+        if _sidecar_token():
+            # Enforced only alongside the token: a browser cannot set this
+            # header cross-origin without a CORS preflight, so it is part of
+            # the same defence. Left off for a hand-started engine so a plain
+            # urllib caller (and the tests) still work.
+            supplied = (self.headers.get("Content-Type") or "")
+            if supplied.split(";", 1)[0].strip().lower() != "application/json":
+                self._json({"ok": False,
+                            "error": "POST bodies must be application/json."},
+                           415)
+                return
+        native_route = self.path.split("?", 1)[0] in ("/verify/run", "/verify/report", "/verify/derive")
+        try:
+            n = int(self.headers.get("Content-Length", 0))
+        except ValueError:
+            self._json({"ok": False, "error": "Invalid Content-Length."}, 400)
+            return
+        limit = VERIFY_BODY_BYTES if native_route else MAX_BODY_BYTES
+        if n < 0 or n > limit:
+            self._json({"ok": False, "error": (
+                "Verification payload exceeds the 2 MiB limit."
+                if native_route else
+                "Request body exceeds the 32 MiB limit.")}, 413)
+            return
         body = self.rfile.read(n) if n else b"{}"
         if self.path == "/ocr":
             # Read an attached image with the engine's own Tesseract - no
@@ -17475,7 +17978,11 @@ class H(BaseHTTPRequestHandler):
             finally:
                 end_activity("calibration")
             return
-        elif self.path == "/teach":
+        elif self.path == "/calibration/teach":
+            # Hover-calibration for one named spot. This used to be spelled
+            # "/teach" too, but the corrections handler above claims
+            # "/teach" and returns on every path, so this branch was
+            # unreachable dead code. Calibration gets its own name.
             try:
                 req = json.loads(body.decode() or "{}")
             except Exception as e:
@@ -17556,32 +18063,35 @@ class H(BaseHTTPRequestHandler):
             self._json({"ok": True, "tests": tests,
                         **pt_verify.summarize([])})
         elif self.path == "/verify/run":
-            # LIVE post-build verification: pings every derived test through
-            # Packet Tracer and reports pass/fail evidence. Runs in a thread
-            # (it drives the GUI); the app polls /verify/report.
+            # Optional native binding: artifactPath, artifactHash and complete
+            # BuildActionIdentity. Claims the existing audit owner atomically.
             try:
                 req = json.loads(body.decode() or "{}")
-            except Exception as e:
-                self._json({"ok": False, "error": f"bad json: {e}"}, 400)
+            except Exception as exc:
+                self._json({"ok": False, "error": f"bad json: {exc}"}, 400)
                 return
-            plan = req.get("plan") if isinstance(req.get("plan"), dict) else req
-            if not isinstance(plan, dict) or not plan:
-                self._json({"ok": False, "error": "missing plan"}, 400)
+            payload, code = _verify_start(req)
+            self._json(payload, code)
+        elif self.path.split("?", 1)[0] == "/verify/report":
+            # Keep POST/no-id retrieval for historical clients; it cannot
+            # accidentally substitute history for a runId-specific request.
+            from urllib.parse import urlparse, parse_qs
+            try:
+                req = json.loads(body.decode() or "{}")
+                if not isinstance(req, dict):
+                    raise ValueError("Report request must be a JSON object.")
+                query = parse_qs(urlparse(self.path).query, keep_blank_values=True, max_num_fields=8)
+                ids = query.get("runId")
+                if ids is not None and len(ids) != 1:
+                    raise ValueError("Specify one runId.")
+                run_id = ids[0] if ids else req.get("runId")
+                if ids and "runId" in req and req["runId"] != run_id:
+                    raise ValueError("Conflicting runId in query and body.")
+            except (ValueError, TypeError) as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
                 return
-            if VERIFY_STATE.get("running"):
-                self._json({"ok": False, "error": "verification already running"},
-                           409)
-                return
-            VERIFY_STATE["running"] = True
-            VERIFY_STATE["report"] = None
-            threading.Thread(target=_verify_run_async, args=(plan,),
-                             daemon=True).start()
-            self._json({"ok": True, "msg": "verification running - poll "
-                        "/verify/report"})
-        elif self.path == "/verify/report":
-            rep = VERIFY_STATE.get("report")
-            self._json({"ok": True, "running": bool(VERIFY_STATE.get("running")),
-                        "report": rep})
+            payload, code = _verify_report_payload(run_id)
+            self._json(payload, code)
         elif self.path == "/dry_run":
             # Walk the plan WITHOUT Packet Tracer: pure logic, instant, no
             # focus steal - the chat shows what a live run would do and the

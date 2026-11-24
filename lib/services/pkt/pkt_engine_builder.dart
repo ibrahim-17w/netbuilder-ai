@@ -231,6 +231,25 @@ PktTemplatePort? exactPort(PktTemplateDevice variant, String spec) {
       return port;
     }
   }
+  // A plan written before the generic-port rename still spells the invented
+  // interface name ("FastEthernet0") for kinds PT labels "Port 0". Same
+  // slot, same pin.
+  if (variant.usesGenericPortNames) {
+    final digits = RegExp(r'\d+$').firstMatch(spec.trim());
+    final familyGuess = RegExp(
+      r'^(?:FastEthernet|GigabitEthernet|Ethernet)\d+$',
+    ).hasMatch(spec.trim());
+    if (digits != null && (familyGuess || want.startsWith('port'))) {
+      final slot = int.parse(digits.group(0)!);
+      const families = <String>{'ethernet', 'fastethernet', 'gigabitethernet'};
+      var seen = 0;
+      for (final port in variant.ports) {
+        if (!families.contains(port.family)) continue;
+        if (seen == slot && port.name.startsWith('Port ')) return port;
+        seen++;
+      }
+    }
+  }
   return null;
 }
 
@@ -361,6 +380,67 @@ Future<(PktTemplateDevice?, List<String>)> selectVariant(
   final hint = '${node['model'] ?? ''}'.trim();
   final requested = PacketTracerCatalog.instance.device(hint);
   final requiredModules = List<String>.from(node['modules'] ?? const []);
+  final variantKey = node['variantKey'];
+  if (variantKey != null) {
+    if (variantKey is! String) {
+      throw PktBuildFailure(
+        '$name: variantKey must be a string. No fallback was made.',
+      );
+    }
+    final pinned = library.deviceByKey(variantKey);
+    if (pinned == null ||
+        requested == null ||
+        requested.type != nodeType ||
+        ptIdentity(pinned.model) != ptIdentity(requested.model) ||
+        !_kindMatches(pinned.kind, nodeType)) {
+      throw PktBuildFailure(
+        '$name: pinned variant "$variantKey" does not match a buildable $nodeType model "$hint". No fallback was made.',
+      );
+    }
+    if (!requiredModules.every(
+      (module) => pinned.modules.any(
+        (available) => ptIdentity(available) == ptIdentity(module),
+      ),
+    )) {
+      throw PktBuildFailure(
+        '$name: pinned variant "$variantKey" does not contain the requested modules. No fallback was made.',
+      );
+    }
+    final mismatch = await _templateIdentityMismatch(library, pinned);
+    if (mismatch.isNotEmpty) {
+      throw PktBuildFailure(
+        '$name: pinned variant "$variantKey" has an incompatible template: $mismatch. No fallback was made.',
+      );
+    }
+    final named = pinned.withNamedPorts();
+    for (final spec in wanted) {
+      if (exactPort(named, spec) == null) {
+        throw PktBuildFailure(
+          '$name: exact port "$spec" is unavailable on pinned variant "$variantKey". No port remap was made.',
+        );
+      }
+    }
+    final media = Map<String, dynamic>.from(
+      node['portMedia'] as Map? ?? const {},
+    );
+    for (final constraint in media.entries) {
+      final cable = PacketTracerCatalog.instance.cable('${constraint.value}');
+      final port = exactPort(named, constraint.key);
+      final single = pinned.modules.any(
+        (m) => const ['GLC-LH-SMD', 'GLC-LX-SM-RGD'].contains(m.toUpperCase()),
+      );
+      if (cable == null ||
+          port == null ||
+          !cable.accepts(PtPort(port.name, port.type, port.family)) ||
+          ((cable.id == 'fiber-single' || cable.id == 'fiber-multi') &&
+              (cable.id == 'fiber-single') != single)) {
+        throw PktBuildFailure(
+          '$name: pinned variant "$variantKey" cannot use ${constraint.value} on ${constraint.key}. No fallback was made.',
+        );
+      }
+    }
+    return (pinned, const <String>[]);
+  }
   final exact = node['exactModel'] == true || requiredModules.isNotEmpty;
   if (exact && (requested == null || requested.type != nodeType)) {
     throw PktBuildFailure(
@@ -475,7 +555,9 @@ Future<(PktTemplateDevice?, List<String>)> selectVariant(
 
   // Python's tuple key `(fits, coverage, hint, -len(ports))`, compared by
   // hand: fits dominates, then coverage, then the model hint, then fewer
-  // ports wins.
+  // ports wins. When a new many-port model joins the library the winner can
+  // legitimately change (Switch-PT over IE-2000 in 2026-11-14) - the parity
+  // fixture's recorded expectations then need a refresh, not this loop.
   int compare(PktTemplateDevice a, PktTemplateDevice b) {
     final (fa, fb) = (fits(a), fits(b));
     if (fa != fb) return fa.compareTo(fb);
@@ -1339,7 +1421,8 @@ Map<String, String> _serviceElements(
       '<POOL><NAME>${_svc(poolName)}</NAME><NETWORK>'
       '${_svc(network)}</NETWORK><MASK>${_svc(mask)}</MASK>'
       '<DEFAULT_ROUTER>${_svc('${pool['gateway'] ?? '0.0.0.0'}')}'
-      '</DEFAULT_ROUTER><TFTP_ADDRESS>0.0.0.0</TFTP_ADDRESS>'
+      '</DEFAULT_ROUTER><TFTP_ADDRESS>'
+      '${_svc('${pool['tftpAddress'] ?? '0.0.0.0'}')}</TFTP_ADDRESS>'
       '<START_IP>${_svc(start)}</START_IP><END_IP>${_svc(end)}</END_IP>'
       '<DNS_SERVER>${_svc('${pool['dnsServer'] ?? '0.0.0.0'}')}'
       '</DNS_SERVER><MAX_USERS>${_svc('${pool['maxUsers'] ?? '100'}')}'
@@ -1844,6 +1927,60 @@ xml.XmlElement? _findFirst(xml.XmlElement scope, String name) {
 /// would read a child leaf's fields as its ancestor's.
 String _childText(xml.XmlElement scope, String name) =>
     scope.getElement(name)?.innerText.trim() ?? '';
+
+/// Give a chosen template PT's physical-workspace fields when it has none.
+///
+/// Packet Tracer insists every cabled device have a physical leaf, and a save
+/// whose device has no PHYSICAL_CPUR at all is refused as an invalid file (a
+/// Cloud-PT built from such a template is the observed case - verified by
+/// opening the result in Packet Tracer 9.0.0). The placement record - X, Y,
+/// slot and ancestry - is not module layout, so another saved block of the
+/// same model supplies it verbatim, and a block of the same kind is an honest
+/// donor when the model has no other variant. Nothing is invented: with no
+/// donor the device stays Logical-workspace only, as before.
+Future<({String block, String donor})> _withPhysicalWorkspace(
+  PktTemplateLibrary library,
+  PktTemplateDevice variant,
+  String block,
+) async {
+  if (block.contains('<PHYSICAL_CPUR')) return (block: block, donor: '');
+  final kind = variant.kind.trim().toLowerCase();
+  final model = ptIdentity(variant.model);
+  final matchers = <bool Function(PktTemplateDevice)>[
+    (d) => ptIdentity(d.model) == model,
+    (d) => kind.isNotEmpty && d.kind.trim().toLowerCase() == kind,
+  ];
+  for (final matches in matchers) {
+    for (final entry in library.devices) {
+      if (entry.key == variant.key || !matches(entry)) continue;
+      String donor;
+      try {
+        donor = await library.blockFor(entry.file);
+      } on PktBuildFailure {
+        continue;
+      }
+      final cpur = RegExp(
+        r'<PHYSICAL_CPUR>.*?</PHYSICAL_CPUR>',
+        dotAll: true,
+      ).firstMatch(donor);
+      if (cpur == null) continue;
+      // `<PHYSICAL>` is the leaf pointer the rebuild rewrites afterwards; a
+      // template with no workspace holds neither field, so both go in.
+      var added = cpur.group(0)!;
+      if (!RegExp(r'<PHYSICAL[\s/>]').hasMatch(block)) {
+        added = '<PHYSICAL></PHYSICAL>$added';
+      }
+      final patched = block.contains('</WORKSPACE>')
+          ? block.replaceFirst('</WORKSPACE>', '$added</WORKSPACE>')
+          : block.replaceFirst(
+              '</DEVICE>',
+              '<WORKSPACE>$added</WORKSPACE></DEVICE>',
+            );
+      return (block: patched, donor: entry.key);
+    }
+  }
+  return (block: block, donor: '');
+}
 
 String _setPhysicalIdentity({
   required String block,
@@ -2655,7 +2792,9 @@ Future<PktEngineBuild> buildPkt({
     final (selected, notes) = await selectVariant(library, {
       ...node,
       'portMedia': {
-        for (final link in sections.links.where((l) => l['exactPorts'] == true))
+        for (final link in sections.links.where(
+          (l) => l['exactPorts'] == true || node['variantKey'] != null,
+        ))
           for (final side in ['a', 'b'])
             if (link[side] == name && link['cable'] != null)
               '${link['${side}If']}': link['cable'],
@@ -2667,7 +2806,9 @@ Future<PktEngineBuild> buildPkt({
     // [PktTemplateDevice.withNamedPorts]. Judging the whole library by named
     // ports changes which model is picked.
     final variant = selected.withNamedPorts();
-    for (final link in sections.links.where((l) => l['exactPorts'] == true)) {
+    for (final link in sections.links.where(
+      (l) => l['exactPorts'] == true || node['variantKey'] != null,
+    )) {
       for (final side in ['a', 'b']) {
         if (link[side] != name) continue;
         final spec = '${link['${side}If'] ?? ''}';
@@ -2684,8 +2825,19 @@ Future<PktEngineBuild> buildPkt({
     try {
       block = await library.blockFor(variant.file);
     } on PktBuildFailure catch (e) {
+      if (node['variantKey'] != null) rethrow;
       warnings.add('$name: ${e.message}');
       continue;
+    }
+    final physical = await _withPhysicalWorkspace(library, variant, block);
+    block = physical.block;
+    if (physical.donor.isNotEmpty) {
+      warnings.add(
+        '$name: the saved ${variant.model} template carries no '
+        'physical-workspace data, so ${physical.donor} supplied the '
+        'placement fields Packet Tracer requires; without them a cabled '
+        'device makes PT refuse the file as Invalid File',
+      );
     }
     variantsUsed[name] = variant;
     final spot = positions[name] ?? (_xStart, _defaultRowY);
@@ -2832,17 +2984,26 @@ Future<PktEngineBuild> buildPkt({
       if (target == null) {
         warnings.add('$name: no Ethernet port found for its IP settings');
       } else {
-        final fields = <String, String>{'PORT_DHCP_ENABLE': 'false'};
-        if ('${settings['ip'] ?? ''}'.isNotEmpty) {
+        final dhcp = '${settings['dhcp'] ?? ''}'.toLowerCase() == 'true';
+        final fields = <String, String>{
+          'PORT_DHCP_ENABLE': dhcp ? 'true' : 'false',
+          if (dhcp) ...{
+            'IP': '0.0.0.0',
+            'SUBNET': '0.0.0.0',
+            'PORT_GATEWAY': '0.0.0.0',
+            'PORT_DNS': '0.0.0.0',
+          },
+        };
+        if (!dhcp && '${settings['ip'] ?? ''}'.isNotEmpty) {
           fields['IP'] = '${settings['ip']}';
         }
-        if ('${settings['mask'] ?? ''}'.isNotEmpty) {
+        if (!dhcp && '${settings['mask'] ?? ''}'.isNotEmpty) {
           fields['SUBNET'] = '${settings['mask']}';
         }
-        if ('${settings['gw'] ?? ''}'.isNotEmpty) {
+        if (!dhcp && '${settings['gw'] ?? ''}'.isNotEmpty) {
           fields['PORT_GATEWAY'] = '${settings['gw']}';
         }
-        if ('${settings['dns'] ?? ''}'.isNotEmpty) {
+        if (!dhcp && '${settings['dns'] ?? ''}'.isNotEmpty) {
           fields['PORT_DNS'] = '${settings['dns']}';
         }
         if ('${settings['ipv6'] ?? ''}'.toLowerCase() == 'true') {
@@ -2896,6 +3057,7 @@ Future<PktEngineBuild> buildPkt({
       if (deviceReportServices.isNotEmpty) 'services': deviceReportServices,
       'model': variant.model,
       'template': variant.key,
+      'variantKey': variant.key,
       'x': spot.$1,
       'y': spot.$2,
       'configLines': configLines.length,

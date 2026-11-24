@@ -1,13 +1,20 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show File;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/build_record.dart';
 import '../models/network_intent.dart';
+import '../models/pkt_verification.dart';
 import '../services/autopilot_service.dart';
 import '../services/memory_service.dart';
 import '../services/project_checks.dart';
 import '../services/plan_version_service.dart';
 import '../services/settings_service.dart';
+import '../services/pkt_build_job_service.dart';
+import '../services/request_understanding/artifact_evidence_service.dart';
+import '../services/request_understanding/build_action_identity.dart';
+import '../widgets/pkt_verification_status.dart';
 
 class ProjectChecksScreen extends StatefulWidget {
   final BuildRecord record;
@@ -17,13 +24,46 @@ class ProjectChecksScreen extends StatefulWidget {
 }
 
 class _ProjectChecksScreenState extends State<ProjectChecksScreen> {
-  late final plan = NetworkIntent.fromJson(
+  late NetworkIntent plan = NetworkIntent.fromJson(
     Map<String, dynamic>.from(jsonDecode(widget.record.intentJson)),
   );
   late ProjectChecks store;
   List<ProjectCheck> checks = [];
   bool busy = true;
+  bool _running = false;
+  bool _stopRequested = false;
+  int _runSequence = 0;
+  String _runId = '';
+  AutopilotService? _runEngine;
   String error = '';
+
+  BuildActionIdentity get _action {
+    final outcome = PlanVersionService.requestOutcomeOf(widget.record);
+    final stored = PlanVersionService.actionIdentityOf(widget.record);
+    final outcomeProject = outcome?.interpretation.projectId;
+    final projectId = stored?.projectId.isNotEmpty == true
+        ? stored!.projectId
+        : outcomeProject?.isNotEmpty == true
+        ? outcomeProject!
+        : PlanVersionService.projectKeyOf(widget.record);
+    return BuildActionIdentity.forPlan(
+      plan: plan,
+      requirements: outcome?.interpretation.requirements ?? const [],
+      target: widget.record.target,
+      projectId: projectId,
+    );
+  }
+
+  @override
+  void dispose() {
+    _runSequence++;
+    final engine = _runEngine;
+    if (engine != null && _runId.isNotEmpty) {
+      unawaited(_stopMatchingRun(engine, _runId));
+    }
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -32,22 +72,62 @@ class _ProjectChecksScreenState extends State<ProjectChecksScreen> {
       PlanVersionService.projectKeyOf(widget.record),
     );
     _load();
+    unawaited(PktBuildJobService.instance.loadHistory());
+  }
+
+  @override
+  void didUpdateWidget(covariant ProjectChecksScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.record.intentJson != widget.record.intentJson ||
+        oldWidget.record.projectKey != widget.record.projectKey ||
+        oldWidget.record.projectName != widget.record.projectName ||
+        oldWidget.record.target != widget.record.target) {
+      final engine = _runEngine;
+      if (engine != null && _runId.isNotEmpty) {
+        unawaited(_stopMatchingRun(engine, _runId));
+      }
+      _runSequence++;
+      _running = false;
+      _runId = '';
+      _runEngine = null;
+      plan = NetworkIntent.fromJson(
+        Map<String, dynamic>.from(jsonDecode(widget.record.intentJson)),
+      );
+      store = ProjectChecks(
+        context.read<MemoryService>(),
+        PlanVersionService.projectKeyOf(widget.record),
+      );
+      checks = [];
+      busy = true;
+      error = '';
+      unawaited(_load());
+    }
   }
 
   Future<void> _load() async {
+    final loadingStore = store;
     try {
-      final rows = await store.load();
-      if (mounted) setState(() => checks = rows);
+      final rows = await loadingStore.load();
+      if (mounted && identical(store, loadingStore)) {
+        setState(() => checks = rows);
+      }
     } catch (_) {
-      if (mounted) setState(() => error = 'Saved checks could not be loaded.');
+      if (mounted && identical(store, loadingStore)) {
+        setState(() => error = 'Saved checks could not be loaded.');
+      }
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted && identical(store, loadingStore)) {
+        setState(() => busy = false);
+      }
     }
   }
 
   Future<void> _save(List<ProjectCheck> rows) async {
-    await store.save(rows);
-    if (mounted) setState(() => checks = rows);
+    final savingStore = store;
+    await savingStore.save(rows);
+    if (mounted && identical(store, savingStore)) {
+      setState(() => checks = rows);
+    }
   }
 
   Future<void> _add() async {
@@ -126,36 +206,185 @@ class _ProjectChecksScreenState extends State<ProjectChecksScreen> {
   }
 
   Future<void> _run() async {
+    if (busy) return;
+    final action = _action;
+    final sequence = ++_runSequence;
+    final engine = AutopilotService.of(context);
+    final jobs = PktBuildJobService.instance;
+    _runEngine = engine;
     setState(() {
       busy = true;
+      _running = true;
+      _stopRequested = false;
+      _runId = '';
       error = '';
     });
+    bool current() => mounted && sequence == _runSequence && _action == action;
     try {
-      final engine = AutopilotService.of(context);
-      if (!await engine.healthy) throw StateError('engine unavailable');
-      await engine.verifyRun(ProjectChecks.request(plan, checks));
-      Map<String, dynamic>? report;
-      for (var i = 0; i < 90; i++) {
+      await jobs.loadHistory();
+      final entry = jobs.history
+          .where(
+            (entry) =>
+                entry.actionIdentity == action &&
+                entry.filePath.isNotEmpty &&
+                ArtifactEvidenceService.validHash(entry.artifactHash),
+          )
+          .firstOrNull;
+      if (entry == null) {
+        throw StateError(
+          'No current saved file is bound to this plan and action. Generate '
+          'the .pkt first; live checks remain unverified.',
+        );
+      }
+      final hash = await ArtifactEvidenceService.contentHash(
+        File(entry.filePath),
+      );
+      if (!entry.matchesArtifact(action, hash)) {
+        throw StateError(
+          'The saved file changed. Rebuild or re-audit the current file '
+          'before native testing; live checks remain unverified.',
+        );
+      }
+      if (!current() || _stopRequested) return;
+      if (!await engine.healthy) throw StateError(engine.hint);
+      if (!current() || _stopRequested) return;
+      final runId = await engine.verifyRun(
+        ProjectChecks.request(plan, checks),
+        artifactPath: entry.filePath,
+        artifactHash: hash,
+        actionIdentity: action,
+      );
+      if (!current()) {
+        await _stopMatchingRun(engine, runId);
+        return;
+      }
+      _runId = runId;
+      if (runId.isEmpty) throw StateError('Native engine returned no run ID.');
+      if (_stopRequested) await _stopMatchingRun(engine, runId);
+      final deadline = DateTime.now().add(const Duration(minutes: 10));
+      while (DateTime.now().isBefore(deadline)) {
+        if (!current()) {
+          await _stopMatchingRun(engine, runId);
+          return;
+        }
+        final report = await engine.verifyReport(runId: runId);
+        if (!current()) {
+          await _stopMatchingRun(engine, runId);
+          return;
+        }
+        if (report != null &&
+            report['runId'] == runId &&
+            report['running'] == false &&
+            const [
+              'completed',
+              'failed',
+              'cancelled',
+            ].contains(report['state'])) {
+          if (_stopRequested || report['state'] != 'completed') {
+            throw StateError(
+              'Live checks were stopped or failed; no successful '
+              'completion was recorded.',
+            );
+          }
+          final recorded = await jobs.recordNativeVerification(
+            report,
+            jobId: entry.id,
+            expectedRunId: runId,
+          );
+          if (!current()) return;
+          if (!recorded) {
+            throw StateError(
+              'The completed report does not match the current '
+              'saved file and action. Live checks remain unverified.',
+            );
+          }
+          final summary = jobs.history
+              .where((row) => row.id == entry.id)
+              .firstOrNull
+              ?.verification;
+          // The job service validates native identity and file-open proof.
+          // Raw per-test counters alone must not promote saved project checks.
+          if (summary?.nativeOpenState != PktVerificationCheckState.passed) {
+            throw StateError(
+              'Native file-open/topology evidence was not proven. '
+              'Saved project checks remain unverified.',
+            );
+          }
+          final normalized = <String, dynamic>{
+            ...report,
+            'tests': [
+              for (final raw
+                  in (report['tests'] as List? ?? const []).whereType<Map>())
+                {
+                  ...raw,
+                  'status': switch (raw['status']) {
+                    'pass' => 'passed',
+                    'fail' => 'failed',
+                    _ => raw['status'],
+                  },
+                },
+            ],
+          };
+          await _save([
+            for (final check in checks)
+              ProjectChecks.applyReport(check, plan, normalized),
+          ]);
+          return;
+        }
         await Future<void>.delayed(const Duration(seconds: 1));
-        if (!mounted) return;
-        report = await engine.verifyReport();
-        if (report != null && report['running'] != true) break;
       }
-      if (report == null || report['running'] == true) {
-        throw StateError('no completed report');
-      }
-      await _save([
-        for (final c in checks) ProjectChecks.applyReport(c, plan, report),
-      ]);
-    } catch (_) {
-      if (mounted) {
+      final stopSent = await _stopMatchingRun(engine, runId);
+      throw TimeoutException(
+        'Live checks timed out. '
+        '${stopSent ? 'Stop was requested.' : 'The active run could not be confirmed; use Stop in the engine.'} '
+        'No completed evidence was recorded. Check the engine before retrying.',
+      );
+    } catch (failure) {
+      if (_runId.isNotEmpty) await _stopMatchingRun(engine, _runId);
+      if (current()) {
         setState(
-          () => error =
-              'Live checks were not completed. Open the matching project in Packet Tracer and check the local engine.',
+          () => error = failure
+              .toString()
+              .replaceFirst('Bad state: ', '')
+              .replaceFirst('Exception: ', ''),
         );
       }
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted && sequence == _runSequence) {
+        setState(() {
+          busy = false;
+          _running = false;
+          _runId = '';
+          _runEngine = null;
+        });
+      }
+    }
+  }
+
+  Future<bool> _stopMatchingRun(AutopilotService engine, String runId) async {
+    try {
+      final report = await engine.verifyReport(runId: runId);
+      if (report?['runId'] == runId && report?['running'] == true) {
+        await engine.stop();
+        return true;
+      }
+    } catch (_) {
+      // No successful stop claim without a correlated engine response.
+    }
+    return false;
+  }
+
+  Future<void> _stop() async {
+    if (!_running || _stopRequested) return;
+    setState(() {
+      _stopRequested = true;
+      error =
+          'Stop requested. Waiting for the native worker to release; '
+          'live checks remain unverified.';
+    });
+    final engine = _runEngine;
+    if (engine != null && _runId.isNotEmpty) {
+      await _stopMatchingRun(engine, _runId);
     }
   }
 
@@ -170,7 +399,18 @@ class _ProjectChecksScreenState extends State<ProjectChecksScreen> {
           style: Theme.of(context).textTheme.headlineSmall,
         ),
         const Text(
-          'Saved design assessments and live evidence are shown separately. Open this exact plan in Packet Tracer before running live checks.',
+          'Saved design assessments and live evidence are shown separately. '
+          'Live tests require the current .pkt file and build-action binding; '
+          'an arbitrary open canvas is not verification of this plan.',
+        ),
+        ListenableBuilder(
+          listenable: PktBuildJobService.instance,
+          builder: (context, _) => PktVerificationStatus(
+            verification: PktBuildJobService.instance.history
+                .where((entry) => entry.actionIdentity == _action)
+                .firstOrNull
+                ?.verification,
+          ),
         ),
         if (!SettingsService.canHostEngine)
           const Text(
@@ -192,6 +432,14 @@ class _ProjectChecksScreenState extends State<ProjectChecksScreen> {
                   : _run,
               child: const Text('Run in Packet Tracer'),
             ),
+            if (_running)
+              OutlinedButton.icon(
+                onPressed: _stopRequested ? null : _stop,
+                icon: const Icon(Icons.stop_circle_outlined),
+                label: Text(
+                  _stopRequested ? 'Stopping...' : 'Stop live checks',
+                ),
+              ),
           ],
         ),
         if (busy) const LinearProgressIndicator(),

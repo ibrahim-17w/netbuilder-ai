@@ -2,6 +2,7 @@ import '../models/network_intent.dart';
 import 'build_guide.dart';
 import 'build_preflight.dart';
 import 'design_review.dart';
+import 'human_language.dart';
 
 /// Reads "export a lab report" - the request to assemble one document.
 class LabReportRequest {
@@ -138,13 +139,15 @@ class LabReport {
       b
         ..writeln(
           '${scanAnalysis['name'] ?? 'the scanned file'}: '
-          '${scanAnalysis['deviceCount'] ?? '?'} device(s), '
-          '${scanAnalysis['linkCount'] ?? '?'} link(s), '
-          '${findings.length} finding(s) ($high high).',
+          '${scanAnalysis['deviceCount'] ?? '?'} '
+          '${scanAnalysis['deviceCount'] == 1 ? 'device' : 'devices'}, '
+          '${scanAnalysis['linkCount'] ?? '?'} '
+          '${scanAnalysis['linkCount'] == 1 ? 'link' : 'links'}, '
+          '${HumanLanguage.count(findings.length, 'finding')} ($high high).',
         )
         ..writeln();
       for (final f in findings.take(8)) {
-        b.writeln('- [${f.severity}] ${f.text}');
+        b.writeln(HumanLanguage.findingLine(f.severity, f.text));
       }
       if (findings.length > 8) {
         b.writeln('- ...and ${findings.length - 8} more.');

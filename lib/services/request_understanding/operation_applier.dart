@@ -182,6 +182,14 @@ class OperationApplier {
           working,
           operation,
           renamedNames: renamedNames,
+          removedNames: {
+            for (final acceptedOperation in accepted)
+              if (acceptedOperation.kind == PlanOperationKind.removeDevices)
+                for (final name
+                    in (acceptedOperation.payload['deviceIds'] as List? ??
+                        const []))
+                  if (name is String) name.toLowerCase(),
+          },
         );
       } on _OperationProblem catch (problem) {
         issue(operation, problem.code, problem.kind, problem.message);
@@ -365,7 +373,7 @@ class OperationApplier {
         throw _OperationProblem(
           RequestIssueKind.conflict,
           'count_reduction_conflicts_with_locked_devices',
-          'The requested total is $amount $type device(s), but only ${removable.length} can be removed without violating a preservation rule or security reference. Name the devices to remove or resolve the protected references.',
+          'The requested total is $amount $type ${amount == 1 ? 'device' : 'devices'}, but only ${removable.length} can be removed without violating a preservation rule or security reference. Name the devices to remove or resolve the protected references.',
         );
       }
       final removeNames = removable.reversed
@@ -376,11 +384,12 @@ class OperationApplier {
     }
     if (delta == 0) return intent;
     if (ValidatorService.isPacketTracerTarget(target) &&
-        intent.nodes.length + delta > ValidatorService.packetTracerMaxDevices) {
+        intent.nodes.length + delta >
+            ValidatorService.packetTracerOfflineMaxDevices) {
       throw const _OperationProblem(
         RequestIssueKind.invalid,
         'packet_tracer_device_limit',
-        'The requested inventory exceeds Packet Tracer’s 50-device limit. The plan was left unchanged.',
+        'The requested inventory exceeds the 120-device offline build limit. The plan was left unchanged.',
       );
     }
     if (ValidatorService.isPacketTracerTarget(target) &&
@@ -459,6 +468,7 @@ class OperationApplier {
           model: template?.model,
           exactModel: template?.exactModel ?? false,
           modules: template?.modules ?? const [],
+          variantKey: template?.variantKey,
           siteId: siteId,
         ),
       );
@@ -784,6 +794,7 @@ class OperationApplier {
     for (final node in existing.skip(1)) {
       if (node.model != first.model ||
           node.exactModel != first.exactModel ||
+          node.variantKey != first.variantKey ||
           !jsonValueEquals(node.modules, first.modules)) {
         throw _OperationProblem(
           RequestIssueKind.ambiguity,
@@ -1067,7 +1078,9 @@ class OperationApplier {
               type: node.type,
               model: model,
               exactModel: true,
-              modules: node.modules,
+              // Replacing the model deliberately releases the old pin.
+              variantKey: null,
+              modules: node.variantKey != null ? const [] : node.modules,
               mgmtIp: node.mgmtIp,
               siteId: node.siteId,
               services: node.services,
@@ -1177,6 +1190,7 @@ class OperationApplier {
       model: node.model,
       exactModel: node.exactModel,
       modules: node.modules,
+      variantKey: node.variantKey,
       mgmtIp: node.mgmtIp,
       siteId: node.siteId,
       services: services,
@@ -1296,6 +1310,8 @@ class OperationApplier {
     }
     return device.variants.any(
       (variant) =>
+          (node.variantKey == null ||
+              (variant.key == node.variantKey && device.type == node.type)) &&
           node.modules.every(
             (module) => variant.modules.any(
               (available) => ptIdentity(available) == ptIdentity(module),
@@ -1703,6 +1719,7 @@ class OperationApplier {
     NetworkIntent candidate,
     PlanOperation operation, {
     required Map<String, String> renamedNames,
+    Set<String> removedNames = const {},
   }) {
     if (operation.scope.kind != RequirementScopeKind.project &&
         operation.scope.kind != RequirementScopeKind.device &&
@@ -1756,7 +1773,7 @@ class OperationApplier {
       'properties',
     );
     for (final property in properties) {
-      final before = _preservedValue(base, operation.scope, property);
+      var before = _preservedValue(base, operation.scope, property);
       final scopeId = operation.scope.kind == RequirementScopeKind.device
           ? renamedNames[operation.scope.scopeId.toLowerCase()] ??
                 operation.scope.scopeId
@@ -1765,7 +1782,35 @@ class OperationApplier {
         kind: operation.scope.kind,
         scopeId: scopeId,
       );
-      final after = _preservedValue(candidate, afterScope, property);
+      var after = _preservedValue(candidate, afterScope, property);
+      final key = property.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+      if ((key == 'addressing' || key == 'addresses') &&
+          before is List &&
+          after is List) {
+        // An explicit removal preserves the addresses of surviving devices,
+        // not the removed row. A rename rewrites only the row's device key.
+        final beforeRows = <Map<String, dynamic>>[
+          for (final row in before)
+            if (row is Map &&
+                !removedNames.contains('${row['node']}'.toLowerCase()))
+              {
+                ...Map<String, dynamic>.from(row),
+                'node':
+                    renamedNames['${row['node']}'.toLowerCase()] ?? row['node'],
+              },
+        ];
+        final retainedNames = {
+          for (final row in beforeRows) '${row['node']}'.toLowerCase(),
+        };
+        before = beforeRows;
+        after = after
+            .where(
+              (row) =>
+                  row is Map &&
+                  retainedNames.contains('${row['node']}'.toLowerCase()),
+            )
+            .toList();
+      }
       if (!jsonValueEquals(before, after)) {
         throw _OperationProblem(
           RequestIssueKind.conflict,
@@ -1795,7 +1840,12 @@ class OperationApplier {
         'inventory' || 'devicecount' || 'devicecounts' => _countsFor(nodes),
         'model' || 'models' || 'devicemodel' || 'devicemodels' => [
           for (final node in nodes)
-            {'name': node.name, 'model': node.model, 'modules': node.modules},
+            {
+              'name': node.name,
+              'model': node.model,
+              'modules': node.modules,
+              if (node.variantKey != null) 'variantKey': node.variantKey,
+            },
         ],
         'services' || 'serviceroles' => [
           for (final node in nodes)
@@ -1836,7 +1886,11 @@ class OperationApplier {
         'device' || 'node' => node.toJson(includeSecrets: false),
         'name' || 'devicename' => node.name,
         'type' || 'devicetype' => node.type,
-        'model' || 'devicemodel' => node.model,
+        'model' || 'devicemodel' => {
+          'model': node.model,
+          'modules': node.modules,
+          if (node.variantKey != null) 'variantKey': node.variantKey,
+        },
         'services' || 'serviceroles' => {
           'services': node.services,
           'rules': mutableJsonCopy(node.serviceRules),
@@ -1867,7 +1921,12 @@ class OperationApplier {
       'devicecount' || 'devicecounts' || 'inventory' => _counts(intent),
       'model' || 'models' || 'devicemodel' || 'devicemodels' => [
         for (final node in intent.nodes)
-          {'name': node.name, 'model': node.model, 'modules': node.modules},
+          {
+            'name': node.name,
+            'model': node.model,
+            'modules': node.modules,
+            if (node.variantKey != null) 'variantKey': node.variantKey,
+          },
       ],
       'services' || 'serviceroles' => [
         for (final node in intent.nodes)

@@ -4,10 +4,12 @@ import 'dart:isolate';
 import 'dart:typed_data';
 import 'dart:ui' show Offset;
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:xml/xml.dart';
 
 import '../models/network_intent.dart';
+import '../models/request_requirement.dart';
 import 'network_math.dart';
 import 'network_tools.dart';
 import 'packet_tracer/catalog.dart';
@@ -25,12 +27,34 @@ class ImportedPktPlan {
   final NetworkIntent intent;
   final List<String> preservedDetails;
   final List<String> limitations;
+  final AttachmentSource? source;
+  final List<Requirement> observedRequirements;
 
   const ImportedPktPlan({
     required this.intent,
     this.preservedDetails = const [],
     required this.limitations,
+    this.source,
+    this.observedRequirements = const [],
   });
+
+  /// Facts observed in the saved source, never reconstructed plan defaults.
+  /// Import intent is supplied by the user; these facts are not user claims or
+  /// proof of live verification. Caller commits them atomically with the plan.
+  List<Requirement> importedRequirements({
+    required String projectId,
+    String turnId = '',
+  }) => [
+    for (final requirement in observedRequirements)
+      requirement.copyWith(
+        id: '${requirement.id}@${turnId.isEmpty ? projectId : turnId}',
+        origin: RequirementOrigin.imported,
+        sourceTurnId: turnId,
+        scope: requirement.scope.kind == RequirementScopeKind.project
+            ? RequirementScope.project(projectId)
+            : requirement.scope,
+      ),
+  ];
 }
 
 class PktPlanImportService {
@@ -41,18 +65,56 @@ class PktPlanImportService {
   static ImportedPktPlan fromBytes(
     List<int> bytes, {
     String projectName = 'Imported network',
+    String attachmentId = '',
+    String sourceName = '',
     void Function(String stage, double progress)? onProgress,
   }) {
     onProgress?.call('Reading the Packet Tracer save', 0.04);
+    final hash = sha256.convert(bytes).toString();
     final document = utf8.decode(decryptPkt(bytes), allowMalformed: true);
     onProgress?.call('Reading devices and connections', 0.1);
-    return fromXml(document, projectName: projectName, onProgress: onProgress);
+    return _fromXml(
+      document,
+      projectName: projectName,
+      onProgress: onProgress,
+      source: AttachmentSource(
+        attachmentId: attachmentId.isEmpty ? 'sha256:$hash' : attachmentId,
+        contentHash: hash,
+        name: sourceName,
+        mimeType: 'application/x-packet-tracer',
+        uncertainty: 'structural_import; not_live_verified',
+        incomplete: true,
+      ),
+    );
   }
 
   @visibleForTesting
   static ImportedPktPlan fromXml(
     String document, {
     String projectName = 'Imported network',
+    String attachmentId = '',
+    String sourceName = '',
+    void Function(String stage, double progress)? onProgress,
+  }) {
+    final hash = sha256.convert(utf8.encode(document)).toString();
+    return _fromXml(
+      document,
+      projectName: projectName,
+      onProgress: onProgress,
+      source: AttachmentSource(
+        attachmentId: attachmentId.isEmpty ? 'sha256:$hash' : attachmentId,
+        contentHash: hash,
+        name: sourceName,
+        mimeType: 'application/xml',
+        uncertainty: 'structural_import; not_live_verified',
+      ),
+    );
+  }
+
+  static ImportedPktPlan _fromXml(
+    String document, {
+    required String projectName,
+    required AttachmentSource source,
     void Function(String stage, double progress)? onProgress,
   }) {
     final library = SeedLibrary.fromXml(document);
@@ -293,6 +355,8 @@ class PktPlanImportService {
     }
     return ImportedPktPlan(
       intent: intent,
+      source: source,
+      observedRequirements: _observedRequirements(document, source),
       preservedDetails: preserved,
       limitations: const [
         'Service-pool records, account contents, and per-device GUI settings are summarized only when the editable plan has a matching field.',
@@ -308,6 +372,8 @@ class PktPlanImportService {
   static Future<ImportedPktPlan> fromBytesInBackground(
     List<int> bytes, {
     String projectName = 'Imported network',
+    String attachmentId = '',
+    String sourceName = '',
     void Function(String stage, double progress)? onProgress,
     PktPlanImportTask? task,
     @visibleForTesting bool forceIsolate = false,
@@ -319,13 +385,325 @@ class PktPlanImportService {
       final result = fromBytes(
         bytes,
         projectName: projectName,
+        attachmentId: attachmentId,
+        sourceName: sourceName,
         onProgress: onProgress,
       );
       task?.throwIfCancelled();
       return result;
     }
     final worker = task ?? PktPlanImportTask();
-    return worker.run(bytes, projectName: projectName, onProgress: onProgress);
+    return worker.run(
+      bytes,
+      projectName: projectName,
+      attachmentId: attachmentId,
+      sourceName: sourceName,
+      onProgress: onProgress,
+    );
+  }
+
+  /// Whitelist source observations before converting a plan. Generated copper
+  /// links, static routing, first-host DHCP ranges, fallback names, device
+  /// defaults and inferred enabled services are deliberately not evidence.
+  static List<Requirement> _observedRequirements(
+    String document,
+    AttachmentSource source,
+  ) {
+    final requirements = <Requirement>[];
+    final seen = <String>{};
+    final namesByRef = <String, String>{};
+    final nameFrequency = <String, int>{};
+    final devices = RegExp(
+      r'<DEVICE(?:\s[^>]*)?>[\s\S]*?</DEVICE>',
+    ).allMatches(document).toList();
+    for (final device in devices) {
+      final rawName = RegExp(
+        r'<NAME(?:\s[^>]*)?>([^<]*)</NAME>',
+      ).firstMatch(device.group(0)!)?.group(1);
+      if (rawName != null && rawName.trim().isNotEmpty) {
+        final name = _unescape(rawName).trim();
+        nameFrequency[name] = (nameFrequency[name] ?? 0) + 1;
+      }
+    }
+    void add({
+      required String subject,
+      required String property,
+      required Object? value,
+      required RequirementScope scope,
+      required int start,
+      required int end,
+      required String location,
+      bool unresolved = false,
+    }) {
+      final key = '$subject|$property|${scope.scopeId}|${jsonEncode(value)}';
+      if (!seen.add(key)) return;
+      requirements.add(
+        Requirement(
+          id: 'import-${source.contentHash}-${requirements.length}',
+          subject: subject,
+          property: property,
+          value: unresolved ? null : value,
+          scope: scope,
+          origin: RequirementOrigin.imported,
+          state: unresolved
+              ? RequirementState.unresolved
+              : RequirementState.active,
+          sourceSpans: [
+            SourceSpan.fromText(
+              messageId: source.attachmentId,
+              originalText: document,
+              start: start,
+              end: end,
+              attachment: source.copyWith(
+                location: location,
+                uncertainty: unresolved
+                    ? 'ambiguous_or_unsupported_source_value'
+                    : source.uncertainty,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    for (final device in devices) {
+      final block = device.group(0)!;
+      if (SeedLibrary.deviceFromBlock(block) == null) continue;
+      final nameMatch = RegExp(
+        r'<NAME(?:\s[^>]*)?>([^<]*)</NAME>',
+      ).firstMatch(block);
+      if (nameMatch == null) continue;
+      final name = _unescape(nameMatch.group(1)!).trim();
+      if (name.isEmpty) continue;
+      final ref = RegExp(
+        r'<SAVE_REF_ID>save-ref-id:([^<]+)</SAVE_REF_ID>',
+      ).firstMatch(block)?.group(1);
+      final ambiguous = nameFrequency[name] != 1;
+      if (ref != null && !ambiguous) namesByRef[ref] = name;
+      final location = ref == null ? 'device:$name' : 'save-ref-id:$ref';
+      final deviceScope = RequirementScope(
+        kind: RequirementScopeKind.device,
+        scopeId: name,
+      );
+      add(
+        subject: 'device',
+        property: 'device_name',
+        value: name,
+        scope: deviceScope,
+        start: device.start + nameMatch.start,
+        end: device.start + nameMatch.end,
+        location: '$location/NAME',
+        unresolved: ambiguous,
+      );
+      final model = RegExp(r'<TYPE\b[^>]*\bmodel="([^"]+)"').firstMatch(block);
+      if (model != null) {
+        add(
+          subject: 'device',
+          property: 'device_model',
+          value: _unescape(model.group(1)!),
+          scope: deviceScope,
+          start: device.start + model.start,
+          end: device.start + model.end,
+          location: '$location/TYPE@model',
+          unresolved: ambiguous,
+        );
+      }
+      final type = RegExp(
+        r'<TYPE(?:\s[^>]*)?>([^<]+)</TYPE>',
+      ).firstMatch(block);
+      if (type != null) {
+        add(
+          subject: 'device',
+          property: 'device_type',
+          value: _normalizedType(type.group(1)!, ''),
+          scope: deviceScope,
+          start: device.start + type.start,
+          end: device.start + type.end,
+          location: '$location/TYPE',
+          unresolved: ambiguous,
+        );
+      }
+      for (final module in RegExp(
+        r'<SLOT>[\s\S]*?<MODEL>([^<]+)</MODEL>[\s\S]*?</SLOT>',
+      ).allMatches(block)) {
+        // The short MODEL tag is evidence, never the whole device XML.
+        final tag = RegExp(
+          r'<MODEL>([^<]+)</MODEL>',
+        ).firstMatch(module.group(0)!)!;
+        add(
+          subject: 'device',
+          property: 'installed_module',
+          value: _unescape(tag.group(1)!),
+          scope: deviceScope,
+          start: device.start + module.start + tag.start,
+          end: device.start + module.start + tag.end,
+          location: '$location/SLOT/MODEL',
+          unresolved: ambiguous,
+        );
+      }
+      final running = RegExp(
+        r'<RUNNINGCONFIG(?:\s[^>]*)?>[\s\S]*?</RUNNINGCONFIG>',
+      ).firstMatch(block);
+      String? iface;
+      if (running != null) {
+        for (final line in RegExp(
+          r'<LINE>([\s\S]*?)</LINE>',
+        ).allMatches(running.group(0)!)) {
+          final clean = _unescape(line.group(1)!).trim();
+          final interface = RegExp(
+            r'^interface\s+(\S+)\s*$',
+            caseSensitive: false,
+          ).firstMatch(clean);
+          if (interface != null) {
+            iface = interface.group(1);
+            continue;
+          }
+          if (clean == '!' || clean == 'exit' || clean == 'end') {
+            iface = null;
+            continue;
+          }
+          final start = device.start + running.start + line.start;
+          final end = device.start + running.start + line.end;
+          final ipv4 = RegExp(
+            r'^ip\s+address\s+(\S+)\s+(\S+)\s*$',
+            caseSensitive: false,
+          ).firstMatch(clean);
+          if (ipv4 != null && iface != null) {
+            final prefix = NetworkMath.prefixFromMask(ipv4.group(2)!);
+            add(
+              subject: name,
+              property: 'ipv4_address',
+              value: prefix == null ? null : '${ipv4.group(1)}/$prefix',
+              scope: RequirementScope(
+                kind: RequirementScopeKind.linkInterface,
+                scopeId: '$name/$iface',
+              ),
+              start: start,
+              end: end,
+              location: '$location/RUNNINGCONFIG/$iface',
+              unresolved:
+                  ambiguous ||
+                  prefix == null ||
+                  NetworkTools.ipToInt(ipv4.group(1)!) == null,
+            );
+          }
+          final ipv6 = RegExp(
+            r'^ipv6\s+address\s+(\S+)\s*$',
+            caseSensitive: false,
+          ).firstMatch(clean);
+          if (ipv6 != null && iface != null) {
+            // Conversion cannot retain an IPv6-only interface yet.
+            final hasV4 = requirements.any(
+              (r) =>
+                  r.property == 'ipv4_address' &&
+                  r.scope.scopeId == '$name/$iface' &&
+                  r.state == RequirementState.active,
+            );
+            add(
+              subject: name,
+              property: 'ipv6_address',
+              value: ipv6.group(1),
+              scope: RequirementScope(
+                kind: RequirementScopeKind.linkInterface,
+                scopeId: '$name/$iface',
+              ),
+              start: start,
+              end: end,
+              location: '$location/RUNNINGCONFIG/$iface',
+              unresolved: ambiguous || !hasV4,
+            );
+          }
+          final routing = RegExp(
+            r'^router\s+(ospf|eigrp|bgp|rip)\b',
+            caseSensitive: false,
+          ).firstMatch(clean);
+          if (routing != null) {
+            add(
+              subject: 'network',
+              property: 'routing_protocol',
+              value: routing.group(1)!.toLowerCase(),
+              scope: deviceScope,
+              start: start,
+              end: end,
+              location: '$location/RUNNINGCONFIG',
+              unresolved: ambiguous || routing.group(1)!.toLowerCase() == 'rip',
+            );
+          }
+          final vlan = RegExp(
+            r'^(?:vlan|switchport\s+access\s+vlan)\s+(\d+)\s*$',
+            caseSensitive: false,
+          ).firstMatch(clean);
+          if (vlan != null) {
+            add(
+              subject: 'network',
+              property: 'vlan_id',
+              value: int.parse(vlan.group(1)!),
+              scope: deviceScope,
+              start: start,
+              end: end,
+              location: '$location/RUNNINGCONFIG',
+              unresolved: ambiguous,
+            );
+          }
+        }
+      }
+      const roles = {
+        'DHCP_SERVER': 'dhcp',
+        'DNS_SERVER': 'dns',
+        'HTTP_SERVER': 'http',
+        'ACS_SERVER': 'aaa',
+        'FTP_SERVER': 'ftp',
+        'SYSLOG_SERVER': 'syslog',
+        'NTP_SERVER': 'ntp',
+        'TFTP_SERVER': 'tftp',
+      };
+      for (final role in roles.entries) {
+        final enabled = RegExp(
+          '<${role.key}>\\s*<ENABLED>1</ENABLED>',
+        ).firstMatch(block);
+        if (enabled == null) continue;
+        add(
+          subject: 'device',
+          property: 'service_role',
+          value: role.value,
+          scope: deviceScope,
+          start: device.start + enabled.start,
+          end: device.start + enabled.end,
+          location: '$location/${role.key}/ENABLED',
+          unresolved: ambiguous,
+        );
+      }
+    }
+    for (final link in RegExp(r'<LINK>[\s\S]*?</LINK>').allMatches(document)) {
+      final block = link.group(0)!;
+      final from = RegExp(
+        r'<FROM>save-ref-id:([^<]+)</FROM>\s*<PORT>([^<]*)</PORT>',
+      ).firstMatch(block);
+      final to = RegExp(
+        r'<TO>save-ref-id:([^<]+)</TO>\s*<PORT>([^<]*)</PORT>',
+      ).firstMatch(block);
+      if (from == null || to == null) continue;
+      final a = namesByRef[from.group(1)];
+      final b = namesByRef[to.group(1)];
+      if (a == null || b == null) continue;
+      for (final endpoint in [(from, a, 'FROM'), (to, b, 'TO')]) {
+        final port = _unescape(endpoint.$1.group(2)!);
+        add(
+          subject: endpoint.$2,
+          property: 'link_endpoint',
+          value: port,
+          scope: RequirementScope(
+            kind: RequirementScopeKind.linkInterface,
+            scopeId: '$a/${from.group(2)}-$b/${to.group(2)}',
+          ),
+          start: link.start + endpoint.$1.start,
+          end: link.start + endpoint.$1.end,
+          location: 'link/${from.group(1)}-${to.group(1)}/${endpoint.$3}',
+          unresolved: port.isEmpty,
+        );
+      }
+    }
+    return List.unmodifiable(requirements);
   }
 
   static List<String> _installedModules(String block) {
@@ -717,6 +1095,8 @@ class PktPlanImportTask {
   Future<ImportedPktPlan> run(
     List<int> bytes, {
     required String projectName,
+    String attachmentId = '',
+    String sourceName = '',
     void Function(String stage, double progress)? onProgress,
   }) async {
     if (_isolate != null || _finished || _cancelled) {
@@ -736,7 +1116,13 @@ class PktPlanImportTask {
       ]);
       _isolate = await Isolate.spawn<List<Object?>>(
         _pktPlanImportWorker,
-        <Object?>[transfer, projectName, _messages.sendPort],
+        <Object?>[
+          transfer,
+          projectName,
+          _messages.sendPort,
+          attachmentId,
+          sourceName,
+        ],
         onExit: _exit.sendPort,
         errorsAreFatal: true,
       );
@@ -774,6 +1160,16 @@ class PktPlanImportTask {
             limitations: List<String>.from(
               map['limitations'] as List? ?? const [],
             ),
+            source: map['source'] is Map
+                ? AttachmentSource.fromMap(
+                    Map<String, dynamic>.from(map['source'] as Map),
+                  )
+                : null,
+            observedRequirements: [
+              for (final requirement
+                  in map['observedRequirements'] as List? ?? const [])
+                Requirement.fromJson(requirement),
+            ],
           ),
         );
         _close();
@@ -830,6 +1226,8 @@ void _pktPlanImportWorker(List<Object?> arguments) {
     final imported = PktPlanImportService.fromBytes(
       bytes,
       projectName: projectName,
+      attachmentId: arguments.length > 3 ? arguments[3] as String : '',
+      sourceName: arguments.length > 4 ? arguments[4] as String : '',
       onProgress: (stage, progress) =>
           send.send({'stage': stage, 'progress': progress}),
     );
@@ -837,6 +1235,10 @@ void _pktPlanImportWorker(List<Object?> arguments) {
       'intent': jsonEncode(imported.intent.toJson(includeSecrets: false)),
       'preservedDetails': imported.preservedDetails,
       'limitations': imported.limitations,
+      'source': imported.source?.toMap(),
+      'observedRequirements': imported.observedRequirements
+          .map((r) => r.toJson())
+          .toList(),
     });
   } catch (error) {
     send.send({'error': error.toString()});

@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 
 import 'app_version.dart';
 import 'credential_redaction.dart';
+import 'engine_token.dart';
 import 'settings_service.dart';
 
 /// The outcome of trying to bring the local engine up.
@@ -520,8 +521,15 @@ class SidecarSupervisor {
 
   static Future<int?> _spawn(SidecarTarget target, String logPath) async {
     try {
+      // The engine refuses requests without this token (except /health), so
+      // the same value has to be sent by AutopilotService. Both read the one
+      // persisted token, which is what keeps a reused engine and a restarted
+      // app agreeing. Empty means the token could not be stored; the engine
+      // then falls back to its Origin/Host guard alone.
+      final token = await EngineToken.ensure();
       final environment = <String, String>{
         ...Platform.environment,
+        if (token.isNotEmpty) 'NETBUILDER_SIDECAR_TOKEN': token,
         // Unbuffered so the log is useful the moment something goes wrong.
         'PYTHONUNBUFFERED': '1',
         'PYTHONIOENCODING': 'utf-8',

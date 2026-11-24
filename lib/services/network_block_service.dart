@@ -4,6 +4,7 @@ import 'dart:ui' show Offset;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/network_intent.dart';
+import '../models/request_requirement.dart';
 
 /// A reusable piece of a network: devices, their internal cables, addresses,
 /// and relative positions. Blocks stay on this device and sync across the
@@ -14,6 +15,8 @@ class NetworkBlock {
   final List<NetLink> links;
   final List<InterfaceAddr> addressing;
   final Map<String, Offset?> layout;
+  final AttachmentSource? source;
+  final List<Requirement> observedRequirements;
 
   const NetworkBlock({
     required this.name,
@@ -21,6 +24,8 @@ class NetworkBlock {
     required this.links,
     required this.addressing,
     required this.layout,
+    this.source,
+    this.observedRequirements = const [],
   });
 
   factory NetworkBlock.fromSelection({
@@ -59,6 +64,11 @@ class NetworkBlock {
     'nodes': nodes.map((n) => n.toJson(includeSecrets: false)).toList(),
     'links': links.map((l) => l.toJson()).toList(),
     'addressing': addressing.map((a) => a.toJson()).toList(),
+    if (source != null) 'source': source!.toMap(),
+    if (observedRequirements.isNotEmpty)
+      'observedRequirements': observedRequirements
+          .map((r) => r.toJson())
+          .toList(),
     'layout': {
       for (final entry in layout.entries)
         if (entry.value case final Offset point)
@@ -80,6 +90,15 @@ class NetworkBlock {
         .whereType<Map>()
         .map((e) => InterfaceAddr.fromJson(Map<String, dynamic>.from(e)))
         .toList(),
+    source: raw['source'] is Map
+        ? AttachmentSource.fromMap(
+            Map<String, dynamic>.from(raw['source'] as Map),
+          )
+        : null,
+    observedRequirements: [
+      for (final item in raw['observedRequirements'] as List? ?? const [])
+        Requirement.fromJson(item),
+    ],
     layout: {
       for (final entry
           in ((raw['layout'] as Map?) ?? const <dynamic, dynamic>{}).entries)
@@ -95,8 +114,22 @@ class NetworkBlock {
 class BlockImportResult {
   final NetworkIntent intent;
   final int clearedAddressCount;
+  final Map<String, String> nameMapping;
 
-  const BlockImportResult(this.intent, this.clearedAddressCount);
+  /// Original addresses removed because they collided with the target project.
+  /// They are evidence of a conflict, NOT currently configured addresses.
+  final List<InterfaceAddr> clearedAddresses;
+  final List<Requirement> importedRequirements;
+  final List<String> unresolvedDetails;
+
+  const BlockImportResult(
+    this.intent,
+    this.clearedAddressCount, {
+    this.nameMapping = const {},
+    this.clearedAddresses = const [],
+    this.importedRequirements = const [],
+    this.unresolvedDetails = const [],
+  });
 }
 
 class NetworkBlockService {
@@ -156,8 +189,19 @@ class NetworkBlockService {
     NetworkIntent intent,
     NetworkBlock block, {
     Map<String, Offset?>? currentLayout,
+    String turnId = '',
+    String? projectId,
   }) {
     final names = <String, String>{};
+    final blockNames = block.nodes
+        .map((node) => node.name.toLowerCase())
+        .toList();
+    if (blockNames.toSet().length != blockNames.length ||
+        blockNames.any((name) => name.trim().isEmpty)) {
+      throw const FormatException(
+        'A block must have distinct, non-empty source device names.',
+      );
+    }
     final reserved = intent.nodes.map((n) => n.name.toLowerCase()).toSet();
     for (final node in block.nodes) {
       var candidate = node.name;
@@ -197,6 +241,7 @@ class NetworkBlockService {
         if (address.ip6Cidr?.isNotEmpty == true) addressKey(address.ip6Cidr!),
     };
     var cleared = 0;
+    final clearedAddresses = <InterfaceAddr>[];
     final addedAddresses = <InterfaceAddr>[];
     for (final address in block.addressing) {
       final ip = address.ipCidr.isEmpty ? '' : addressKey(address.ipCidr);
@@ -206,7 +251,10 @@ class NetworkBlockService {
       final conflict =
           (ip.isNotEmpty && usedAddresses.contains(ip)) ||
           (ip6.isNotEmpty && usedAddresses.contains(ip6));
-      if (conflict) cleared++;
+      if (conflict) {
+        cleared++;
+        clearedAddresses.add(address);
+      }
       final nextAddress = InterfaceAddr(
         node: names[address.node] ?? address.node,
         iface: address.iface,
@@ -247,6 +295,108 @@ class NetworkBlockService {
         layout: {...baseLayout, ...translated},
       ),
       cleared,
+      nameMapping: Map.unmodifiable(names),
+      clearedAddresses: List.unmodifiable(clearedAddresses),
+      importedRequirements: _remapRequirements(
+        block.observedRequirements,
+        names,
+        clearedAddresses,
+        projectId: projectId ?? intent.projectName,
+        turnId: turnId,
+      ),
+      unresolvedDetails: [
+        if (block.source == null && block.observedRequirements.isEmpty)
+          'Legacy block has no source provenance; reconstructed defaults are not imported evidence.',
+        for (final entry in names.entries)
+          if (entry.key != entry.value)
+            'Imported device ${entry.key} was renamed to ${entry.value}.',
+        for (final address in clearedAddresses)
+          '${names[address.node] ?? address.node}/${address.iface}: conflicting source addresses were cleared; assign them before building.',
+      ],
     );
+  }
+
+  static List<Requirement> _remapRequirements(
+    List<Requirement> requirements,
+    Map<String, String> names,
+    List<InterfaceAddr> cleared, {
+    required String projectId,
+    required String turnId,
+  }) {
+    String remapIdentity(String value) {
+      if (names.containsKey(value)) return names[value]!;
+      // Name-aware scopes use a slash boundary; never substring-replace R1 in
+      // R10 or an address, SSID, model, credential or prose excerpt.
+      final keys = names.keys.toList()
+        ..sort((a, b) => b.length.compareTo(a.length));
+      var result = value;
+      for (final name in keys) {
+        if (result.startsWith('$name/')) {
+          result = '${names[name]}${result.substring(name.length)}';
+          break;
+        }
+      }
+      for (final name in keys) {
+        result = result.replaceAll('-$name/', '-${names[name]}/');
+      }
+      return result;
+    }
+
+    bool addressWasCleared(Requirement requirement) {
+      if (!requirement.property.toLowerCase().contains('address') &&
+          !requirement.property.toLowerCase().contains('cidr')) {
+        return false;
+      }
+      return cleared.any(
+        (address) =>
+            requirement.scope.scopeId == '${address.node}/${address.iface}' ||
+            (requirement.scope.scopeId == address.node ||
+                requirement.subject == address.node),
+      );
+    }
+
+    return List.unmodifiable([
+      for (final requirement in requirements)
+        requirement.copyWith(
+          id: '${requirement.id}@block-${turnId.isEmpty ? projectId : turnId}-${names.values.join('|')}',
+          origin: RequirementOrigin.imported,
+          sourceTurnId: turnId,
+          subject: names[requirement.subject] ?? requirement.subject,
+          scope: requirement.scope.kind == RequirementScopeKind.project
+              ? RequirementScope.project(projectId)
+              : RequirementScope(
+                  kind: requirement.scope.kind,
+                  scopeId: remapIdentity(requirement.scope.scopeId),
+                ),
+          value:
+              const {
+                    'device_name',
+                    'device_presence',
+                  }.contains(requirement.property) &&
+                  requirement.value is String
+              ? names[requirement.value] ?? requirement.value
+              : requirement.value,
+          clearValue: addressWasCleared(requirement),
+          state: addressWasCleared(requirement)
+              ? RequirementState.unresolved
+              : requirement.state,
+          // Preserve original excerpt/hash; only current scopes/values move.
+          sourceSpans: [
+            for (final span in requirement.sourceSpans)
+              SourceSpan(
+                messageId: span.messageId,
+                start: span.start,
+                end: span.end,
+                excerpt: span.excerpt,
+                attachment: addressWasCleared(requirement)
+                    ? span.attachment?.copyWith(
+                        uncertainty: 'source_address_cleared_on_import',
+                        incomplete: true,
+                      )
+                    : span.attachment,
+              ),
+          ],
+        ),
+    ]);
   }
 }

@@ -2,6 +2,7 @@ import '../models/design_brief.dart';
 import '../models/environment_profile.dart';
 import '../models/network_intent.dart';
 import 'memory_service.dart';
+import 'nlu/parser.dart' show bridgeBriefWithMapping;
 
 /// One clarifying question the chat may ask before committing a plan.
 class ClarificationQuestion {
@@ -72,6 +73,42 @@ class ClarificationService {
     _ => null,
   };
 
+  static ClarificationQuestion localize(
+    ClarificationQuestion question, {
+    required bool arabic,
+  }) {
+    if (!arabic) return question;
+    final prompt = switch (question.id) {
+      'scale' =>
+        'كم جهازاً أو حاسوباً تريد؟ إذا كنت تقصد عدد المستخدمين فاذكر ذلك.',
+      'routing' => 'تريد توجيهاً ثابتاً static أم بروتوكولاً مثل OSPF؟',
+      'segmentation' => 'شبكة واحدة بدون VLANs أم تقسيمها إلى VLANs؟',
+      _ => question.question,
+    };
+    final replies = switch (question.id) {
+      'scale' => const ['١٠', '٢٥', '٥٠'],
+      'routing' => const ['توجيه ثابت', 'OSPF'],
+      'segmentation' => const ['شبكة واحدة بدون VLANs', 'تقسيم إلى VLANs'],
+      _ => question.quickReplies,
+    };
+    return ClarificationQuestion(
+      id: question.id,
+      question: prompt,
+      quickReplies: replies,
+      quickReplyValues: question.quickReplyValues,
+    );
+  }
+
+  static String _readableAnswer(String text) {
+    final normalized = bridgeBriefWithMapping(text);
+    return List.generate(
+      normalized.normalizedText.length,
+      (index) => normalized.overlapsOpaqueSource(start: index, end: index + 1)
+          ? ' '
+          : normalized.normalizedText[index],
+    ).join().trim().toLowerCase();
+  }
+
   /// Read an explicit request to reuse a routing choice for later labs.
   ///
   /// Keeping this separate from ordinary routing answers prevents a memory
@@ -131,7 +168,7 @@ class ClarificationService {
     // Ask for capacity only when the request has not already specified the
     // network inventory. A complete device list is not an invitation to ask
     // the user how many devices they wanted.
-    final text = instruction.toLowerCase();
+    final text = _readableAnswer(instruction);
     // Router/switch counts describe the infrastructure, not how many client
     // devices it must support. Skip the generic sizing question only when
     // the user has specified end-device inventory (including named PCs).
@@ -170,11 +207,11 @@ class ClarificationService {
   /// (a tapped quick reply is a user decision; a remembered replay is
   /// [BriefSource.remembered] with its own provenance line).
   static BriefFact? resolveAnswer(ClarificationQuestion q, String answerText) {
-    final t = answerText.trim().toLowerCase();
+    final t = _readableAnswer(answerText);
     if (t.isEmpty) return null;
     // Quick replies map exactly (case-insensitive).
     for (var i = 0; i < q.quickReplies.length; i++) {
-      if (q.quickReplies[i].trim().toLowerCase() == t) {
+      if (_readableAnswer(q.quickReplies[i]) == t) {
         final value = q.quickReplyValues[i];
         return BriefFact(
           value: value,
@@ -288,10 +325,30 @@ class ClarificationService {
       final digit = match.group(0)!.codeUnitAt(0);
       return '${digit >= 0x06f0 ? digit - 0x06f0 : digit - 0x0660}';
     });
-    final numberMatches = RegExp(r'\d+').allMatches(normalized).toList();
+    // Combined pending answers may also contain "one network" or a VLAN
+    // number. Only a number immediately attached to a scale noun is a count.
+    final numberMatches = RegExp(r'\d+')
+        .allMatches(normalized)
+        .where(
+          (match) =>
+              RegExp(r'^\s*\d{1,4}\s*$').hasMatch(normalized) ||
+              RegExp(
+                r'^\s*(?:users?|people|staff|employees?|students?|clients?|customers?|seats?|devices?|hosts?|pcs?|computers?|workstations?|endpoints?)\b',
+              ).hasMatch(normalized.substring(match.end)),
+        )
+        .toList();
     if (numberMatches.length != 1) return null;
     final m = numberMatches.single;
     final number = m.group(0)!;
+    final clausePrefix = normalized
+        .substring(0, m.start)
+        .split(RegExp(r'[,;\n]'))
+        .last;
+    if (RegExp(
+      r'\b(?:not|no|without|add|remove|additional|more)\b',
+    ).hasMatch(clausePrefix)) {
+      return null;
+    }
     final exactNumber = RegExp(r'^\s*\d{1,4}\s*$').hasMatch(normalized);
     final afterNumber = normalized.substring(m.end).trimLeft();
     final userLoad = RegExp(
@@ -322,6 +379,21 @@ class ClarificationService {
   }
 
   static BriefFact? _resolveRouting(String t) {
+    final replacement = RegExp(
+      r'\breplace\s+(ospf|eigrp|bgp|static)\s+(?:with|by)\s+(ospf|eigrp|bgp|static)\b',
+    ).firstMatch(t);
+    if (replacement != null &&
+        !RegExp(
+          r'\b(?:not|never)\b',
+        ).hasMatch(t.substring(0, replacement.start))) {
+      final protocol = replacement.group(2)!;
+      return BriefFact(
+        value: protocol,
+        display: protocol == 'static'
+            ? 'Static routes'
+            : protocol.toUpperCase(),
+      );
+    }
     // Negation binds: "not static" states a rejection, not a choice.
     final matches = RegExp(r'\b(ospf|eigrp|bgp|rip|static)\b')
         .allMatches(t)
@@ -346,10 +418,19 @@ class ClarificationService {
   }
 
   static BriefFact? _resolveSegmentation(String t) {
-    if (RegExp(r'\bflat\b|\bno vlans?\b|\bone (?:lan|network)\b').hasMatch(t)) {
+    final none = RegExp(
+      r'\b(?:no|without)\s+vlans?\b|\b(?:one|1)\s+(?:flat\s+)?(?:lan|network)\b|'
+      r'\b(?:do\s+not|don.t)\s+(?:add|use|create|enable)\s+vlans?\b|\bflat\s+(?:lan|network)\b',
+    ).hasMatch(t);
+    final positiveVlan = RegExp(r'\bvlans?\b').allMatches(t).any((match) {
+      final clause = t.substring(0, match.start).split(RegExp(r'[,;\n]')).last;
+      return !RegExp(r'\b(?:no|not|without|never)\b').hasMatch(clause);
+    });
+    if (none && positiveVlan) return null;
+    if (none) {
       return const BriefFact(value: 'none', display: 'one flat network');
     }
-    if (RegExp(r'\bvlans?\b|\bsplit\b|\bsegment').hasMatch(t)) {
+    if (positiveVlan || RegExp(r'\b(?:split|segment)\b').hasMatch(t)) {
       return const BriefFact(value: 'vlans', display: 'VLANs');
     }
     return null;

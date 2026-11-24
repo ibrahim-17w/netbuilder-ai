@@ -37,6 +37,7 @@ import xml.etree.ElementTree as ET
 
 import pkt_codec
 import path_guard
+import xml_guard
 
 def user_data_dir() -> str:
     """A per-user folder the app may write to without admin rights."""
@@ -189,11 +190,24 @@ PORT_FAMILIES = (
     ("serial", "eSmartSerial", "Serial"),
     ("serial", "eSerial", "Serial"),
     ("fiber", "eFiber", "Fiber"),
+    ("coaxial", "eCopperCoaxial", "Coaxial"),
+    ("modem", "eModem", "Modem"),
     ("wireless", "eWireless", "Wireless"),
 )
 _TYPE_TO_FAMILY = {}
 for _family, _type, _prefix in PORT_FAMILIES:
     _TYPE_TO_FAMILY.setdefault(_type, _family)
+
+# Kinds whose ports Packet Tracer addresses as "Port 0", "Port 1"...
+# Naming one of them after an interface family ("FastEthernet0") makes PT
+# reject any file that cables the device.  Mirrored in pkt_builder.
+# Mirrors pkt_builder: IOS gear and end hosts keep interface-style names, and
+# every other kind is labelled by PT as "Port N".
+FAMILY_PORT_KINDS = frozenset({"router", "switch", "multilayerswitch",
+                               "asa", "isa", "pc", "laptop", "server",
+                               "printer", "wiredenddevice"})
+GENERIC_ETHERNET_FAMILIES = frozenset({"ethernet", "fastethernet",
+                                      "gigabitethernet"})
 
 # Kinds whose ports never appear in a running config and are named by the
 # host module instead.  `FastEthernet0` is what the links in a real save use.
@@ -218,6 +232,8 @@ FAMILY_PORT_NAMES = {
     "ethernet": "Ethernet",
     "serial": "Serial",
     "fiber": "Fiber",
+    "coaxial": "Coaxial",
+    "modem": "Modem",
     "wireless": "Wireless",
 }
 
@@ -333,9 +349,62 @@ def _family_of_name(name: str) -> str:
         return "serial"
     if lowered.startswith("fiber"):
         return "fiber"
+    if lowered.startswith("coaxial"):
+        return "coaxial"
     if lowered.startswith("wireless"):
         return "wireless"
     return ""
+
+
+# The modules whose presence turns a device's custom-IO slot tree into
+# cableable pins. Without one fitted, the same slot tree exists on every
+# IoT chassis but exposes nothing (a Wind-Detector on its NM-1W has the
+# slots and no pins).
+CUSTOM_IO_MODULE_MODELS = ("PT-IOT-CUSTOM-IO", "PT-IOE-CUSTOM-IO")
+
+
+def _custom_io_pin_ports(block: bytes) -> list[dict]:
+    """The custom-IO pins a device's fitted PT-IOT-CUSTOM-IO module exposes.
+
+    Packet Tracer writes no ``<PORT>`` element for a custom-IO pin: the
+    module tree's ``ePtIoeDigitalModule`` / ``ePtIoeAnalogModule`` slots ARE
+    the pins, and it names them ``D0``.. / ``A0``.. by order among the
+    same-kind slots of the carrier that holds the fitted module. Every
+    PT-authored custom-IO cable endpoint the harvested library has evidence
+    for (D0-D4, A0-A3 across 37 models) fits that rule, so the pins are
+    derived from the tree instead of being left unknown - which is what lets
+    a sensor never cabled in any source save still be wired to an MCU.
+    """
+    try:
+        root = xml_guard.fromstring(
+            re.sub(rb"[\x00-\x08\x0b\x0c\x0e-\x1f]", b"", block))
+    except (ET.ParseError, xml_guard.UntrustedXmlError):
+        return []
+    parents = {child: parent for parent in root.iter() for child in parent}
+    carriers = []
+    for module in root.iter("MODULE"):
+        model = module.findtext("MODEL", "").strip()
+        if model not in CUSTOM_IO_MODULE_MODELS:
+            continue
+        slot = parents.get(module)
+        carrier = parents.get(slot)
+        if carrier is not None and not any(c is carrier for c in carriers):
+            carriers.append(carrier)
+    pins = []
+    for carrier in carriers:
+        digital = analog = 0
+        for slot in carrier.findall("SLOT"):
+            slot_type = slot.findtext("TYPE", "").strip()
+            evidence = "PT custom-IO slot order"
+            if slot_type == "ePtIoeDigitalModule":
+                pins.append({"index": -1, "type": "eCustomIO", "family": "io",
+                             "name": f"D{digital}", "namingEvidence": evidence})
+                digital += 1
+            elif slot_type == "ePtIoeAnalogModule":
+                pins.append({"index": -1, "type": "eCustomIO", "family": "io",
+                             "name": f"A{analog}", "namingEvidence": evidence})
+                analog += 1
+    return pins
 
 
 def port_inventory(port_types: list[str], names: list[str],
@@ -367,6 +436,15 @@ def port_inventory(port_types: list[str], names: list[str],
             counters[family] = seen + 1
         ports.append(entry)
 
+    # PT's tvcoaxiatpcserver.pkt names the splitter's connectors Port 0..2,
+    # not the generic family's Coaxial0..2. Keep that evidence on new entries.
+    if kind.strip().lower() == "coaxialsplitter":
+        for port in ports:
+            if port["family"] == "coaxial" and not port["name"]:
+                port["name"] = f"Port {port['index']}"
+                port["namingEvidence"] = (
+                    "PT-authored tvcoaxiatpcserver.pkt cable endpoint")
+
     unnamed = [p for p in ports if not p["name"]]
     if unnamed:
         fallback = HOST_FALLBACK_NAMES.get(kind.strip().lower(), "")
@@ -385,6 +463,18 @@ def port_inventory(port_types: list[str], names: list[str],
                 continue
             entry["name"] = _fallback_port_name(entry["family"], taken)
             taken.add(entry["name"])
+        # Access points and IP phones expose their ports as generic pins: PT
+        # knows them as "Port 0", "Port 1" and rejects a save that names them
+        # after an interface family, so replace the family guess here too.
+        if (not names and kind.strip().lower()
+                and kind.strip().lower() not in FAMILY_PORT_KINDS):
+            slot = 0
+            for entry in ports:
+                if entry["family"] not in GENERIC_ETHERNET_FAMILIES:
+                    continue
+                entry["name"] = f"Port {slot}"
+                entry["namingEvidence"] = "PT module pin order"
+                slot += 1
         still = [p for p in ports if not p["name"] and p["family"]]
         if still:
             warnings.append(
@@ -468,18 +558,44 @@ def skeleton_from(xml: bytes) -> bytes:
 # Extraction
 # ---------------------------------------------------------------------------
 
+def _version_key(version: str) -> tuple[int, ...] | None:
+    """Numeric native VERSION ordering; labels and unknown versions are not evidence."""
+    text = str(version or "").strip()
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)*", text):
+        return None
+    parts = [int(part) for part in text.split(".")]
+    while len(parts) > 1 and parts[-1] == 0:
+        parts.pop()
+    return tuple(parts)
+
+
+def _source_version(entry: dict, sources: list[dict]) -> str:
+    """Recover legacy metadata only from unambiguous matching source history.
+
+    Neither the skeleton/library version nor a PT version in a filename proves
+    which schema wrote this device. Conflicting or incomplete history is unknown.
+    """
+    if "sourceVersion" in entry:
+        return str(entry["sourceVersion"] or "").strip()
+    if not entry.get("source"):
+        return ""
+    versions = [str(item.get("version") or "").strip() for item in sources
+                if item.get("path") == entry["source"]]
+    keys = {_version_key(version) for version in versions}
+    if versions and None not in keys and len(keys) == 1:
+        return versions[0]
+    return ""
+
+
 def extract_from_xml(xml: bytes, source: str, library: dict) -> dict:
-    """Merge one decrypted save into the library being built."""
+    """Merge a save, preferring newer native schemas for identical hardware."""
     summary = pkt_codec.pkt_xml_summary(xml)
-    library.setdefault("sources", []).append({
-        "path": source,
-        "sha256": _sha256(xml),
-        "version": summary.get("version", ""),
-        "devices": summary.get("deviceCount", 0),
-        "links": summary.get("linkCount", 0),
-    })
+    source_version = summary.get("version", "")
+    # Keep the incoming record out of legacy inference: this path may have been
+    # resaved since the selected block was extracted.
+    sources = library.setdefault("sources", [])
     if not library.get("version"):
-        library["version"] = summary.get("version", "")
+        library["version"] = source_version
 
     if not library.get("skeleton"):
         library["skeleton"] = skeleton_from(xml).decode("utf-8", "replace")
@@ -492,38 +608,65 @@ def extract_from_xml(xml: bytes, source: str, library: dict) -> dict:
         key = _safe_key(model + ("+" + "+".join(modules) if modules
                                  else ""))
         existing = next((entry for entry in library["devices"]
-                         if entry["key"] == key), None)
+                         if entry.get("model") == model
+                         and entry.get("modules", []) == modules), None)
         if existing is not None:
-            # One model is saved in many labs, and not every save gives it
-            # physical-workspace data.  Only a block that has it can be given
-            # a physical leaf, so it wins over an earlier block without it -
-            # otherwise the model would be logical-workspace-only for as long
-            # as the library lives.
-            if (has_physical_data(block)
-                    and not has_physical_data(
-                        library["_blocks"][existing["file"]])):
-                library["_blocks"][existing["file"]] = clean_device(block)
-                existing["hasPhysical"] = True
-                existing["source"] = source
-                existing["sourceName"] = _device_name(block)
-            continue
+            key = existing["key"]
+            existing_version = _source_version(existing, sources)
+            if existing_version:
+                existing["sourceVersion"] = existing_version
+            old_version = _version_key(existing_version)
+            new_version = _version_key(source_version)
+            # VERSION wins over CPUR/config richness. Unknown versions cannot
+            # establish an upgrade; equal known versions retain the CPUR tie-break.
+            newer = (old_version is not None and new_version is not None
+                     and new_version > old_version)
+            # Equal known versions retain the CPUR tie-break: a block that
+            # carries physical-workspace data replaces one that lost it.
+            # An unknown or older version never wins on that basis - see
+            # test_template_schema_upgrade.py.
+            physical_upgrade = (
+                old_version is not None and old_version == new_version
+                and has_physical_data(block)
+                and not has_physical_data(library["_blocks"][existing["file"]]))
+            if not (newer or physical_upgrade):
+                continue
+        elif any(entry["key"] == key for entry in library["devices"]):
+            # A filename slug is not hardware identity (e.g. spaces vs '-').
+            identity = json.dumps([model, modules]).encode("utf-8")
+            key += "-" + _sha256(identity)[:12]
         kind = _device_kind(block)
-        ports, warnings = port_inventory(
-            _device_port_types(block), _interface_names(block), kind)
+        names = _interface_names(block)
+        ports, warnings = port_inventory(_device_port_types(block), names, kind)
+        # Custom-IO pins never appear as PORT elements; recompute them for the
+        # selected block just like every other part of its port inventory.
+        if not any(p["family"] == "io" for p in ports):
+            pins = _custom_io_pin_ports(block)
+            if pins:
+                ports.extend(pins)
         entry = {
             "key": key,
             "model": model,
             "kind": kind,
             "modules": modules,
-            "file": f"devices/{key}.xml",
+            "file": existing["file"] if existing else f"devices/{key}.xml",
             "ports": ports,
             "source": source,
+            "sourceVersion": source_version,
             "sourceName": _device_name(block),
-            "hasConfig": bool(_interface_names(block)),
+            "hasConfig": bool(names),
             "hasPhysical": has_physical_data(block),
             "warnings": warnings,
         }
-        library["devices"].append(entry)
+        if existing is None:
+            library["devices"].append(entry)
+        else:
+            # Remove only this entry's old warnings, preserving identical
+            # warnings contributed by other devices and source-read failures.
+            for warning in existing.get("warnings", []):
+                if warning in library["warnings"]:
+                    library["warnings"].remove(warning)
+            existing.update(entry)
         library["_blocks"][entry["file"]] = clean_device(block)
         library["warnings"].extend(warnings)
 
@@ -546,6 +689,13 @@ def extract_from_xml(xml: bytes, source: str, library: dict) -> dict:
         }
         library["links"].append(entry)
         library["_blocks"][entry["file"]] = clean_link(block)
+    sources.append({
+        "path": source,
+        "sha256": _sha256(xml),
+        "version": source_version,
+        "devices": summary.get("deviceCount", 0),
+        "links": summary.get("linkCount", 0),
+    })
     return library
 
 
@@ -604,9 +754,9 @@ def harvest_templates(roots=None, out_dir: str = "", *, log=None,
                       include_existing: bool = True) -> dict:
     """Extend the template library with every model found in local .pkt files.
 
-    The existing sources are read first, so a model already in the library
-    keeps its winning block (extraction takes the first file that has it) and
-    the harvest only ever *adds* models.
+    With include_existing, tested blocks and metadata already on disk stay
+    untouched. Requested saves use native VERSION preference when selecting
+    templates for new hardware identities.
     """
     say = log or (lambda *_: None)
     # out_dir is user-designated (harvest CLI / HTTP); a raw '..' segment is
@@ -632,20 +782,52 @@ def harvest_templates(roots=None, out_dir: str = "", *, log=None,
                 "error": "no .pkt files found to harvest; point this at a "
                          "folder or save a topology from Packet Tracer first",
                 "roots": requested}
-    before = set()
     manifest_path = os.path.join(directory, MANIFEST_FILE)
-    if os.path.isfile(manifest_path):
-        try:
-            with open(manifest_path, encoding="utf-8") as stream:
-                before = {entry.get("key") for entry in
-                          json.load(stream).get("devices", [])}
-        except Exception:  # noqa: BLE001
-            before = set()
-    say(f"harvest: reading {len(files)} .pkt file(s)")
-    manifest = extract_templates(files, directory, log=say)
-    after = {entry.get("key") for entry in manifest.get("devices", [])}
-    added = sorted(after - before)
-    say(f"harvest: {len(added)} new model(s): {', '.join(added) or 'none'}")
+    files = discover_pkt_files(requested)
+    if not files:
+        return {"ok": False, "added": [], "scanned": 0,
+                "error": "no .pkt files found to harvest", "roots": requested}
+    if include_existing and os.path.isfile(manifest_path):
+        with open(manifest_path, encoding="utf-8") as stream:
+            manifest = json.load(stream)
+        library = {"devices": [], "links": [], "warnings": [], "_blocks": {},
+                   "sources": [], "version": ""}
+        for path in files:
+            try:
+                with open(path, "rb") as stream:
+                    xml = pkt_codec.decrypt_pkt(stream.read())
+                extract_from_xml(xml, path, library)
+            except Exception as exc:
+                library["warnings"].append(f"skipped {path}: {exc}")
+        added = []
+        for section in ("devices", "links"):
+            keys = {entry.get("key") for entry in manifest.get(section, [])}
+            for entry in library[section]:
+                if entry.get("key") in keys:
+                    continue
+                relative = path_guard.ensure_no_traversal(entry["file"])
+                block = library["_blocks"].get(relative)
+                destination = os.path.join(directory, relative)
+                # Never replace an existing block, even if its manifest entry
+                # is missing. It may carry tested naming/placement evidence.
+                if block is None or os.path.exists(destination):
+                    continue
+                os.makedirs(os.path.dirname(destination), exist_ok=True)
+                with path_guard.open_state(destination, "wb") as stream:
+                    stream.write(pkt_codec.xml_safe(block))
+                manifest.setdefault(section, []).append(entry)
+                keys.add(entry["key"])
+                if section == "devices":
+                    added.append(entry["key"])
+        for source in library["sources"]:
+            if source not in manifest.get("sources", []):
+                manifest.setdefault("sources", []).append(source)
+        manifest.setdefault("warnings", []).extend(library["warnings"])
+        with path_guard.open_state(manifest_path, "w", encoding="utf-8") as stream:
+            json.dump(manifest, stream, indent=2)
+    else:
+        manifest = extract_templates(files, directory, log=say)
+        added = sorted(entry["key"] for entry in manifest["devices"])
     return {
         "ok": True,
         "scanned": len(files),

@@ -17,6 +17,16 @@ class RequirementEvidence {
   final String checkedAt;
   final String explanation;
 
+  /// Empty for legacy evidence. Such rows remain useful forensic records but
+  /// cannot establish freshness for a current artifact action.
+  final String projectId;
+  final String buildRevision;
+  final String requirementsDigest;
+  final String scope;
+  final String layoutIdentity;
+  final String outputIdentity;
+  final DeliveryStatus? deliveryStatus;
+
   RequirementEvidence({
     required this.requirementId,
     required this.planRevision,
@@ -27,6 +37,13 @@ class RequirementEvidence {
     required this.checker,
     required this.checkedAt,
     this.explanation = '',
+    this.projectId = '',
+    this.buildRevision = '',
+    this.requirementsDigest = '',
+    this.scope = '',
+    this.layoutIdentity = '',
+    this.outputIdentity = '',
+    this.deliveryStatus,
   }) : measuredValue = freezeJsonValue(
          measuredValue,
          label: 'RequirementEvidence measuredValue',
@@ -50,6 +67,13 @@ class RequirementEvidence {
       'checker',
       'checkedAt',
       'explanation',
+      'projectId',
+      'buildRevision',
+      'requirementsDigest',
+      'scope',
+      'layoutIdentity',
+      'outputIdentity',
+      'deliveryStatus',
     }, 'RequirementEvidence');
     return RequirementEvidence(
       requirementId: readString(json, 'requirementId', allowEmpty: false),
@@ -66,6 +90,23 @@ class RequirementEvidence {
       checker: readString(json, 'checker', allowEmpty: false),
       checkedAt: readString(json, 'checkedAt', defaultValue: ''),
       explanation: readString(json, 'explanation', defaultValue: ''),
+      projectId: readString(json, 'projectId', defaultValue: ''),
+      buildRevision: readString(json, 'buildRevision', defaultValue: ''),
+      requirementsDigest: readString(
+        json,
+        'requirementsDigest',
+        defaultValue: '',
+      ),
+      scope: readString(json, 'scope', defaultValue: ''),
+      layoutIdentity: readString(json, 'layoutIdentity', defaultValue: ''),
+      outputIdentity: readString(json, 'outputIdentity', defaultValue: ''),
+      deliveryStatus: json['deliveryStatus'] == null
+          ? null
+          : readEnum(
+              json['deliveryStatus'],
+              DeliveryStatus.values,
+              'evidence delivery status',
+            ),
     );
   }
 
@@ -79,6 +120,13 @@ class RequirementEvidence {
     'checker': checker,
     'checkedAt': checkedAt,
     'explanation': explanation,
+    if (projectId.isNotEmpty) 'projectId': projectId,
+    if (buildRevision.isNotEmpty) 'buildRevision': buildRevision,
+    if (requirementsDigest.isNotEmpty) 'requirementsDigest': requirementsDigest,
+    if (scope.isNotEmpty) 'scope': scope,
+    if (layoutIdentity.isNotEmpty) 'layoutIdentity': layoutIdentity,
+    if (outputIdentity.isNotEmpty) 'outputIdentity': outputIdentity,
+    if (deliveryStatus != null) 'deliveryStatus': deliveryStatus!.name,
   };
 
   @override

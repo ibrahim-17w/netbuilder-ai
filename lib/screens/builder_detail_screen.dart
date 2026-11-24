@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show File;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
@@ -7,18 +8,26 @@ import 'package:provider/provider.dart';
 import '../models/build_attempt.dart';
 import '../models/build_record.dart';
 import '../models/network_intent.dart';
+import '../models/pkt_verification.dart';
 import '../services/adapters/gns3_adapter.dart';
 import '../services/adapters/packet_tracer_adapter.dart';
 import '../services/autopilot_service.dart';
 import '../services/build_artifact_service.dart';
 import '../services/gemini_service.dart';
+import '../services/human_language.dart';
 import '../services/engine_configuration_sync.dart';
 import '../services/memory_service.dart';
 import '../services/privacy_search_service.dart';
 import '../services/settings_service.dart';
 import '../services/validator_service.dart';
+import '../services/plan_version_service.dart';
+import '../services/pkt_build_job_service.dart';
+import '../services/request_understanding/artifact_evidence_service.dart';
+import '../services/request_understanding/build_action_identity.dart';
+import '../services/request_understanding/build_readiness.dart';
 import '../widgets/correction_badges.dart';
 import '../widgets/verification_report.dart';
+import '../widgets/pkt_verification_status.dart';
 import '../theme/app_kit.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
@@ -85,10 +94,48 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
   // Post-build verification (PDU/ping evidence from the live canvas).
   Map<String, dynamic>? _verifyReport;
   bool _verifying = false;
+  bool _verificationStopRequested = false;
+  int _verificationSequence = 0;
+  String _verificationRunId = '';
+  AutopilotService? _verificationService;
+  PktVerificationSummary? _buildVerification;
+  String? _verificationJobId;
+
+  BuildActionIdentity get _currentAction {
+    final outcome = PlanVersionService.requestOutcomeOf(widget.record);
+    final stored = PlanVersionService.actionIdentityOf(widget.record);
+    final outcomeProject = outcome?.interpretation.projectId;
+    final projectId = stored?.projectId.isNotEmpty == true
+        ? stored!.projectId
+        : outcomeProject?.isNotEmpty == true
+        ? outcomeProject!
+        : PlanVersionService.projectKeyOf(widget.record);
+    return BuildActionIdentity.forPlan(
+      plan: widget.intent,
+      requirements: outcome?.interpretation.requirements ?? const [],
+      target: widget.target,
+      projectId: projectId,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant BuilderDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.intent.buildRevision != widget.intent.buildRevision ||
+        oldWidget.record.intentJson != widget.record.intentJson ||
+        oldWidget.target != widget.target) {
+      _verifyReport = null;
+      _buildVerification = _buildVerification?.refresh(
+        currentAction: _currentAction,
+        currentHash: '',
+      );
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    unawaited(PktBuildJobService.instance.loadHistory());
     if (!widget.monitorSidecar) return;
     // A previous error message is local Flutter state, not proof that the
     // sidecar is still busy. Refresh immediately and keep the status chip in
@@ -200,8 +247,9 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
     if (mounted) {
       setState(
         () => _log =
-            'Execution blocked by preflight. Fix these ${errors.length} '
-            'error(s) before changing the live network:\n'
+            'Execution blocked by preflight. Fix these '
+            '${HumanLanguage.count(errors.length, 'error')} before changing the '
+            'live network:\n'
             '${errors.map((issue) => '• ${issue.message}').join('\n')}',
       );
     }
@@ -210,6 +258,11 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
 
   @override
   void dispose() {
+    _verificationSequence++;
+    final verificationService = _verificationService;
+    if (verificationService != null && _verificationRunId.isNotEmpty) {
+      unawaited(_stopVerificationRun(verificationService, _verificationRunId));
+    }
     _statusTimer?.cancel();
     _fix.dispose();
     for (final ctrls in _pcFixFields.values) {
@@ -556,7 +609,9 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
     ];
     setState(() {
       _busy = true;
-      _log = 'Applying $count fix(es)... keep Packet Tracer in front.';
+      _log =
+          'Applying ${HumanLanguage.count(count, 'fix')}... keep Packet Tracer '
+          'in front.';
     });
     try {
       final svc = AutopilotService.of(context);
@@ -625,12 +680,18 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
             runSpacing: AppTheme.s8,
             children: [
               AppTag(
-                label: '${summary['device_count'] ?? 0} device(s)',
+                label: HumanLanguage.count(
+                  ((summary['device_count'] as num?) ?? 0).toInt(),
+                  'device',
+                ),
                 tone: AppTone.accent,
                 icon: Icons.devices_other_outlined,
               ),
               AppTag(
-                label: '${summary['finding_count'] ?? 0} finding(s)',
+                label: HumanLanguage.count(
+                  ((summary['finding_count'] as num?) ?? 0).toInt(),
+                  'finding',
+                ),
                 tone: (summary['finding_count'] ?? 0) == 0
                     ? AppTone.success
                     : AppTone.warning,
@@ -707,7 +768,9 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
                 ? null
                 : _applyFixes,
             icon: const Icon(Icons.build_outlined, size: 18),
-            label: Text('Apply ${_selectedFixes.length} selected fix(es)'),
+            label: Text(
+              'Apply ${HumanLanguage.count(_selectedFixes.length, 'selected fix')}',
+            ),
           ),
         ),
       ],
@@ -726,7 +789,9 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       initiallyExpanded: findings.any((f) => (f as Map)['severity'] == 'high'),
       title: Text('$name (${dev['type']})'),
       subtitle: Text(
-        findings.isEmpty ? 'no issues found' : '${findings.length} finding(s)',
+        findings.isEmpty
+            ? 'no issues found'
+            : HumanLanguage.count(findings.length, 'finding'),
       ),
       children: [
         if (ipcfg.values.any((value) => value.toString().isNotEmpty))
@@ -1167,7 +1232,8 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
                   '$cliProofLine'
                   '$learningLine'
                   '$artifactLine'
-                  'RECORDED $learned recurring pattern(s) for review - '
+                  'RECORDED ${HumanLanguage.count(learned, 'recurring pattern')} '
+                  'for review - '
                   'not applied to plans.',
             );
             return;
@@ -1465,6 +1531,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
 
   Future<void> _ptStop() async {
     if (_stopPending) return;
+    if (_verifying) _verificationStopRequested = true;
     _stopPending = true;
     if (mounted) {
       setState(() {
@@ -1664,7 +1731,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
             .join('\n');
         setState(
           () => _log =
-              'Remembered ${devs.length} device(s) for "${widget.record.projectName}" (reused next run):\n$lines',
+              'Remembered ${HumanLanguage.count(devs.length, 'device')} for "${widget.record.projectName}" (reused next run):\n$lines',
         );
       }
     } catch (e) {
@@ -1867,41 +1934,165 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
     }
   }
 
-  /// Post-build verification: run the plan's derived test list in the live
-  /// Packet Tracer window (gateway/service reachability plus DNS lookups) and
-  /// show evidence per test. DHCP, HTTP, and security behavior remain manual.
+  /// Native verification is bound to an exact saved file and build action.
+  /// Test counts can grow while running; only the correlated terminal report
+  /// may update durable job evidence.
   Future<void> _verifyBuild() async {
+    if (_verifying || _busy) return;
+    final action = _currentAction;
+    final sequence = ++_verificationSequence;
+    final svc = AutopilotService.of(context);
+    _verificationService = svc;
+    final jobs = PktBuildJobService.instance;
     setState(() {
       _verifying = true;
+      _verificationStopRequested = false;
+      _verificationRunId = '';
       _verifyReport = null;
     });
+    bool current() =>
+        mounted &&
+        sequence == _verificationSequence &&
+        _currentAction == action;
     try {
-      final svc = AutopilotService.of(context);
-      if (!await svc.healthy) {
-        if (!mounted) return;
-        setState(() => _log = svc.hint);
-        return;
+      await jobs.loadHistory();
+      final entry = jobs.history
+          .where(
+            (entry) =>
+                entry.actionIdentity == action &&
+                entry.filePath.isNotEmpty &&
+                ArtifactEvidenceService.validHash(entry.artifactHash),
+          )
+          .firstOrNull;
+      if (entry == null) {
+        throw StateError(
+          'No current saved file is bound to this build action. Generate the '
+          '.pkt first; native verification remains unverified.',
+        );
       }
-      final plan = PacketTracerAdapter.autopilotPlan(widget.intent);
-      await svc.verifyRun(plan);
-      // Poll until the bounded runner finishes; larger runs can take several minutes.
-      for (var i = 0; i < 150; i++) {
-        await Future.delayed(const Duration(seconds: 4));
-        if (!mounted) return;
-        final rep = await svc.verifyReport();
-        if (rep != null) {
-          setState(() => _verifyReport = rep);
-          if (rep['error'] != null) break;
-          if ((rep['total'] ?? 0) > 0) break; // a finished report has tests
+      final hash = await ArtifactEvidenceService.contentHash(
+        File(entry.filePath),
+      );
+      if (!entry.matchesArtifact(action, hash)) {
+        if (current()) {
+          _verificationJobId = entry.id;
+          setState(
+            () => _buildVerification = entry.verification?.refresh(
+              currentAction: action,
+              currentHash: hash,
+            ),
+          );
         }
+        throw StateError(
+          'The saved file changed. Rebuild or re-audit it before native '
+          'testing; verification remains unverified.',
+        );
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _log = 'Verification failed: $e');
+      if (!current() || _verificationStopRequested) return;
+      if (!await svc.healthy) throw StateError(svc.hint);
+      if (!current() || _verificationStopRequested) return;
+      final runId = await svc.verifyRun(
+        PacketTracerAdapter.autopilotPlan(widget.intent),
+        artifactPath: entry.filePath,
+        artifactHash: hash,
+        actionIdentity: action,
+      );
+      _verificationRunId = runId;
+      if (runId.isEmpty) throw StateError('Native engine returned no run ID.');
+      if (_verificationStopRequested) await _stopVerificationRun(svc, runId);
+      final deadline = DateTime.now().add(const Duration(minutes: 10));
+      while (DateTime.now().isBefore(deadline)) {
+        if (!current()) {
+          await _stopVerificationRun(svc, runId);
+          return;
+        }
+        final report = await svc.verifyReport(runId: runId);
+        if (!current()) {
+          await _stopVerificationRun(svc, runId);
+          return;
+        }
+        if (report != null &&
+            report['runId'] == runId &&
+            report['running'] == false &&
+            const [
+              'completed',
+              'failed',
+              'cancelled',
+            ].contains(report['state'])) {
+          final recorded =
+              !_verificationStopRequested &&
+              await jobs.recordNativeVerification(
+                report,
+                jobId: entry.id,
+                expectedRunId: runId,
+              );
+          if (!current()) return;
+          final summary = jobs.history
+              .where((row) => row.id == entry.id)
+              .firstOrNull
+              ?.verification;
+          setState(() {
+            _verificationJobId = entry.id;
+            _buildVerification = summary;
+            _verifyReport = recorded
+                ? report
+                : {
+                    'summary': 'Native verification remains unverified.',
+                    'error': _verificationStopRequested
+                        ? 'Verification was stopped. No successful completion was recorded.'
+                        : 'The report could not be bound to the current saved file and action.',
+                  };
+            _log = recorded
+                ? 'Native run $runId finished (${report['state']}). '
+                      'Open and connectivity evidence are shown separately.'
+                : _verifyReport!['error'].toString();
+          });
+          return;
+        }
+        await Future<void>.delayed(const Duration(seconds: 1));
       }
+      final stopSent = await _stopVerificationRun(svc, runId);
+      throw TimeoutException(
+        'Native verification timed out. '
+        '${stopSent ? 'Stop was requested.' : 'The active run could not be confirmed; use Stop in the engine.'} '
+        'No completed verification was recorded. Check the live engine before retrying.',
+      );
+    } catch (error) {
+      if (_verificationRunId.isNotEmpty) {
+        await _stopVerificationRun(svc, _verificationRunId);
+      }
+      if (!current()) return;
+      setState(() {
+        _log =
+            'Native verification unverified: '
+            '${error.toString().replaceFirst('Bad state: ', '').replaceFirst('Exception: ', '')}';
+        _verifyReport = {
+          'summary': 'Native verification remains unverified.',
+          'error': _log,
+        };
+      });
     } finally {
-      if (mounted) setState(() => _verifying = false);
+      if (mounted && sequence == _verificationSequence) {
+        setState(() {
+          _verifying = false;
+          _verificationRunId = '';
+          _verificationService = null;
+        });
+      }
     }
+  }
+
+  Future<bool> _stopVerificationRun(AutopilotService svc, String runId) async {
+    try {
+      final report = await svc.verifyReport(runId: runId);
+      if (report?['runId'] == runId && report?['running'] == true) {
+        await svc.stop();
+        return true;
+      }
+    } catch (_) {
+      // Do not claim stopped when the engine cannot confirm its active run.
+    }
+    return false;
   }
 
   /// Offline .pkt generation: the same plan the autopilot would drive the
@@ -1909,6 +2100,25 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
   /// Tracer, no mouse, no screen. A timestamped filename means a repeat
   /// click never overwrites an earlier artifact.
   Future<void> _generatePkt() async {
+    if (_busy || _verifying) return;
+    final intent = widget.intent;
+    final action = _currentAction;
+    final outcome = PlanVersionService.requestOutcomeOf(widget.record);
+    final readiness = BuildReadiness.evaluate(
+      plan: widget.intent,
+      target: widget.target,
+      offlineBuild: true,
+      requirements: outcome?.interpretation.requirements ?? const [],
+      interpretation: outcome?.interpretation,
+    );
+    if (!readiness.canBuild) {
+      setState(
+        () => _log =
+            'Offline build blocked by preflight:\n'
+            '${readiness.blockers.map((blocker) => '• ${blocker.reason}').join('\n')}',
+      );
+      return;
+    }
     setState(() {
       _busy = true;
       _log = 'Generating .pkt offline (no Packet Tracer needed)...';
@@ -1921,20 +2131,58 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
         setState(() => _log = svc.hint);
         return;
       }
-      final plan = PacketTracerAdapter.autopilotPlan(widget.intent);
-      final res = await svc.pktGenerate(
-        plan,
-        // Named for the network: the record's own instruction is the
-        // description, so the file in the folder reads like the lab it is.
-        filename: BuildArtifactService.networkFileName(
-          plan: widget.intent,
-          brief: widget.record.instruction,
-          taken: const {},
+      final plan = PacketTracerAdapter.autopilotPlan(intent);
+      final jobs = PktBuildJobService.instance;
+      final buildFuture = jobs.runExclusive(
+        identity: action,
+        build: () => svc.pktGenerate(
+          plan,
+          project: intent.projectName,
+          // Repeat generation never overwrites an earlier artifact.
+          filename: BuildArtifactService.networkFileName(
+            plan: intent,
+            brief: widget.record.instruction,
+            taken: const {},
+          ),
         ),
       );
-      if (!mounted) return;
-      final warnings = (res['warnings'] as List?) ?? const [];
+      final jobId = jobs.currentJobId;
+      final res = await buildFuture;
+      if (!mounted || _currentAction != action) return;
       final path = (res['path'] ?? '').toString();
+      if (path.isEmpty) {
+        throw StateError('The generator returned no saved file.');
+      }
+      Map<String, dynamic> audit;
+      try {
+        audit = await svc.pktAudit(path, project: intent.projectName);
+      } catch (_) {
+        audit = const {'unreadable': true};
+      }
+      final evidence = ArtifactEvidenceService.completeAudit(
+        action: action,
+        requirements: outcome?.interpretation.requirements ?? const [],
+        audit: audit,
+        planning: readiness.coverage,
+      );
+      if (!mounted || _currentAction != action) return;
+      jobs.recordGeneratedFile(
+        project: intent.projectName,
+        filePath: path,
+        deviceCount:
+            (res['deviceCount'] as num?)?.toInt() ?? intent.nodes.length,
+        linkCount: (res['linkCount'] as num?)?.toInt() ?? intent.links.length,
+        sourceRecordId: widget.record.id,
+        planRevision: intent.revision,
+        planJson: jsonEncode(intent.toPlannerJson()),
+        target: widget.target,
+        actionIdentity: action,
+        artifactHash: evidence.artifactHash,
+        coverage: evidence.coverage,
+        audit: audit,
+        expectedJobId: jobId,
+      );
+      final warnings = (res['warnings'] as List?) ?? const [];
       final warningText = warnings.isEmpty
           ? 'No warnings.'
           : 'Warnings:\n- ${warnings.join('\n- ')}';
@@ -1947,9 +2195,16 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
                 "${learning['note']}"
           : '';
       setState(() {
+        _verifyReport = null;
+        _verificationJobId = jobId;
+        _buildVerification = jobs.history
+            .where((entry) => entry.id == jobId)
+            .firstOrNull
+            ?.verification;
         _log =
             'Generated: $path\n'
             'devices: ${res['deviceCount']}, links: ${res['linkCount']}\n'
+            '${evidence.lines.join('\n')}\n'
             '$warningText\n'
             '${substituted ? 'A model this plan asked for was not in the library, '
                       'so the nearest match was used. Press "Extend model library" to '
@@ -1989,7 +2244,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       setState(() {
         _log =
             'Model library now covers ${res['deviceCount']} models, '
-            'read from ${res['scanned']} .pkt file(s).'
+            'read from ${HumanLanguage.count(((res['scanned'] as num?) ?? 0).toInt(), '.pkt file')}.'
             '${added.isEmpty ? '\nNo new models: this machine already had them all.' : '\nAdded ${added.length}:\n- ${added.take(40).join('\n- ')}'}'
             '${added.length > 40 ? '\n- ...' : ''}';
       });
@@ -2029,6 +2284,9 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       widget.intent,
       target: widget.record.target,
     );
+    final errors = issues.where((i) => i.severity == 'error').length;
+    final warnings = issues.where((i) => i.severity == 'warning').length;
+    final notes = issues.length - errors - warnings;
     return AppPage(
       maxWidth: 980,
       header: AppPageHeader(
@@ -2087,9 +2345,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
           AppPanel(
             icon: Icons.rule_outlined,
             title: 'Validator',
-            subtitle:
-                '${issues.where((i) => i.severity == 'error').length} error(s), '
-                '${issues.where((i) => i.severity != 'error').length} warning(s)',
+            subtitle: HumanLanguage.findingsSummary(errors, warnings, notes),
             children: [
               for (final i in issues)
                 AppBanner(
@@ -2097,7 +2353,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
                   tone: i.severity == 'error'
                       ? AppTone.danger
                       : AppTone.warning,
-                  message: '[${i.severity}] ${i.message}',
+                  message: HumanLanguage.finding(i.severity, i.message),
                 ),
               if (issues.any((i) => i.severity == 'error'))
                 const AppBanner(
@@ -2137,7 +2393,7 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
                   label: const Text('Cables + CLI only'),
                 ),
                 ElevatedButton.icon(
-                  onPressed: _busy ? null : _generatePkt,
+                  onPressed: (_busy || _verifying) ? null : _generatePkt,
                   icon: const Icon(Icons.save_outlined, size: 18),
                   label: const Text('Generate .pkt (no PT)'),
                 ),
@@ -2253,8 +2509,8 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
           icon: Icons.account_tree_outlined,
           title: 'Topology',
           subtitle:
-              '${widget.intent.nodes.length} device(s), '
-              '${widget.intent.links.length} link(s)',
+              '${HumanLanguage.count(widget.intent.nodes.length, 'device')}, '
+              '${HumanLanguage.count(widget.intent.links.length, 'link')}',
           children: [
             Wrap(
               spacing: 6,
@@ -2424,10 +2680,32 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
         ),
         if (_audit != null) _buildAuditCard(),
         const SizedBox(height: 8),
+        AppPanel(
+          icon: Icons.inventory_2_outlined,
+          title: 'Build evidence',
+          subtitle:
+              'File generation and read-back do not imply a native open or live connectivity pass.',
+          children: [
+            ListenableBuilder(
+              listenable: PktBuildJobService.instance,
+              builder: (context, _) {
+                final action = _currentAction;
+                final entry = PktBuildJobService.instance.history
+                    .where((entry) => entry.actionIdentity == action)
+                    .firstOrNull;
+                return PktVerificationStatus(
+                  verification: entry == null || entry.id == _verificationJobId
+                      ? _buildVerification ?? entry?.verification
+                      : entry.verification,
+                );
+              },
+            ),
+          ],
+        ),
         VerificationReport(
           report: _verifyReport,
           busy: _verifying,
-          onRerun: _verifyBuild,
+          onRerun: (_busy || _verifying) ? null : _verifyBuild,
           onReviewFailure: widget.onReviewFailure,
         ),
         // The run log is the only place a long build reports its own state,

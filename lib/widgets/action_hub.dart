@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../services/capability_registry.dart';
+import '../services/human_language.dart';
 import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
 import 'whats_new.dart';
@@ -232,7 +233,7 @@ class _ActionHubPanelState extends State<ActionHubPanel> {
                     Expanded(
                       child: Text(
                         searching
-                            ? '${matches.length} feature(s) match "$_query"'
+                            ? '${HumanLanguage.count(matches.length, 'feature')} match "$_query"'
                             : '${matches.length} features, grouped. '
                                   'Up/Down to choose, Enter to run the highlighted '
                                   'one.',

@@ -14,6 +14,8 @@ import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
+
 import '../../models/network_intent.dart';
 import '../network_math.dart';
 import 'pkt_builder.dart';
@@ -279,6 +281,11 @@ class OnDevicePktBuilder {
     double gapY = 140,
   }) {
     final devices = <PktDeviceSpec>[];
+    if (intent.nodes.any((node) => node.variantKey != null)) {
+      throw const PktBuildFailure(
+        'The legacy seed builder cannot honor a pinned variant. Use the bundled template builder; no fallback was made.',
+      );
+    }
     for (var i = 0; i < intent.nodes.length; i++) {
       final node = intent.nodes[i];
       final column = i % 4;
@@ -529,13 +536,24 @@ class OnDevicePktBuilder {
     String path = '',
     String project = '',
   }) {
-    final doc = utf8.decode(decryptPkt(bytes), allowMalformed: true);
+    final savedBytes = Uint8List.fromList(bytes);
+    final doc = utf8.decode(decryptPkt(savedBytes));
+    final blocks = SeedLibrary.deviceBlocksOf(doc).toList();
+    var inventoryComplete =
+        RegExp(r'<PACKETTRACER5(?:\s[^>]*)?>').hasMatch(doc) &&
+        doc.contains('</PACKETTRACER5>') &&
+        RegExp(r'<DEVICE(?:\s[^>]*)?>').allMatches(doc).length ==
+            blocks.length &&
+        RegExp(r'</DEVICE\s*>').allMatches(doc).length == blocks.length;
     final devices = <Map<String, dynamic>>[];
     final refNames = <String, String>{};
     final servicesEnabled = <String>[];
-    for (final block in SeedLibrary.deviceBlocksOf(doc)) {
+    for (final block in blocks) {
       final device = SeedLibrary.deviceFromBlock(block);
-      if (device == null) continue;
+      if (device == null) {
+        inventoryComplete = false;
+        continue;
+      }
       final ref = RegExp(
         r'<SAVE_REF_ID>save-ref-id:([^<]+)</SAVE_REF_ID>',
       ).firstMatch(block)?.group(1);
@@ -547,16 +565,27 @@ class OnDevicePktBuilder {
       final configLines = configMatch == null
           ? 0
           : RegExp(r'<LINE>').allMatches(configMatch.group(0)!).length;
-      final enabled = _enabledServices(block);
+      final states = _observedServiceStates(block);
+      final enabled = states.entries
+          .where((entry) => entry.value == true)
+          .map((entry) => entry.key)
+          .toList();
       servicesEnabled.addAll(enabled.map((s) => '${device.name}:$s'));
+      final interfaces = _savedInterfaces(block, configMatch?.group(0) ?? '');
+      final position = _savedPosition(block);
       devices.add({
         'name': device.name,
         'type': device.type,
         'model': device.model,
-        'interfaces': <Map<String, dynamic>>[],
+        'interfaces': interfaces,
+        'interfacesComplete':
+            interfaces.isNotEmpty &&
+            interfaces.every((row) => '${row['name'] ?? ''}'.isNotEmpty),
         'config_lines': configLines,
         'findings': <String>[],
         'services': enabled,
+        'serviceStates': states,
+        'position': ?position,
         'probes': <String>[],
         'ipcfg': _ipConfigOf(configMatch?.group(0) ?? ''),
       });
@@ -584,8 +613,16 @@ class OnDevicePktBuilder {
       });
     }
     final findings = _semanticFindings(devices, links);
+    inventoryComplete =
+        inventoryComplete &&
+        RegExp(r'<LINK(?:\s[^>]*)?>').allMatches(doc).length == links.length &&
+        RegExp(r'</LINK\s*>').allMatches(doc).length == links.length;
     return {
       'mode': 'on-device',
+      'inventoryComplete': inventoryComplete,
+      // Hash the exact input buffer decrypted above, not a later path read.
+      'artifactHash': sha256.convert(savedBytes).toString(),
+      'hashBinding': 'saved-bytes-v1',
       'generated': DateTime.now().toUtc().toIso8601String(),
       'path': path,
       'project': project,
@@ -701,24 +738,175 @@ class OnDevicePktBuilder {
     return match?.group(1) ?? '';
   }
 
-  /// The Services-tab roles a device block carries in the enabled state.
-  static List<String> _enabledServices(String block) {
-    final enabled = <String>[];
-    void check(String role, RegExp pattern) {
-      if (pattern.hasMatch(block)) enabled.add(role);
+  /// A tag that exists but is empty is observed empty; an absent tag is null.
+  static String? _savedTag(String block, String tag) {
+    final match = RegExp(
+      '<$tag(?:\\s[^>]*)?>([^<]*)</$tag>',
+      dotAll: true,
+    ).firstMatch(block);
+    if (match != null) {
+      return match
+          .group(1)!
+          .replaceAll('&lt;', '<')
+          .replaceAll('&gt;', '>')
+          .replaceAll('&amp;', '&')
+          .trim();
     }
+    return RegExp('<$tag(?:\\s[^>]*)?\\s*/>').hasMatch(block) ? '' : null;
+  }
 
-    check('dhcp', RegExp(r'<DHCP_SERVER>\s*<ENABLED>1'));
-    check('dns', RegExp(r'<DNS_SERVER><ENABLED>1'));
-    check('http', RegExp(r'<HTTP_SERVER><ENABLED>1'));
-    check('https', RegExp(r'<HTTPSENABLED>1'));
-    check('aaa', RegExp(r'<ACS_SERVER><ENABLED>1'));
-    check('ftp', RegExp(r'<FTP_SERVER><ENABLED>1'));
-    check('email', RegExp(r'<SMTP_ENABLED>1'));
-    check('syslog', RegExp(r'<SYSLOG_SERVER><ENABLED>1'));
-    check('ntp', RegExp(r'<NTP_SERVER><ENABLED>1'));
-    check('tftp', RegExp(r'<TFTP_SERVER><ENABLED>1'));
-    return enabled;
+  static String _portFamily(String type) {
+    final lower = type.toLowerCase();
+    for (final family in [
+      'gigabitethernet',
+      'fastethernet',
+      'ethernet',
+      'serial',
+      'fiber',
+      'wireless',
+    ]) {
+      if (lower.contains(family)) return family;
+    }
+    return '';
+  }
+
+  /// Raw PORT state, not config IPs. Config names may identify ordered physical
+  /// ports only when the entire family has a one-to-one correspondence. Do not
+  /// fill unnamed host ports from the plan or conventional model defaults.
+  static List<Map<String, dynamic>> _savedInterfaces(
+    String block,
+    String config,
+  ) {
+    final ports = <Map<String, dynamic>>[];
+    for (final (start, end) in iterPortSpans(block)) {
+      final port = block.substring(start, end);
+      final type = _savedTag(port, 'TYPE');
+      if (type == null) {
+        continue; // a service's text PORT reference, not hardware
+      }
+      final ip = _savedTag(port, 'IP');
+      final mask = _savedTag(port, 'SUBNET');
+      final power = _savedTag(port, 'POWER');
+      ports.add({
+        'name': _savedTag(port, 'NAME') ?? '',
+        'family': _portFamily(type),
+        'rawIndex': ports.length,
+        'source': 'saved-port',
+        'ip': ?ip,
+        'mask': ?mask,
+        'ipObserved': ip != null,
+        'maskObserved': mask != null,
+        'status': power == 'true'
+            ? 'up'
+            : power == 'false'
+            ? 'administratively down'
+            : 'unknown',
+      });
+    }
+    final names = <String, List<String>>{};
+    for (final match in RegExp(
+      r'<LINE(?:\s[^>]*)?>(.*?)</LINE>',
+      dotAll: true,
+    ).allMatches(config)) {
+      final line = match.group(1)!.trim();
+      final nameMatch = RegExp(
+        r'^interface\s+(\S+)$',
+        caseSensitive: false,
+      ).firstMatch(line);
+      if (nameMatch == null) continue;
+      final name = nameMatch.group(1)!;
+      if (name.contains('.')) continue; // not another physical port
+      final family = _portFamily(normalizePortName(name));
+      if (family.isEmpty) continue;
+      (names[family] ??= []).add(name);
+    }
+    for (final entry in names.entries) {
+      final siblings = ports
+          .where((port) => port['family'] == entry.key)
+          .toList();
+      if (siblings.length != entry.value.length ||
+          entry.value.toSet().length != entry.value.length) {
+        continue;
+      }
+      for (var index = 0; index < siblings.length; index++) {
+        if (siblings[index]['name'] == '') {
+          siblings[index]['name'] = entry.value[index];
+          siblings[index]['nameSource'] = 'saved-config-family-order';
+        }
+      }
+    }
+    return ports;
+  }
+
+  static Map<String, num>? _savedPosition(String block) {
+    final logical = RegExp(
+      r'<LOGICAL(?:\s[^>]*)?>.*?</LOGICAL>',
+      dotAll: true,
+    ).firstMatch(block)?.group(0);
+    if (logical == null) return null;
+    final x = num.tryParse(_savedTag(logical, 'X') ?? '');
+    final y = num.tryParse(_savedTag(logical, 'Y') ?? '');
+    return x != null && y != null && x.isFinite && y.isFinite
+        ? {'x': x, 'y': y}
+        : null;
+  }
+
+  /// Only flags directly present in saved service panels. Missing panels or
+  /// missing flags do not imply a disabled role.
+  static Map<String, bool?> _observedServiceStates(String block) {
+    const panels = {
+      'dhcp': 'DHCP_SERVER',
+      'dns': 'DNS_SERVER',
+      'http': 'HTTP_SERVER',
+      'https': 'HTTPS_SERVER',
+      'aaa': 'ACS_SERVER',
+      'ftp': 'FTP_SERVER',
+      'email': 'EMAIL_SERVER',
+      'syslog': 'SYSLOG_SERVER',
+      'ntp': 'NTP_SERVER',
+      'tftp': 'TFTP_SERVER',
+      'dhcpv6': 'DHCPV6_SERVER',
+      'snmp': 'SNMP_MANAGER',
+      'iot': 'REGISTRATION_SEVER',
+      'vm': 'IOX_VM_MANAGER',
+    };
+    final states = <String, bool?>{};
+    bool? enabled(String? value) => switch (value) {
+      '1' || 'true' => true,
+      '0' || 'false' => false,
+      _ => null,
+    };
+    for (final entry in panels.entries) {
+      final matches = RegExp(
+        '<${entry.value}(?:\\s[^>]*)?>(.*?)</${entry.value}>',
+        dotAll: true,
+      ).allMatches(block).toList();
+      if (matches.isEmpty) continue;
+      final flags = matches
+          .map(
+            (match) => enabled(
+              _savedTag(
+                match.group(1)!,
+                entry.key == 'email' ? 'SMTP_ENABLED' : 'ENABLED',
+              ),
+            ),
+          )
+          .toList();
+      states[entry.key] = flags.contains(true)
+          ? true
+          : flags.every((value) => value == false)
+          ? false
+          : null;
+    }
+    if (!states.containsKey('https')) {
+      final http = RegExp(
+        r'<HTTP_SERVER(?:\s[^>]*)?>(.*?)</HTTP_SERVER>',
+        dotAll: true,
+      ).firstMatch(block)?.group(1);
+      final flag = http == null ? null : _savedTag(http, 'HTTPSENABLED');
+      if (flag != null) states['https'] = enabled(flag);
+    }
+    return states;
   }
 
   /// Packet Tracer model names as the seed library files them.

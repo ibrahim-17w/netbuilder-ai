@@ -1,8 +1,10 @@
 import 'dart:isolate';
+import 'dart:convert';
 
 import '../models/chat_message.dart';
 import 'context_report.dart';
 import 'conversation_memory.dart';
+import 'human_language.dart';
 
 /// What one request will actually carry, and what had to be compacted.
 class ContextPlan {
@@ -44,6 +46,23 @@ class ContextPlan {
   /// it - the follow-up questions it exists for were unanswerable.
   final String sessionStateBlock;
 
+  /// Null only on legacy caller-supplied plans. Planned requests carry the
+  /// exact system text budgeted, including any explicit trimming.
+  final String? systemBlock;
+  final String mandatoryStateBlock;
+  final String limitReason;
+
+  void requireFits() {
+    if (limitReason.isNotEmpty ||
+        (windowTokens > 0 && tokensUsed > windowTokens)) {
+      throw ContextLimitException(
+        limitReason.isEmpty
+            ? 'The required request exceeds the $windowTokens-token runtime window.'
+            : limitReason,
+      );
+    }
+  }
+
   /// Why something was left out, in the words of the report.
   final List<String> notes;
 
@@ -61,6 +80,9 @@ class ContextPlan {
     this.memoriesBlock = '',
     this.networkBlock = '',
     this.sessionStateBlock = '',
+    this.systemBlock,
+    this.mandatoryStateBlock = '',
+    this.limitReason = '',
     this.notes = const [],
     this.report,
   });
@@ -76,6 +98,13 @@ class ContextPlan {
   /// True when the runtime's window is what limited the request - the state
   /// that used to be invisible.
   bool get limitedByWindow => windowTokens > 0 && windowTokens < budgetTokens;
+}
+
+class ContextLimitException implements Exception {
+  final String message;
+  const ContextLimitException(this.message);
+  @override
+  String toString() => 'Context limit: $message';
 }
 
 /// The context window, in one place.
@@ -172,6 +201,40 @@ class ContextBudget {
   static int outputReserveFor(int window) =>
       (window * 0.2).round().clamp(minOutputTokens, defaultMaxOutputTokens);
 
+  /// Include message framing and tool declarations at every provider round,
+  /// including tool results appended after the original context plan.
+  static void requirePayloadFits({
+    required List<Map<String, dynamic>> messages,
+    required int windowTokens,
+    Object? tools,
+    int? outputReserve,
+  }) {
+    Object? withoutImageBytes(Object? value) {
+      if (value is Map) {
+        if (value['type'] == 'image_url') {
+          return {'imageTokens': 'x' * (attachmentOverheadTokens * 4)};
+        }
+        return {
+          for (final entry in value.entries)
+            '${entry.key}': withoutImageBytes(entry.value),
+        };
+      }
+      if (value is List) return value.map(withoutImageBytes).toList();
+      return value;
+    }
+
+    final tokens =
+        estimateTokens(jsonEncode(withoutImageBytes(messages))) +
+        (tools == null ? 0 : estimateTokens(jsonEncode(tools))) +
+        systemOverheadTokens +
+        (outputReserve ?? outputReserveFor(windowTokens));
+    if (tokens > windowTokens) {
+      throw ContextLimitException(
+        'The assembled request needs about $tokens tokens but the runtime window is $windowTokens. Required state was retained; the request was not sent.',
+      );
+    }
+  }
+
   /// Decide what fits.
   ///
   /// Walks the history newest-first while it fits under the working budget,
@@ -183,6 +246,7 @@ class ContextBudget {
     required String pendingText,
     String networkContext = '',
     String sessionState = '',
+    String mandatoryState = '',
     String memories = '',
     String storedSummary = '',
     int attachmentCount = 0,
@@ -223,20 +287,27 @@ class ContextBudget {
     final systemTokens = estimateTokens(systemBlock) + systemOverheadTokens;
     final currentTokens =
         estimateTokens(pendingText) +
-        (attachmentCount > 0 ? attachmentOverheadTokens : 0);
+        perTurnOverheadTokens +
+        attachmentCount * attachmentOverheadTokens;
+    final mandatoryTokens = mandatoryState.isEmpty
+        ? 0
+        : estimateTokens(mandatoryState) + perTurnOverheadTokens;
+    var limitReason = '';
 
-    // If the system prompt alone does not fit, it is trimmed - and said so.
-    // Silently sending a prompt the runtime will cut is how a chat ends up
-    // answering the wrong question.
-    var fixedTokens = systemTokens + currentTokens + reserve;
-    if (fixedTokens > working) {
-      final allowed = working - currentTokens - reserve;
+    // A mutation's compact authoritative state and safety instructions are
+    // indivisible. Optional chat-only prompts may be trimmed, never this state.
+    var fixedTokens = systemTokens + currentTokens + mandatoryTokens + reserve;
+    if (fixedTokens > working && mandatoryState.isNotEmpty) {
+      limitReason =
+          'The current request, safety instructions and required project state need about $fixedTokens tokens; the $window-token runtime allows $working here. Shorten the request or increase its context window. No provider request was sent.';
+      notes.add(limitReason);
+    } else if (fixedTokens > working) {
+      final allowed = working - currentTokens - reserve - systemOverheadTokens;
       if (allowed <= 0) {
         systemBlock = '';
-        notes.add(
-          'the request did not fit the $window-token runtime window even '
-          'without the system prompt: raise the runtime context window',
-        );
+        limitReason =
+            'The current request cannot fit the $window-token runtime window, even without optional context. Shorten the request or increase the runtime window.';
+        notes.add(limitReason);
       } else {
         systemBlock = _trimToTokens(systemBlock, allowed);
         notes.add(
@@ -249,6 +320,7 @@ class ContextBudget {
           estimateTokens(systemBlock) +
           systemOverheadTokens +
           currentTokens +
+          mandatoryTokens +
           reserve;
     }
 
@@ -358,7 +430,7 @@ class ContextBudget {
           ? 'the saved conversation summary plus the turns compacted now'
           : 'a summary built from those turns';
       notes.add(
-        'summarized $droppedCount earlier turn(s) into $source to stay inside '
+        'summarized ${HumanLanguage.count(droppedCount, 'earlier turn')} into $source to stay inside '
         'the ${_thousands(window)}-token runtime window',
       );
       // The summary is fitted to the room the kept turns actually left
@@ -400,12 +472,10 @@ class ContextBudget {
       );
     }
     if (tokens > working) {
-      // Even the fixed blocks are over (a huge single message). The request is
-      // still sent - the runtime will cut it - but the report says so.
-      notes.add(
-        'the current message plus the system prompt exceed the '
-        '${_thousands(window)}-token window',
-      );
+      limitReason = limitReason.isEmpty
+          ? 'The required request needs about $tokens tokens, beyond the $working-token allocation in the $window-token runtime. No provider request was sent.'
+          : limitReason;
+      notes.add(limitReason);
     }
 
     final summarizedCount = history.length - kept.length;
@@ -422,6 +492,9 @@ class ContextBudget {
       memoriesBlock: memoriesBlock,
       networkBlock: networkBlock,
       sessionStateBlock: stateBlock,
+      systemBlock: systemBlock,
+      mandatoryStateBlock: mandatoryState,
+      limitReason: limitReason,
       notes: notes,
       report: RequestReport(
         sequence: 0,
@@ -439,6 +512,8 @@ class ContextBudget {
                     'system prompt',
                     estimateTokens(systemBlock) + systemOverheadTokens,
                   ),
+                  if (mandatoryState.isNotEmpty)
+                    ReportSection('required project state', mandatoryTokens),
                   if (networkBlock.isNotEmpty)
                     ReportSection(
                       'network context',
@@ -450,7 +525,7 @@ class ContextBudget {
                     ReportSection(
                       'conversation summary',
                       estimateTokens(memoryBlock),
-                      '$summarizedCount earlier turn(s)',
+                      HumanLanguage.count(summarizedCount, 'earlier turn'),
                     ),
                   if (memoriesBlock.isNotEmpty)
                     ReportSection(
@@ -460,12 +535,14 @@ class ContextBudget {
                   ReportSection(
                     'recent conversation',
                     estimateMessages(kept),
-                    '${kept.length} turn(s)',
+                    HumanLanguage.count(kept.length, 'turn'),
                   ),
                   ReportSection(
                     'current message',
                     currentTokens,
-                    attachmentCount > 0 ? '$attachmentCount attachment(s)' : '',
+                    attachmentCount > 0
+                        ? HumanLanguage.count(attachmentCount, 'attachment')
+                        : '',
                   ),
                 ]
                 // A section with no cost was not sent at all; the report lists what
@@ -501,6 +578,7 @@ class ContextBudget {
     required String pendingText,
     String networkContext = '',
     String sessionState = '',
+    String mandatoryState = '',
     String memories = '',
     String storedSummary = '',
     int attachmentCount = 0,
@@ -518,6 +596,7 @@ class ContextBudget {
       pendingText: pendingText,
       networkContext: networkContext,
       sessionState: sessionState,
+      mandatoryState: mandatoryState,
       memories: memories,
       storedSummary: storedSummary,
       attachmentCount: attachmentCount,
@@ -599,12 +678,28 @@ class ContextBudget {
   static String _trimToTokens(String text, int tokens) {
     if (tokens <= 0) return '';
     if (estimateTokens(text) <= tokens) return text;
-    final maxChars = tokens * 4;
-    if (text.length <= maxChars) return text;
-    final cut = text.substring(0, maxChars);
+    // Count wide characters too; a four-characters/token substring could keep
+    // an entire oversized Arabic prompt while claiming it was trimmed.
+    const marker = '\n[... trimmed to fit the runtime context window ...]';
+    if (estimateTokens(marker) >= tokens) return '';
+    var low = 0;
+    var high = text.length;
+    while (low < high) {
+      final middle = (low + high + 1) ~/ 2;
+      if (estimateTokens('${text.substring(0, middle)}$marker') <= tokens) {
+        low = middle;
+      } else {
+        high = middle - 1;
+      }
+    }
+    if (low > 0 &&
+        text.codeUnitAt(low - 1) >= 0xD800 &&
+        text.codeUnitAt(low - 1) <= 0xDBFF) {
+      low--;
+    }
+    final cut = text.substring(0, low);
     final line = cut.lastIndexOf('\n');
-    return '${line > maxChars ~/ 2 ? cut.substring(0, line) : cut}\n'
-        '[... trimmed to fit the runtime context window ...]';
+    return '${line > low ~/ 2 ? cut.substring(0, line) : cut}$marker';
   }
 
   static String _thousands(int n) {

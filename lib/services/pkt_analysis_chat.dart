@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'human_language.dart';
 import 'offline_knowledge.dart';
 
 /// A bounded, serializable snapshot of what the offline .pkt audit actually
@@ -103,20 +104,24 @@ class PktAnalysisChat {
       ..writeln('**Offline review of `${analysis['name'] ?? 'capture'}`**')
       ..writeln()
       ..writeln(
-        'The saved file contains ${_number(analysis['deviceCount'])} devices '
-        'and ${_number(analysis['linkCount'])} links. I found '
-        '${findings.length} potential issue(s): $high high priority'
-        '${conditional == 0 ? '' : ', $conditional conditional'}.',
+        'The saved file has ${_number(analysis['deviceCount'])} devices and '
+        '${_number(analysis['linkCount'])} links.',
       );
     if (findings.isEmpty) {
       b
         ..writeln()
         ..writeln(
-          'No saved-configuration or topology issues were detected by the '
-          'checks available in this scan.',
+          'Nothing in the saved configuration or topology tripped the checks '
+          'this scan can run.',
         );
     } else {
-      b.writeln();
+      b
+        ..writeln(
+          'I found ${HumanLanguage.count(findings.length, 'potential issue')}: '
+          '$high high priority'
+          '${conditional == 0 ? '' : ', $conditional conditional'}.',
+        )
+        ..writeln();
       for (var i = 0; i < findings.length && i < 12; i++) {
         final f = findings[i];
         final label = _isConditional(f)
@@ -125,16 +130,16 @@ class PktAnalysisChat {
         b.writeln('${i + 1}. **$label** — ${f['device']}: ${f['text']}');
       }
       if (findings.length > 12) {
-        b.writeln('- ${findings.length - 12} more finding(s) are in the scan.');
+        b.writeln('- ${findings.length - 12} more findings are in the scan.');
       }
     }
     b
       ..writeln()
       ..writeln(
-        'I only read the saved file; nothing has been changed and Packet '
-        'Tracer was not opened. This cannot confirm live pings, service '
-        'behavior, or what you intended each link to do. Ask me to explain '
-        'a finding, or name the specific change you want prepared.',
+        'I only read the saved file; nothing changed and Packet Tracer never '
+        'opened. That means this can\'t confirm live pings, service behavior '
+        'or what you meant each link to do. Ask me to explain a finding, or '
+        'name the change you want prepared.',
       );
     return b.toString().trimRight();
   }
@@ -245,11 +250,12 @@ class PktAnalysisChat {
 
     final interfaces = [
       for (final row in (analysis['interfaces'] as List?) ?? const [])
-        if (row is Map)
-          Map<String, dynamic>.from(row),
+        if (row is Map) Map<String, dynamic>.from(row),
     ];
     List<Map<String, dynamic>> rowsOf(String device) => interfaces
-        .where((r) => '${r['device'] ?? ''}'.toLowerCase() == device.toLowerCase())
+        .where(
+          (r) => '${r['device'] ?? ''}'.toLowerCase() == device.toLowerCase(),
+        )
         .toList();
 
     PktAnalysisReply noAddress(String device) {
@@ -449,7 +455,7 @@ class PktAnalysisChat {
         .map((f) => '${f['device']}: ${_commands(f).join(' ; ')}')
         .join('\n');
     final summary = all
-        ? 'Prepare ${fixes.length} supported change(s) in one new copy'
+        ? 'Prepare ${HumanLanguage.count(fixes.length, 'supported change')} in one new copy'
         : 'Prepare the requested change in a new copy';
     return PktAnalysisReply(
       'I can prepare this change from your request:\n$commands\n\n'
@@ -486,7 +492,8 @@ class PktAnalysisChat {
         ..writeln()
         ..writeln(
           'In `${analysis['name'] ?? 'this file'}`, the scan found '
-          '${down.length} cabled link(s) with a saved-down endpoint:',
+          '${HumanLanguage.count(down.length, 'cabled link')} with a '
+          'saved-down endpoint:',
         );
       for (final f in down.take(8)) {
         b.writeln('- ${f['text']}');

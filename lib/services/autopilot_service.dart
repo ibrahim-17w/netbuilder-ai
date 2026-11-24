@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 
 import 'app_diagnostics.dart';
 import 'credential_redaction.dart';
+import 'engine_token.dart';
+import 'request_understanding/build_action_identity.dart';
 import 'settings_service.dart';
 import 'sidecar_supervisor.dart';
 
@@ -20,6 +22,29 @@ import 'sidecar_supervisor.dart';
 ///
 /// If the engine is not running you get a friendly hint naming the address
 /// that did not answer, NOT a raw ClientException dump.
+/// Adds the engine bearer token to loopback requests.
+///
+/// The token is the second lock behind the sidecar's Origin/Host guard: a
+/// browser page can neither read nor set it. It is only attached to loopback
+/// addresses, because a remote address is not this machine and must never
+/// receive a credential.
+class _EngineClient extends http.BaseClient {
+  _EngineClient(this._inner);
+
+  final http.Client _inner;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    if (SettingsService.isLoopbackEngineBase(request.url.toString())) {
+      final token = await EngineToken.ensure();
+      if (token.isNotEmpty) {
+        request.headers.putIfAbsent('Authorization', () => 'Bearer $token');
+      }
+    }
+    return _inner.send(request);
+  }
+}
+
 class AutopilotService {
   /// The address used when nothing else says where the engine is. A
   /// last-resort default for a bare client, never a decision this class makes
@@ -46,7 +71,10 @@ class AutopilotService {
 
   AutopilotService({String? base, this.baseProvider, http.Client? c})
     : _baseOverride = base?.trim(),
-      _client = c ?? http.Client();
+      // A caller-supplied client is used as-is: tests inject fakes and must
+      // not be made to depend on the token file. The app's real client adds
+      // the token, which is what the engine it launched requires.
+      _client = c ?? _EngineClient(http.Client());
 
   /// Where the next request goes. Resolved per call, so a settings change is
   /// picked up without rebuilding anything.
@@ -497,15 +525,30 @@ class AutopilotService {
     }
   }
 
-  /// Kick off LIVE post-build verification in Packet Tracer. Poll
-  /// [verifyReport] until `running` is false.
-  Future<void> verifyRun(Map<String, dynamic> plan) async {
+  /// Kick off LIVE post-build verification in Packet Tracer and return the
+  /// run id the sidecar assigned. The optional binding fields tie the run
+  /// to one exact saved file and one build action: the sidecar re-derives
+  /// the hash from the bytes it opens, and a report that does not match is
+  /// refused rather than quoted. Poll [verifyReport] with that run id until
+  /// `running` is false.
+  Future<String> verifyRun(
+    Map<String, dynamic> plan, {
+    String? artifactPath,
+    String? artifactHash,
+    BuildActionIdentity? actionIdentity,
+  }) async {
     try {
+      final body = <String, dynamic>{'plan': plan};
+      if (artifactPath != null) body['artifactPath'] = artifactPath;
+      if (artifactHash != null) body['artifactHash'] = artifactHash;
+      if (actionIdentity != null) {
+        body['actionIdentity'] = actionIdentity.toJson();
+      }
       final r = await _client
           .post(
             Uri.parse('$base/verify/run'),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'plan': plan}),
+            body: jsonEncode(body),
           )
           .timeout(const Duration(seconds: 10));
       final j = jsonDecode(r.body);
@@ -514,21 +557,40 @@ class AutopilotService {
           (j['error'] as String?) ?? 'verify/run ${r.statusCode}: ${r.body}',
         );
       }
+      final runId = '${j['runId'] ?? ''}';
+      if (runId.isEmpty) {
+        throw Exception('verify/run returned no run id');
+      }
+      return runId;
     } catch (e) {
       throw Exception(_friendly(e));
     }
   }
 
-  /// Latest verification report (null while nothing has run yet).
-  Future<Map<String, dynamic>?> verifyReport() async {
+  /// The verification report for [runId] (or the engine's latest run when
+  /// null - a compatibility retrieval the sidecar marks historyOnly, never
+  /// identity-bound proof). Null while the run has not produced a report
+  /// yet or the id has expired from the bounded history. The returned map
+  /// merges the envelope (runId, running) with the report content, so a
+  /// caller binds on the same map it reads the results from.
+  Future<Map<String, dynamic>?> verifyReport({String? runId}) async {
     try {
-      final r = await _client
-          .get(Uri.parse('$base/verify/report'))
-          .timeout(const Duration(seconds: 10));
+      final uri = runId == null || runId.isEmpty
+          ? Uri.parse('$base/verify/report')
+          : Uri.parse(
+              '$base/verify/report',
+            ).replace(queryParameters: {'runId': runId});
+      final r = await _client.get(uri).timeout(const Duration(seconds: 10));
       final j = jsonDecode(r.body);
       if (j is! Map) return null;
+      if (r.statusCode != 200 || j['ok'] != true) return null;
       final rep = j['report'];
-      return rep is Map ? Map<String, dynamic>.from(rep) : null;
+      if (rep is! Map) return null;
+      return {
+        ...Map<String, dynamic>.from(rep),
+        'runId': '${j['runId'] ?? rep['runId'] ?? ''}',
+        'running': j['running'] == true,
+      };
     } catch (e) {
       throw Exception(_friendly(e));
     }

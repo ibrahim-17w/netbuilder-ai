@@ -6,7 +6,9 @@ import 'adapters/cisco_adapter.dart';
 import 'adapters/gns3_adapter.dart';
 import 'adapters/packet_tracer_adapter.dart';
 import 'adapters/terraform_adapter.dart';
+import 'conversation_titles.dart';
 import 'secret_vault.dart';
+import 'stored_privacy.dart';
 
 /// The in-memory representation needed to reopen a saved build.
 ///
@@ -113,6 +115,17 @@ class BuildArtifactService {
     }
   }
 
+  /// Portable configuration output. Redact GNS3's data/configuration strings
+  /// before encoding them, never by matching credentials in serialized JSON.
+  static String renderLocalRedacted(NetworkIntent intent, String target) {
+    if (target.trim().toLowerCase() == 'gns3') {
+      return const JsonEncoder.withIndent(
+        '  ',
+      ).convert(StoredPrivacy.redact(Gns3Adapter.projectPayload(intent)));
+    }
+    return NetworkIntent.redactSecrets(renderLocal(intent, target));
+  }
+
   /// A human-meaningful .pkt file name for [plan]: content words from the
   /// brief ("small office with OSPF" saves as `small-office-ospf.pkt`),
   /// because in chat builds [plan]'s projectName is the CONVERSATION key
@@ -128,7 +141,19 @@ class BuildArtifactService {
     String brief = '',
     required Set<String> taken,
   }) {
-    var source = _briefWords(brief);
+    // A NAME THE USER GAVE WINS over both the conversation key and the
+    // descriptive words: a lab asked for as "named release-validation" must
+    // arrive as release-validation.pkt, findable by the name it was asked for.
+    var source = ConversationTitles.requestedNetworkName(brief) ?? '';
+    if (source.isEmpty) {
+      final project = plan.projectName.trim();
+      if (project.isNotEmpty &&
+          project.toLowerCase() != 'chat' &&
+          !_isGenericName(project)) {
+        source = project;
+      }
+    }
+    if (source.isEmpty) source = _briefWords(brief);
     if (source.isEmpty) {
       source = plan.projectName.trim();
       if (_isGenericName(source)) {

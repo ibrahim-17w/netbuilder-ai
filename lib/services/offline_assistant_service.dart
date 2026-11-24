@@ -1,11 +1,17 @@
 import '../models/chat_message.dart';
 import '../models/environment_profile.dart';
 import '../models/network_intent.dart';
+import '../models/request_interpretation.dart';
+import 'adapters/packet_tracer_adapter.dart';
 import 'advisor_service.dart';
+import 'assistant_voice.dart';
 import 'casual_english.dart';
 import 'chat_capabilities.dart';
 import 'clarification_service.dart';
+import 'concept_knowledge.dart';
 import 'conversation_memory.dart';
+import 'domain_vocabulary.dart';
+import 'human_language.dart';
 import 'learned_answers_service.dart';
 import 'networking_help_reader.dart';
 import 'plan_device_explainer.dart';
@@ -13,6 +19,7 @@ import 'offline_knowledge.dart';
 import 'plan_config_composer.dart';
 import 'plan_repair_service.dart';
 import 'scope_gate.dart';
+import 'request_understanding/normalizer.dart';
 import 'topology_reasoner.dart';
 import 'troubleshoot_flows.dart';
 import 'validator_service.dart';
@@ -88,8 +95,6 @@ class AssistantReply {
 class OfflineAssistantService {
   const OfflineAssistantService._();
 
-  static final RegExp _arabicScript = RegExp(r'[\u0600-\u06FF]');
-
   static final RegExp _whitespace = RegExp(r'\s+');
 
   static AssistantReply reply({
@@ -114,6 +119,13 @@ class OfflineAssistantService {
     // (see [LearnedAnswers]): replayed verbatim, offline, before any other
     // branch - "same question, same answer" is the promise.
     LearnedAnswer? learnedAnswer,
+    // The concept-level match for this question (see [ConceptKnowledge]):
+    // knowledge filed under the THING the question is about, so a
+    // differently-worded ask still reaches what was learned. Only consulted
+    // when the exact replay above has nothing; a build request never gets
+    // here (the caller gates on ConceptKnowledge.isKnowledgeAsk, and the
+    // branch re-checks).
+    ConceptRetrieval? conceptKnowledge,
     // The remembered environment (see [EnvironmentProfile]): fills in the
     // venue/scale/budget the message leaves unsaid, so advice written for a
     // remembered office does not fall back to generic.
@@ -128,6 +140,14 @@ class OfflineAssistantService {
     // "what firewall do we need for an office with guests?" advises at no
     // scale at all, and the plan it then builds carries zero hosts.
     int? briefScale,
+    // The user's stored style ("Shorter answers" / "Less formal"), written
+    // by the chat's per-message feedback menu and the Settings panel. The
+    // model path reads these from its prompt; the offline path applies them
+    // here, so the keyless answers speak the same personality the user
+    // asked for. A phrase in the message itself ("less formal", "briefly")
+    // still wins for that turn, exactly as it does on the model path.
+    String styleTone = '',
+    String styleLength = '',
   }) {
     // MEMORY: the earlier turns of this conversation are the difference
     // between a useful answer and a generic one. The offline path has no
@@ -169,18 +189,90 @@ class OfflineAssistantService {
     // keep their English technical content (device commands ARE English) but
     // are framed in Arabic, so a mixed "كيف أعمل ssh" conversation is
     // answered, not ignored.
-    final arabic = _arabicScript.hasMatch(
+    final responsePreferences = ResponsePreferenceReader.read(
       rawText.isEmpty ? normalized : rawText,
     );
+    final arabic = responsePreferences.isArabic;
+    // THE PERSONALITY THE USER CHOSE. A stored "casual"/"formal" tone and a
+    // stored "concise" length shape every answer below through [tone] and
+    // [concise]; a phrase in THIS message ("less formal", "briefly")
+    // overrides the stored choice for the turn, matching the precedence the
+    // model path gives its response preferences. An unset choice ('' or an
+    // unknown value) leaves every answer exactly as it reads by default.
+    final messageTone = responsePreferences.isCasual
+        ? 'casual'
+        : responsePreferences.isFormal
+        ? 'formal'
+        : '';
+    final tone = messageTone.isNotEmpty
+        ? messageTone
+        : styleTone.trim().toLowerCase() == AssistantVoice.casual
+        ? 'casual'
+        : styleTone.trim().toLowerCase() == AssistantVoice.formal
+        ? 'formal'
+        : '';
+    final concise =
+        responsePreferences.brevity == ResponseBrevity.concise ||
+        styleLength.trim().toLowerCase() == AssistantVoice.concise;
 
     // The answer starts with its CONTENT. Which brain produced it - the
     // planner, a model, a learned answer - is the app's state, shown once
     // in the top bar's AI pill, not a line repeated under every message.
     const opening = '';
 
+    final responseText = NetworkIntent.bridgeBrief(
+      rawText.isEmpty ? normalized : rawText,
+    ).toLowerCase();
+    if (responsePreferences.maxSentences != null &&
+        RegExp(r'\b(?:explain|difference|compare)\b').hasMatch(responseText) &&
+        RegExp(r'\bstatic\b').hasMatch(responseText) &&
+        RegExp(r'\bospf\b').hasMatch(responseText)) {
+      final oneSentence = responsePreferences.maxSentences == 1;
+      return AssistantReply(
+        arabic
+            ? oneSentence
+                  ? 'في static تُضبط المسارات يدوياً، أما OSPF فيتبادل المسارات ويتكيف مع تغيّر الشبكة تلقائياً.'
+                  : 'في static تُضبط المسارات يدوياً، وهو أبسط للشبكات الصغيرة والمستقرة. أما OSPF فيتبادل المسارات تلقائياً ويتكيف مع تغيّر الروابط، لذا يناسب الشبكات الأكبر.'
+            : oneSentence
+            ? 'Static routing uses manually configured paths, while OSPF exchanges routes and adapts to link changes automatically.'
+            : 'Static routing uses manually configured paths and suits small, stable networks. OSPF exchanges routes and adapts to link changes automatically, making it more useful as a network grows.',
+        intent: 'howto',
+      );
+    }
+    if (responsePreferences.configurationOnly) {
+      if (plan == null || plan.nodes.isEmpty) {
+        return AssistantReply(
+          arabic
+              ? 'أي شبكة تريد تصدير إعداداتها؟ لا توجد خطة نشطة.'
+              : 'Which network should I export? There is no active plan.',
+          intent: 'clarify',
+        );
+      }
+      final configs = PacketTracerAdapter.deviceConfigs(plan);
+      if (configs.isEmpty) {
+        return AssistantReply(
+          arabic
+              ? 'لا توجد إعدادات مدعومة للتصدير في هذه الخطة.'
+              : 'This plan has no supported device configurations to export.',
+          intent: 'missing',
+        );
+      }
+      return AssistantReply(
+        configs.entries
+            .map((entry) => '! ${entry.key}\n${entry.value.trimRight()}')
+            .join('\n\n'),
+        intent: 'howto',
+      );
+    }
+
     if (t.isEmpty) {
       return AssistantReply(
-        _join(opening, arabic ? _vagueAnswerAr : _vagueAnswer(originalAsk)),
+        _join(
+          opening,
+          arabic
+              ? _vagueAnswerAr
+              : _vagueAnswer(originalAsk, tone: tone, concise: concise),
+        ),
         questions: _vagueQuestions,
         quickReplies: _exampleReplies,
         intent: 'vague',
@@ -188,7 +280,12 @@ class OfflineAssistantService {
     }
     if (_isRecall(t)) {
       return AssistantReply(
-        _join(opening, _recallAnswer(asks, normalized, plan)),
+        _join(
+          opening,
+          arabic
+              ? _recallAnswerAr(asks, plan)
+              : _recallAnswer(asks, normalized, plan),
+        ),
         quickReplies: _nextStepsFor(plan),
         intent: 'recall',
       );
@@ -202,16 +299,42 @@ class OfflineAssistantService {
                   'مرحباً! أنا مساعد NetBuilder وأعمل دون اتصال - لا حاجة إلى مفتاح API، ولا شيء يخرج من جهازك. أخبرني ماذا تريد أن تبني (مثلاً "2 routers, 1 switch and 4 PCs with OSPF") أو اسألني عن الشبكات.',
                   'أهلاً بك! المساعد يعمل دون اتصال - بلا مفتاح وبلا انتظار. صِف الشبكة التي تريدها أو اسألني عن أي تقنية (الأوامر بالإنجليزية).',
                 ], seed)
-              : _pick(const [
-                  'Hi! I am the NetBuilder assistant and I am running offline - no '
-                      'API key needed, and nothing you type leaves this device. Tell '
-                      'me what to build (for example "2 routers, 1 switch and 4 PCs '
-                      'with OSPF"), or ask me a networking question and I will '
-                      'answer with advice.',
-                  'Hello! Offline assistant here - no key, nothing leaves this '
-                      'device, and no waiting on a model. Describe the lab you want '
-                      'and I will plan it, or ask me a networking question.',
-                ], seed),
+              : _pickTone(
+                  tone,
+                  const [
+                    'Hi! I\'m the NetBuilder assistant, running offline - no '
+                        'API key needed, and nothing you type leaves this '
+                        'device. Tell me what to build (for example "2 routers, '
+                        '1 switch and 4 PCs with OSPF"), or ask me a networking '
+                        'question and I\'ll answer with advice.',
+                    'Hello! Offline assistant here - no key, nothing leaves '
+                        'this device, and no waiting on a model. Describe the '
+                        'lab you want and I\'ll plan it, or ask me a networking '
+                        'question.',
+                  ],
+                  seed,
+                  casual: const [
+                    'Hey! I\'m your offline networking copilot - no key, no '
+                        'cloud, and nothing you type leaves this device. Say '
+                        'what you want to build ("2 routers, 1 switch and 4 '
+                        'PCs with OSPF") or just ask me a networking question.',
+                    'Hi there! Everything here runs on this device - no key, '
+                        'no waiting. Tell me the lab you\'re after, or fire a '
+                        'networking question at me and I\'ll take it from '
+                        'there.',
+                  ],
+                  formal: const [
+                    'Hello. I am the NetBuilder assistant, running fully '
+                        'offline - no API key is required and nothing you type '
+                        'leaves this device. Describe the lab you need (for '
+                        'example "2 routers, 1 switch and 4 PCs with OSPF"), '
+                        'or ask a networking question.',
+                    'Good day. This assistant runs entirely on this device - '
+                        'no key, no cloud. State the network you want planned, '
+                        'or ask about a technology, and I will answer from my '
+                        'offline material.',
+                  ],
+                ),
         ),
         quickReplies: _exampleReplies,
         intent: 'greeting',
@@ -232,13 +355,31 @@ class OfflineAssistantService {
                   'إلى اللقاء! لا يخرج شيء مما بنيناه من جهازك - وأنا هنا '
                       'عندما تعود.',
                 ], seed)
-              : _pick(const [
-                  'Take care! Everything stays on this device - come back any '
-                      'time and we will pick up right where we left off.',
-                  'See you! The plans and .pkt files are all saved on this '
-                      'device - nothing leaves it, and I am here when you '
-                      'are back.',
-                ], seed),
+              : _pickTone(
+                  tone,
+                  const [
+                    'Take care! Everything stays on this device - come back '
+                        'any time and we\'ll pick up right where we left off.',
+                    'See you! The plans and .pkt files are all saved on this '
+                        'device - nothing leaves it, and I\'m here when '
+                        'you\'re back.',
+                  ],
+                  seed,
+                  casual: const [
+                    'Catch you later! It\'s all saved on this device - pick '
+                        'up any time and we\'ll carry on from where we '
+                        'stopped.',
+                    'See you around! Nothing leaves this device, and I\'ll '
+                        'be here when you\'re back.',
+                  ],
+                  formal: const [
+                    'Goodbye. Everything is stored on this device - the '
+                        'conversation will resume exactly where it stopped '
+                        'when you return.',
+                    'Farewell. The plans and .pkt files remain saved here, '
+                        'and nothing leaves this device.',
+                  ],
+                ),
         ),
         quickReplies: _exampleReplies,
         intent: 'bye',
@@ -251,24 +392,37 @@ class OfflineAssistantService {
       return AssistantReply(
         _join(
           opening,
-          arabic ? _ackAnswerAr(plan, seed) : _ackAnswer(plan, seed),
+          arabic
+              ? _ackAnswerAr(plan, seed)
+              : _ackAnswer(plan, seed, tone: tone),
         ),
         quickReplies: _nextStepsFor(plan),
         intent: 'ack',
       );
     }
-    if (_isYes(t)) {
+    if (_isYes(t) || _isYesAr(t)) {
       final blocked = plan == null
           ? const <ValidationIssue>[]
           : _blocking(plan, target);
       return AssistantReply(
-        _join(opening, _confirmAnswer(plan, suggestions, blocked)),
+        _join(
+          opening,
+          arabic
+              ? _confirmAnswerAr(plan, seed, target)
+              : _confirmAnswer(plan, suggestions, blocked, seed, tone),
+        ),
         quickReplies: _nextStepsFor(plan, blocked: blocked),
         intent: 'confirm',
       );
     }
-    if (_isNo(t)) {
-      return AssistantReply(_join(opening, _denyAnswer(plan)), intent: 'deny');
+    if (_isNo(t) || _isNoAr(t)) {
+      return AssistantReply(
+        _join(
+          opening,
+          arabic ? _denyAnswerAr(plan) : _denyAnswer(plan, seed, tone),
+        ),
+        intent: 'deny',
+      );
     }
     // FLOW CONTINUATION: an active troubleshooting flow owns this turn. The
     // user is answering a diagnostic question ("what does the port show?"),
@@ -282,7 +436,7 @@ class OfflineAssistantService {
           _join(
             opening,
             'Ladder dropped - say the symptom again any time (for example '
-            '"PC1 cannot ping PC2") and I will start it fresh.',
+            '"PC1 cannot ping PC2") and I\'ll start it fresh.',
           ),
           quickReplies: _exampleReplies,
           intent: 'troubleshoot',
@@ -313,6 +467,39 @@ class OfflineAssistantService {
         intent: 'learned',
       );
     }
+    // CONCEPT KNOWLEDGE: the question is worded differently than anything
+    // the exact replay holds, but the THING it asks about was learned
+    // before. Answered from the saved concept with an honest confidence
+    // tier: an alias-anchored hit answers directly, an overlap-only hit is
+    // phrased as qualified ("this may be about..."), and a question naming
+    // two concepts of which only one is known is answered PARTIALLY - the
+    // known part explained, the missing part named as missing. Everything
+    // below comes from stored text and fixed templates; nothing is
+    // generated, and a build request can never reach this branch (the
+    // knowledge-ask gate mirrors the capture gate's planner guards).
+    if (conceptKnowledge != null &&
+        ConceptKnowledge.isKnowledgeAsk(t) &&
+        conceptKnowledge.known.isNotEmpty) {
+      final body = ConceptKnowledge.composeAnswer(conceptKnowledge);
+      final qualified =
+          conceptKnowledge.missing.isEmpty &&
+          conceptKnowledge.score < 1.0 &&
+          conceptKnowledge.confidence == 'medium';
+      final lead = qualified
+          ? 'This looks like it may be about ${conceptKnowledge.known.first.displayName} '
+                '- here is the saved knowledge I have on it:\n\n'
+          : '';
+      final provenance = conceptKnowledge.known.length == 1
+          ? '\n\n${ConceptKnowledge.provenanceLine(conceptKnowledge.known.first)}'
+          : '\n\nFrom saved knowledge on this device - '
+                '${conceptKnowledge.known.map((r) => r.source.isEmpty ? 'your AI provider' : r.source).toSet().join(', ')} '
+                '· ${conceptKnowledge.known.every((r) => r.verified) ? 'verified' : 'unverified'}.';
+      return AssistantReply(
+        _join(opening, '$lead$body$provenance'),
+        quickReplies: _nextStepsFor(plan),
+        intent: 'learned',
+      );
+    }
     // IDENTITY: "who are you", "what can you do", "how are you" - questions
     // about the assistant itself. They used to fall through to the scope
     // gate or, worse, to the missing-coverage line - an odd answer to "who
@@ -328,7 +515,7 @@ class OfflineAssistantService {
           opening,
           arabic
               ? _identityAnswerAr(identity, seed)
-              : _identityAnswer(identity, seed),
+              : _identityAnswer(identity, seed, tone: tone),
         ),
         quickReplies: _identityReplies,
         intent: 'identity',
@@ -340,7 +527,7 @@ class OfflineAssistantService {
     // vocabulary passes, so a real network question is never refused.
     if (ScopeGate.isOffTopic(rawText.isNotEmpty ? rawText : normalized)) {
       return AssistantReply(
-        _join(opening, ScopeGate.decline),
+        _join(opening, ScopeGate.declineFor(rawText)),
         quickReplies: const [
           'Plan a network for 10 employees on two floors',
           'What is better, OSPF or static routing?',
@@ -417,7 +604,7 @@ class OfflineAssistantService {
         _join(
           opening,
           '${arabic ? '$_arabicLead\n\n' : ''}'
-          '${_continuity(plan, t, history)}${advice.toText()}',
+          '${_continuity(plan, t, history)}${advice.toText(seed: seed, tone: tone, concise: concise)}',
         ),
         questions: advice.questions,
         quickReplies: advice.quickReplies.isNotEmpty
@@ -465,7 +652,7 @@ class OfflineAssistantService {
         concept == null &&
         OfflineKnowledge.answerFor(t) == null) {
       return AssistantReply(
-        _join(opening, _vagueAnswer(originalAsk)),
+        _join(opening, _vagueAnswer(originalAsk, tone: tone, concise: concise)),
         questions: _vagueQuestions,
         quickReplies: _exampleReplies,
         intent: 'vague',
@@ -475,7 +662,12 @@ class OfflineAssistantService {
     // doing", "do you still remember my first ask", "which file did you make".
     if (_isRecall(t) && asks.isNotEmpty) {
       return AssistantReply(
-        _join(opening, _recallAnswer(asks, normalized, plan)),
+        _join(
+          opening,
+          arabic
+              ? _recallAnswerAr(asks, plan)
+              : _recallAnswer(asks, normalized, plan),
+        ),
         quickReplies: _nextStepsFor(plan),
         intent: 'recall',
       );
@@ -497,25 +689,25 @@ class OfflineAssistantService {
       final buildLine = blocked.isEmpty
           ? 'Press "Build the .pkt" below and I compile the whole lab, not '
                 'just the change - offline, with no Packet Tracer.'
-          : 'The Build card below is withheld: this plan still has '
-                '${blocked.length} finding(s) that would be baked into the .pkt '
+          : 'I can\'t build this yet - the plan still has '
+                '${HumanLanguage.count(blocked.length, 'problem')} that would go into the .pkt '
                 '(first: ${blocked.first.message}). Fix that and the build '
                 'unlocks.';
       final body = StringBuffer()..writeln(_describeChange(t));
       if (hasLab && delta.isNotEmpty) {
         body
           ..writeln()
-          ..writeln('That updates the lab you had: $delta.')
+          ..writeln('Here\'s what changed: $delta.')
           ..writeln()
-          ..writeln('The lab now reads ${_labLine(plan)}. $buildLine');
+          ..writeln('The lab is now ${_labLine(plan)}. $buildLine');
       } else if (hasLab) {
         body
           ..writeln()
           ..writeln(
-            'As far as the plan goes nothing changed - it still reads '
+            'Nothing changed in the plan - it still reads '
             '${_labLine(plan)}. If that was meant to add or alter something, '
             'say it as a request ("add an AAA server with 3 users", "use '
-            'OSPF") and I will plan it in.',
+            'OSPF") and I\'ll plan it in.',
           );
       }
       body
@@ -580,7 +772,14 @@ class OfflineAssistantService {
                     'the relevant devices and addressing; no file is required.' : '\n\n$grounded'}'
           '${briefNote.isEmpty ? '' : '\n\n$briefNote'}',
         ),
-        quickReplies: _nextStepsFor(plan, help: true),
+        // Related questions first - they are the natural next tap after an
+        // explainer - then the standing plan's own next steps. Every chip
+        // routes to a real answer (enforced by test), so a tap never
+        // dead-ends.
+        quickReplies: [
+          ..._conceptFollowUps[concept] ?? const <String>[],
+          ..._nextStepsFor(plan, help: true),
+        ],
         intent: 'howto',
       );
     }
@@ -665,11 +864,12 @@ class OfflineAssistantService {
         arabic: arabic,
         opening: opening,
         plan: plan,
+        seed: seed,
       );
       if (plan == null || plan.nodes.isEmpty) return gap;
       return AssistantReply(
         '${gap.text}\n\nYour lab on the table: ${_labLine(plan)}. Name one of '
-        'its devices (for example ${plan.nodes.first.name}) and I will '
+        'its devices (for example ${plan.nodes.first.name}) and I\'ll '
         'explain exactly what it does there.',
         questions: gap.questions,
         quickReplies: gap.quickReplies,
@@ -685,7 +885,13 @@ class OfflineAssistantService {
       words.length,
       hasPlan: plan != null && plan.nodes.isNotEmpty,
     )) {
-      return _missingReply(t, arabic: arabic, opening: opening, plan: plan);
+      return _missingReply(
+        t,
+        arabic: arabic,
+        opening: opening,
+        plan: plan,
+        seed: seed,
+      );
     }
     if (plan != null && plan.nodes.isNotEmpty) {
       // ASK BEFORE PLAN: the brief has critical gaps and the chat supplied
@@ -706,7 +912,12 @@ class OfflineAssistantService {
       // the build path deliberately: there the plan IS the answer, and
       // trading it for "not in my offline material" would answer worse.
       if (mixed && wh) {
-        final gap = _missingReply(t, arabic: arabic, opening: opening);
+        final gap = _missingReply(
+          t,
+          arabic: arabic,
+          opening: opening,
+          seed: seed,
+        );
         final chips = <String>[
           ...gap.quickReplies,
           ..._nextStepsFor(plan, blocked: _blocking(plan, target)),
@@ -724,10 +935,16 @@ class OfflineAssistantService {
         _buildAnswer(
           plan,
           suggestions,
-          originalAsk,
+          // The first turn has no stored history to read the ask from; the
+          // message itself is then the ask, so a capability named in it is
+          // still reported as unsupported.
+          originalAsk.isEmpty ? rawText : originalAsk,
           target: target,
           opening: opening,
           previousPlan: previousPlan,
+          seed: seed,
+          tone: tone,
+          concise: concise,
         ),
         // The quick replies are the same gate the card uses: offering "Build
         // the .pkt" for a plan the card is going to refuse is the reported
@@ -741,7 +958,12 @@ class OfflineAssistantService {
       );
     }
     return AssistantReply(
-      _join(opening, arabic ? _vagueAnswerAr : _vagueAnswer(originalAsk)),
+      _join(
+        opening,
+        arabic
+            ? _vagueAnswerAr
+            : _vagueAnswer(originalAsk, tone: tone, concise: concise),
+      ),
       questions: _vagueQuestions,
       quickReplies: _exampleReplies,
       intent: 'vague',
@@ -775,13 +997,13 @@ class OfflineAssistantService {
           if (q.question.trim().isNotEmpty) q.question.trim(),
       ];
       return asks.isEmpty
-          ? 'You are also describing a lab with $described. It is not '
-                'planned yet - tell me the rest and I will plan it.'
+          ? 'You\'re also describing a lab with $described. It\'s not '
+                'planned yet - tell me the rest and I\'ll plan it.'
           : 'You are also describing a lab with $described, which I have not '
                 'planned yet: ${asks.join(' ')}';
     }
     return 'You are also describing a lab with $described - say "build the '
-        '.pkt" and I will compile it offline.';
+        '.pkt" and I\'ll compile it offline.';
   }
 
   /// The ask-before-plan reply: the questions, the way out ("just build
@@ -793,6 +1015,10 @@ class OfflineAssistantService {
     bool arabic, {
     NetworkIntent? plan,
   }) {
+    final localized = [
+      for (final question in questions)
+        ClarificationService.localize(question, arabic: arabic),
+    ];
     final b = StringBuffer();
     if (opening.isNotEmpty) b.writeln('$opening\n\n');
     if (plan != null && plan.nodes.isNotEmpty) {
@@ -807,20 +1033,24 @@ class OfflineAssistantService {
     }
     b
       ..writeln(
-        questions.length == 1
+        arabic
+            ? 'أحتاج توضيحاً قبل تثبيت الخطة.'
+            : questions.length == 1
             ? '**One quick thing before I plan this:**'
             : '**Two quick things before I plan this:**',
       )
       ..writeln();
     for (var i = 0; i < questions.length; i++) {
-      b.writeln('${i + 1}. ${questions[i].question}');
+      b.writeln('${i + 1}. ${localized[i].question}');
     }
     b
       ..writeln()
       ..writeln(
-        'Tap an answer, or say "just build it" and I will use safe '
-        'defaults for what is still open. Nothing is compiled until you '
-        'say so.',
+        arabic
+            ? 'أجب عن المطلوب؛ لم أغيّر الشبكة أو أبنِ ملفاً.'
+            : 'Tap an answer, or say "just build it" and I\'ll use safe '
+                  'defaults for what is still open. Nothing is compiled until you '
+                  'say so.',
       );
     return AssistantReply(
       b.toString().trim(),
@@ -829,9 +1059,9 @@ class OfflineAssistantService {
       // fully readable in the text and becomes the next turn's chips once
       // the first is answered - the ack loop carries the conversation.
       quickReplies: [
-        if (questions.isNotEmpty) ...questions.first.quickReplies,
-        'Just build it with defaults',
-        for (final q in questions.skip(1)) ...q.quickReplies,
+        if (localized.isNotEmpty) ...localized.first.quickReplies,
+        if (!arabic) 'Just build it with defaults',
+        for (final q in localized.skip(1)) ...q.quickReplies,
       ],
       intent: 'clarify',
     );
@@ -862,7 +1092,10 @@ class OfflineAssistantService {
   static bool _isAck(String t) => _ackPattern.hasMatch(t);
 
   /// "yes, do that", "yeah go ahead", "sure, build it" - agreement with an
-  /// offer, which people rarely type as a bare "yes".
+  /// offer, which people rarely type as a bare "yes". The Arabic bare forms
+  /// (نعم, أيوه, ايوة) ride along: an Arabic "yes" used to fall through to
+  /// the vague reply, so the confirm branch it was meant to reach never
+  /// fired.
   static final RegExp _yesPattern = RegExp(
     r'^(yes|yeah|yep|yup|sure|do it|go ahead|go on|please do|please|of '
     r'course|correct|right|y|ok|okay|alright|absolutely|definitely|'
@@ -874,11 +1107,29 @@ class OfflineAssistantService {
 
   static bool _isYes(String t) => _yesPattern.hasMatch(t);
 
+  /// The bare Arabic agreements: نعم (yes) and the dialectal أيوه/ايوة/
+  /// أي والله spellings. Checked as whole words anchored to the turn, the
+  /// same way the English forms are, so a longer sentence is never eaten.
+  static final RegExp _arabicYesPattern = RegExp(
+    r'^[.!؟?]*(نعم|انعم|ايوه|أيوه|ايوة|أيوة|اي والله|أي والله|اجل|إجل)[.!؟?]*$',
+  );
+
+  static bool _isYesAr(String t) => _arabicYesPattern.hasMatch(t);
+
   static final RegExp _noPattern = RegExp(
     r'^(no|nope|nah|not now|later|stop|dont|do not|no thanks|not yet|n)[.!]*$',
   );
 
   static bool _isNo(String t) => _noPattern.hasMatch(t);
+
+  /// The bare Arabic refusals: لا / لأ / لاء (no). "لا شكراً" (no thanks)
+  /// and longer phrases stay outside - this only owns the bare word, the
+  /// way the English pattern does.
+  static final RegExp _arabicNoPattern = RegExp(
+    r'^[.!؟?]*(لا|لأ|لاء|مش دلوقتي|ليس الان)[.!؟?]*$',
+  );
+
+  static bool _isNoAr(String t) => _arabicNoPattern.hasMatch(t);
 
   /// The findings that would be baked into the file, computed with the same
   /// validator call and the same target the build card uses, so this service
@@ -912,22 +1163,56 @@ class OfflineAssistantService {
     ];
   }
 
-  static String _ackAnswer(NetworkIntent? plan, int seed) {
+  static String _ackAnswer(NetworkIntent? plan, int seed, {String tone = ''}) {
     if (plan != null && plan.nodes.isNotEmpty) {
-      return _pick([
-        'Any time. Your lab is still here - ${_labLine(plan)}. Tell me what to '
-            'change, or say "build the .pkt" and I will compile it offline.',
-        'No problem. ${_labLine(plan)} is still the plan I am holding, so we can '
-            'pick up exactly there.',
-      ], seed);
+      return _pickTone(
+        tone,
+        [
+          'Any time. Your lab is still here - ${_labLine(plan)}. Tell me what '
+              'to change, or say "build the .pkt" and I\'ll compile it '
+              'offline.',
+          'No problem. ${_labLine(plan)} is still the plan I\'m holding, so '
+              'we can pick up exactly there.',
+        ],
+        seed,
+        casual: [
+          'Any time! ${_labLine(plan)} is still sitting right here - say the '
+              'word and I\'ll change it or build the .pkt.',
+          'You got it. Still holding ${_labLine(plan)} for you - where were '
+              'we?',
+        ],
+        formal: [
+          'You are welcome. The lab stands as planned: ${_labLine(plan)}. '
+              'State any adjustment, or request the .pkt build.',
+          'With pleasure. ${_labLine(plan)} remains the current plan; we '
+              'may continue from there.',
+        ],
+      );
     }
-    return _pick(const [
-      'Any time. Whenever you are ready, describe the lab you want - for '
-          'example "2 routers, 1 switch and 4 PCs with OSPF" - or ask me a '
-          'networking question.',
-      'Any time. Tell me the lab to build, or ask me about a technology, and I '
-          'will take it from there.',
-    ], seed);
+    return _pickTone(
+      tone,
+      const [
+        'Any time. Whenever you\'re ready, describe the lab you want - for '
+            'example "2 routers, 1 switch and 4 PCs with OSPF" - or ask me a '
+            'networking question.',
+        'Any time. Tell me the lab to build, or ask me about a technology, '
+            'and I\'ll take it from there.',
+      ],
+      seed,
+      casual: const [
+        'Any time! Whenever you\'re ready - describe the lab ("2 routers, 1 '
+            'switch and 4 PCs with OSPF") or just ask me something.',
+        'No worries. Say what you want built, or throw me a networking '
+            'question - I\'ve got it from there.',
+      ],
+      formal: const [
+        'You are welcome. Whenever you are ready, describe the lab you want '
+            '- for example "2 routers, 1 switch and 4 PCs with OSPF" - or '
+            'ask a networking question.',
+        'With pleasure. Name the lab to build, or the technology to ask '
+            'about, and I will answer.',
+      ],
+    );
   }
 
   /// The Arabic companion of [_ackAnswer]: the conversation stays continuous
@@ -949,16 +1234,97 @@ class OfflineAssistantService {
     ], seed);
   }
 
+  /// The Arabic companion of [_confirmAnswer]: the same gates (a blocked
+  /// plan never advertises the build button) in the user's language, with
+  /// the technical content - findings, device names, the .pkt phrase -
+  /// kept in English because that is what the app and the file speak.
+  static String _confirmAnswerAr(NetworkIntent? plan, int seed, String target) {
+    if (plan == null || plan.nodes.isEmpty) {
+      return 'ممتاز - ماذا تريد أن أبني؟ مثلاً "2 routers, 1 switch and 4 '
+          'PCs with OSPF"، أو "شبكة مكتب صغيرة مع واي فاي للضيوف".';
+    }
+    final b = StringBuffer()..writeln('لنمضِ بهذه الخطة: ${_labLine(plan)}.');
+    final blocked = _blocking(plan, target);
+    if (blocked.isNotEmpty) {
+      // Arabic plural rules differ from English: one problem is "مشكلة
+      // واحدة", 3-10 take the plural "مشاكل", and 11+ take the singular
+      // with the number - HumanLanguage.count only knows English plurals,
+      // so the count is worded here.
+      final count = blocked.length == 1
+          ? 'مشكلة واحدة'
+          : '${blocked.length} ${blocked.length <= 10 ? 'مشاكل' : 'مشكلة'}';
+      b
+        ..writeln()
+        ..writeln(
+          'لا أستطيع البناء بعد: $count ستُكتب في ملف .pkt، لذا أوقفت زر '
+          'البناء.',
+        )
+        ..writeln()
+        ..writeln('أصلح هذه أولاً:');
+      for (final issue in blocked.take(6)) {
+        b.writeln('- ${HumanLanguage.finding(issue.severity, issue.message)}');
+      }
+      if (blocked.length > 6) {
+        b.writeln('- ...و${blocked.length - 6} غيرها.');
+      }
+      b
+        ..writeln()
+        ..writeln(
+          'قل لي بما يجب تغييره أو عدّل الخطة في مستعرض الشبكة، وسأعيد '
+          'التخطيط - كله دون مفتاح API.',
+        );
+      return b.toString().trimRight();
+    }
+    b
+      ..writeln()
+      ..writeln(
+        'اضغط "Build the .pkt" بالأسفل وسأبني الملف على هذا الجهاز - دون '
+        'Packet Tracer ودون مفتاح API.',
+      );
+    return b.toString().trimRight();
+  }
+
+  /// The Arabic companion of [_denyAnswer].
+  static String _denyAnswerAr(NetworkIntent? plan) {
+    final lab = plan == null || plan.nodes.isEmpty
+        ? ''
+        : ' ما زلت أحتفظ بهذه الخطة: ${_labLine(plan)}.';
+    return 'حسناً - لم يتغير شيء.$lab قل لي بما تريد التعديل: مثلاً "استخدم '
+        'OSPF بدلاً من static" أو "اجعلها 2 routers و20 PCs".';
+  }
+
   static String _confirmAnswer(
     NetworkIntent? plan,
     List<String> suggestions, [
     List<ValidationIssue> blocked = const [],
+    int seed = 0,
+    String tone = '',
   ]) {
     if (plan == null || plan.nodes.isEmpty) {
-      return 'Great - what should I build? For example "2 routers, 1 switch and '
-          '4 PCs with OSPF", or "a small office with guest wifi".';
+      return _pickTone(
+        tone,
+        const [
+          'Great - what should I build? For example "2 routers, 1 switch and '
+              '4 PCs with OSPF", or "a small office with guest wifi".',
+          'Okay. Describe the lab - counts and a routing choice is all I '
+              'need, like "2 routers, 1 switch and 4 PCs with OSPF".',
+        ],
+        seed,
+        casual: const [
+          'Awesome - so what are we building? "2 routers, 1 switch and 4 PCs '
+              'with OSPF", or "a small office with guest wifi" - your call.',
+          'Alright! Describe the lab and I\'m on it - counts and a routing '
+              'choice is all I need.',
+        ],
+        formal: const [
+          'Very well. What should be built? For example "2 routers, 1 switch '
+              'and 4 PCs with OSPF", or "a small office with guest wifi".',
+          'Understood. Describe the lab - the device counts and a routing '
+              'choice are all that is required.',
+        ],
+      );
     }
-    final b = StringBuffer()..writeln('Then we go with ${_labLine(plan)}.');
+    final b = StringBuffer()..writeln('Let\'s go with ${_labLine(plan)}.');
     // A confirmation must not advertise a build the card is going to refuse:
     // "press Build" followed by "I did not build: 2 findings" is the dead end
     // that was reported. Say what is in the way and how to clear it instead.
@@ -966,44 +1332,90 @@ class OfflineAssistantService {
       b
         ..writeln()
         ..writeln(
-          'I cannot build this one yet: it still has ${blocked.length} '
-          'finding(s) that would be baked into the .pkt, so the Build card '
-          'below is withheld rather than offered.',
+          'I can\'t build this yet: ${HumanLanguage.count(blocked.length, 'problem')} '
+          'would end up in the .pkt, so I held back the build button.',
         )
         ..writeln()
-        ..writeln('First:');
+        ..writeln('Fix these first:');
       for (final issue in blocked.take(6)) {
-        b.writeln('- [${issue.severity}] ${issue.message}');
+        b.writeln('- ${HumanLanguage.finding(issue.severity, issue.message)}');
       }
       if (blocked.length > 6) {
-        b.writeln('- ... and ${blocked.length - 6} more.');
+        b.writeln('- ...and ${blocked.length - 6} more.');
       }
       b
         ..writeln()
         ..writeln(
-          'Tell me what to change (or edit the plan in the network '
-          'inspector) and I will re-plan and unlock the build. No API key '
-          'is needed for any of it.',
+          _pickTone(
+            tone,
+            const [
+              'Tell me what to change, or edit the plan in the network '
+                  'inspector, and I\'ll re-plan it. You don\'t need an API '
+                  'key for any of it.',
+              'Fix one and I\'ll re-check - here in the chat or in the '
+                  'network inspector, whichever you prefer.',
+            ],
+            seed,
+            casual: const [
+              'Fix one and I\'ll re-check it right away - here or in the '
+                  'network inspector, whatever\'s easier.',
+              'Sort any of those out and I\'ll take another look - your call '
+                  'how.',
+            ],
+            formal: const [
+              'Resolve any finding and I will re-check the plan - here or in '
+                  'the network inspector. No API key is required.',
+              'Correct one item and I will re-validate; the network '
+                  'inspector offers the same edits.',
+            ],
+          ),
         );
       return b.toString().trimRight();
     }
     b
       ..writeln()
       ..writeln(
-        'Press "Build the .pkt" below and I will compile it offline - no Packet '
-        'Tracer and no API key.${suggestions.isEmpty ? '' : ' One thing worth '
+        '${_pickTone(tone, const ['Press "Build the .pkt" below and I\'ll compile it offline - no '
+            'Packet Tracer and no API key.', '"Build the .pkt" below writes the file on this device - no '
+            'Packet Tracer and no API key.'], seed, casual: const ['Hit "Build the .pkt" below and I\'ll write the file right here '
+            '- no Packet Tracer, no key.', '"Build the .pkt" below does the whole thing on this device - '
+            'just say when.'], formal: const ['Press "Build the .pkt" below to compile the file offline - '
+            'neither Packet Tracer nor an API key is required.', 'The "Build the .pkt" button below compiles the file on this '
+            'device when you are ready.'])}${suggestions.isEmpty ? '' : ' One thing worth '
                   'fixing first: ${suggestions.first}'}',
       );
     return b.toString().trimRight();
   }
 
-  static String _denyAnswer(NetworkIntent? plan) {
+  static String _denyAnswer(
+    NetworkIntent? plan, [
+    int seed = 0,
+    String tone = '',
+  ]) {
     final lab = plan == null || plan.nodes.isEmpty
         ? ''
-        : ' The lab I am holding is ${_labLine(plan)}.';
-    return 'Understood - nothing changes.$lab Tell me what to adjust: for '
-        'example "use OSPF instead of static" or "make it 2 routers and 20 '
-        'PCs".';
+        : ' I still have ${_labLine(plan)}.';
+    final openers = _pickTone(
+      tone,
+      const [
+        'Understood - nothing changes.',
+        "Okay - I've left the lab exactly as it was.",
+        'Fine - nothing moves until you say so.',
+      ],
+      seed,
+      casual: const [
+        "Got it - nothing's moved.",
+        'Cool - leaving it exactly as it is.',
+        'Sure - hands off until you say otherwise.',
+      ],
+      formal: const [
+        'Understood. The plan remains unchanged.',
+        'Very well - no change has been made.',
+        'As you wish; the plan stands.',
+      ],
+    );
+    return '$openers$lab Tell me what to adjust: for example '
+        '"use OSPF instead of static" or "make it 2 routers and 20 PCs".';
   }
 
   /// Explain the blockers on the plan without changing it. This is used by
@@ -1015,7 +1427,7 @@ class OfflineAssistantService {
   }) {
     if (plan == null || plan.nodes.isEmpty) {
       return const AssistantReply(
-        'There is no network plan on the table to check yet.',
+        'There\'s no plan to check yet.',
         intent: 'fix',
       );
     }
@@ -1044,31 +1456,30 @@ class OfflineAssistantService {
           'over the limit, so cable or IP repairs cannot make it buildable.',
         )
         ..writeln(
-          'I will not remove or replace devices without your choice. Tell me '
+          'I won\'t remove or replace devices without your choice. Tell me '
           'the intended total and counts by device type, and which unsupported '
           'models to replace or remove.',
         );
     } else if (repair.changes.isNotEmpty) {
       b
         ..writeln(
-          'I can safely repair ${repair.changes.length} issue(s) without '
-          'changing the requested device types. Say “fix the plan” to apply '
-          'those changes.',
+          'I can safely fix ${HumanLanguage.count(repair.changes.length, 'issue')} '
+          'without changing the requested device types. Say "fix the plan" '
+          'to apply them.',
         )
         ..writeln()
-        ..writeln('The remaining decisions are:');
+        ..writeln('The rest need a decision from you:');
     } else {
       b.writeln(
-        'No safe automatic repair remains. These blockers need a device, '
-        'model, or topology choice:',
+        'I can\'t fix these automatically - each one needs a choice from you:',
       );
     }
     b.writeln();
     for (final issue in blocking.take(5)) {
-      b.writeln('- [${issue.severity}] ${issue.message}');
+      b.writeln('- ${HumanLanguage.finding(issue.severity, issue.message)}');
     }
     if (blocking.length > 5) {
-      b.writeln('- ... and ${blocking.length - 5} more blocker group(s).');
+      b.writeln('- ...and ${blocking.length - 5} more.');
     }
     final remedy = _remedyFor(blocking, plan: plan);
     if (remedy.isNotEmpty) {
@@ -1115,9 +1526,9 @@ class OfflineAssistantService {
       return AssistantReply(
         _join(
           opening,
-          'There is no plan on the table to fix yet. Describe the lab - for '
-          'example "2 routers, 2 switches and 15 PCs with OSPF" - and I '
-          'will plan it and clear any finding that comes up.',
+          'There\'s no plan to fix yet. Describe the lab - for example '
+          '"2 routers, 2 switches and 15 PCs with OSPF" - and I\'ll plan it '
+          'and clear any finding that comes up.',
         ),
         quickReplies: _exampleReplies,
         intent: 'fix',
@@ -1132,19 +1543,18 @@ class OfflineAssistantService {
       // it, so say that instead of pretending to repair something.
       final b = StringBuffer()
         ..writeln(
-          'Nothing in this plan blocks the build: the checks report no '
-          'findings that would be baked into the .pkt (${_labLine(plan)}).',
+          'This plan is clean - the checks found nothing that would end up '
+          'in the .pkt (${_labLine(plan)}).',
         )
         ..writeln()
         ..writeln(
           andBuild
-              ? 'Nothing to repair, so I am compiling it as it stands: the '
+              ? 'Nothing to repair, so I\'m compiling it as it stands: the '
                     '.pkt is written offline, with no Packet Tracer and no API '
                     'key.'
               : 'If you pressed Build on an older card, that card was written '
                     'for an earlier version of this network. The card on this '
-                    'reply is stamped with the plan that stands now - rev '
-                    '${plan.revision} - so it builds what you can see.',
+                    'reply matches the plan you can see now, so it builds that.',
         );
       if (suggestions.isNotEmpty) {
         b
@@ -1171,20 +1581,20 @@ class OfflineAssistantService {
         b
           ..writeln(
             andBuild
-                ? 'I did not build or change this plan. It has '
+                ? 'I didn\'t build or change this plan. It has '
                       '${plan.nodes.length} devices, above the '
                       '${ValidatorService.packetTracerMaxDevices}-device '
                       'Packet Tracer build limit.'
                 : 'I left this plan unchanged: it has ${plan.nodes.length} '
                       'devices, above the '
                       '${ValidatorService.packetTracerMaxDevices}-device '
-                      'Packet Tracer build limit. Cable and IP repairs cannot '
-                      'clear that blocker.',
+                      'Packet Tracer build limit. Cable and IP repairs can\'t '
+                      'clear that.',
           )
           ..writeln(
-            'I will not guess which devices to remove or replace. Tell me the '
+            'I won\'t guess which devices to remove or replace. Tell me the '
             'intended total and counts by device type, plus what to do with '
-            'models the bundled templates cannot build.',
+            'models the bundled templates can\'t build.',
           )
           ..writeln()
           ..writeln('What is still blocking it:');
@@ -1192,18 +1602,18 @@ class OfflineAssistantService {
         b
           ..writeln(
             andBuild
-                ? 'I did not build it, and I cannot repair these from here - '
+                ? 'I didn\'t build it, and I can\'t repair these from here - '
                       'each one needs a choice only you can make:'
-                : 'I cannot repair these from here - each one needs a choice only '
-                      'you can make:',
+                : 'I can\'t repair these from here - each one needs a choice '
+                      'only you can make:',
           )
           ..writeln();
       }
       for (final issue in repair.remaining.take(6)) {
-        b.writeln('- [${issue.severity}] ${issue.message}');
+        b.writeln('- ${HumanLanguage.finding(issue.severity, issue.message)}');
       }
       if (repair.remaining.length > 6) {
-        b.writeln('- ... and ${repair.remaining.length - 6} more.');
+        b.writeln('- ...and ${repair.remaining.length - 6} more.');
       }
       if (remedy.isNotEmpty) {
         b
@@ -1215,21 +1625,23 @@ class OfflineAssistantService {
         ..writeln(
           'Tell me what to change - for example "move the branch onto '
           '192.168.20.0/24", "add another switch", or "use 192.168.30.0/24" '
-          '- and I will plan it in and run the checks again.',
+          '- and I\'ll plan it in and run the checks again.',
         );
     } else {
-      b.writeln('Fixed ${repair.changes.length} thing(s):');
+      b.writeln(
+        'Fixed ${HumanLanguage.count(repair.changes.length, 'issue')}:',
+      );
       for (final change in repair.changes.take(8)) {
         b.writeln('- $change');
       }
       if (repair.changes.length > 8) {
-        b.writeln('- ... and ${repair.changes.length - 8} more repair(s).');
+        b.writeln('- ...and ${repair.changes.length - 8} more.');
       }
       b.writeln();
       if (repair.remaining.isEmpty) {
         b.writeln(
           andBuild
-              ? 'The plan is buildable now (${_labLine(repair.plan)}), so I am '
+              ? 'The plan is buildable now (${_labLine(repair.plan)}), so I\'m '
                     'compiling it into a .pkt - offline, no Packet Tracer and '
                     'no API key.'
               : 'The plan is buildable now (${_labLine(repair.plan)}). Press '
@@ -1240,7 +1652,7 @@ class OfflineAssistantService {
         b
           ..writeln(
             andBuild
-                ? 'I did not build it: these findings would be baked into the '
+                ? 'I didn\'t build it: these findings would end up in the '
                       '.pkt and they need your call:'
                 : 'These still block the build and need your call:',
           )
@@ -1257,7 +1669,9 @@ class OfflineAssistantService {
           b.writeln();
         }
         for (final issue in repair.remaining.take(6)) {
-          b.writeln('- [${issue.severity}] ${issue.message}');
+          b.writeln(
+            '- ${HumanLanguage.finding(issue.severity, issue.message)}',
+          );
         }
         if (remedy.isNotEmpty) {
           b
@@ -1267,7 +1681,7 @@ class OfflineAssistantService {
         b
           ..writeln()
           ..writeln(
-            'Tell me how you want them handled and I will fix the rest - the '
+            'Tell me how you want them handled and I\'ll fix the rest - the '
             'build follows by itself once nothing is left.',
           );
       }
@@ -1318,7 +1732,7 @@ class OfflineAssistantService {
       }
       // The same gap said the other way round: the server exists and holds no
       // account at all, which is the shape a profile-based brief lands in.
-      if (issue.message.startsWith('The AAA server holds no account')) {
+      if (issue.message.contains('has no AAA login yet')) {
         final server = plan?.security.aaaServer?.trim() ?? '';
         addLogin(server.isEmpty ? 'the AAA server' : '$server (AAA)');
         continue;
@@ -1395,7 +1809,9 @@ class OfflineAssistantService {
       if (plan.routing != 'static') plan.routing.toUpperCase(),
       if (plan.security.requested) 'security controls',
     ];
-    return bits.isEmpty ? '${plan.nodes.length} device(s)' : bits.join(', ');
+    return bits.isEmpty
+        ? HumanLanguage.count(plan.nodes.length, 'device')
+        : HumanLanguage.list(bits);
   }
 
   static String _join(String a, String b) => a.trim().isEmpty ? b : '$a\n\n$b';
@@ -1403,6 +1819,27 @@ class OfflineAssistantService {
   /// Deterministic variety: the same conversation always gets the same words.
   static String _pick(List<String> options, int seed) =>
       options[seed.abs() % options.length];
+
+  /// The variant pool for the user's stored tone: a senior engineer who is
+  /// warm and direct by default, looser with a casual "yes, that's me", and
+  /// more precise with a formal one. The neutral pool is what the assistant
+  /// has always said, so an unset preference changes nothing; a tone with no
+  /// pool of its own falls back to it too. Seeded like [_pick], so a
+  /// conversation still reads the same way on every reload.
+  static String _pickTone(
+    String tone,
+    List<String> neutral,
+    int seed, {
+    List<String> casual = const [],
+    List<String> formal = const [],
+  }) {
+    final pool = tone == 'casual' && casual.isNotEmpty
+        ? casual
+        : tone == 'formal' && formal.isNotEmpty
+        ? formal
+        : neutral;
+    return _pick(pool, seed);
+  }
 
   // --- intent detection ---------------------------------------------------
 
@@ -1602,18 +2039,18 @@ class OfflineAssistantService {
 
   /// What the assistant says about itself, by kind. Honest by design: it is
   /// a rule-based local assistant, and every answer says where the line is.
-  static String _identityAnswer(String kind, int seed) {
+  static String _identityAnswer(String kind, int seed, {String tone = ''}) {
     switch (kind) {
       case 'made':
-        return 'I am built into NetBuilder AI as its offline brain - rules '
-            'that run on this device, not a model in a cloud. There is no '
+        return 'I\'m built into NetBuilder AI as its offline brain - rules '
+            'that run on this device, not a model in a cloud. There\'s no '
             'company to call and no account to sign into; every answer is '
             'computed right here.';
       case 'ai':
-        return 'I am a local, rule-based assistant - no model, no cloud, no '
-            'API key. That is why the same question always gets the same '
-            'answer, and why nothing you type ever leaves this device. It '
-            'is also why I say so plainly when something is not in my '
+        return 'I\'m a local, rule-based assistant - no model, no cloud, no '
+            'API key. That\'s why the same question always gets the same '
+            'answer, and why nothing you type ever leaves this device. It\'s '
+            'also why I say so plainly when something is not in my '
             'offline material.';
       case 'skills':
         return 'I can do a few concrete things, all on this device:\n\n'
@@ -1629,18 +2066,33 @@ class OfflineAssistantService {
             'cleared.\n\n'
             'Ask one of these, or just describe your network.';
       case 'wellbeing':
-        return _pick(const [
-          'Running fast - everything is local, so there is no server to '
-              'wait on. What are we building?',
-          'All good - no key to check and no server to wait on. What are we '
-              'building?',
-        ], seed);
+        return _pickTone(
+          tone,
+          const [
+            'Running fast - everything is local, so there is no server to '
+                'wait on. What are we building?',
+            'All good - no key to check and no server to wait on. What are '
+                'we building?',
+          ],
+          seed,
+          casual: const [
+            "Running great - it's all local, so nothing's waiting on a "
+                "server. What are we building?",
+            "Never better - no key, no server, no waiting. What's next?",
+          ],
+          formal: const [
+            'Operating normally. Everything runs locally, so there is no '
+                'server to wait on. What would you like to build?',
+            'All functions are working. No key is required and nothing is '
+                'waiting on a server.',
+          ],
+        );
       case 'offline':
         return 'Yes - fully offline. Planning, building the .pkt, the '
             'answers and the repairs all run on this device: no API key, no '
             'cloud and no internet needed, and nothing you type leaves it.';
       default: // 'who'
-        return 'I am the NetBuilder assistant - a fully offline networking '
+        return 'I\'m the NetBuilder assistant - a fully offline networking '
             'copilot. I plan labs from plain language, compile real Packet '
             'Tracer .pkt files on this device, answer Cisco config and '
             'subnet questions, and repair plans. No API key, and nothing '
@@ -1703,7 +2155,16 @@ class OfflineAssistantService {
     r'what file|which file|where (is|was) the file)\b',
   );
 
-  static bool _isRecall(String t) => _recallPattern.hasMatch(t);
+  /// The Arabic recall cues. Dart's RegExp `\b` is ASCII-only, so the
+  /// `\b...\b` anchors in [_recallPattern] can never match around Arabic
+  /// text - these phrases are matched bare instead, and they are distinct
+  /// enough that a bare match cannot collide with a build request.
+  static final RegExp _arabicRecallPattern = RegExp(
+    r'(ماذا طلبت|ماذا قلت|ماذا كتبت|ما كان الطلب|هل تتذكر|هل تذكر|ذكرني بما)',
+  );
+
+  static bool _isRecall(String t) =>
+      _recallPattern.hasMatch(t) || _arabicRecallPattern.hasMatch(t);
 
   /// Answer a recall question with the user's own words, oldest first.
   static String _recallAnswer(
@@ -1721,21 +2182,46 @@ class OfflineAssistantService {
           ask,
     ];
     if (prior.isEmpty) {
-      return 'This is the start of our conversation - you have not asked me '
-          'for anything yet. Tell me what you want to build and I will plan '
+      return 'This is the start of our conversation - you haven\'t asked me '
+          'for anything yet. Tell me what you want to build and I\'ll plan '
           'it, or ask me a networking question.';
     }
     final b = StringBuffer()
-      ..writeln('Here is what you have asked me, oldest first:')
+      ..writeln('Here\'s what you\'ve asked me, oldest first:')
       ..writeln();
     for (var i = 0; i < prior.length; i++) {
       b.writeln('${i + 1}. ${prior[i]}');
     }
     b.writeln();
-    b.writeln('Your ORIGINAL request was: "${prior.first}".');
+    b.writeln('Your original ask was: "${prior.first}".');
     if (plan != null && plan.nodes.isNotEmpty) {
       b.writeln(
-        'I still hold the plan for it: '
+        'The plan for it is still here: '
+        '${plan.nodes.map((n) => n.name).join(', ')}.',
+      );
+    }
+    return b.toString().trimRight();
+  }
+
+  /// The Arabic companion of [_recallAnswer]: the asks are quoted as the
+  /// user typed them (their own words, whatever language they are in), the
+  /// framing is Arabic.
+  static String _recallAnswerAr(List<String> asks, NetworkIntent? plan) {
+    if (asks.isEmpty) {
+      return 'هذه بداية محادثتنا - لم تطلب مني شيئاً بعد. قل لي ماذا تريد '
+          'أن تبني وسأخططه، أو اسألني سؤالاً عن الشبكات.';
+    }
+    final b = StringBuffer()
+      ..writeln('هذا ما طلبته مني، بالترتيب:')
+      ..writeln();
+    for (var i = 0; i < asks.length; i++) {
+      b.writeln('${i + 1}. ${asks[i]}');
+    }
+    b.writeln();
+    b.writeln('طلبك الأصلي كان: "${asks.first}".');
+    if (plan != null && plan.nodes.isNotEmpty) {
+      b.writeln(
+        'الخطة ما تزال محفوظة: '
         '${plan.nodes.map((n) => n.name).join(', ')}.',
       );
     }
@@ -2004,6 +2490,49 @@ class OfflineAssistantService {
     ])
       w: RegExp('\\b$w\\b'),
   };
+
+  /// Tappable follow-ups for a concept answer, keyed by the concept key
+  /// [_concept] returns. Every chip is a sample from [_topicCatalog] - the
+  /// questions documented as ones the offline path REALLY answers - for a
+  /// topic adjacent to the concept just explained, so a tap is never a dead
+  /// end. A test walks this whole map and asserts each chip routes to a
+  /// real answer, the same guarantee the advice chips carry.
+  static const Map<String, List<String>> _conceptFollowUps = {
+    'routing': ['how do I verify OSPF neighbors', 'static route syntax'],
+    'trunk': [
+      'what is the difference between a trunk and an access port',
+      'how do VLANs work',
+    ],
+    'dhcp': ['how does DHCP work', 'how do I point the PCs at a DNS server'],
+    'dns': ['how do I point the PCs at a DNS server', 'how does DHCP work'],
+    'vlan': ['how do VLANs work', 'what is router-on-a-stick'],
+    'two_routers': ['how do I verify OSPF neighbors', 'static route syntax'],
+    'internet': ['how do I configure PAT overload', 'what is an ACL'],
+    'acl': ['what is an ACL', 'how do I enable port security on a switch'],
+    'subnet': [
+      'how many hosts does a /28 subnet support',
+      'what is the wildcard mask for /27',
+    ],
+    'stp': ['how does spanning tree work', 'how does EtherChannel work'],
+    'etherchannel': [
+      'how does EtherChannel work',
+      'how does spanning tree work',
+    ],
+    'mtu': ['request timed out when pinging across routers'],
+    'tcp': ['request timed out when pinging across routers'],
+    'wireless': ['how to secure wifi with WPA2'],
+    'ipv6': ['how does IPv6 addressing work'],
+    'ospf_internals': ['how do I verify OSPF neighbors'],
+    'eigrp': ['how does EIGRP work'],
+    'bgp': ['how does BGP work'],
+    'default_route': ['static route syntax'],
+  };
+
+  /// [_conceptFollowUps] as data, for tests: the guarantee under test is
+  /// that every chip routes to a real answer, which only a walk over the
+  /// whole map can prove.
+  static Map<String, List<String>> get conceptFollowUpsView =>
+      _conceptFollowUps;
 
   static String? _concept(String rawText) {
     // Full names and fault phrasings are canonicalized to the short forms
@@ -2274,7 +2803,7 @@ class OfflineAssistantService {
             'with `default-information originate`; in EIGRP or BGP redistribute '
             'it. Nothing more specific may exist, or that wins instead.';
       default:
-        return 'Tell me the platform and the symptom and I will pin it '
+        return 'Tell me the platform and the symptom and I\'ll pin it '
             'down. Useful shape for any networking problem: (1) what changed '
             'last, (2) what is the exact symptom and scope (one host, one '
             'VLAN, one direction?), (3) work up the stack - link, addressing, '
@@ -2292,70 +2821,130 @@ class OfflineAssistantService {
     String opening = '',
     NetworkIntent? previousPlan,
     String target = 'packet-tracer',
+    int seed = 0,
+    String tone = '',
+    bool concise = false,
   }) {
     final routers = plan.nodes.where((n) => n.type == 'router').length;
     final switches = plan.nodes.where((n) => n.type == 'switch').length;
-    final pcs = plan.nodes.where((n) => n.type == 'pc').length;
-    final servers = plan.nodes.where((n) => n.type == 'server').length;
-    final others = plan.nodes.length - routers - switches - pcs - servers;
     final statedTotal = _statedDeviceTotal(originalAsk);
+    final counts = <String, int>{};
+    for (final node in plan.nodes) {
+      counts[node.type] = (counts[node.type] ?? 0) + 1;
+    }
+    final types = counts.keys.toList()..sort(_byDeviceOrder);
+    final parts = <String>[
+      for (final type in types)
+        HumanLanguage.count(counts[type]!, _deviceLabel(type)),
+    ];
 
     final sb = StringBuffer();
+    // A capability the offline service model cannot deliver is stated in the
+    // answer that describes the plan, not only in a ledger card: the GUI
+    // stress run asked for Active Directory and DHCP failover and got a lab
+    // description that never said either was unsupported.
+    final unsupported = UnsupportedServiceCapabilities.namedIn(originalAsk);
+    if (unsupported.isNotEmpty) {
+      sb
+        ..writeln(
+          'I can plan the hardware, but not '
+          '${HumanLanguage.list(unsupported)}: this is not implemented by '
+          'the offline service model or the Packet Tracer server generator, '
+          'and the plan below does not claim it.',
+        )
+        ..writeln();
+    }
     if (opening.trim().isNotEmpty) {
       sb
         ..writeln(opening)
         ..writeln();
     }
     // What changed since the last turn, so a follow-up reads as a continuation
-    // of one conversation rather than a fresh description of a lab.
+    // of one conversation rather than a fresh description of a lab. The
+    // opener is one of a few equivalent wordings, picked by the same
+    // conversation seed as the rest of the chat's variety.
     final delta = NetworkIntent.planChangeSummary(previousPlan, plan);
     if (delta.isNotEmpty) {
-      sb.writeln('That updates the lab you had: $delta.');
-      sb.writeln();
+      sb
+        ..writeln(
+          '${_pick(const ["Here's what changed:", 'Since last time:', 'I updated it:'], seed)} $delta.',
+        )
+        ..writeln();
     }
-    final parts = <String>[
-      if (routers > 0) '$routers router(s)',
-      if (switches > 0) '$switches switch(es)',
-      if (pcs > 0) '$pcs PC(s)',
-      if (servers > 0) '$servers server(s)',
-      if (others > 0) '$others other device(s)',
-    ];
     // The total is stated as well as the breakdown, so the number the user
     // reads here is the same number the build card and the .pkt report. A
     // summary that only listed the parts left nothing to compare against a
     // card that said "2 device(s), 0 link(s)".
     sb.writeln(
-      'Here is the lab I understand: ${parts.join(', ')} '
-      '(${plan.nodes.length} device(s) in total).',
+      "Here's the lab: ${parts.isEmpty ? 'no devices' : HumanLanguage.list(parts)}"
+      ' — ${HumanLanguage.count(plan.nodes.length, 'device')} in total.',
     );
     if (statedTotal != null && statedTotal != plan.nodes.length) {
       sb.writeln(
-        'Count mismatch: your brief says $statedTotal devices, but this plan '
-        'contains ${plan.nodes.length}. I have not guessed which devices to '
-        'drop; confirm the intended counts before building.',
+        "Your brief says $statedTotal devices but this plan has "
+        '${plan.nodes.length}. I haven\'t guessed which to drop - confirm the '
+        'counts before building.',
       );
     }
-    if (originalAsk.isNotEmpty) {
-      sb.writeln('This follows what you asked earlier: "$originalAsk".');
+    // A brief that named only servers gets the gear a person would draw to
+    // connect them. Say so: three extra devices appearing without a word is
+    // as confusing as the blocked build it replaced.
+    final addedGear = <String>[
+      for (final node in plan.nodes)
+        if (node.type == 'router') node.name,
+      for (final node in plan.nodes)
+        if (node.type == 'switch') node.name,
+    ];
+    final mentionsGear = RegExp(
+      r'\b(?:routers?|switches?)\b',
+      caseSensitive: false,
+    ).hasMatch(originalAsk);
+    if (!mentionsGear &&
+        addedGear.isNotEmpty &&
+        plan.nodes.any((node) => node.type == 'server')) {
+      final router = plan.security.aaaRouter;
+      sb.writeln(
+        'I added ${HumanLanguage.list(addedGear)} to connect them'
+        '${plan.security.aaa && router != null ? '; the AAA logins are '
+                  'applied on $router' : ''}.',
+      );
     }
     sb.writeln(_inventoryLine(plan));
-    // The revision travels with every count, so a number in this paragraph is
-    // always traceable to one plan version and can be compared with what the
-    // build card and the .pkt say.
+    // Link count and routing share one sentence so the numbers in this
+    // paragraph match the build card and the .pkt report without a revision
+    // hash the user cannot check.
     sb.writeln(
-      'Links: ${plan.links.length}, routing: ${plan.routing} '
-      '(rev ${plan.revision}).',
+      '${HumanLanguage.count(plan.links.length, 'link')}'
+      '${plan.routing.trim().isEmpty ? '' : ', running ${plan.routing.toLowerCase() == 'static' ? 'static routing' : plan.routing.toUpperCase()}'}.',
     );
     if (plan.addressing.isNotEmpty) {
       sb.writeln(
-        'Addressing: ${plan.addressing.take(6).map((a) => '${a.node} ${a.iface}=${a.ipCidr}').join(', ')}'
+        'Addressing: ${plan.addressing.take(6).map((a) => '${a.node} ${a.iface} is ${a.ipCidr}').join(', ')}'
         '${plan.addressing.length > 6 ? ' ...' : ''}',
       );
     }
-    sb.writeln();
-    sb.writeln('Advice:');
-    if (plan.routing == 'static' && routers > 1) {
+    // Which server does what, in one line. A brief that names roles and a
+    // count can be read two ways ("2 servers ... and an HTTP server"); this
+    // shows the reading the plan took, so a wrong guess is visible and easy
+    // to correct instead of hiding behind a device count.
+    final serverRoles = <String>[
+      for (final node in plan.nodes)
+        if (node.type == 'server' && node.services.isNotEmpty)
+          '${node.name} runs ${_serviceSentence(node.services)}',
+    ];
+    if (serverRoles.isNotEmpty) {
+      // Four is as many as fits in a readable sentence; a big server farm
+      // says how many more it has instead of running on for a paragraph.
+      final shown = serverRoles.take(4).toList();
+      final extra = serverRoles.length - shown.length;
       sb.writeln(
+        'Server roles: ${HumanLanguage.list(shown)}'
+        '${extra > 0 ? ', plus $extra more' : ''}.',
+      );
+    }
+    final advice = <String>[];
+    if (plan.routing == 'static' && routers > 1) {
+      advice.add(
         '- With more than one router, OSPF is usually easier than '
         'hand-written static routes - say "use ospf" to switch.',
       );
@@ -2374,32 +2963,40 @@ class OfflineAssistantService {
             switchNames.contains(l.b.toLowerCase()),
       );
       if (trunk) {
-        sb.writeln(
+        advice.add(
           '- Make the switch-to-switch cable a trunk and leave the '
           'device ports as access ports.',
         );
       } else {
-        sb.writeln(
+        advice.add(
           '- The switches are not cabled to each other in this plan, '
           'so there is no trunk yet - say "add a trunk between the '
-          'switches" and I will add the link as well as the config.',
+          'switches" and I\'ll add the link as well as the config.',
         );
       }
     }
-    final noRole = plan.nodes
-        .where((n) => n.type == 'server' && n.services.isEmpty)
-        .length;
-    if (noRole > 0) {
-      sb.writeln(
-        '- Give each server a role (DHCP, DNS, HTTP, AAA, ...) so its '
-        'service tab is actually configured.',
-      );
-    }
     if (!plan.security.requested) {
-      sb.writeln(
+      advice.add(
         '- If this is a secure/graded lab, add port security on the '
         'user ports plus an ACL or VPN - I can plan those too.',
       );
+    }
+    // A "shorter answers" preference drops the suggestions block - the lab
+    // description and the build path stay; the unsolicited extras go. The
+    // blocking findings never go: they are the reason the build button is
+    // off, and a warning is never trimmed for style.
+    if (advice.isNotEmpty && !concise) {
+      sb.writeln();
+      sb.writeln(
+        _pick(const [
+          'Worth doing:',
+          'While you are at it:',
+          'Two thoughts:',
+        ], seed),
+      );
+      for (final line in advice) {
+        sb.writeln(line);
+      }
     }
     // The findings that hold the build card back, stated as the same list the
     // card shows, so the advice and the disabled button tell one story.
@@ -2408,12 +3005,12 @@ class OfflineAssistantService {
       sb.writeln();
       sb.writeln('Fix these first:');
       for (final issue in blocking.take(6)) {
-        sb.writeln('- [${issue.severity}] ${issue.message}');
+        sb.writeln('- ${HumanLanguage.finding(issue.severity, issue.message)}');
       }
       if (blocking.length > 6) {
-        sb.writeln('- ... and ${blocking.length - 6} more.');
+        sb.writeln('- ...and ${blocking.length - 6} more.');
       }
-    } else if (suggestions.isNotEmpty) {
+    } else if (suggestions.isNotEmpty && !concise) {
       sb.writeln();
       sb.writeln('Worth knowing:');
       for (final s in suggestions.take(6)) {
@@ -2424,53 +3021,54 @@ class OfflineAssistantService {
     if (blocking.isNotEmpty) {
       // Saying "press Build" here while the card below refuses to build is
       // the dead end the user reported. Name the blocker and the way out.
-      sb.writeln('Next steps:');
       if (ValidatorService.isPacketTracerTarget(target) &&
           plan.nodes.length > ValidatorService.packetTracerMaxDevices) {
         sb.writeln(
-          '1. This app cannot build more than '
-          '${ValidatorService.packetTracerMaxDevices} devices in one Packet '
-          'Tracer plan. Say which device counts and unsupported models to keep; '
-          'repeating "fix the plan" cannot clear the size limit.',
-        );
-        sb.writeln(
-          '2. The Build card stays withheld until the plan is within the limit '
-          'and its device models have buildable templates.',
+          'One size limit is in the way: this app can\'t build more than '
+          '${ValidatorService.packetTracerMaxDevices} devices in a single '
+          'Packet Tracer plan. Tell me which device counts and unsupported '
+          'models to keep - repeating "fix the plan" won\'t clear it.',
         );
       } else {
         sb.writeln(
-          '1. The Build card on this reply is withheld: this plan still '
-          'has ${blocking.length} finding(s) that would be baked into the '
-          '.pkt. Fix them above (tell me what to change, or edit the plan in '
-          'the network inspector) and the build unlocks.',
-        );
-        sb.writeln(
-          '2. Tell me anything that is wrong or missing and I will keep '
-          'the plan moving - I hold on to it between messages.',
+          'The build button stays off until those are cleared. Tell me what '
+          'to change, or edit the plan in the network inspector, and it '
+          'unlocks.',
         );
       }
-      sb.writeln();
-      sb.writeln(
-        'Nothing is built or typed into Packet Tracer until you '
-        'approve it.',
-      );
       return sb.toString();
     }
-    sb.writeln('Next steps:');
     sb.writeln(
-      '1. Press "Build the .pkt" on this reply - it compiles the plan '
-      'into a real file offline, with no Packet Tracer and no API key.',
+      concise
+          ? '"Build the .pkt" below compiles this plan offline and reports '
+                'what the read-back verified.'
+          : _pickTone(
+              tone,
+              const [
+                'When you\'re ready, press "Build the .pkt" on this reply. It '
+                    'compiles the plan into a real file offline - no Packet '
+                    'Tracer and no API key - and I\'ll report what the '
+                    'read-back verified.',
+                'Happy with it? "Build the .pkt" below compiles the file on '
+                    'this device and reports what the read-back verified.',
+                'Say the word or press "Build the .pkt" and I\'ll write the '
+                    'file offline, then check it matches this plan.',
+              ],
+              seed,
+              casual: const [
+                'Good to go? Hit "Build the .pkt" and I\'ll write the file '
+                    'right here, then tell you exactly what checked out.',
+                'Whenever you\'re happy - "Build the .pkt" below, and I\'ll '
+                    'report what the read-back verified.',
+              ],
+              formal: const [
+                'When ready, press "Build the .pkt" below; the file is '
+                    'compiled offline and the read-back result is reported.',
+                'Approve with "Build the .pkt" - the file is written on this '
+                    'device and verified by read-back.',
+              ],
+            ),
     );
-    sb.writeln(
-      '2. Open the file in Packet Tracer and check it against your '
-      'brief.',
-    );
-    sb.writeln(
-      '3. Tell me anything that is wrong or missing and I will keep '
-      'the plan moving - I hold on to it between messages.',
-    );
-    sb.writeln();
-    sb.writeln('Nothing is typed into Packet Tracer until you approve it.');
     return sb.toString();
   }
 
@@ -2518,28 +3116,120 @@ class OfflineAssistantService {
       final more = entry.value.length > 4
           ? ', plus ${entry.value.length - 4} more'
           : '';
-      groups.add('${entry.key}: ${entry.value.length} ($names$more)');
+      groups.add(
+        '${HumanLanguage.pluralize(_deviceLabel(entry.key))} '
+        '(${entry.value.length}): $names$more',
+      );
     }
     final extraTypes = entries.length > 10
-        ? '; ${entries.length - 10} other type(s) omitted'
+        ? '; ${entries.length - 10} more device types omitted'
         : '';
-    return 'Device inventory by type: ${groups.join('; ')}$extraTypes.';
+    return 'By type: ${groups.join('; ')}$extraTypes.';
   }
 
-  static String _vagueAnswer(String originalAsk) =>
-      'I am here - I just need a bit more to go on.\n\n'
-      '${originalAsk.isEmpty ? '' : 'Earlier in this conversation you asked: '
-                '"$originalAsk". Do you want me to build on that, or is this '
-                'something new?\n\n'}'
-      'Tell me what you want in plain words, for example:\n'
-      '- "2 routers, 2 switches, 1 server and 4 PCs with OSPF"\n'
-      '- "a small office with guest wifi and port security"\n'
-      '- "connect two routers over a serial WAN and add a DNS server"\n\n'
-      'Three things make a plan complete in one go:\n'
-      '1. How many routers, switches, PCs and servers do you want?\n'
-      '2. Static routes or OSPF?\n'
-      '3. Any security - port security, an ACL or a VPN?\n\n'
-      'Or just ask a question, like "what is better, OSPF or static routing?".';
+  static String _serviceSentence(List<String> services) => HumanLanguage.list([
+    for (final service in services) DomainVocabulary.serviceRoleLabel(service),
+  ]);
+
+  /// The words a person uses for a device type, singular.
+  static const _deviceLabels = <String, String>{
+    'router': 'router',
+    'switch': 'switch',
+    'pc': 'PC',
+    'server': 'server',
+    'printer': 'printer',
+    'wireless': 'access point',
+    'phone': 'IP phone',
+    'laptop': 'laptop',
+    'firewall': 'firewall',
+    'cloud': 'cloud',
+    'wlc': 'wireless controller',
+    'tablet': 'tablet',
+    'smartphone': 'smartphone',
+    'hub': 'hub',
+    'modem': 'modem',
+    'cable-modem': 'cable modem',
+    'meraki-server': 'Meraki server',
+    'iot': 'IoT device',
+    'mcu': 'MCU',
+  };
+
+  static String _deviceLabel(String type) {
+    final key = type.trim().toLowerCase();
+    final known = _deviceLabels[key];
+    if (known != null) return known;
+    final spaced = type.replaceAll(RegExp(r'[-_]+'), ' ').trim();
+    return spaced.isEmpty ? 'device' : spaced;
+  }
+
+  /// The order a lab is normally described in: the gear that carries the
+  /// network first, then what is plugged into it.
+  static const _deviceOrder = <String>[
+    'router',
+    'switch',
+    'pc',
+    'server',
+    'printer',
+    'wireless',
+    'phone',
+    'laptop',
+    'firewall',
+    'cloud',
+    'wlc',
+    'tablet',
+    'smartphone',
+  ];
+
+  static int _byDeviceOrder(String a, String b) {
+    final ai = _deviceOrder.indexOf(a);
+    final bi = _deviceOrder.indexOf(b);
+    if (ai != bi) {
+      if (ai < 0) return 1;
+      if (bi < 0) return -1;
+      return ai.compareTo(bi);
+    }
+    return a.compareTo(b);
+  }
+
+  /// The answer when there is nothing to parse. The three example briefs
+  /// and the three completing questions are ALREADY on this reply as
+  /// tappable chips ([_exampleReplies] and [_vagueQuestions]), so the prose
+  /// names one example and the shape of a complete plan instead of
+  /// repeating every chip as a numbered list - the wall of text that made
+  /// the vague reply read like a form.
+  static String _vagueAnswer(
+    String originalAsk, {
+    String tone = '',
+    bool concise = false,
+  }) {
+    if (concise) {
+      final tail = originalAsk.isEmpty
+          ? ''
+          : ' - you started with "$originalAsk"';
+      return 'I need a bit more to go on$tail. Say something like "2 '
+          'routers, 1 switch and 4 PCs with OSPF", or tap a question '
+          'below.';
+    }
+    final lead = _pickTone(
+      tone,
+      const ['I\'m here - I just need a bit more to go on.'],
+      0,
+      casual: const ["I'm here - just give me a bit more to work with!"],
+      formal: const ['I am here; a little more detail is all I need.'],
+    );
+    final recall = originalAsk.isEmpty
+        ? ''
+        : 'You started with "$originalAsk". Should I build on that, or is '
+              'this something new?\n\n';
+    return '$lead\n\n'
+        '$recall'
+        'Tell me what you want in plain words - say "2 routers, 1 switch '
+        'and 4 PCs with OSPF" - and I\'ll plan it. The three things that '
+        'complete a plan in one go: the device counts, static-or-OSPF, and '
+        'any security you want; the questions below cover exactly those.\n\n'
+        'Or just ask a question, like "what is better, OSPF or static '
+        'routing?".';
+  }
 
   /// The short Arabic opener answer: honest, in the user's language, without
   /// pretending to have parsed a plan request it cannot read.
@@ -2557,12 +3247,20 @@ class OfflineAssistantService {
       'وسأعيدها بالعربية.';
 
   /// The honest answer when the offline material does not cover a question.
-  static const _missingCoverage =
-      'That one is not in my offline material. Without a model I cover '
-      'planning, device configuration steps, verification commands, subnet '
-      'math and the common faults - try naming the device or protocol (for '
-      'example "how do OSPF areas work"), or add a model key in Settings '
-      'for open-ended questions.';
+  /// Two equivalent wordings, picked by the conversation seed like the rest
+  /// of the chat's variety.
+  static const _missingCoverage = [
+    'That\'s not in my offline material. Without a model I cover planning, '
+        'device configuration steps, verification commands, subnet math and '
+        'the common faults - try naming the device or protocol (for example '
+        '"how do OSPF areas work"), or add a model key in Settings for '
+        'open-ended questions.',
+    'I don\'t have that one offline. What I can answer here is planning, '
+        'config steps, verification commands, subnet math and the common '
+        'faults - name the device or protocol (say "how do OSPF areas work") '
+        'and I\'ll take it, or add a model key in Settings for anything '
+        'open-ended.',
+  ];
 
   static const _arabicMissing =
       'هذا السؤال خارج ما لديّ دون اتصال. أُغطّي التخطيط وخطوات إعداد '
@@ -2585,11 +3283,12 @@ class OfflineAssistantService {
     required bool arabic,
     required String opening,
     NetworkIntent? plan,
+    int seed = 0,
   }) {
     final near = _nearTopics(t);
     if (near.isEmpty) {
       return AssistantReply(
-        _join(opening, arabic ? _arabicMissing : _missingCoverage),
+        _join(opening, arabic ? _arabicMissing : _pick(_missingCoverage, seed)),
         // help: true - a gap answer must not advertise a build; the plan is
         // context for the question, not an offer.
         quickReplies: _nextStepsFor(plan, help: true),
@@ -2598,7 +3297,7 @@ class OfflineAssistantService {
     }
     final b = StringBuffer()
       ..writeln(
-        'That one is not in my offline material - but I can answer these '
+        'That one\'s not in my offline material, but I can answer these '
         'nearby questions:',
       )
       ..writeln();

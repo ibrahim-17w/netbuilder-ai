@@ -14,7 +14,7 @@ class AppVersion {
   /// [PackageInfo] on a real launch.
   static String version = const String.fromEnvironment(
     'FLUTTER_BUILD_NAME',
-    defaultValue: '1.0.0',
+    defaultValue: '1.1.0',
   );
   static String buildNumber = const String.fromEnvironment(
     'FLUTTER_BUILD_NUMBER',

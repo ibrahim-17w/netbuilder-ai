@@ -1,3 +1,5 @@
+import 'nlu/parser.dart' show bridgeBriefWithMapping;
+
 /// One turn's reading: exploration or request.
 ///
 /// [cues] carries the matched phrases that DROVE the verdict - the definite
@@ -250,7 +252,13 @@ class TentativeLanguageService {
   ///    a general classifier. A turn it does not recognize keeps the chat
   ///    behaviour that existed before this gate.
   static TentativeVerdict analyze(String normalizedText) {
-    var t = normalizedText.trim().toLowerCase();
+    final normalized = bridgeBriefWithMapping(normalizedText);
+    var t = List.generate(
+      normalized.normalizedText.length,
+      (index) => normalized.overlapsOpaqueSource(start: index, end: index + 1)
+          ? ' '
+          : normalized.normalizedText[index],
+    ).join().trim().toLowerCase();
     if (!_hasWords.hasMatch(t)) {
       return const TentativeVerdict(tentative: false);
     }

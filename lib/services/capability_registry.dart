@@ -16,6 +16,7 @@ import '../screens/topology_preview_screen.dart';
 import '../widgets/app_dialogs.dart';
 import '../widgets/packet_tracer_catalog.dart';
 import 'adapters/cisco_adapter.dart';
+import 'human_language.dart';
 import 'adapters/gns3_adapter.dart';
 import 'adapters/packet_tracer_adapter.dart';
 import 'adapters/terraform_adapter.dart';
@@ -648,12 +649,13 @@ class CapabilityRegistry {
           context.context,
           title: issues.isEmpty
               ? 'The plan is clean'
-              : '${issues.length} finding(s)',
+              : HumanLanguage.count(issues.length, 'finding'),
           subtitle: '${intent.projectName} - ${_filesLocked(intent)}',
           icon: Icons.fact_check_outlined,
           warn: issues.any((i) => i.severity == 'error'),
           lines: [
-            for (final issue in issues) '[${issue.severity}] ${issue.message}',
+            for (final issue in issues)
+              HumanLanguage.finding(issue.severity, issue.message),
           ],
         );
       },
@@ -790,7 +792,7 @@ class CapabilityRegistry {
           context.context,
           title: duplicates.isEmpty
               ? 'No duplicate addresses'
-              : '${duplicates.length} duplicate address(es)',
+              : HumanLanguage.count(duplicates.length, 'duplicate address'),
           subtitle: intent.projectName,
           icon: Icons.rule_folder_outlined,
           warn: duplicates.isNotEmpty,
@@ -996,7 +998,7 @@ class CapabilityRegistry {
               '${summary['links'] ?? 0} links, '
               '${summary['cliDevices'] ?? 0} CLI, '
               '${summary['ipConfigured'] ?? 0} IP-configured, '
-              '${warnings.length} warning(s)',
+              '${HumanLanguage.count(warnings.length, 'warning')}',
           text: [
             if (warnings.isNotEmpty) ...[
               'WARNINGS:',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/conversation_titles.dart';
+import '../services/human_language.dart';
 import '../theme/app_theme.dart';
 
 /// The conversations, as a real chat app lists them.
@@ -378,7 +379,7 @@ class _ConversationTile extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '$messages message(s)',
+                        HumanLanguage.count(messages, 'message'),
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
                         ),
@@ -547,6 +548,53 @@ class ChatWelcome extends StatelessWidget {
     ),
   ];
 
+  /// The day-rotating openers. Two of these four join the fixed five on any
+  /// given day, so a returning user does not read the same welcome twice -
+  /// while the fixed five stay put, because they are the app's front door
+  /// and tests (and habits) rely on finding them. Each title is a question
+  /// the offline assistant answers VERBATIM (they are drawn from the same
+  /// verified set as the chat's near-miss topics), so tapping one is never
+  /// a dead end.
+  static const rotatingSuggestions = <(IconData, String, String)>[
+    (
+      Icons.calculate_outlined,
+      'How many hosts does a /28 subnet support',
+      'The subnet math, worked out',
+    ),
+    (
+      Icons.vpn_key_outlined,
+      'What is the wildcard mask for /27',
+      'One line you can paste into an ACL',
+    ),
+    (
+      Icons.security_outlined,
+      'How do I enable port security on a switch',
+      'Lock the user ports to known MACs',
+    ),
+    (
+      Icons.device_hub_outlined,
+      'What is router-on-a-stick',
+      'VLANs without a second router',
+    ),
+  ];
+
+  /// The two rotating openers for [day]: the list walks one step per day
+  /// of the year, so the same day is the same welcome everywhere - tests
+  /// included - and tomorrow is visibly different from today.
+  static List<(IconData, String, String)> rotatingFor(DateTime day) {
+    final start = _dayOfYear(day) % rotatingSuggestions.length;
+    return [
+      rotatingSuggestions[start],
+      rotatingSuggestions[(start + 1) % rotatingSuggestions.length],
+    ];
+  }
+
+  static int _dayOfYear(DateTime day) => DateTime.utc(
+    day.year,
+    day.month,
+    day.day,
+  ).difference(DateTime.utc(day.year)).inDays;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -632,6 +680,16 @@ class ChatWelcome extends StatelessWidget {
             runSpacing: AppTheme.s8,
             children: [
               for (final (icon, title, subtitle) in suggestions)
+                _SuggestionChip(
+                  icon: icon,
+                  title: title,
+                  subtitle: subtitle,
+                  onTap: () => onSuggestion(title),
+                ),
+              // Two openers that change with the day, after the fixed
+              // five: the front door stays where it is, and a returning
+              // user still finds one new thing to tap.
+              for (final (icon, title, subtitle) in rotatingFor(DateTime.now()))
                 _SuggestionChip(
                   icon: icon,
                   title: title,

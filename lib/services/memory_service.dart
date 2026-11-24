@@ -12,6 +12,7 @@ import '../models/build_attempt.dart';
 import '../models/chat_message.dart';
 import '../models/environment_profile.dart';
 import '../models/network_intent.dart';
+import 'concept_knowledge.dart';
 import 'learned_answers_service.dart';
 import 'misparse_ledger.dart';
 import 'phrasing_memory_service.dart';
@@ -134,12 +135,23 @@ class MemoryService extends ChangeNotifier {
   static Future<Database> _openAt(String path) async {
     final db = await openDatabase(
       path,
-      version: 12,
+      version: 14,
       // PRAGMA assignments return a row in SQLite. Android's sqflite plugin
       // requires rawQuery for statements with a result, while the FFI backend
       // happens to accept execute and hid this startup failure in tests.
       onConfigure: (db) async {
         await db.rawQuery('PRAGMA secure_delete = ON');
+        // The store is opened from the app's private support directory, never
+        // a network share, which is what makes WAL safe here. It is also the
+        // difference between a second window waiting and failing outright
+        // with "database is locked".
+        await db.rawQuery('PRAGMA busy_timeout = 5000');
+        await db.rawQuery('PRAGMA journal_mode = WAL');
+        // WAL keeps committed pages in the -wal file until a checkpoint, so
+        // secure_delete alone no longer puts a deleted row's bytes beyond
+        // reach on disk. Truncating on open discards whatever the previous
+        // session left behind.
+        await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
       },
       onCreate: (db, v) async => _create(db),
       onUpgrade: (db, oldVersion, newVersion) async =>
@@ -281,6 +293,21 @@ CREATE TABLE IF NOT EXISTS builds(
           'ALTER TABLE builds ADD COLUMN parentVersion INTEGER',
         );
       }
+      if (oldVersion < 13) {
+        // Concept knowledge: what was learned, organized by the THING the
+        // knowledge is about, so a paraphrase retrieves what the exact
+        // wording learned (see [ConceptKnowledge]). The exact-question
+        // replay store (learned_answer) is untouched - this table is the
+        // tier under it.
+        await db.execute(_knowledgeConceptTableSql);
+        await db.execute(_knowledgeConceptIndexSql);
+      }
+      if (oldVersion < 14) {
+        // No schema change: the indexes the hot queries have always needed.
+        // Re-runnable like every step above, and a no-op on a store that
+        // already has them.
+        await _createHotIndexes(db);
+      }
     }
   }
 
@@ -364,6 +391,11 @@ CREATE TABLE IF NOT EXISTS attempts(
     await db.execute(_envProfileTableSql);
     await db.execute(_clarificationAnswerTableSql);
     await db.execute(_openQuestionTableSql);
+    await db.execute(_knowledgeConceptTableSql);
+    await db.execute(_knowledgeConceptIndexSql);
+    // A fresh store gets the same indexes the version-14 migration adds to an
+    // existing one.
+    await _createHotIndexes(db);
   }
 
   /// Attachments are paths on disk, not blobs: screenshots are hundreds of
@@ -423,6 +455,92 @@ CREATE TABLE IF NOT EXISTS changes(
   static const _changesIndexSql =
       'CREATE INDEX IF NOT EXISTS idx_changes_conversation '
       'ON changes(conversation, actionId DESC)';
+
+  /// One concept entry per row: the THING the knowledge is about (see
+  /// [ConceptKnowledge]), the explanation learned for it, optional
+  /// summary/beginner/example variants, and the provenance + verification
+  /// status that keep the replay honest. Separate from `learned_answer`,
+  /// which stays the verbatim exact-question tier.
+  static const _knowledgeConceptTableSql = '''
+CREATE TABLE IF NOT EXISTS knowledge_concept(
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ concept TEXT NOT NULL,
+ label TEXT NOT NULL DEFAULT '',
+ category TEXT NOT NULL DEFAULT '',
+ answer TEXT NOT NULL,
+ summary TEXT NOT NULL DEFAULT '',
+ beginner TEXT NOT NULL DEFAULT '',
+ example TEXT NOT NULL DEFAULT '',
+ source TEXT NOT NULL DEFAULT '',
+ origin TEXT NOT NULL DEFAULT 'provider',
+ status TEXT NOT NULL DEFAULT 'unverified',
+ qkey TEXT NOT NULL DEFAULT '',
+ seenCount INTEGER NOT NULL DEFAULT 1,
+ createdAt TEXT NOT NULL,
+ updatedAt TEXT NOT NULL
+)''';
+
+  static const _knowledgeConceptIndexSql =
+      'CREATE INDEX IF NOT EXISTS idx_knowledge_concept_concept '
+      'ON knowledge_concept(concept)';
+
+  /// Indexes for the queries the app runs on every screen.
+  ///
+  /// Loading a transcript is `WHERE conversation = ? ORDER BY id`, the saved
+  /// network list is `WHERE projectName = ? ORDER BY createdAt`, and the
+  /// failure view filters by project. Without these, SQLite scans the table
+  /// and sorts the result on every open.
+  ///
+  /// The table name and the columns each index needs ride along because a
+  /// migration has to survive a store that is missing one: the version
+  /// counter is not proof the table or its newer columns landed, and an index
+  /// statement that assumes them turns a recoverable store into an
+  /// unopenable one.
+  static const _hotIndexes = <(String, List<String>, String)>[
+    (
+      'chat',
+      ['conversation', 'id'],
+      'CREATE INDEX IF NOT EXISTS idx_chat_conversation_id '
+          'ON chat(conversation, id)',
+    ),
+    (
+      'builds',
+      ['projectName', 'createdAt'],
+      'CREATE INDEX IF NOT EXISTS idx_builds_project_created '
+          'ON builds(projectName, createdAt)',
+    ),
+    (
+      'attempts',
+      ['projectName'],
+      'CREATE INDEX IF NOT EXISTS idx_attempts_project '
+          'ON attempts(projectName)',
+    ),
+  ];
+
+  /// Create the hot-query indexes for whichever of those tables exist AND
+  /// carry every column the index names.
+  ///
+  /// A legacy `builds` table can exist without `projectName` (the schema-10
+  /// upgrade fixture is exactly that shape); creating the index there failed
+  /// the whole open with "no such column", which is the unrecoverable-store
+  /// failure the table check above was written to prevent.
+  static Future<void> _createHotIndexes(DatabaseExecutor db) async {
+    for (final (table, columns, sql) in _hotIndexes) {
+      final present = await db.rawQuery(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        [table],
+      );
+      if (present.isEmpty) continue;
+      final info = await db.rawQuery('PRAGMA table_info($table)');
+      final actual = {
+        for (final row in info) '${row['name'] ?? ''}'.toLowerCase(),
+      };
+      if (!columns.every((column) => actual.contains(column.toLowerCase()))) {
+        continue;
+      }
+      await db.execute(sql);
+    }
+  }
 
   /// One learned phrasing per row: what the user said, and the resolved
   /// brief it replayed to. Its own table, not prefs - a lesson is memory the
@@ -1487,8 +1605,30 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
       _ => -1,
     };
     if (id > 0) await _capLearnedAnswers();
+    // CONCEPT KNOWLEDGE: the same answer, filed under the concept it is
+    // about, is what lets a differently-worded question retrieve it later.
+    // The exact-question row above is still the tier the verbatim replay
+    // serves; this only adds the tier under it. The concept's confirmation
+    // follows the learned row's (a fact-checked or repeated answer starts
+    // verified). Filing never throws - see [learnAnswerAsConcept].
+    if (id > 0) {
+      await learnAnswerAsConcept(
+        question: question,
+        answer: answer,
+        source: source,
+        qkey: key,
+        confirmed: id > 0 && _captureWasConfirmed(capture),
+      );
+    }
     notifyListeners();
     return id;
+  }
+
+  /// Whether a capture decision carries day-one confirmation (the CIDR
+  /// fact check passed, or the answer agreed with one already stored).
+  static bool _captureWasConfirmed(LearnedCapture capture) {
+    if (capture.action == LearnedCapture.agrees) return true;
+    return capture.candidate?.confirmed ?? false;
   }
 
   /// The best learned answer for this question, or null. Exact-key match:
@@ -1557,6 +1697,291 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
     lastSeenAt: (r['lastSeenAt'] ?? '').toString(),
   );
 
+  // --- concept knowledge (learned answers, organized by concept) ------------
+
+  /// Knowledge is a library, not a dumping ground, but it is the USER's
+  /// library: the cap is high enough that real growth is managed through
+  /// the Memory screen, not silently lost. Beyond it the stalest entries
+  /// go first.
+  static const int maxConcepts = 10000;
+
+  /// Learn one model answer AND file it under the concept it is about (see
+  /// [ConceptKnowledge.extractConcept]). The exact-question replay above is
+  /// unchanged; this adds the tier under it. Never throws: a filing hiccup
+  /// must not cost the answer that earned it.
+  Future<void> learnAnswerAsConcept({
+    required String question,
+    required String answer,
+    required String source,
+    required String qkey,
+    required bool confirmed,
+  }) async {
+    try {
+      final concept = ConceptKnowledge.extractConcept(question, answer);
+      if (concept == null) return;
+      await _upsertConcept(
+        concept: concept,
+        answer: answer,
+        source: source,
+        origin: 'provider',
+        qkey: qkey,
+        confirmed: confirmed,
+      );
+    } catch (_) {
+      // Learning never breaks a conversation.
+    }
+  }
+
+  /// File one USER-WRITTEN concept entry ("Support alternative sources of
+  /// knowledge, including user-written explanations"): the user's own words
+  /// are knowledge the app is entitled to keep, so the entry starts
+  /// verified and origin 'user'. An existing entry under the same name that
+  /// agrees is reinforced; one that contradicts stays untouched and the
+  /// incoming text becomes a conflict row for review, exactly as with
+  /// provider answers.
+  Future<void> saveConcept({
+    required String concept,
+    String label = '',
+    required String answer,
+    String summary = '',
+    String beginner = '',
+    String example = '',
+  }) async {
+    final name = concept.trim().toLowerCase();
+    if (name.isEmpty || answer.trim().isEmpty) return;
+    // The user may paste a running config or a note with credentials in it:
+    // everything that goes to the store passes the same redaction the
+    // capture path uses, so a secret can never become replayable knowledge.
+    await _upsertConcept(
+      concept: name,
+      label: label.trim(),
+      answer: NetworkIntent.redactSecrets(answer),
+      source: '',
+      origin: 'user',
+      qkey: '',
+      confirmed: true,
+      summary: NetworkIntent.redactSecrets(summary),
+      beginner: NetworkIntent.redactSecrets(beginner),
+      example: NetworkIntent.redactSecrets(example),
+    );
+    notifyListeners();
+  }
+
+  /// File (or reinforce) one concept entry. An agreeing repeat bumps the
+  /// seen count and confirms at two independent sightings; a contradicting
+  /// one is stored as its own row with status 'conflict' - the stored
+  /// knowledge is never silently overwritten (Test E).
+  Future<void> _upsertConcept({
+    required String concept,
+    required String answer,
+    required String source,
+    required String origin,
+    required String qkey,
+    bool confirmed = false,
+    String label = '',
+    String summary = '',
+    String beginner = '',
+    String example = '',
+  }) async {
+    final db = _active;
+    if (db == null) return;
+    final clean = answer.trim();
+    if (clean.isEmpty) return;
+    final now = DateTime.now().toIso8601String();
+    final spec = ConceptKnowledge.specs[concept];
+    final resolvedLabel = label.isNotEmpty ? label : (spec?.label ?? '');
+    final existing = await db.query(
+      'knowledge_concept',
+      where: 'concept = ? AND status != ?',
+      whereArgs: [concept, 'conflict'],
+      limit: 1,
+    );
+    if (existing.isNotEmpty) {
+      final row = _conceptFromRow(existing.first);
+      if (ConceptKnowledge.classifyIncoming(row, clean) ==
+          IncomingDecision.agrees) {
+        await db.update(
+          'knowledge_concept',
+          {
+            'seenCount': row.seenCount + 1,
+            // Agreement across independent sightings is confirmation, the
+            // same signal the exact replay tier uses.
+            'status': (row.verified || confirmed || row.seenCount + 1 >= 2)
+                ? 'confirmed'
+                : row.status,
+            'updatedAt': now,
+          },
+          where: 'id = ?',
+          whereArgs: [row.id],
+        );
+        return;
+      }
+      // Contradiction: the incoming answer becomes its own conflict row for
+      // the user to resolve in the Memory screen. The stored entry keeps
+      // its status and its answer, byte for byte.
+      await db.insert('knowledge_concept', {
+        'concept': concept,
+        'label': resolvedLabel,
+        'category': spec?.category ?? '',
+        'answer': clean,
+        'source': source,
+        'origin': origin,
+        'status': 'conflict',
+        'qkey': qkey,
+        'seenCount': 1,
+        'createdAt': now,
+        'updatedAt': now,
+      });
+      return;
+    }
+    await db.insert('knowledge_concept', {
+      'concept': concept,
+      'label': resolvedLabel,
+      'category': spec?.category ?? '',
+      'answer': clean,
+      'summary': summary,
+      'beginner': beginner,
+      'example': example,
+      'source': source,
+      'origin': origin,
+      // A fact-checked answer (or a user's own entry) is confirmed from day
+      // one; every other provider answer starts unverified.
+      'status': confirmed ? 'confirmed' : 'unverified',
+      'qkey': qkey,
+      'seenCount': 1,
+      'createdAt': now,
+      'updatedAt': now,
+    });
+    // The prune is a whole-table pass, so running it per insert would make
+    // growth quadratic. The cap has 100 entries of slack: checking every
+    // hundredth insert bounds the library within maxConcepts + 99.
+    _conceptInserts++;
+    if (_conceptInserts % 100 == 0) await _capConcepts();
+  }
+
+  int _conceptInserts = 0;
+
+  /// The rows read by [allConcepts], with the cheap stamp that validated
+  /// them. Retrieval runs once per offline answer, and re-reading and
+  /// decoding the whole library for every ask cost more than the matching
+  /// (measured at test/concept_knowledge_perf_test.dart).
+  List<KnowledgeConcept>? _conceptCache;
+  String _conceptCacheStamp = '';
+
+  /// Every concept entry, most recently updated first - what the Memory
+  /// screen lists and what the retrieval sweep reads.
+  ///
+  /// A cache is safe here because the stamp (row count and newest
+  /// `updatedAt`) changes on every insert, edit and delete; a write through
+  /// this app therefore invalidates it without every call site remembering
+  /// to. Multi-process access to one store is unsupported.
+  Future<List<KnowledgeConcept>> allConcepts() async {
+    final db = _active;
+    if (db == null) return const [];
+    final stampRows = await db.rawQuery(
+      'SELECT COUNT(*) AS n, MAX(updatedAt) AS u FROM knowledge_concept',
+    );
+    final stamp =
+        '${stampRows.isEmpty ? 0 : stampRows.single['n']}|'
+        '${stampRows.isEmpty ? '' : stampRows.single['u']}';
+    final cached = _conceptCache;
+    if (cached != null && _conceptCacheStamp == stamp) return cached;
+    final rows = await db.query(
+      'knowledge_concept',
+      orderBy: 'updatedAt DESC',
+      limit: maxConcepts,
+    );
+    final list = [for (final r in rows) _conceptFromRow(r)];
+    _conceptCache = list;
+    _conceptCacheStamp = stamp;
+    return list;
+  }
+
+  /// Retrieve the saved concept knowledge for [query], or null when nothing
+  /// clears the confidence floor (see [ConceptKnowledge.retrieve]).
+  Future<ConceptRetrieval?> retrieveConcepts(String query) async {
+    final rows = await allConcepts();
+    if (rows.isEmpty) return null;
+    return ConceptKnowledge.retrieve(query, rows);
+  }
+
+  /// The user corrected an entry. The edited text is what the user means,
+  /// so it is marked verified - the provenance line still says where the
+  /// entry came from originally.
+  Future<void> updateConcept(
+    int id, {
+    required String answer,
+    String summary = '',
+    String beginner = '',
+    String example = '',
+  }) async {
+    final db = _active;
+    if (db == null) return;
+    await db.update(
+      'knowledge_concept',
+      {
+        'answer': answer.trim(),
+        'summary': summary.trim(),
+        'beginner': beginner.trim(),
+        'example': example.trim(),
+        'status': 'confirmed',
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    notifyListeners();
+  }
+
+  /// Drop one concept entry by id (a conflict row counts: resolving it IS
+  /// deleting it).
+  Future<void> deleteConcept(int id) async {
+    final db = _active;
+    if (db == null) return;
+    await db.delete('knowledge_concept', where: 'id = ?', whereArgs: [id]);
+    notifyListeners();
+  }
+
+  /// Remove ALL learned concept knowledge, after the caller has confirmed.
+  /// The exact-question replay store is a separate table and is not touched
+  /// unless its own clear is called.
+  Future<void> clearConcepts() async {
+    final db = _active;
+    if (db == null) return;
+    await db.delete('knowledge_concept');
+    notifyListeners();
+  }
+
+  Future<void> _capConcepts() async {
+    final db = _active;
+    if (db == null) return;
+    await db.delete(
+      'knowledge_concept',
+      where:
+          'id NOT IN (SELECT id FROM knowledge_concept '
+          'ORDER BY updatedAt DESC LIMIT ?)',
+      whereArgs: [maxConcepts],
+    );
+  }
+
+  KnowledgeConcept _conceptFromRow(Map<String, Object?> r) => KnowledgeConcept(
+    id: (r['id'] as num?)?.toInt() ?? 0,
+    concept: (r['concept'] ?? '').toString(),
+    label: (r['label'] ?? '').toString(),
+    category: (r['category'] ?? '').toString(),
+    answer: (r['answer'] ?? '').toString(),
+    summary: (r['summary'] ?? '').toString(),
+    beginner: (r['beginner'] ?? '').toString(),
+    example: (r['example'] ?? '').toString(),
+    source: (r['source'] ?? '').toString(),
+    origin: (r['origin'] ?? 'provider').toString(),
+    status: (r['status'] ?? 'unverified').toString(),
+    qkey: (r['qkey'] ?? '').toString(),
+    seenCount: (r['seenCount'] as num?)?.toInt() ?? 1,
+    createdAt: (r['createdAt'] ?? '').toString(),
+    updatedAt: (r['updatedAt'] ?? '').toString(),
+  );
+
   /// The version stamped on [exportJson]. A backup whose shape can change
   /// silently is not a backup: this is what lets a reader (a future importer,
   /// a person) tell what it is looking at before trusting it.
@@ -1564,7 +1989,8 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
   /// v3: adds the environment profile (one row or null).
   /// v4: adds the clarification answers.
   /// v5: includes the learned-answer replay store.
-  static const exportSchemaVersion = 5;
+  /// v6: includes the concept-knowledge library.
+  static const exportSchemaVersion = 6;
 
   /// Everything the app remembers, as one JSON document.
   ///
@@ -1591,6 +2017,7 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
         'changes': <Map<String, dynamic>>[],
         'phrasing': <Map<String, dynamic>>[],
         'learnedAnswers': <Map<String, dynamic>>[],
+        'concepts': <Map<String, dynamic>>[],
         'clarificationAnswers': <Map<String, dynamic>>[],
         'environmentProfile': null,
       });
@@ -1611,6 +2038,7 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
       orderBy: 'id ASC',
     );
     final learnedAnswers = await db.query('learned_answer', orderBy: 'id ASC');
+    final concepts = await db.query('knowledge_concept', orderBy: 'id ASC');
     final envRow = await db.query(
       'environment_profile',
       where: 'id = 1',
@@ -1629,6 +2057,7 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
         'changes': changes,
         'phrasing': phrasing,
         'learnedAnswers': learnedAnswers,
+        'concepts': concepts,
         'clarificationAnswers': clarifications,
         'environmentProfile': envRow.isEmpty
             ? null
@@ -1698,6 +2127,7 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
     final sourceChanges = rows('changes', optional: version < 4);
     final sourcePhrasing = rows('phrasing', optional: version < 2);
     final sourceAnswers = rows('learnedAnswers', optional: version < 5);
+    final sourceConcepts = rows('concepts', optional: version < 6);
     final sourceClarifications = rows(
       'clarificationAnswers',
       optional: version < 4,
@@ -2012,6 +2442,51 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
       }
     }
 
+    // Concept knowledge merges like the exact replay, with one honesty
+    // rule on top: the same concept learned with a DIFFERENT answer on the
+    // other device is a contradiction, not a duplicate - it arrives as a
+    // conflict row for review instead of silently joining the library.
+    final concepts = currentRows('concepts');
+    var conceptNext = nextId(concepts);
+    const conceptKey = ['concept', 'answer'];
+    for (final sourceRow in sourceConcepts) {
+      final row = Map<String, dynamic>.from(sourceRow);
+      final duplicate = concepts
+          .where(
+            (existing) =>
+                signature(existing, conceptKey) == signature(row, conceptKey),
+          )
+          .firstOrNull;
+      if (duplicate != null) {
+        final oldCount = (duplicate['seenCount'] as num?)?.toInt() ?? 1;
+        final newCount = (row['seenCount'] as num?)?.toInt() ?? 1;
+        duplicate['seenCount'] = oldCount > newCount ? oldCount : newCount;
+        duplicate['status'] =
+            '${duplicate['status']}' == 'confirmed' ||
+                '${row['status']}' == 'confirmed'
+            ? 'confirmed'
+            : duplicate['status'];
+        if ('${row['updatedAt'] ?? ''}'.compareTo(
+              '${duplicate['updatedAt'] ?? ''}',
+            ) >
+            0) {
+          duplicate['updatedAt'] = row['updatedAt'];
+        }
+        continue;
+      }
+      if ('${row['status']}' != 'conflict') {
+        final clash = concepts.any(
+          (existing) =>
+              existing['concept'] == row['concept'] &&
+              '${existing['status']}' != 'conflict',
+        );
+        if (clash) row['status'] = 'conflict';
+      }
+      row['id'] = conceptNext++;
+      concepts.add(row);
+      added['concepts'] = (added['concepts'] ?? 0) + 1;
+    }
+
     var environment = current['environmentProfile'];
     if (sourceEnvironment != null &&
         (environment == null ||
@@ -2036,6 +2511,7 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
       'changes': changes,
       'phrasing': phrasing,
       'learnedAnswers': answers,
+      'concepts': concepts,
       'clarificationAnswers': clarifications,
       'environmentProfile': environment,
     };
@@ -2096,6 +2572,7 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
     final changes = rows('changes', optional: version < 4);
     final phrasing = rows('phrasing', optional: version < 2);
     final learnedAnswers = rows('learnedAnswers', optional: version < 5);
+    final concepts = rows('concepts', optional: version < 6);
     final clarifications = rows('clarificationAnswers', optional: version < 4);
     final prefRaw = backup['prefs'];
     if (prefRaw is! Map) {
@@ -2122,6 +2599,7 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
         changes.length +
         phrasing.length +
         learnedAnswers.length +
+        concepts.length +
         clarifications.length +
         prefs.length;
     if (total > 150000) {
@@ -2161,6 +2639,7 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
       ],
       'phrasing': phrasing,
       'learned_answer': learnedAnswers,
+      'knowledge_concept': concepts,
       'clarification_answer': clarifications,
       'environment_profile': env == null
           ? const []
@@ -2387,10 +2866,10 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
     // exactly the one this pass exists to protect. A completed run records
     // itself in user_version; a future upgrade that needs the walk again
     // bumps past 1 and re-runs.
-    final version = (await db.rawQuery('PRAGMA user_version'))
-        .single
-        .values
-        .single as int? ?? 0;
+    final version =
+        (await db.rawQuery('PRAGMA user_version')).single.values.single
+            as int? ??
+        0;
     if (version >= 1) return;
     await _migrateStoredPrivacyOnce(db);
     await db.rawQuery('PRAGMA user_version = 1');
@@ -2914,6 +3393,8 @@ CREATE TABLE IF NOT EXISTS clarification_answer(
     await _active!.delete('phrasing');
     await _active!.delete('environment_profile');
     await _active!.delete('clarification_answer');
+    await _active!.delete('knowledge_concept');
+    await _active!.delete('learned_answer');
     PhrasingMemoryService.clearIndex();
     notifyListeners();
   }
