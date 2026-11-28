@@ -27,7 +27,7 @@ const List<DeviceKind> deviceKinds = [
     // Its own keyword, so 'wireless router' never reads as a plain AP (an AP
     // has no routing or NAT) - and no CLI either, because PT drives it from
     // the same GUI a home router has.
-    keywords: ['wireless router'],
+    keywords: ['wireless router', 'wifi router', 'wi-fi router'],
     models: ['Wireless Router-PT'],
     port: 'ethernet1',
   ),
@@ -40,7 +40,19 @@ const List<DeviceKind> deviceKinds = [
   ),
   DeviceKind(
     type: 'pc',
-    keywords: ['pc', 'workstation', 'desktop computer'],
+    // "Hosts" is how a brief often names its PCs. Only the plural is a
+    // keyword: the singular is also infrastructure wording ("a host route"),
+    // and a bare keyword would invent a PC there.
+    // "computer" is a PC, while "computer network" is not a device: the
+    // bridge consumes that phrase before the lexicon ever sees it.
+    keywords: [
+      'pc',
+      'workstation',
+      'desktop computer',
+      'desktop',
+      'computer',
+      'hosts',
+    ],
     models: ['PC-PT'],
     port: 'f0',
     ipConfig: true,
@@ -93,6 +105,13 @@ const List<DeviceKind> deviceKinds = [
       'wi-fi access point',
       'access point',
       'wireless ap',
+      // A range extender/repeater is an access point in Packet Tracer, and a
+      // home brief names it that way far more often than "access point".
+      'range extender',
+      'wifi extender',
+      'wi-fi extender',
+      'wireless extender',
+      'signal booster',
       'ap',
     ],
     models: ['AccessPoint-PT', 'AccessPoint-PT-A', 'AccessPoint-PT-N'],
@@ -169,6 +188,8 @@ const List<DeviceKind> deviceKinds = [
       'modem',
       'ont',
       'onu',
+      'modem router',
+      'router modem',
     ],
     models: ['DSL Modem-PT', 'Cable Modem-PT', 'Modem-PT'],
     port: 'port1',
@@ -389,10 +410,23 @@ const Map<String, int> numberWords = {
   'ten': 10,
   'eleven': 11,
   'twelve': 12,
+  'thirteen': 13,
+  'fourteen': 14,
+  'fifteen': 15,
+  'sixteen': 16,
+  'seventeen': 17,
+  'eighteen': 18,
+  'nineteen': 19,
   'twenty': 20,
   'thirty': 30,
   'forty': 40,
   'fifty': 50,
+  'sixty': 60,
+  'seventy': 70,
+  'eighty': 80,
+  'ninety': 90,
+  'hundred': 100,
+  'thousand': 1000,
   'pair': 2,
   'pairs': 2,
   'dozen': 12,
@@ -427,6 +461,18 @@ const Map<String, int> numberWords = {
   'اربعون': 40,
   'خمسين': 50,
   'خمسون': 50,
+  'ستين': 60,
+  'سبعين': 70,
+  'ثمانين': 80,
+  'تسعين': 90,
+  'ميتين': 200,
+  'الفين': 2000,
+  'تلاته': 3,
+  'تمانيه': 8,
+  'ميه': 100,
+  'مئه': 100,
+  'مائه': 100,
+  'الف': 1000,
 };
 
 /// Irregular plurals. "pcs" has no regular English plural, so the

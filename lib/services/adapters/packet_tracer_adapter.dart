@@ -476,6 +476,12 @@ class PacketTracerAdapter {
         : intentLayoutFromNotes(intent);
     return {
       'project': intent.projectName,
+      // A plan converted from a saved .pkt carries the SOURCE machine's port
+      // names, which the offline template library may not reproduce exactly.
+      // The builder may then fall back to a spare port - with a warning -
+      // instead of refusing to rebuild the lab at all. A plan the user typed
+      // stays strict: there, a wrong port is a request to honour or report.
+      'imported': intent.planningSource == 'packet-tracer-import',
       if (effective.isNotEmpty || intent.layout.isNotEmpty)
         'layout': resolveLayoutForEngine(intent, effective),
       'requirement': 'PT window open, maximized, focused, uninterrupted',

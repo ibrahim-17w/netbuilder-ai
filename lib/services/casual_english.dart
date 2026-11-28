@@ -42,6 +42,99 @@ class CasualEnglish {
     'n': 'and',
     'nd': 'and',
     'abt': 'about',
+    // Speech that reaches the box faster than the spelling does. Each maps to
+    // a phrase the readers already parse, so a casual sentence lands on the
+    // same path as the formal one instead of falling through to the model.
+    'dunno': 'do not know',
+    'hafta': 'have to',
+    'oughta': 'ought to',
+    'gimme': 'give me',
+    'ppl': 'people',
+    'bout': 'about',
+    'tho': 'though',
+    'til': 'until',
+    'thru': 'through',
+    'becuz': 'because',
+    // Contractions people type without the apostrophe, plus the ones the
+    // keyboard does not make easy. Whole-token matches only: "its" is left
+    // alone because the possessive is a real word.
+    "i'm": 'i am',
+    "i've": 'i have',
+    "i'd": 'i would',
+    "i'll": 'i will',
+    "you're": 'you are',
+    "you've": 'you have',
+    "we're": 'we are',
+    "we've": 'we have',
+    "they're": 'they are',
+    "they've": 'they have',
+    "can't": 'cannot',
+    "won't": 'will not',
+    "isn't": 'is not',
+    "aren't": 'are not',
+    "doesn't": 'does not',
+    "shouldn't": 'should not',
+    "couldn't": 'could not',
+    "wouldn't": 'would not',
+    "hasn't": 'has not',
+    "haven't": 'have not',
+    "didn't": 'did not',
+    "wasn't": 'was not',
+    "weren't": 'were not',
+    "what's": 'what is',
+    "that's": 'that is',
+    "let's": 'let us',
+    "y'all": 'you all',
+    // Networking shorthand. Device labels with digits (SW1, R2) are protected
+    // as data tokens before this table runs, so only the bare words fold.
+    'rtr': 'router',
+    'rtrs': 'routers',
+    'sw': 'switch',
+    'sws': 'switches',
+    'srv': 'server',
+    'srvs': 'servers',
+    'fw': 'firewall',
+    'fws': 'firewalls',
+    // Texting habits, and the contractions people type without the apostrophe.
+    // Only spellings with one obvious expansion are listed: "its", "were"
+    // and "id" are real words (an identifier is an id), so they stay put.
+    'plss': 'please',
+    'pleas': 'please',
+    'thnx': 'thanks',
+    'thanx': 'thanks',
+    'thnks': 'thanks',
+    'cud': 'could',
+    'wud': 'would',
+    'shud': 'should',
+    'hav': 'have',
+    'giv': 'give',
+    'ans': 'answer',
+    'didnt': 'did not',
+    'wouldnt': 'would not',
+    'couldnt': 'could not',
+    'shouldnt': 'should not',
+    'havent': 'have not',
+    'hasnt': 'has not',
+    'wasnt': 'was not',
+    'werent': 'were not',
+    'youre': 'you are',
+    'theyre': 'they are',
+    'weve': 'we have',
+    'youve': 'you have',
+    'theyve': 'they have',
+    'theres': 'there is',
+    'thats': 'that is',
+    'whats': 'what is',
+    'lets': 'let us',
+    'youll': 'you will',
+    'theyll': 'they will',
+    'itll': 'it will',
+    'mustnt': 'must not',
+    'neednt': 'need not',
+    'nvm': 'never mind',
+    // How people shorten the hardware itself in a quick message.
+    'puter': 'pc',
+    'puters': 'pcs',
   };
 
   static const Map<String, String> _typos = {
@@ -68,6 +161,35 @@ class CasualEnglish {
     'servre': 'server', 'sevr': 'server', 'lapto': 'laptop',
     'printar': 'printer', 'firewal': 'firewall', 'vlaan': 'vlan',
     'ospff': 'ospf', 'gatewy': 'gateway', 'trnuk': 'trunk',
+    'netwrok': 'network', 'netwrk': 'network', 'newtork': 'network',
+    'netowrk': 'network', 'switche': 'switch',
+    'ruter': 'router', 'routerr': 'router', 'routet': 'router',
+    'rauter': 'router', 'rowter': 'router',
+    'swithc': 'switch', 'swicth': 'switch', 'switxh': 'switch',
+    'swittch': 'switch', 'swtches': 'switches',
+    'serverr': 'server', 'serevr': 'server', 'servor': 'server',
+    'firewll': 'firewall', 'firwall': 'firewall', 'firewalll': 'firewall',
+    'gatewau': 'gateway', 'gayeway': 'gateway', 'gatewya': 'gateway',
+    'subnett': 'subnet', 'subnte': 'subnet',
+    'dhpc': 'dhcp', 'dchp': 'dhcp', 'dsn': 'dns',
+    'opspf': 'ospf', 'osspf': 'ospf', 'eirgp': 'eigrp', 'eigrpp': 'eigrp',
+    'gbp': 'bgp', 'bgpp': 'bgp',
+    'acsess': 'access', 'acesss': 'access', 'accees': 'access',
+    'wierless': 'wireless', 'wieless': 'wireless', 'wirelss': 'wireless',
+    'etherent': 'ethernet', 'ehternet': 'ethernet',
+    'cabel': 'cable', 'kable': 'cable', 'cabble': 'cable',
+    'adress': 'address', 'addres': 'address', 'adrress': 'address',
+    'interfase': 'interface', 'truk': 'trunk', 'trunkk': 'trunk',
+    'topolgy': 'topology', 'toplogy': 'topology',
+    'pakcet': 'packet', 'packett': 'packet',
+    'destop': 'desktop', 'desktp': 'desktop', 'deskop': 'desktop',
+    'pritner': 'printer', 'prnter': 'printer', 'printter': 'printer',
+    'moderm': 'modem', 'moden': 'modem', 'modom': 'modem',
+    'cluod': 'cloud', 'clould': 'cloud',
+    'guets': 'guest', 'guestt': 'guest', 'vnp': 'vpn',
+    'consol': 'console', 'consoel': 'console',
+    'droping': 'dropping', 'intenet': 'internet', 'interent': 'internet',
+    'disconect': 'disconnect', 'disconets': 'disconnects', 'wifis': 'wifi',
   };
 
   static const List<String> _filler = [
@@ -85,6 +207,34 @@ class CasualEnglish {
     'thank you',
     'so yeah',
     'ok so',
+    // Hedges and softeners. They carry tone, never a plan meaning: "honestly
+    // just 2 routers" and "2 routers" must read the same, or the parse
+    // answers the politeness instead of the request. "actually" is NOT one
+    // of these: it is a correction marker ("actually 8 pcs") that both the
+    // count-correction reader and the tentative gate key on, so stripping it
+    // turned a correction into a fresh request.
+    'honestly',
+    'literally',
+    'pretty much',
+    'kind of',
+    'sort of',
+    'if possible',
+    'if you can',
+    'for me',
+    'for us',
+    'to be honest',
+    'frankly',
+    'tbh',
+    'ngl',
+    'if that is ok',
+    'if thats ok',
+    'if that works',
+    'when you get a chance',
+    'whenever you can',
+    'no rush',
+    'no hurry',
+    'real quick',
+    'for now',
   ];
 
   static final RegExp _dataToken = RegExp(r'[\d٠-٩۰-۹/@\\.:_+=-]');
@@ -262,6 +412,37 @@ class CasualEnglish {
     // and split forms fold onto it.
     'wi-fi': 'wifi',
     'wi fi': 'wifi',
+    // Switching, link aggregation, tunnels and the encryption names a
+    // security brief writes out in full. Each target is the short form the
+    // knowledge table already triggers on.
+    'multiple spanning tree protocol': 'mst',
+    'per vlan spanning tree': 'pvst',
+    'link aggregation': 'etherchannel',
+    'port channel': 'etherchannel',
+    'port-channel': 'etherchannel',
+    'ether channel': 'etherchannel',
+    'generic routing encapsulation': 'gre',
+    'point to point protocol': 'ppp',
+    'high level data link control': 'hdlc',
+    'multiprotocol label switching': 'mpls',
+    'lightweight access point protocol': 'lwapp',
+    'wireless distribution system': 'wds',
+    'routing information protocol': 'rip',
+    'remote authentication dial in user service': 'radius',
+    'terminal access controller access control system': 'tacacs',
+    'extensible authentication protocol': 'eap',
+    'wi-fi protected access': 'wpa',
+    'wired equivalent privacy': 'wep',
+    'temporal key integrity protocol': 'tkip',
+    'advanced encryption standard': 'aes',
+    'simple mail transfer protocol': 'smtp',
+    'hypertext transfer protocol secure': 'https',
+    'hypertext transfer protocol': 'http',
+    'virtual private network': 'vpn',
+    'wide area network': 'wan',
+    'local area network': 'lan',
+    'media access control address': 'mac address',
+    'media access control': 'mac',
   };
 
   /// Casual fault phrasings -> the trigger text of the entry that answers
@@ -279,6 +460,14 @@ class CasualEnglish {
     'no ip address': '169.254',
     'cable shows red': 'red link',
     'link shows red': 'red link',
+    // Every spelling below is a real trigger of the no-connectivity entry once
+    // it lands on the canonical phrase; the contraction is already expanded by
+    // normalize() before canonical() runs.
+    'cannot reach': 'no connectivity',
+    'cannot connect': 'no connectivity',
+    'no connection': 'no connectivity',
+    'does not connect': 'no connectivity',
+    'will not connect': 'no connectivity',
     // The wireless triggers carry the article ('connect to the wifi');
     // re-adding it keeps both spellings routing after the fold above.
     'connect to wifi': 'connect to the wifi',
@@ -287,6 +476,30 @@ class CasualEnglish {
     'join wi-fi': 'join the wifi',
     'secure wifi': 'secure the wifi',
     'secure wi-fi': 'secure the wifi',
+    // The plain-English way a red or dead link is described. Each maps onto a
+    // trigger the saved entries already own, so the fault is recognised
+    // instead of the assistant asking which port the user means.
+    'no link': 'red link',
+    'link is down': 'red link',
+    'link down': 'red link',
+    'port is down': 'red link',
+    'interface is down': 'red link',
+    'interface down': 'red link',
+    'cable unplugged': 'red link',
+    'not plugged in': 'red link',
+    'no ip': '169.254',
+    'did not get an ip': '169.254',
+    'does not have an ip': '169.254',
+    'cannot get online': 'no connectivity',
+    'cannot get on the internet': 'no connectivity',
+    'no network access': 'no connectivity',
+    'no network connection': 'no connectivity',
+    'internet is down': 'no connectivity',
+    'internet down': 'no connectivity',
+    'cannot browse': 'no connectivity',
+    'unreachable': 'no connectivity',
+    'request timed out': 'no connectivity',
+    'ping fails': 'no connectivity',
   };
 
   /// The rules compiled once: longest key first (so "rapid spanning tree

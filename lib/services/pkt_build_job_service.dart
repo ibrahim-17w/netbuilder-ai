@@ -188,6 +188,32 @@ class PktBuildJobService extends ChangeNotifier {
   PktBuildJobService.createForTesting() : this._();
 
   static final PktBuildJobService instance = PktBuildJobService._();
+
+  /// Back to idle, for a test that starts from a freshly opened app. Only
+  /// the status the chrome reads is cleared: a running job keeps running,
+  /// so this can never be mistaken for a cancel.
+  @visibleForTesting
+  void resetForTesting() {
+    _status = PktBuildJobStatus.idle;
+    _project = '';
+    _stage = '';
+    _progress = 0;
+    _error = '';
+    _savedLocation = '';
+    _result = null;
+    _cancelRequested = false;
+    _activeKey = null;
+    _currentJobId = null;
+    _latestRunId = null;
+    _planRevision = '';
+    _planJson = '';
+    _artifactHash = '';
+    _coverage = null;
+    _verification = null;
+    _actionIdentity = null;
+    notifyListeners();
+  }
+
   static const _storageKey = 'netbuilder.pkt_build_jobs.v1';
   static const _historyLimit = 30;
 

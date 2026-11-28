@@ -749,16 +749,54 @@ class AdvisorService {
 
   static AdviceAnswer _apSelection(_AdvisorContext c) {
     final scale = c.scale;
-    final aps = scale == null ? null : (scale / 25).ceil().clamp(1, 64);
+    // Area is the other half of the answer: a coverage-bound floor needs
+    // APs for square metres even when only a few people work there.
+    final areaMatch = RegExp(
+      r'(\d{1,6})\s*(m2|sq\s*m|square\s*met(?:er|re)s?|sq\s*ft|'
+      r'square\s*feet|ft2)\b',
+    ).firstMatch(c.t);
+    final rawArea = areaMatch == null
+        ? null
+        : int.tryParse(areaMatch.group(1) ?? '');
+    final isFeet =
+        areaMatch != null && (areaMatch.group(2) ?? '').contains('ft');
+    final sqm = rawArea == null
+        ? null
+        : (isFeet ? (rawArea * 0.0929).round() : rawArea).clamp(1, 1000000);
+    // Square metres one AP covers, by venue. Dense teaching and clinical
+    // spaces need more APs than open-plan offices; a warehouse needs fewer
+    // because the client density and the walls are lower.
+    final density = switch (c.venue) {
+      _Venue.school => 80,
+      _Venue.clinic => 90,
+      _Venue.hospitality => 100,
+      _Venue.industrial => 300,
+      _Venue.home => 80,
+      _ => 120,
+    };
+    final coverage = sqm == null ? 0 : (sqm / density).ceil();
+    final capacity = scale == null ? 0 : (scale / 25).ceil();
+    final total = coverage > capacity ? coverage : capacity;
+    final basis = [
+      if (sqm != null) '$sqm m2 at about $density m2 per AP gives $coverage',
+      if (scale != null)
+        '$scale active clients at one AP per ~25 gives $capacity',
+    ].join('; ');
+    final recommendation = total == 0
+        ? 'For anything larger than a flat, wired access points '
+              'beat mesh: a mesh node spends half its radio repeating the '
+              'signal, while a wired AP uses both radios for clients. If a cable '
+              'cannot be run, mesh is the honest fallback - but run the cable if '
+              'you possibly can, it is cheap once the wall is open.'
+        : 'Plan for $total wired ${total == 1 ? 'access point' : 'access points'}, then survey. '
+              '${coverage > capacity ? 'Coverage' : 'Client load'} sets the '
+              'count: $basis. Wire every AP to a PoE switch and use 5 GHz with '
+              '20 MHz channels in dense areas. Mesh is only for a space where '
+              'cable cannot be run.';
     return AdviceAnswer(
       topic: 'ap_selection',
       kind: c.kind,
-      recommendation:
-          'For anything larger than a flat, wired access points '
-          'beat mesh: a mesh node spends half its radio repeating the '
-          'signal, while a wired AP uses both radios for clients. If a cable '
-          'cannot be run, mesh is the honest fallback - but run the cable if '
-          'you possibly can, it is cheap once the wall is open.',
+      recommendation: recommendation,
       options: const [
         AdviceOption(
           label: 'One all-in-one router',
@@ -786,11 +824,15 @@ class AdvisorService {
         ),
       ],
       reasons: [
-        if (aps != null)
+        if (sqm != null)
+          '$sqm m2 at about $density m2 per AP is $coverage APs for coverage; '
+              'dense rooms need more, open plan needs fewer.',
+        if (scale != null)
           'About $scale active devices: at the dense end (one AP per ~25 '
-              'devices) that is ${HumanLanguage.count(aps, 'AP')}; for lighter '
-              'use assume ~50 per AP. Then add APs for coverage - one per '
-              '2-4 rooms, or per floor in open plan.',
+              'devices) that is ${HumanLanguage.count(capacity, 'AP')}; for lighter '
+              'use assume ~50 per '
+              'AP. Then add APs for coverage - one per 2-4 rooms, or per floor '
+              'in open plan.',
         'Wi-Fi is a shared medium: more APs on the same channel do not add '
             'capacity, they add interference. Place by coverage first, then '
             'tune channels.',
@@ -802,7 +844,7 @@ class AdvisorService {
               'cable is drawn to the laptop.',
       ],
       questions: [
-        if (aps == null) 'How many people/devices will be connected at once?',
+        if (total == 0) 'How many people/devices will be connected at once?',
         'Is the space one floor or several (and are the walls thick)?',
       ],
       quickReplies: [
@@ -1903,16 +1945,27 @@ class AdvisorService {
     final n = c.scale;
     final browse = n == null ? null : (n * 7.5).round();
     final calls = n == null ? null : n * 25;
+    String rate(int mbps) => mbps >= 1000
+        ? '${(mbps / 1000).toStringAsFixed(1)} Gbit/s'
+        : '$mbps Mbit/s';
+    final recommendation = n == null || browse == null || calls == null
+        ? 'Size from the busy hour, not the average: budget '
+              '5-10 Mbit/s per user for browsing, 25+ Mbit/s per user when '
+              'several video-call at once, and 25-50% headroom on the WAN. For '
+              'ports, count devices + uplinks + 20% spare. For Wi-Fi, one access '
+              'point per ~25-50 active devices, then add APs for coverage - '
+              'coverage first, capacity second.'
+        : 'For $n users: ${rate(browse)} for browsing and ${rate(calls)} at a '
+              'video-heavy peak. Add 25-50% headroom, so plan the WAN for '
+              '${rate((browse * 1.25).round())} to '
+              '${rate((browse * 1.5).round())} '
+              'for browsing, or ${rate((calls * 1.25).round())} at the peak. '
+              'Then size ports (devices + uplinks + 20% spare) and Wi-Fi '
+              '(one AP per ~25-50 active clients, then coverage) separately.';
     return AdviceAnswer(
       topic: 'sizing',
       kind: c.kind,
-      recommendation:
-          'Size from the busy hour, not the average: budget '
-          '5-10 Mbit/s per user for browsing, 25+ Mbit/s per user when '
-          'several video-call at once, and 25-50% headroom on the WAN. For '
-          'ports, count devices + uplinks + 20% spare. For Wi-Fi, one access '
-          'point per ~25-50 active devices, then add APs for coverage - '
-          'coverage first, capacity second.',
+      recommendation: recommendation,
       options: const [
         AdviceOption(
           label: 'Capacity-led',

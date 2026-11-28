@@ -144,7 +144,13 @@ class _BuilderDetailScreenState extends State<BuilderDetailScreen> {
       if (mounted) unawaited(_refreshSidecarState());
     });
     _statusTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      if (mounted) unawaited(_refreshSidecarState());
+      // A covered route (a pushed detail, a dialog) stays mounted but is not
+      // being looked at, and polling it every two seconds is a request nobody
+      // reads. The first tick after the route is current again catches up well
+      // inside the chip's own freshness.
+      if (mounted && (ModalRoute.of(context)?.isCurrent ?? true)) {
+        unawaited(_refreshSidecarState());
+      }
     });
   }
 

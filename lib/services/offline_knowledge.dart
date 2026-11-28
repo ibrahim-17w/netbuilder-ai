@@ -1,6 +1,7 @@
 import 'casual_english.dart';
 import 'network_math.dart';
 import 'network_tools.dart';
+import 'networking_intellect.dart';
 
 /// The offline brain: what this app can answer with NO model and NO API key.
 ///
@@ -46,6 +47,12 @@ class OfflineKnowledge {
         RegExp(r'^(how|what|why|when|which|where)\b').hasMatch(t) ||
         RegExp(r'\bhow\s+(do|to|can|should|i)\b').hasMatch(t);
     if (!questionShaped && _buildAsk.hasMatch(t)) return null;
+    // The senior layer answers what this table does not: computed route
+    // selection and VLSM, technology comparisons, and the deeper corpus.
+    // It runs after the two guards above so a build brief still reaches the
+    // planner, and its own gates keep advice and purchases out.
+    final intellect = NetworkingIntellect.answer(t);
+    if (intellect != null) return intellect.text;
     for (final topic in _topics) {
       if (topic.match(t)) {
         final answer = topic.answer(t);
@@ -1181,6 +1188,109 @@ class OfflineKnowledge {
           'must - between autonomous systems or where policy, not just '
           'reachability, is the point. For labs, static for two routers and '
           'OSPF the moment a third path appears.',
+    ),
+    // Definitions people ask first and the corpus did not carry: what a MAC
+    // address is, what an IP address is, and what an API key is. Answering a
+    // first-term definition with "not in my offline material" was the worst
+    // answer the keyless path could give, and the training log shows it
+    // happened.
+    (
+      match: (t) =>
+          RegExp(r'\b(mac|hardware|physical)\s+address(es)?\b').hasMatch(t) &&
+          !_anyw(t, const [
+            'table',
+            'filter',
+            'flap',
+            'flapping',
+            'security',
+            'spoof',
+            'clone',
+            'duplicate',
+          ]) &&
+          (_has(t, 'what') ||
+              _has(t, 'meaning') ||
+              _has(t, 'mean') ||
+              _has(t, 'define') ||
+              _has(t, 'explain') ||
+              _has(t, 'why') ||
+              _has(t, 'difference') ||
+              _has(t, 'versus') ||
+              _has(t, ' vs ')),
+      answer: (t) =>
+          'A MAC address is the 48-bit hardware address built into a network '
+          'interface: 12 hex digits in six pairs, for example '
+          '00:1A:2B:3C:4D:5E. The first 24 bits are the vendor (the OUI) and '
+          'the last 24 belong to the card, which is why the prefix tells you '
+          'who made it.\n\n'
+          '- It is burned in, not configured: the same laptop keeps its MAC '
+          'on every network, and a virtual adapter has its own.\n'
+          '- A switch learns it from the SOURCE address of each frame and '
+          'stores it against the port it arrived on: show mac '
+          'address-table.\n'
+          '- A frame must carry one to be delivered on the local segment, '
+          'and ARP is what supplies it: a host asks "who has 192.168.1.1?" '
+          'and gets the MAC back.\n'
+          '- It is never routed. A router rewrites it at every hop, so a MAC '
+          'only means anything inside one broadcast domain.\n\n'
+          'Short version: the IP address says WHERE a host is logically, the '
+          'MAC says WHICH interface it is on this cable.',
+    ),
+    (
+      match: (t) {
+        // "what's an ip" is the same first-term definition as "what is an IP
+        // address"; a bare "IP" question was logged as unanswered. Only the
+        // whole question, so "what is an IP helper-address" is not swallowed.
+        final bareIp = RegExp(
+          r"^(what'?s|what is|what are)\s+(an?\s+|the\s+)?(ip|ipv4)\s*[?.!]*$",
+        ).hasMatch(t.trim());
+        return (bareIp || RegExp(r'\bip\s+address(es)?\b').hasMatch(t)) &&
+            RegExp(r'\b(what|define|meaning|explain|why)\b').hasMatch(t) &&
+            !_anyw(t, const [
+              'configure',
+              'assign',
+              'change',
+              'dhcp',
+              'duplicate',
+              'conflict',
+            ]) &&
+            !_cidr.hasMatch(t) &&
+            !_ip.hasMatch(t);
+      },
+      answer: (t) =>
+          'An IP address is the logical address of an interface: 32 bits for '
+          'IPv4, written as four octets such as 192.168.1.10. It has two '
+          'parts, and the subnet mask (or /prefix) decides where the split '
+          'falls: the network part identifies the segment, the host part '
+          'identifies this interface on it.\n\n'
+          '- Two addresses are reserved per subnet: the network address and '
+          'the broadcast address.\n'
+          '- A host needs three things to reach beyond its own segment: an '
+          'address, a mask, and a default gateway.\n'
+          '- Private ranges are 10.0.0.0/8, 172.16.0.0/12 and '
+          '192.168.0.0/16; everything else is public.\n'
+          '- Unlike a MAC, it is logical: DHCP can hand it out, one interface '
+          'can hold several, and it changes when the host moves segment.\n\n'
+          'To see one: "ipconfig /all" on a PC, "show ip interface brief" on '
+          'a router or switch.',
+    ),
+    (
+      match: (t) =>
+          RegExp(r'\bapi[\s-]?key\b|\bapikey\b').hasMatch(t) &&
+          RegExp(r'\b(what|why|need|use|required|add|set|mean)\b')
+              .hasMatch(t),
+      answer: (t) =>
+          'An API key is a password-like token that identifies your account '
+          'to a hosted AI provider: the app sends it with the request so the '
+          'provider knows who is asking and bills them.\n\n'
+          '- This app does not need one. Planning, building the .pkt, subnet '
+          'math and the offline answers are all computed on this device.\n'
+          '- Add one in Settings under API key when you want answers for '
+          'questions the offline material does not cover.\n'
+          '- With a key, the message you send (plus the plan and context the '
+          'app attaches) goes to that provider over HTTPS. Without one, '
+          'nothing you type leaves the device.\n'
+          '- The key itself is kept in this device secure storage, not in the '
+          'plan or the .pkt file.',
     ),
   ];
 }

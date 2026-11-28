@@ -48,6 +48,17 @@ class AppTheme {
   static const double rLg = 16;
   static const double rXl = 22;
 
+  // --- motion -------------------------------------------------------------
+
+  /// A small state change: a colour, an opacity, a chevron turning over.
+  /// Short enough to read as instant, long enough not to blink.
+  static const Duration motionFast = Duration(milliseconds: 150);
+
+  /// A surface change: a panel growing, the viewport moving to a message.
+  /// One step slower than [motionFast], so two events that are not the same
+  /// event do not animate at the same speed.
+  static const Duration motionMedium = Duration(milliseconds: 220);
+
   /// The reading measure for prose: ~66 characters at 14px. Long answers are
   /// the main thing this app displays, and a full-width line of text on a
   /// desktop is genuinely harder to read.

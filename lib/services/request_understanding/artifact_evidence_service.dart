@@ -70,7 +70,7 @@ class ArtifactEvidenceService {
     Map<String, dynamic> audit;
     try {
       final bytes = await file.readAsBytes();
-      audit = OnDevicePktBuilder.auditReport(
+      audit = await OnDevicePktBuilder.auditReportInBackground(
         bytes,
         path: file.path,
         project: action.projectId,

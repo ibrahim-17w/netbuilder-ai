@@ -139,7 +139,10 @@ class _MemoryScreenState extends State<MemoryScreen> {
     _refreshMisparse();
     _refreshRestoreGuard();
     _learningTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (mounted) {
+      // `mounted` alone is not enough: the Navigator keeps a covered page in
+      // the tree, so its timer would keep asking the engine forever while the
+      // user is on some other screen. Skip the round trips until it is back.
+      if (mounted && (ModalRoute.of(context)?.isCurrent ?? true)) {
         _refreshLearning(quiet: true);
         // Cheaper than the journal poll: once a minute the teaching-loop
         // state re-syncs, so a stale badge never outlives the run that

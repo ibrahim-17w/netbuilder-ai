@@ -293,6 +293,7 @@ class BriefSlotPipeline {
           'pc',
           'computer',
           'workstation',
+          'hosts',
         ])) {
       pcCount = 1;
     }
@@ -595,7 +596,9 @@ class BriefSlotPipeline {
 
   static final _pcQty = RegExp(
     r'(?<![\d./])\b(\d+)\s*(?:(?:more|extra|additional|further)\s+)?'
-    r'(?:pcs?|computers?|workstations?)\b',
+    // Only the plural "hosts": singular "host" is also infrastructure
+    // wording ("a host route"), and counting it would invent a PC.
+    r'(?:pcs?|computers?|workstations?|hosts)\b',
   );
 
   static final _serverQty = RegExp(
@@ -641,6 +644,31 @@ class BriefSlotPipeline {
     ).hasMatch(after);
   }
 
+  /// Characters that glue a number to the token it belongs to: a password
+  /// written `Net@99`, an address written `10.0.0.99`, a hostname, a port.
+  static const _tokenGlueCharacters =
+      r'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+      r'@./\_#$%^&*+=:';
+
+  /// True when a quantity's number starts in the MIDDLE of a token.
+  ///
+  /// The quantity patterns open with `\b`, which treats a symbol as a word
+  /// boundary: in `password Net@99 dhcp server` the `0` of `@99` starts a
+  /// new word, and "99 dhcp server" then read as a quantity of DHCP servers.
+  /// A brief asking for one AAA server, one DHCP server and one HTTP server -
+  /// with the password in between - came back as 99 servers plus an AAA
+  /// server, 133 devices for an office that stated 35. The same read turned
+  /// "10.0.0.99 servers" into ninety-nine servers. A count is a standalone
+  /// number: a letter or a symbol that belongs to the same token means the
+  /// digits are part of a password, an address or a name, not a quantity.
+  static bool _numberStartsMidToken(String text, int at, String number) {
+    if (int.tryParse(number) == null) return false; // "a"/"an" are not numbers
+    if (at <= 0) return false;
+    final previous = text[at - 1];
+    if (previous.trim().isEmpty) return false;
+    return _tokenGlueCharacters.contains(previous);
+  }
+
   static List<_Qty> _quantityRecords(String lower) {
     final clauses = _clauses(lower);
     final scopeReader = RequirementScopeReader(lower);
@@ -649,6 +677,9 @@ class BriefSlotPipeline {
     void scan(String type, RegExp pattern) {
       for (final m in pattern.allMatches(lower)) {
         final at = m.start;
+        // A number glued to a password, address or name is not a count - see
+        // [_numberStartsMidToken].
+        if (_numberStartsMidToken(lower, at, m.group(1) ?? '')) continue;
         // "domain controller" is a software role, not Packet Tracer's generic
         // controller device: counting one invented a CTRL1 nobody asked for.
         if (_softwareControllerAt(lower, at)) continue;
@@ -1171,7 +1202,7 @@ class BriefSlotPipeline {
 
   static final RegExp _infraWords = RegExp(r'\brouters?\b|\bswitch(?:es)?\b');
   static final RegExp _anyBulkEndpoints = RegExp(
-    r'\b(?:[2-9]|\d{2,})\s*(?:pcs?|servers?|phones?|printers?|laptops?)\b',
+    r'\b(?:[2-9]|\d{2,})\s*(?:pcs?|servers?|phones?|printers?|laptops?|hosts)\b',
   );
   static const List<String> _wiredKindWords = [
     'pc',
@@ -1332,7 +1363,16 @@ class BriefSlotPipeline {
     ).hasMatch(head)) {
       return false;
     }
-    return _negationTail.hasMatch(head);
+    final negation = _negationTail.firstMatch(head);
+    if (negation == null) return false;
+    // A negation binds to the number it sits next to, and only that one.
+    // "not 99 servers 3 servers AAA, dhcp, and http" corrects an inventory:
+    // the "not" rejects 99, and the 3 that follows is the replacement. The
+    // 14-character window reached across the rejected quantity and negated
+    // the correction too, so the user's fix was read as "no servers at all"
+    // and the plan kept the single role server.
+    if (RegExp(r'\d').hasMatch(negation.group(0)!)) return false;
+    return true;
   }
 
   /// The elliptical shapes' own pieces, hoisted out of [_ellipse] so the

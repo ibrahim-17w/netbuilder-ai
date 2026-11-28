@@ -524,8 +524,16 @@ class ChatWelcome extends StatelessWidget {
     this.embedded = false,
   });
 
+  /// The five fixed openers. The TITLE is what tapping sends (it is a real
+  /// prompt the offline assistant answers), so the titles stay put; the
+  /// SUBTITLE is display only, and says what the app will do with the answer
+  /// rather than restating the title in different words.
   static const suggestions = <(IconData, String, String)>[
-    (Icons.search, 'Analyze a network', 'Audit a .pkt for real problems'),
+    (
+      Icons.search,
+      'Analyze a network',
+      'Find what is actually wrong in a .pkt',
+    ),
     (
       Icons.wifi_tethering_error,
       'Troubleshoot connectivity',
@@ -534,17 +542,17 @@ class ChatWelcome extends StatelessWidget {
     (
       Icons.folder_open_outlined,
       'Open a .pkt project',
-      'Work on a saved network',
+      'Pick a saved lab up where you left it',
     ),
     (
       Icons.fact_check_outlined,
       'Check a configuration',
-      'Review the CLI for mistakes',
+      'Paste a config and I will read it back',
     ),
     (
       Icons.add_road_outlined,
       'Create a network',
-      'Describe a lab and build it',
+      'Describe the lab, then build the .pkt',
     ),
   ];
 

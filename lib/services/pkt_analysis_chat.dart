@@ -34,30 +34,16 @@ class PktAnalysisChat {
       }
       for (final rawFinding in (d['findings'] as List?) ?? const []) {
         if (rawFinding is! Map) continue;
-        final f = Map<String, dynamic>.from(rawFinding);
-        final repairs =
-            (f['repairs'] as List?)
-                ?.whereType<Map>()
-                .map((r) => Map<String, dynamic>.from(r))
-                .toList() ??
-            const <Map<String, dynamic>>[];
-        findings.add({
-          'id': '${f['id'] ?? ''}',
-          'device': '${f['device'] ?? device}',
-          'severity': '${f['severity'] ?? 'info'}',
-          'kind': '${f['kind'] ?? ''}',
-          'text': '${f['text'] ?? ''}',
-          'fix_cli':
-              (f['fix_cli'] as List?)
-                  ?.map((line) => line.toString())
-                  .toList() ??
-              const <String>[],
-          'repairs': repairs,
-          'evidence': f['evidence'] is Map
-              ? Map<String, dynamic>.from(f['evidence'] as Map)
-              : const <String, dynamic>{},
-        });
+        findings.add(_finding(rawFinding, device));
       }
+    }
+    // Report-level rows: the on-device audit reads duplicate addresses and
+    // uncabled devices from the whole file, not from one device block, so its
+    // findings have no per-device home. Without this loop the chat showed a
+    // clean scan for a file the audit had already found faults in.
+    for (final rawFinding in (report['findingRows'] as List?) ?? const []) {
+      if (rawFinding is! Map) continue;
+      findings.add(_finding(rawFinding, ''));
     }
     final summary = report['summary'] is Map
         ? Map<String, dynamic>.from(report['summary'] as Map)
@@ -75,13 +61,40 @@ class PktAnalysisChat {
       // The local path is retained for a user-requested repair, but omitted
       // from the model context below.
       'path': path,
-      'deviceCount': summary['device_count'] ?? devices.length,
+      'deviceCount':
+          summary['device_count'] ?? summary['devices'] ?? devices.length,
       'linkCount': report['linkCount'] ?? summary['links'] ?? links.length,
       'devices': devices.take(80).toList(),
       'findings': findings.take(50).toList(),
       'interfaces': interfaces.take(160).toList(),
       'links': links,
       'note': '${report['note'] ?? ''}',
+    };
+  }
+
+  /// One finding, normalised for the snapshot. [device] fills in when the
+  /// finding came from a device block and does not repeat its own name.
+  static Map<String, dynamic> _finding(Map f, String device) {
+    final repairs =
+        (f['repairs'] as List?)
+            ?.whereType<Map>()
+            .map((r) => Map<String, dynamic>.from(r))
+            .toList() ??
+        const <Map<String, dynamic>>[];
+    final own = '${f['device'] ?? ''}'.trim();
+    return {
+      'id': '${f['id'] ?? ''}',
+      'device': own.isEmpty ? device : own,
+      'severity': '${f['severity'] ?? 'info'}',
+      'kind': '${f['kind'] ?? ''}',
+      'text': '${f['text'] ?? ''}',
+      'fix_cli':
+          (f['fix_cli'] as List?)?.map((line) => line.toString()).toList() ??
+          const <String>[],
+      'repairs': repairs,
+      'evidence': f['evidence'] is Map
+          ? Map<String, dynamic>.from(f['evidence'] as Map)
+          : const <String, dynamic>{},
     };
   }
 

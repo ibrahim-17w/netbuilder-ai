@@ -507,6 +507,59 @@ class OnDevicePktBuilder {
     );
   }
 
+  /// [audit] on a background isolate. Decrypting and parsing a save is linear
+  /// in device count, so running it on the UI isolate janks the screen for a
+  /// full-size lab. Same result, off the UI thread.
+  static Future<PktAudit> auditInBackground(Uint8List bytes) =>
+      Isolate.run(() => audit(bytes));
+
+  /// True when two devices sit in the same layer-2 segment: a cable joins
+  /// them, or a chain of switches, hubs or access points does.
+  ///
+  /// Routers, firewalls and hosts end a segment, so the walk stops at them.
+  /// That is what keeps two unrelated LANs reusing the same private address
+  /// from being reported as a duplicate.
+  static bool _sameSegment(
+    List<Map<String, dynamic>> links,
+    Map<String, String> kinds,
+    String a,
+    String b,
+  ) {
+    if (a == b) return true;
+    final seen = <String>{a};
+    final queue = <String>[a];
+    while (queue.isNotEmpty) {
+      final at = queue.removeLast();
+      for (final link in links) {
+        final left = '${link['a'] ?? ''}'.trim();
+        final right = '${link['b'] ?? ''}'.trim();
+        final other = left == at
+            ? right
+            : right == at
+            ? left
+            : '';
+        if (other.isEmpty) continue;
+        if (other == b) return true;
+        final kind = kinds[other] ?? '';
+        final layerTwo =
+            kind.contains('switch') ||
+            kind.contains('hub') ||
+            kind.contains('bridge') ||
+            kind.contains('repeater') ||
+            kind.contains('accesspoint');
+        if (layerTwo && seen.add(other)) queue.add(other);
+      }
+    }
+    return false;
+  }
+
+  /// [auditReport] on a background isolate; see [auditInBackground].
+  static Future<Map<String, dynamic>> auditReportInBackground(
+    Uint8List bytes, {
+    String path = '',
+    String project = '',
+  }) => Isolate.run(() => auditReport(bytes, path: path, project: project));
+
   /// Read a built file back and describe it, using the same audit the
   /// verification step needs on either platform.
   static PktAudit audit(Uint8List bytes) {
@@ -612,7 +665,10 @@ class OnDevicePktBuilder {
         'cable': typeTags.length > 1 ? typeTags.last : '',
       });
     }
-    final findings = _semanticFindings(devices, links);
+    final findingRows = _semanticFindingRows(devices, links);
+    final findings = <String>[
+      for (final row in findingRows) '${row['kind']}: ${row['text']}',
+    ];
     inventoryComplete =
         inventoryComplete &&
         RegExp(r'<LINK(?:\s[^>]*)?>').allMatches(doc).length == links.length &&
@@ -630,12 +686,16 @@ class OnDevicePktBuilder {
       'linkCount': links.length,
       'links': links,
       'findings': findings,
+      // Structured beside the strings: the chat needs the device, kind and
+      // severity, and a /32 duplicate is information rather than a fault.
+      'findingRows': findingRows,
       'summary': {
         'devices': devices.length,
+        'device_count': devices.length,
         'links': links.length,
         'servicesEnabled': servicesEnabled.length,
         'findings': findings.length,
-        'high': findings.length,
+        'high': findingRows.where((row) => row['severity'] == 'high').length,
       },
       'note': 'audited on this device by the same codec that wrote it',
     };
@@ -673,34 +733,73 @@ class OnDevicePktBuilder {
   /// The defect CLASSES this file carries, in the same words the repair pass
   /// uses, so a finding from the builder and a finding from the repair pass
   /// can be compared rather than translated.
-  static List<String> _semanticFindings(
+  ///
+  /// Structured, not just sentences: the chat ranks and explains a finding by
+  /// its device, kind and severity, and a plain string left it nothing to
+  /// rank. [auditReport] still exposes the old `kind: text` strings beside
+  /// these rows, so every existing reader keeps working.
+  static List<Map<String, dynamic>> _semanticFindingRows(
     List<Map<String, dynamic>> devices,
     List<Map<String, dynamic>> links,
   ) {
-    final out = <String>[];
+    final rows = <Map<String, dynamic>>[];
+    final kinds = {
+      for (final d in devices) '${d['name']}'.trim(): '${d['type']}'.toLowerCase(),
+    };
 
-    // Duplicate interface address: two devices claiming one address.
-    final claimed = <String, String>{};
+    // Duplicate interface address: two devices claiming one address. A /32 on
+    // both is reported as information, not a fault: lab saves reuse
+    // loopback-style /32s (router IDs, a simulated "internet" on two border
+    // routers), and calling that a high-severity defect made a correct lab
+    // look broken.
+    final claimed = <String, Map<String, String>>{};
     for (final d in devices) {
       final cfg = d['ipcfg'];
       final addrs = cfg is Map ? cfg['addresses'] : null;
       if (addrs is! List) continue;
+      final name = '${d['name']}';
       for (final a in addrs) {
-        final ip = '$a'.split('/').first.trim();
+        final cidr = '$a'.trim();
+        final ip = cidr.split('/').first.trim();
         if (ip.isEmpty) continue;
         final first = claimed[ip];
         if (first == null) {
-          claimed[ip] = '${d['name']}';
-        } else if (first != '${d['name']}') {
-          out.add(
-            'duplicate_interface_address: $ip is claimed by both $first and '
-            '${d['name']}',
-          );
+          claimed[ip] = {'device': name, 'cidr': cidr};
+          continue;
         }
+        if (first['device'] == name) continue;
+        // An address only collides with another if both interfaces sit in
+        // the same broadcast domain. Two firewalls that each keep the factory
+        // 192.168.1.1 on opposite sides of a router do not collide, and
+        // reporting them made a correct introductory lab look broken.
+        if (!_sameSegment(links, kinds, first['device']!, name)) continue;
+        final hostRoutes =
+            cidr.endsWith('/32') && '${first['cidr']}'.endsWith('/32');
+        rows.add({
+          'id': 'duplicate_interface_address:$ip',
+          'kind': 'duplicate_interface_address',
+          'device': name,
+          'severity': hostRoutes ? 'info' : 'high',
+          'text': hostRoutes
+              ? '$cidr is configured on both ${first['device']} and $name '
+                    'as a /32 host route. Labs often reuse a /32 for a router '
+                    'id or a simulated internet address - confirm both are '
+                    'meant to be there'
+              : '$ip is claimed by both ${first['device']} and $name',
+          'fix_cli': const <String>[],
+          'evidence': {
+            'address': ip,
+            'cidr': cidr,
+            'devices': ['${first['device']}', name],
+          },
+        });
       }
     }
 
-    // Uncabled device: present in the file, connected to nothing.
+    // Uncabled device: present in the file, connected to nothing. A device
+    // with no data ports of its own (a power distribution strip, a cloud) or
+    // with wireless ports only is not miscabled - it was never meant to take
+    // a cable - so it is not reported.
     final cabled = <String>{};
     for (final l in links) {
       for (final end in ['a', 'b']) {
@@ -708,22 +807,30 @@ class OnDevicePktBuilder {
         if (name.isNotEmpty) cabled.add(name);
       }
     }
-    final loose = <String>[];
     for (final d in devices) {
       final name = '${d['name']}'.trim();
       if (name.isEmpty || cabled.contains(name)) continue;
-      // Cloud and standalone endpoints legitimately carry no cable, so only
-      // infrastructure that must be wired is reported as uncabled.
-      final type = '${d['type']}'.toLowerCase();
-      if (type == 'cloud' || type == 'wireless' || type == 'access-point') {
+      final ports = (d['interfaces'] as List?)?.whereType<Map>().toList() ??
+          const <Map>[];
+      if (ports.isEmpty) continue;
+      if (ports.every((row) => '${row['family'] ?? ''}' == 'wireless')) {
         continue;
       }
-      loose.add(name);
+      rows.add({
+        'id': 'uncabled_device:$name',
+        'kind': 'uncabled_device',
+        'device': name,
+        'severity': 'high',
+        'text': '$name is in the file but no cable ends on it',
+        'fix_cli': const <String>[],
+        'evidence': {
+          'device': name,
+          'type': '${d['type'] ?? ''}',
+          'model': '${d['model'] ?? ''}',
+        },
+      });
     }
-    if (loose.isNotEmpty) {
-      out.add('uncabled_device: ${loose.join(', ')} carry no cable');
-    }
-    return out;
+    return rows;
   }
 
   /// The `<PORT>` text directly after [marker] in a link block - the port

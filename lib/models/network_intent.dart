@@ -2059,6 +2059,18 @@ class NetworkIntent {
         project: project,
       );
     }
+    // AN EDIT OF THE LAB THAT STANDS. "remove 2 pcs", "make it 30 pcs",
+    // "change the pcs to 30", "we need 2 more switches" name the lab that
+    // exists and change it. Read before the re-plan branch below, which used
+    // to answer "remove 2 pcs" with a two-PC lab and threw away everything
+    // the conversation had built.
+    final inventoryEdit = _applyInventoryEdit(
+      previous: previous,
+      previousBrief: previousBrief,
+      brief: brief,
+      project: project,
+    );
+    if (inventoryEdit != null) return inventoryEdit;
     // "we will need more than 1 router and 1 switch and 1 server" states
     // FLOORS, not exact counts: the standing lab grows to meet them and is
     // never shrunk back to the stated minimums (a discussed 2-site network
@@ -2234,6 +2246,492 @@ class NetworkIntent {
 
     if (!changed) return null;
     return previous.copyWith(security: security, nodes: nodes);
+  }
+
+  // --- edits of the lab that stands ----------------------------------------
+  //
+  // The whole point of a conversation about a network is that the next
+  // sentence is about the SAME network. "remove 2 pcs", "make it 30 pcs",
+  // "change the pcs to 30", "we need 2 more switches" are edits of the lab on
+  // the table; reading them with the brief parser produced a brand-new lab out
+  // of the fragment, so a 24-device network became the two devices the
+  // sentence happened to name. These readers decide WHAT the edit changes, and
+  // the plan is changed in place instead of being replaced.
+
+  /// Verbs that take something out of the lab.
+  static final RegExp _removalVerb = RegExp(
+    r'\b(?:remove|removing|removed|delete|deleting|deleted|drop|dropping|'
+    r'dropped|take\s+out|takes\s+out|taking\s+out|get\s+rid\s+of|'
+    r'strip\s+out|eliminate|discard|lose)\b',
+    caseSensitive: false,
+  );
+
+  /// Verbs and words that put something into it.
+  static final RegExp _addVerb = RegExp(
+    r'\b(?:add|adding|added|also|plus|include|including|another|more|'
+    r'extra|additional|further|give|provision|deploy|stand\s+up)\b',
+    caseSensitive: false,
+  );
+
+  /// Wording that points at the lab that already stands rather than at a new
+  /// one: "it", "them", "the network", or the act of changing it.
+  static final RegExp _editCue = RegExp(
+    r'\b(?:it|them|the\s+(?:lab|network|topology|design|plan)|'
+    r'this\s+(?:lab|network|topology|design|plan)|'
+    r'change|changing|update|updating|edit|editing|modify|modifying|'
+    r'adjust|adjusting|give\s+it|instead)\b|'
+    r'\bmake\s+(?:it|them|the\s+(?:lab|network|plan))\b',
+    caseSensitive: false,
+  );
+
+  /// A request for a NEW lab replaces the standing one on purpose; it is not
+  /// an edit of it, however it is phrased.
+  static final RegExp _freshLabWording = RegExp(
+    r'\b(?:new\s+(?:network|lab|topology|design|project)|'
+    r'start\s+(?:over|again)|from\s+scratch|another\s+(?:network|lab)|'
+    r'separate\s+(?:network|lab))\b',
+    caseSensitive: false,
+  );
+
+  /// Every noun the planner knows for a device kind, mapped back to the kind's
+  /// type. Built from [deviceKinds] so "access point", "laptop" and "ec2"
+  /// cannot drift from the words the parser itself counts.
+  static final Map<String, String> _kindByNoun = () {
+    final map = <String, String>{};
+    void add(String noun, String type) =>
+        map.putIfAbsent(noun.toLowerCase(), () => type);
+    for (final kind in deviceKinds) {
+      add(kind.type, kind.type);
+      add(_pluralNoun(kind.type), kind.type);
+      for (final keyword in kind.keywords) {
+        add(keyword, kind.type);
+        add(_pluralNoun(keyword), kind.type);
+      }
+    }
+    // Everyday plurals the keyword table spells only in the singular.
+    add('pcs', 'pc');
+    add('computers', 'pc');
+    add('routers', 'router');
+    add('switches', 'switch');
+    add('servers', 'server');
+    add('aps', 'wireless');
+    add('access points', 'wireless');
+    return map;
+  }();
+
+  static String _pluralNoun(String noun) {
+    final parts = noun.toLowerCase().split(' ');
+    final last = parts.last;
+    const esEndings = ['ch', 'sh', 'ss', 's', 'x', 'z'];
+    parts[parts.length - 1] = esEndings.any(last.endsWith)
+        ? '${last}es'
+        : '${last}s';
+    return parts.join(' ');
+  }
+
+  /// The noun alternation every count pattern is built from, longest first so
+  /// "access points" is read whole before "access".
+  static final String _kindNouns = () {
+    final nouns = _kindByNoun.keys.toList()
+      ..sort((a, b) => b.length.compareTo(a.length));
+    return nouns
+        .map((noun) => RegExp.escape(noun).replaceAll(' ', r'\s+'))
+        .join('|');
+  }();
+
+  /// "2 more switches", "one router", "a server": a number in front of a
+  /// kind. Group 2 is the additive marker when the sentence wrote one.
+  static final RegExp _countBeforeKind = RegExp(
+    '\\b(\\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|an|a)\\s+'
+    '(more\\s+|additional\\s+|extra\\s+|another\\s+|new\\s+|'
+    'of\\s+(?:the\\s+)?)?'
+    '($_kindNouns)\\b',
+    caseSensitive: false,
+  );
+
+  /// "another server", "one more switch" - an addition written without a
+  /// number of its own.
+  static final RegExp _anotherKind = RegExp(
+    '\\b(?:another|an\\s+extra|one\\s+more)\\s+($_kindNouns)\\b',
+    caseSensitive: false,
+  );
+
+  /// "the pcs to 30", "the routers should be 3" - a count stated AFTER the
+  /// kind. Old-style model numbers are refused by the three-digit bound, so
+  /// "change the switch model to 2960" is not 2960 switches.
+  static final RegExp _kindThenCount = RegExp(
+    '\\b($_kindNouns)\\s+(?:count\\s+|number\\s+)?'
+    '(?:to|should\\s+be|must\\s+be|needs\\s+to\\s+be|is|be|=)\\s*(\\d{1,3})\\b',
+    caseSensitive: false,
+  );
+
+  /// "make the routers 3", "set the pcs 30".
+  static final RegExp _makeKindCount = RegExp(
+    '\\b(?:make|set|change|update|turn)\\s+(?:the\\s+|our\\s+|its\\s+)?'
+    '($_kindNouns)\\s+(?:to\\s+|into\\s+)?(\\d{1,3})\\b',
+    caseSensitive: false,
+  );
+
+  static int? _countValue(String raw) {
+    final digits = int.tryParse(raw.trim());
+    if (digits != null) return digits;
+    const words = {
+      'a': 1,
+      'an': 1,
+      'one': 1,
+      'two': 2,
+      'three': 3,
+      'four': 4,
+      'five': 5,
+      'six': 6,
+      'seven': 7,
+      'eight': 8,
+      'nine': 9,
+      'ten': 10,
+    };
+    return words[raw.toLowerCase()];
+  }
+
+  /// Where the clause holding [at] starts. Only punctuation ends a clause:
+  /// "remove the old server and add 2 pcs" keeps its verbs in one clause, and
+  /// the LAST verb before the number decides what happens to it.
+  static int _clauseStart(String lower, int at) {
+    var start = 0;
+    for (final match in RegExp(r'[,.;]').allMatches(lower)) {
+      if (match.end > at) break;
+      start = match.end;
+    }
+    return start;
+  }
+
+  /// What the words in front of [at] ask for: a removal, an addition, or a
+  /// restated total.
+  ///
+  /// Only the sixty characters before the number are read: a verb from an
+  /// earlier sentence is not the verb governing this number, and reading it
+  /// made "set phone switchports ... VLAN 20 AP client traffic" an addition.
+  static String _actionBefore(String lower, int at) {
+    final start = _clauseStart(lower, at);
+    final prefix = lower.substring(start > at - 60 ? start : at - 60, at);
+    var removalAt = -1;
+    for (final match in _removalVerb.allMatches(prefix)) {
+      removalAt = match.start;
+    }
+    var addAt = -1;
+    for (final match in _addVerb.allMatches(prefix)) {
+      addAt = match.start;
+    }
+    if (removalAt >= 0 && removalAt > addAt) return 'remove';
+    if (addAt >= 0) return 'add';
+    return 'set';
+  }
+
+  /// True when the words around [at] ask to CHANGE a count ("make it 30 pcs",
+  /// "3 routers instead") rather than merely mentioning one.
+  ///
+  /// The cue has to sit next to the number. A whole-clause test read "Set
+  /// phone switchports to user access VLAN 10 with voice VLAN 20 AP ..." as
+  /// twenty access points, because the word "set" was somewhere in the same
+  /// sentence.
+  static bool _explicitCountEdit(String lower, int at) {
+    final before = lower.substring(at > 60 ? at - 60 : 0, at);
+    if (RegExp(
+      r'\b(?:make|change|changing|update|updating|set|setting|turn|'
+      r'give\s+it|edit|editing|modify|modifying|adjust|adjusting)\b',
+    ).hasMatch(before)) {
+      return true;
+    }
+    final after = lower
+        .substring(at, at + 40 > lower.length ? lower.length : at + 40)
+        .split(RegExp(r'[,.;]'))
+        .first;
+    return RegExp(r'\b(?:instead|total|exactly)\b').hasMatch(after);
+  }
+
+  /// The edit an inventory turn asks for, as data: what to take out, what to
+  /// put in, and which counts it restates.
+  static ({
+    Map<String, int> removals,
+    Map<String, int> additions,
+    Map<String, int> sets,
+    Set<String> named,
+  })
+  _readInventoryEdit(String brief, {Iterable<NetNode> standing = const []}) {
+    final lower = brief.toLowerCase();
+    final removals = <String, int>{};
+    final additions = <String, int>{};
+    final sets = <String, int>{};
+    final named = <String>{};
+
+    if (standing.isNotEmpty && _removalVerb.hasMatch(lower)) {
+      // "remove PC3", "delete SRV1": a device the lab actually has.
+      final known = {
+        for (final node in standing) node.name.toLowerCase(): node.name,
+      };
+      for (final token in lower.split(RegExp(r'[^a-z0-9]+'))) {
+        final name = known[token];
+        if (name != null) named.add(name);
+      }
+    }
+
+    for (final match in _countBeforeKind.allMatches(lower)) {
+      final value = _countValue(match.group(1)!);
+      final type = _kindByNoun[match.group(3)!.replaceAll(RegExp(r'\s+'), ' ')];
+      if (value == null || type == null) continue;
+      final marker = (match.group(2) ?? '').trim();
+      final additive = marker.isNotEmpty && !marker.startsWith('of');
+      final action = _actionBefore(lower, match.start);
+      if (additive || action == 'add') {
+        additions[type] = (additions[type] ?? 0) + value;
+      } else if (action == 'remove') {
+        removals[type] = (removals[type] ?? 0) + value;
+      } else if ((RegExp(r'^\d').hasMatch(match.group(1)!) || value > 1) &&
+          _explicitCountEdit(lower, match.start)) {
+        // A bare "a server" restates nothing, and a count merely mentioned
+        // ("VLAN 20 AP client traffic" is not twenty access points) restates
+        // nothing either: the clause has to ask for the change.
+        sets[type] = value;
+      }
+    }
+    for (final match in _kindThenCount.allMatches(lower)) {
+      final value = _countValue(match.group(2)!);
+      final type = _kindByNoun[match.group(1)!.replaceAll(RegExp(r'\s+'), ' ')];
+      if (value == null || type == null) continue;
+      sets[type] = value;
+    }
+    for (final match in _makeKindCount.allMatches(lower)) {
+      final value = _countValue(match.group(2)!);
+      final type = _kindByNoun[match.group(1)!.replaceAll(RegExp(r'\s+'), ' ')];
+      if (value == null || type == null) continue;
+      sets[type] = value;
+    }
+    // "another server DNS" names a DIFFERENT existing server to configure,
+    // not one more device, when the sentence also names a service.
+    final assignsService = RegExp(
+      r'\b(?:dhcp|dns|https?|web|aaa|radius|tacacs|ftp|mail|email|ntp|syslog)\b',
+    ).hasMatch(lower);
+    if (!assignsService) {
+      for (final match in _anotherKind.allMatches(lower)) {
+        final type =
+            _kindByNoun[match.group(1)!.replaceAll(RegExp(r'\s+'), ' ')];
+        if (type == null) continue;
+        additions[type] = (additions[type] ?? 0) + 1;
+      }
+    }
+    // "delete the server" / "remove a switch": a kind named for removal with
+    // no number of its own means one of it.
+    if (_removalVerb.hasMatch(lower)) {
+      final namedLines = RegExp(
+        '\\b(?:remove|removing|delete|deleting|drop|dropping|'
+        'take\\s+out|get\\s+rid\\s+of|strip\\s+out|eliminate|discard)'
+        '\\b[\\w\\s,]{0,20}?\\b($_kindNouns)\\b',
+        caseSensitive: false,
+      ).allMatches(lower);
+      for (final match in namedLines) {
+        final type =
+            _kindByNoun[match.group(1)!.replaceAll(RegExp(r'\s+'), ' ')];
+        if (type == null) continue;
+        if (removals.containsKey(type) || additions.containsKey(type)) {
+          continue;
+        }
+        removals[type] = 1;
+      }
+    }
+    return (removals: removals, additions: additions, sets: sets, named: named);
+  }
+
+  /// The parts of a plan one edit turn may change: the device kinds it resized
+  /// or removed, and the devices it named for removal.
+  ///
+  /// Everything else in the standing lab has to survive the turn. Exposed so
+  /// the request coordinator can tell an edit that keeps the network from one
+  /// that quietly rebuilds it.
+  static ({Set<String> kinds, Set<String> names}) editTargets(
+    String brief, {
+    Iterable<NetNode> standing = const [],
+  }) {
+    final read = _readInventoryEdit(brief, standing: standing);
+    return (
+      kinds: {...read.removals.keys, ...read.additions.keys, ...read.sets.keys},
+      names: read.named,
+    );
+  }
+
+  /// Apply an inventory edit to [previous] instead of re-planning it.
+  ///
+  /// Returns null when the brief is not an edit of the standing lab, so the
+  /// caller keeps its existing behaviour.
+  static ({NetworkIntent plan, String brief})? _applyInventoryEdit({
+    required NetworkIntent previous,
+    required String previousBrief,
+    required String brief,
+    required String project,
+  }) {
+    final lower = brief.toLowerCase();
+    if (_freshLabWording.hasMatch(lower)) return null;
+    // "more than 2 switches" is a FLOOR the lab grows toward, not a count that
+    // replaces one - the floor reader owns that turn.
+    if (_readsAsGrowth(brief)) return null;
+    // A count scoped to a site ("30 PCs at HQ") replaces that site's count and
+    // keeps the other sites; the scoped correction reader owns that turn.
+    if (RegExp(
+      r'(\d{1,4})\s*(?:pcs?|routers?|switch(?:es)?|servers?|laptops?|'
+      r'printers?)\s+(?:at|in|for)\s+\w+',
+    ).hasMatch(lower)) {
+      return null;
+    }
+    // A correction cue ("actually", "no wait") belongs to the correction
+    // reader, which also carries services and addressing of its own.
+    final correctionTurn =
+        _countCorrectionCue.hasMatch(lower) ||
+        _makeItCountCorrection.hasMatch(lower) ||
+        _notCountCorrection.hasMatch(lower);
+    final structural =
+        _editCue.hasMatch(lower) ||
+        _removalVerb.hasMatch(lower) ||
+        _kindThenCount.hasMatch(lower) ||
+        _makeKindCount.hasMatch(lower);
+    final additive =
+        !RegExp(
+          r'\b(?:dhcp|dns|https?|web|aaa|radius|tacacs|ftp|mail|email|ntp|syslog)\b',
+        ).hasMatch(lower) &&
+        (_additiveCountWording.hasMatch(lower) || _anotherKind.hasMatch(lower));
+    if (!structural && !additive) return null;
+    if (correctionTurn && !structural) return null;
+
+    final read = _readInventoryEdit(brief, standing: previous.nodes);
+    if (read.removals.isEmpty &&
+        read.additions.isEmpty &&
+        read.sets.isEmpty &&
+        read.named.isEmpty) {
+      return null;
+    }
+
+    var plan = previous;
+
+    int countOf(NetworkIntent p, String type) =>
+        p.nodes.where((n) => n.type == type).length;
+
+    /// Take [take] devices of one kind off the end of the plan: the newest
+    /// ones, so the remaining PCs stay PC1..PCn.
+    NetworkIntent dropKind(NetworkIntent p, String type, int take) {
+      final ofKind = p.nodes.where((n) => n.type == type).toList();
+      if (ofKind.isEmpty || take <= 0) return p;
+      final from = (ofKind.length - take).clamp(0, ofKind.length);
+      return _dropNodes(p, {
+        for (final node in ofKind.sublist(from)) node.name,
+      });
+    }
+
+    for (final entry in read.removals.entries) {
+      plan = dropKind(plan, entry.key, entry.value);
+    }
+    if (read.named.isNotEmpty) plan = _dropNodes(plan, read.named);
+
+    final growth = <String, int>{};
+    final changed = <String>{};
+    for (final entry in read.sets.entries) {
+      final current = countOf(plan, entry.key);
+      if (entry.value < current) {
+        plan = dropKind(plan, entry.key, current - entry.value);
+        changed.add(entry.key);
+      } else if (entry.value > current) {
+        growth[entry.key] = entry.value;
+        changed.add(entry.key);
+      }
+    }
+    for (final entry in read.additions.entries) {
+      growth[entry.key] = countOf(plan, entry.key) + entry.value;
+      changed.add(entry.key);
+    }
+
+    if (growth.isNotEmpty) {
+      // Adding devices is not just a bigger number: they need names, cables
+      // and addresses. The correction reader already grows a standing lab
+      // from a cued tally and then verifies every count, so it is used here
+      // rather than a second, weaker implementation. The tally pins EVERY
+      // kind, not only the grown ones: the re-read starts from the standing
+      // brief, and a kind left unpinned would come back at its old count and
+      // undo a shrink the same turn asked for.
+      final tally = <String>[
+        for (final kind in _correctionTallyKinds)
+          if (changed.contains(kind) &&
+              (growth[kind] ?? countOf(plan, kind)) > 0)
+            '${growth[kind] ?? countOf(plan, kind)} '
+                '${_correctionKindNoun(kind)}',
+      ];
+      final grown = _mergeCountCorrection(
+        previous: plan,
+        previousBrief: previousBrief,
+        brief: 'actually ${tally.join(' ')}',
+        project: project,
+      );
+      if (grown != null) plan = grown.plan;
+    }
+
+    if (plan.nodes.isEmpty) return null;
+    if (identical(plan, previous) &&
+        read.removals.isEmpty &&
+        read.named.isEmpty &&
+        read.sets.isEmpty &&
+        read.additions.isEmpty) {
+      return null;
+    }
+    return (plan: plan, brief: _pinnedBrief(previousBrief, brief, plan));
+  }
+
+  /// [plan] without the named devices, and without the cables, addresses,
+  /// canvas positions and security references that pointed at them.
+  static NetworkIntent _dropNodes(NetworkIntent plan, Set<String> names) {
+    if (names.isEmpty) return plan;
+    final gone = {for (final name in names) name.toLowerCase()};
+    bool dropped(String name) => gone.contains(name.toLowerCase());
+
+    final security = plan.security.toJson();
+    for (final field in const [
+      'aaaServer',
+      'aaaRouter',
+      'vpnPeerA',
+      'vpnPeerB',
+    ]) {
+      final value = security[field];
+      if (value is String && dropped(value)) security[field] = null;
+    }
+    final layout = Map<String, Offset?>.from(plan.layout)
+      ..removeWhere((name, _) => dropped(name));
+
+    return plan.copyWith(
+      nodes: plan.nodes.where((node) => !dropped(node.name)).toList(),
+      links: plan.links
+          .where((link) => !dropped(link.a) && !dropped(link.b))
+          .toList(),
+      addressing: plan.addressing
+          .where((address) => !dropped(address.node))
+          .toList(),
+      layout: layout,
+      security: SecurityIntent.fromJson(security),
+    );
+  }
+
+  /// The standing brief, the words of the edit, and a trailing tally that pins
+  /// the counts the lab now has.
+  ///
+  /// The tally is the format the parser already reads as a correction
+  /// ("Global totals: actually 2 routers 2 switches 18 pcs"), so the next
+  /// follow-up re-reads this lab instead of the one the edit replaced.
+  static String _pinnedBrief(String base, String edit, NetworkIntent plan) {
+    final strip = RegExp(r'[\s,.;:]+$');
+    final tally = <String>[
+      for (final kind in _correctionTallyKinds)
+        if (plan.nodes.any((node) => node.type == kind))
+          '${plan.nodes.where((node) => node.type == kind).length} '
+              '${_correctionKindNoun(kind)}',
+    ];
+    return [
+      base.replaceAll(strip, '').trim(),
+      edit.replaceAll(strip, '').trim(),
+      if (tally.isNotEmpty) 'Global totals: actually ${tally.join(' ')}',
+    ].where((part) => part.isNotEmpty).join('. ');
   }
 
   /// Wording that asks to ADD to what exists rather than to start again.
@@ -2639,8 +3137,28 @@ class NetworkIntent {
     caseSensitive: false,
   );
 
+  /// "not 99 servers 3 servers", "not 6 access points but 4" - a rejected
+  /// count followed by the number that replaces it. This is a correction of
+  /// the standing lab's count even though it carries none of the cue words
+  /// ("actually", "no wait"), and without it the message was read as a new
+  /// specification: a 33-device lab plus "not 99 servers 3 servers AAA, dhcp,
+  /// and http" became five devices, the PCs and the second site server gone.
+  static final RegExp _notCountCorrection = RegExp(
+    r'\bnot\s+\d{1,4}\s*(?:[a-z+-]+\s+){0,3}?'
+    r'(?:routers?|switch(?:es)?|pcs?|servers?|laptops?|printers?|firewalls?|'
+    r'phones?|access\s+points?)\b[\s\S]{0,40}?\b\d{1,4}\s*'
+    r'(?:routers?|switch(?:es)?|pcs?|servers?|laptops?|printers?|'
+    r'firewalls?|phones?|access\s+points?)\b',
+    caseSensitive: false,
+  );
+
   static bool _readsAsCountCorrection(String brief) {
     final lower = brief.toLowerCase();
+    if (_notCountCorrection.hasMatch(lower)) {
+      if (_readsAsAddition(brief)) return false;
+      if (_additiveCountWording.hasMatch(lower)) return false;
+      return true;
+    }
     final makeIt = _makeItCountCorrection.firstMatch(lower);
     if (makeIt != null) {
       if (_readsAsAddition(brief)) return false;

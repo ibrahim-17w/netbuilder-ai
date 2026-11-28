@@ -160,7 +160,7 @@ class _ReadinessPanelState extends State<ReadinessPanel> {
               ),
             ),
             AnimatedSize(
-              duration: const Duration(milliseconds: 160),
+              duration: AppTheme.motionFast,
               curve: Curves.easeOutCubic,
               alignment: Alignment.topCenter,
               // A conditional child, not an opacity fade: the detail rows

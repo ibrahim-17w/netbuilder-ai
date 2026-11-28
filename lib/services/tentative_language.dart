@@ -174,7 +174,7 @@ class TentativeLanguageService {
   /// pcs" states a requirement.
   static final RegExp _frameOpeners = RegExp(
     r'\b(?:what\s+if|suppos(?:e|ing)|hypothetically|imagine|'
-    r"let'?s\s+say|what\s+about|how\s+about)\b",
+    r"let(?:'?s|\s+us)\s+say|what\s+about|how\s+about)\b",
   );
 
   /// Correction and need markers. Not imperatives - there is no verb
@@ -203,7 +203,9 @@ class TentativeLanguageService {
     RegExp(r'\bwhat\s+if\b'),
     RegExp(r'\bsuppos(?:e|ing)\b'),
     RegExp(r'\bhypothetically\b'),
-    RegExp(r"\blet'?s\s+say\b"),
+    // "let's say" survives normalization as "let us say", so both spellings
+    // must fire or the flagship exploration frame silently stops working.
+    RegExp(r"\blet(?:'?s|\s+us)\s+say\b"),
     RegExp(r'\bimagine\b'),
     // Hedges and design musing.
     RegExp(r'\bmaybe\b'),

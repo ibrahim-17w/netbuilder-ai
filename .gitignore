@@ -31,6 +31,8 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+# Local Python virtual environment
+/.venv/
 /coverage/
 
 # Symbolication related
@@ -113,4 +115,6 @@ sidecar/run_ledger.json
 # Aggregated learning-loop counters: regenerated from the journal on this
 # machine, describes this install rather than the source.
 sidecar/journal_aggregate.json
+# Local Packet Tracer screen-coordinate cache.
+sidecar/pc_tiles.json
 sidecar/strategy_memory.json.v1.bak

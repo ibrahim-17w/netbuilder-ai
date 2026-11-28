@@ -229,9 +229,17 @@ class TroubleshootFlowEngine {
   /// the same cleaner - a label with dots or punctuation ('a 169.254.x.x
   /// address') must compare equal to the same words typed back.
   static String? _matchOption(List<FlowOption> options, String userText) {
-    String clean(String s) => CasualEnglish.canonical(
-      s.trim().toLowerCase().replaceAll(RegExp(r'[.!?,;:]'), ''),
-    );
+    // Structural cleaning only. [CasualEnglish.canonical] rewrites fault
+    // phrases into knowledge-table triggers, which collapses two DIFFERENT
+    // answers onto one string ("request timed out" and "destination host
+    // unreachable" both became "no connectivity"), so the first option won
+    // and a timeout was diagnosed as a routing fault.
+    String clean(String s) => s
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[.!?,;:]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
     final text = clean(userText);
     for (final o in options) {
       if (text == clean(o.label) || text == clean(o.value)) return o.value;

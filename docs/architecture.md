@@ -130,6 +130,42 @@ provenance line and editable/deletable in the Memory screen; the app never
 enables search grounding and never trains on outputs, so retention stays the
 user's own local replay with attribution.
 
+## The offline networking engineer
+
+`NetworkingIntellect.answer` is the offline answer engine behind the assistant's
+networking expertise. It is deterministic, needs no key and no network, and is
+ordered so the most specific reader wins:
+
+1. **Understanding** - `networking_language.dart` reads the sentence as typed:
+   symptom phrasing is expanded (never replaced), British spellings and split
+   compounds fold onto corpus tokens, tone frames are stripped, spoken prefixes
+   and spelled counts become real values. It is idempotent and never rewrites an
+   address, a CIDR or a command.
+2. **Calculations** - host counts, wildcard masks, size-for-hosts, summary and
+   prefix arithmetic are computed, not remembered.
+3. **Triage** - `networking_triage.dart` reads the shape of the report before
+   the technology: scope (one host, everyone, wireless-only, one VLAN, one
+   site), timing (intermittent, periodic, a fixed delay), a named change, two
+   symptoms in separate clauses, a pasted syslog line, or a composite scenario
+   (connected-but-no-internet, ping-but-no-browse, ping-but-no-service, guest
+   portal, one-VLAN-only, link-up-no-traffic). It states what the report
+   already rules out and the test that proves the boundary, decodes facility,
+   severity and mnemonic before the topic corpus sees the line, and answers
+   "where do I start" with scope, layer and time when no named fault fits.
+4. **Diagnosis** - `diagnostic_playbooks.dart` answers a named fault with what it
+   proves, ranked causes, the read-only command that separates them and the rule
+   that stops it recurring. Playbooks outrank definitions.
+5. **Design and judgement** - `networking_consultant.dart` sizes and shapes a
+   network from a brief (areas, users, sites, services) and answers "should I"
+   engineering questions with the trade-off, not a product.
+6. **Comparison, facts and concepts** - `networking_catalog.dart`,
+   `networking_facts.dart` and the topic render cover definitions, mechanisms,
+   trade-offs, commands and exact numbers.
+
+Build briefs with explicit device counts go to the planner. Purchasing,
+device selection and sizing questions go to the advisor. Definitions go to
+the concept layer.
+
 ## Code map
 
 | Area | Where |
@@ -139,8 +175,10 @@ user's own local replay with attribution.
 | Chat and context | `lib/screens/chat_screen.dart`, `lib/services/chat_service.dart`, `lib/services/context_budget.dart` |
 | Provider transport | `lib/services/ai_provider.dart`, `lib/services/provider_chat_service.dart` |
 | Engine model calls | `sidecar/model_gateway.py` (in-process Respan Gateway), `sidecar/pt_autopilot.py` (`_llm_request`) |
+| Offline networking expertise | `lib/services/networking_intellect.dart` + `networking_language`, `networking_catalog`, `networking_facts`, `diagnostic_playbooks`, `networking_triage`, `networking_consultant`, `phrase_match` |
 | Local memory | `lib/services/memory_service.dart` |
-| On-device `.pkt` | `lib/services/pkt/`, `sidecar/pkt_template_build.py` |
+| Training export | `lib/services/chat_export_service.dart` |
+| On-device `.pkt` | `lib/services/pkt/` (codec, template library, builder, `pkt_capture_analysis`), `sidecar/pkt_template_build.py` |
 | Python engine | `sidecar/pt_autopilot.py` (HTTP routes, planner, executor, automation) |
 | Packaging and CI | `packaging/`, `.github/workflows/ci.yml` |
 

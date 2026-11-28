@@ -2,8 +2,188 @@
 
 ## Unreleased
 
+### Added
+
+- **Reading a saved lab on the phone.** "Analyze this capture" no longer
+  waits on a desktop engine a phone cannot run: the file is decrypted, its
+  devices, cables, addresses and saved configurations are audited in Dart, and
+  the report offers to turn the file into the lab the conversation edits. When
+  the engine is present it is still preferred; when it is not, the phone reads
+  the file itself instead of blaming the platform.
+- **The sample labs taught the library eight hardware variants.** Harvesting
+  the 48 labs in the training folder added the module combinations they use -
+  a serial 2911, a 2911 with an SFP WAN port, 3650 stack members with their
+  built-in module and power supply, and Router/Switch-PT chassis with common
+  NM modules - plus the rollover and fiber cable templates the saves contain.
+  Every one of those labs now rebuilds to the same device list, and cables the
+  library genuinely cannot reproduce are named in the build report rather than
+  dropped.
+- **Local training export.** A download action in the chat header exports
+  every conversation, the plans, builds, attempts, changes, rules and learned
+  answers behind them, questions the offline material could not answer, the
+  generated `.pkt` files and chat attachments, and a redacted app log into one
+  JSON document. Nothing is uploaded: the user reviews the document and sends
+  it themselves. API keys, secure-storage values and local preferences are
+  excluded; embedded files carry SHA-256 hashes and explicit size-limit
+  omissions, and generated files are warned about because a lab `.pkt` can
+  contain credentials.
+- **Triage before technology.** The offline engineer now reads the shape of a
+  fault report before it names a protocol. Scope is treated as evidence - one
+  host, everyone, wireless-only, wired-only, VPN-only, one VLAN, one site, one
+  application, intermittent, periodic, a fixed delay, small-packets-only,
+  ping-but-no-TCP, IP-but-no-name, one direction, after a reboot, after a
+  change or a steady state - and each finding states what it rules out and the
+  test that proves the boundary. The notes are appended to the playbook ladder,
+  never substituted for it. A named change is correlated with the failure it
+  characteristically causes (MTU/PMTUD, VLAN trunk, ACL order, NAT order, route
+  prefix, firmware, switch replacement, DNS, DHCP scope, certificate, QoS, ISP,
+  wireless, AAA, addressing, power, hypervisor) and given a first test and a
+  rollback. Two symptoms in separate clauses are checked for one shared cause
+  before two ladders are worked. A pasted IOS/NX-OS or ASA syslog line is
+  decoded by facility, severity and mnemonic with the check that proves it, and
+  an unknown mnemonic still gets its severity and first step. "Connected but no
+  internet" and "ping works but the browser does not" get ordered check
+  ladders, and so do a device that pings while its service fails, a guest
+  portal that will not load, a resource that works from one VLAN but not
+  another, and a link that is up with no traffic. New ladders cover a host with
+  an address but no gateway and a device that reloads by itself, and the
+  playbooks now recognise the ticket spellings for vPC peer links, CAPWAP
+  joins, console lockout, PoE night reboots, BGP looking-glass invisibility,
+  split DNS, ACL host mismatches and late collisions on an uplink. A complaint
+  with no symptom ("the network is acting weird") gets the three questions
+  that narrow it.
+- **The English layer.** A deterministic understanding pass now reads the
+  question the way it was typed before any corpus sees it: symptom phrasing is
+  expanded ("bgp keeps bouncing" gains "flapping", "is not carrying vlan 20"
+  gains "not passing"), British spellings and split compounds fold onto the
+  corpus token, tone frames ("quick q", "for my ccna", "can you tell me") are
+  stripped, spoken prefixes become real ones ("slash twenty nine" is /29), and
+  spelled numbers become digits only before a countable noun ("five hundred
+  hosts" is 500 hosts, while "one way audio" stays a symptom). It leaves
+  addresses, CIDRs and commands intact.
+- **A second corpus wave: ninety-five playbooks, seventy-one fact sets and
+  one hundred sixty-one technology entries.** New diagnoses for BGP/OSPF
+  adjacency, AS-path loops, RPKI invalids, STP blocking the wrong port,
+  BPDU Guard err-disable, native-VLAN mismatches, incomplete ARP, LACP
+  imbalance, microbursts, voice registration and one-way audio, cloud egress,
+  route black holes, Kubernetes service and DNS failures, SNMP/syslog/NetFlow
+  silence, config drift, AP reboot loops and default-route failures. New
+  entries for IPv6 RA Guard, TrustSec, MAC spoofing defence, IoT/OT
+  segmentation, guest isolation, TLS inspection, serverless networking, cloud
+  landing zones, VPC peering, sub-second failover, fibre testing, config
+  backup, monitoring, runbooks, network documentation, floating statics,
+  conditional defaults, flat-network judgement, redundancy cost, VLAN
+  numbering plans and OSPF over a WAN. New facts: VPN and firewall capacity, DHCP lease timers, STP cost,
+  EtherTypes, frame size, IPv6 allocation sizes and special addresses, AAA and
+  802.1X timers, port-security and err-disable defaults, NetFlow cache timers,
+  NTP values, well-known communities, ICMP types, Wi-Fi channels, EVPN route
+  types, IS-IS timers and the IPv4 header.
+- **Address plans and WAN circuits are computed, not described.** "How do I
+  plan IP addresses for 40 branches" returns the reserved 10.20.0.0/16, the
+  site formula (site 40 is 10.20.39.0/24), the /25 users and /26 voice split
+  inside each /24, a separate /31 block and loopback block, the one summary
+  route the WAN advertises and the cloud/VPN ranges to reserve first - with a
+  banked layout when the site count outgrows one /16. "How many IP addresses
+  do I need for 500 users" returns the block (/22, 1,022 usable) rather than a
+  range. "How do I size the WAN link for 200 users" returns the busy-hour
+  arithmetic (40 Mbps, 52 Mbps with headroom), the 20 percent concurrency
+  voice budget and the circuit and second-provider rule.
+- **Senior design sizing, not generic advice.** Wireless questions now
+  compute access points from area and active clients (with PoE and uplink
+  figures), explain 5 GHz channel width as a reuse decision, and give the
+  SSID count and policy split. DNS redundancy names the minimum pair, the
+  per-site resolver and the WAN dependency. Core and distribution counts
+  explain the pair rule, the collapsed-core boundary and the pair per
+  building. A bare multi-building brief gets a campus LAN (fiber type,
+  diverse paths, per-building summary), and a DMZ brief gets a policy zone
+  with no DMZ-to-inside path.
+- **A senior fault corpus.** Ninety-five diagnostic playbooks answer a
+  named fault state with what it proves, ranked causes, the read-only
+  command that separates them, the fix and the rule that keeps it from
+  coming back. They cover BGP/OSPF/IS-IS/EIGRP/BFD, VLANs, trunks,
+  err-disabled, MAC flaps, loops, LACP, vPC/MLAG, DHCP, snooping, DAI, FHRP,
+  NTP, DNS, IPsec, NAT, ACLs, 802.1X, wireless join and drops, VXLAN,
+  multicast, voice, PoE, cloud, MTU black holes, asymmetric routing and more.
+- **A fact book of exact numbers.** Seventy-one reference sets (timers,
+  distances, VLAN and label ranges, port numbers, protocol numbers,
+  overheads, DSCP/CoS, HSRP/VRRP/GLBP values, MTU/MSS, PoE classes, syslog,
+  RADIUS/TACACS+, Wi-Fi standards, T1/DS1 rates, the voice latency budget,
+  NTP server count, VPN and firewall capacity, lease and cache timers, ICMP
+  types, EVPN route types and rack power) answer "what is the default ..."
+  with the number, not a paragraph that contains it.
+- **Sixty-eight new technology entries**, then a second wave, taking the
+  catalog to one hundred sixty:
+  EVPN, vPC/MLAG, segment routing, IS-IS, BFD, DMVPN, GRE, anycast, PTP,
+  streaming telemetry, SASE, MACsec, DHCP snooping, DAI, IP Source Guard,
+  QinQ, LACP, CAPWAP, Wi-Fi 6/7, roaming, EAP-TLS, transit gateway,
+  PrivateLink, campus design, L2 vs L3 access, failure domains, convergence,
+  CoPP, uRPF, RPKI, OSPFv3, SLAAC and IPv6 Neighbor Discovery. Each carries
+  mechanism, when to use it, its trade-offs, commands, verification and
+  pitfalls. Switch hardening covers the management, control and data planes
+  with an ordered checklist and a parking VLAN.
+- **Hosts-in-a-prefix arithmetic**: "how many hosts does a /28 support" now
+  computes the count, mask, range, broadcast and the /31 exception instead
+  of falling through to a definition.
+
 ### Fixed
 
+- The chat's own answers now cover the questions people ask before anything
+  else: what a MAC address is, what an IP address is, whether an API key is
+  needed (it is not), what this app can do, and which features are not
+  implemented. Each has an Arabic twin where the rest of the answer does.
+- A bare "build it" that ends without a file now says why instead of "not
+  completed; see the build status above" - the engine's own error is quoted,
+  and a cancelled build is named as cancelled.
+- Rebuilding an imported lab is honest about the hardware it cannot reproduce.
+  A saved port the offline library has no template for no longer fails the
+  whole build: an imported plan falls back to the base chassis and a free port
+  of the same medium, changes a fiber record to copper when the rebuilt socket
+  is copper, and writes each substitution into the build warnings. A plan the
+  user typed keeps the strict behaviour, so a port that does not exist is
+  still refused rather than moved.
+- A judgement question is answered by an engineer, not deflected as a
+  purchase. "Should I run OSPF over the WAN", "would you run OSPF over a
+  wan", "what should I monitor on a switch" and "is a flat network ever ok"
+  now reach the technical answer, while buying, device selection and sizing
+  ("is a PoE switch worth it", "which router should I get", "how many access
+  points do I need") still go to the advisor with the standing plan.
+- Spelled numbers no longer half-convert: "twenty nine hosts" was becoming
+  "twenty 9 hosts", and a repeated symptom no longer doubles its canonical
+  phrase ("are not forming" produced "not forming not forming").
+- Fault phrasing survives canonicalisation. Phrases such as "broadcast
+  storm", "link down" and "peer link down" are rewritten for the concept
+  layer, so the diagnosis layer now matches the user's words as well as the
+  canonical form and no longer misses the very symptom it was given.
+- Plural nouns match: "how many VLANs" reaches the VLAN answer, while "IP"
+  still never matches "IPS".
+- A definition is no longer mistaken for a fault ("what is a supplicant",
+  "what is DHCP snooping"), and a port question is no longer answered with
+  a TCP port list ("which ports need portfast with BPDUguard").
+
+## 1.1.0 - 2026-11-25
+
+### Fixed
+
+- The parser now requires standalone numbers for device counts. Digits
+  within passwords, addresses and names no longer change the inventory.
+- A correction that rejects a count is read as a correction. The negation
+  window reached across the rejected quantity, so "not 99 servers 3 servers
+  AAA, dhcp, and http" negated the replacement too and the lab kept one
+  server; the "not" now binds only to the number beside it. The same
+  sentence on an existing lab is also treated as a count correction now,
+  so it moves the server count and leaves the PCs, switches and routers
+  standing instead of re-planning the turn down to five devices.
+- An open question can no longer swallow an unrelated message. While a
+  question asked about an older plan revision was open, any message was
+  refused with "I did not apply that answer", including a correction that
+  answered nothing, so the user's fix was lost. Only a message that actually
+  resolves the question can be refused now; everything else is planned.
+- A plan whose routers chain deeper than one hop builds again. The
+  static-route walk asked the directly-connected table for a router two
+  hops out, hit a null-check exception and produced no configuration at
+  all: "4 routers 4 switches 8 pcs" could neither be built live nor
+  exported offline, while the same intent planned cleanly. The hop now
+  comes from the hop that reaches the current router.
 - A generated `.pkt` no longer drops a cableable device out of the Physical
   Workspace. The builder now refuses a save whose model can carry a physical
   leaf but has none (the 48-device GUI-Services save Packet Tracer 9.0.0

@@ -279,12 +279,15 @@ def _sha256(data: bytes) -> str:
 # ---------------------------------------------------------------------------
 
 def _device_model(block: bytes) -> str:
-    return _one(rb"<TYPE customModel=\"[^\"]*\" model=\"([^\"]*)\"", block)
+    # Real saves write the attributes in either order, so neither may be
+    # assumed to come first.
+    return _one(
+        rb"<TYPE [^>]*?(?<![A-Za-z])model=\"([^\"]*)\"", block) or _one(
+            rb"<TYPE [^>]*customModel=\"([^\"]*)\"", block)
 
 
 def _device_kind(block: bytes) -> str:
-    return _one(
-        rb"<TYPE customModel=\"[^\"]*\" model=\"[^\"]*\">([^<]*)<", block)
+    return _one(rb"<TYPE [^>]*>([^<]*)<", block)
 
 
 def _device_name(block: bytes) -> str:

@@ -14,6 +14,7 @@ import 'domain_vocabulary.dart';
 import 'human_language.dart';
 import 'learned_answers_service.dart';
 import 'networking_help_reader.dart';
+import 'networking_intellect.dart';
 import 'plan_device_explainer.dart';
 import 'offline_knowledge.dart';
 import 'plan_config_composer.dart';
@@ -589,6 +590,21 @@ class OfflineAssistantService {
     // It runs BEFORE the capability table: "review my design" is advice,
     // while "review the plan" keeps routing to the plan-suggestions
     // capability (the advisor does not claim it).
+    // SENIOR NETWORKING LAYER: deterministic depth for the technical
+    // questions the advisor and the concept table were never built to cover -
+    // route selection, VLSM, wildcards, protocol internals, technology
+    // comparisons, design trade-offs and diagnosis. It runs BEFORE the
+    // advisor because "what is" and "how do I" are not purchase decisions,
+    // and before the concept table because that table answers a short list of
+    // topics only. Its own gates keep build briefs and buying questions out.
+    final intellect = NetworkingIntellect.answer(t);
+    if (intellect != null) {
+      return AssistantReply(
+        _join(opening, intellect.text),
+        quickReplies: _nextStepsFor(plan, help: true),
+        intent: intellect.intent,
+      );
+    }
     final advice = AdvisorService.advise(
       // The normalized text, not the raw one: a typo'd question ("what
       // routr for 30 staff?") must reach the advisor's topic words, and
@@ -885,12 +901,21 @@ class OfflineAssistantService {
       words.length,
       hasPlan: plan != null && plan.nodes.isNotEmpty,
     )) {
-      return _missingReply(
+      final gap = _missingReply(
         t,
         arabic: arabic,
         opening: opening,
         plan: plan,
         seed: seed,
+      );
+      // The turn asked something AND described a lab: the gap answer is the
+      // answer, but the lab it also wrote must not be dropped on the floor.
+      if (briefNote.isEmpty) return gap;
+      return AssistantReply(
+        _join(gap.text, briefNote),
+        questions: gap.questions,
+        quickReplies: gap.quickReplies,
+        intent: gap.intent,
       );
     }
     if (plan != null && plan.nodes.isNotEmpty) {
@@ -1912,12 +1937,25 @@ class OfflineAssistantService {
 
   /// "what can you do", "what do you do", "what are you for", "what's new".
   static final RegExp _identitySkills = RegExp(
-    r'\bwhat\s+(can|could)\s+you\s+do\b|'
-    r'\bwhat\s+(else\s+)?do\s+you\s+do\b|'
+    r'\bwhat\s+(can|could)\s+(this\s+)?(app|assistant|you)\s+do\b|'
+    r'\bwhat\s+(else\s+)?do\s+(you|this\s+(app|assistant))\s+do\b|'
     r'\bwhat\s+are\s+you\s+for\b|'
+    r'\bwhat\s+does\s+(this\s+)?(app|assistant|netbuilder)\s+do\b|'
     r'\bwhat\s+do\s+you\s+support\b|'
     r'\bwhat\s+are\s+your\s+(features|skills|abilities|capabilities)\b|'
+    r'\bwhat\s+is\s+(this\s+)?(app|netbuilder)\b|'
     r"what(?:'?s|\s+is)\s+new\b",
+  );
+
+  /// "what isn't implemented", "what can't you do", "your limitations". The
+  /// honest gap list, not the capability list: a user who asks this has
+  /// usually just hit a boundary and wants it named.
+  static final RegExp _identityLimits = RegExp(
+    r'\bwhat\s+(is\s+not|isn.?t|features?\s+(are\s+not|aren.?t))\s+'
+    r'(implemented|supported|built|done|missing|there)\b|'
+    r'\bwhat\s+(can.?t|cannot|do\s+you\s+not)\s+(you\s+)?(do|support)\b|'
+    r'\bwhat\s+(is|are)\s+(missing|not\s+implemented)\b|'
+    r'\b(limitations?|missing\s+features?)\b',
   );
 
   /// "how are you", "how's it going" - small talk, but about the assistant.
@@ -2015,6 +2053,7 @@ class OfflineAssistantService {
     if (_identityOfflineKey.hasMatch(t)) return 'offline';
     if (_identityMadeBy.hasMatch(t)) return 'made';
     if (_identityAi.hasMatch(t)) return 'ai';
+    if (_identityLimits.hasMatch(t)) return 'limits';
     if (_identitySkills.hasMatch(t)) return 'skills';
     if (_identityWho.hasMatch(t)) return 'who';
     if (_identityWellbeing.hasMatch(t)) return 'wellbeing';
@@ -2065,6 +2104,28 @@ class OfflineAssistantService {
             '- Repair a plan: say "fix the plan" and I clear what can be '
             'cleared.\n\n'
             'Ask one of these, or just describe your network.';
+      case 'limits':
+        // Named boundaries, because a capability list that hides its gaps is
+        // worse than no list: the user asking this has just met one.
+        return 'Here is the honest line, because a list that hides its gaps '
+            'is useless:\n\n'
+            '- Works offline on this device: planning from plain words, '
+            'building the .pkt from bundled templates, subnet math, the config '
+            'corpus, plan checks and repairs.\n'
+            '- Desktop only: driving the real Packet Tracer window (open, '
+            'place, cable, verify) needs Windows with Packet Tracer installed. '
+            'That is live control, not file work.\n'
+            '- Needs an API key: open-ended questions my offline corpus does '
+            'not cover. Without one they get the honest "not in my offline '
+            'material" answer instead of a guess.\n'
+            '- Not implemented anywhere: reading a device screenshot or photo '
+            '(the OCR step also runs only with the desktop engine), non-Cisco '
+            'platforms, and anything outside networking.\n'
+            '- On a phone it is the on-device build path only: a phone cannot '
+            'host the engine, so live control is out of reach there by '
+            'design.\n\n'
+            'Everything else is real - try "2 routers, 1 switch and 4 PCs with '
+            'OSPF", "what is the wildcard mask for /27", or "fix the plan".';
       case 'wellbeing':
         return _pickTone(
           tone,
@@ -2124,6 +2185,19 @@ class OfflineAssistantService {
             '- نصائح التصميم: "which router should I get for a home?".\n'
             '- إصلاح الخطة: قل "fix the plan".\n\n'
             'جرّب أحدها، أو صِف شبكتك بكلماتك.';
+      case 'limits':
+        return 'هذا هو الخط الصريح، لأن قائمة قدرات تخفي ثغراتها لا فائدة منها:\n\n'
+            '- يعمل دون اتصال على جهازك: التخطيط، وبناء ملف .pkt من القوالب '
+            'المرفقة، وحسابات الشبكات، ومادة الإعداد، وفحص الخطة وإصلاحها.\n'
+            '- سطح المكتب فقط: التحكم في نافذة Packet Tracer نفسها (فتح، '
+            'إضافة، توصيل، تحقق) يحتاج Windows مع Packet Tracer مثبتاً.\n'
+            '- يحتاج مفتاح API: الأسئلة المفتوحة التي لا تغطيها مادتي دون '
+            'اتصال؛ وبدونه تحصل على جواب صريح لا على تخمين.\n'
+            '- غير منفَّذ أصلاً: قراءة صورة أو لقطة شاشة لجهاز (خطوة OCR تعمل '
+            'مع محرك سطح المكتب فقط)، والمنصات غير Cisco، وكل ما هو خارج '
+            'الشبكات.\n'
+            '- على الهاتف: مسار البناء على الجهاز فقط؛ لا يمكن استضافة المحرك '
+            'على هاتف، فالتحكم المباشر غير متاح هناك بحكم التصميم.';
       case 'wellbeing':
         return _pick(const [
           'بخير - كل شيء محلي على جهازك، فلا انتظار لأي خادم. ماذا نبني؟',
@@ -2624,7 +2698,9 @@ class OfflineAssistantService {
     }
     if (t.contains('etherchannel') ||
         t.contains('port-channel') ||
-        t.contains('lag')) {
+        // Whole-word 'lag' only: 'flag' and 'flags' are ordinary words in
+        // troubleshooting questions and must not become EtherChannel.
+        RegExp(r'\blag\b').hasMatch(t)) {
       return 'etherchannel';
     }
     if (t.contains('mtu') || t.contains('mss') || t.contains('fragment')) {
@@ -2636,7 +2712,9 @@ class OfflineAssistantService {
         t.contains('handshake')) {
       return 'tcp';
     }
-    if (t.contains('nat') || t.contains('pat')) return 'internet';
+    // Whole-word 'pat' only: 'path' ("bgp path selection") contains the
+    // letters p-a-t and used to be answered as NAT.
+    if (t.contains('nat') || RegExp(r'\bpat\b').hasMatch(t)) return 'internet';
     if (t.contains('qos') ||
         t.contains('priority queue') ||
         t.contains('dscp')) {
@@ -3353,6 +3431,8 @@ class OfflineAssistantService {
     ),
     (topic: 'VPN and IPsec', sample: 'how do I configure a site-to-site VPN'),
     (topic: 'Wireless and wifi', sample: 'how to secure wifi with WPA2'),
+    (topic: 'MAC addresses', sample: 'what is a MAC address'),
+    (topic: 'IP addressing', sample: 'what is an IP address'),
     (topic: 'IPv6', sample: 'how does IPv6 addressing work'),
     (
       topic: 'Ping and traceroute faults',

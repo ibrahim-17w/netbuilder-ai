@@ -538,7 +538,7 @@ class ActivityTodoBar extends StatelessWidget {
                   // The chevron is the affordance the bar exists for.
                   AnimatedRotation(
                     turns: expanded ? 0.0 : 0.5,
-                    duration: const Duration(milliseconds: 150),
+                    duration: AppTheme.motionFast,
                     child: Icon(
                       Icons.keyboard_arrow_down,
                       size: 19,

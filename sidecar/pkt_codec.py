@@ -569,12 +569,14 @@ def pkt_xml_summary(xml: bytes) -> dict:
         inventory.append({
             "name": _one(rb"<NAME translate=\"true\">([^<]*)</NAME>",
                          block, ""),
-            "model": _one(
-                rb"<TYPE customModel=\"[^\"]*\" model=\"([^\"]*)\"",
-                block, ""),
-            "kind": _one(
-                rb"<TYPE customModel=\"[^\"]*\" model=\"[^\"]*\">([^<]*)<",
-                block, ""),
+            # Packet Tracer versions disagree on the attribute order:
+            # <TYPE customModel="" model="2911"> and <TYPE model="2911"
+            # customModel=""> both exist in real saves.
+            "model": (_one(
+                rb"<TYPE [^>]*?(?<![A-Za-z])model=\"([^\"]*)\"", block, "")
+                      or _one(rb"<TYPE [^>]*customModel=\"([^\"]*)\"",
+                              block, "")),
+            "kind": _one(rb"<TYPE [^>]*>([^<]*)<", block, ""),
             "sysName": _one(rb"<SYS_NAME>([^<]*)</SYS_NAME>", block, ""),
             "configLines": len(re.findall(rb"<LINE>", block)),
         })

@@ -6898,11 +6898,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT0",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Humidity-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -6985,11 +6984,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT1",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Generic-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -7072,11 +7070,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT2",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Generic-Environment-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -7159,11 +7156,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT3",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Flex-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -7246,11 +7242,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT4",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Motion-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -7333,11 +7328,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT7",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Photo-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -7420,11 +7414,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT8",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Smoke-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -7507,11 +7500,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT13",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Toggle-Push-Button+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -7594,11 +7586,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT16",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Trip-Wire+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -7681,11 +7672,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT17",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Water-Detector+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -7768,11 +7758,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT18",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Water-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -7855,11 +7844,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT19",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Wind-Sensor+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -7942,11 +7930,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT20",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Air-Cooler+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -8029,11 +8016,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT21",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Alarm+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -8116,11 +8102,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT22",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Ceiling-Sprinkler+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -8203,11 +8188,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT23",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Dimmable-LED+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -8290,11 +8274,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT24",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Floor-Sprinkler+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -8377,11 +8360,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT25",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Heating-Element+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -8464,11 +8446,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT26",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Servo+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -8551,11 +8532,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT32",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Speaker+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -8638,11 +8618,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT34",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Wind-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
@@ -8685,11 +8664,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT36",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Street-Lamp+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
@@ -8720,11 +8698,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT37",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Solar-Panel+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -8838,11 +8815,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT38",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "RFID-Reader+PT-IOT-NM-1CFE+PT-UNV-PWR-ADAPTER",
@@ -8861,11 +8837,10 @@
           "name": "FastEthernet0"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT39",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Power-Meter+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -8979,11 +8954,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT40",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Fan+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -9097,11 +9071,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT42",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Carbon-Monoxide-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
@@ -9144,11 +9117,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT43",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Beacon+PT-UNV-PWR-ADAPTER",
@@ -9172,11 +9144,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT44",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Battery+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -9290,11 +9261,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT45",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Atm-Pressure-Monitor+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -9384,11 +9354,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT46",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Air-Conditioner+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -9502,11 +9471,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT47",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Appliance+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -9620,11 +9588,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT48",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "ISA-3000+ISA3000-SFP-BUILTIN",
@@ -9666,11 +9633,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "ISA0",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "5506-X",
@@ -9734,11 +9700,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "ASA1",
       "hasConfig": true,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Bluetooth-Speaker+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
@@ -9781,11 +9746,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT49",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Carbon-Dioxide-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
@@ -9828,11 +9792,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT50",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Door+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -9946,11 +9909,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT53",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Furnace+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -10064,11 +10026,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT55",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Garage-Door+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -10182,11 +10143,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT56",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Home-Speaker+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -10300,11 +10260,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT58",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Humidifier+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -10418,11 +10377,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT59",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Humidity-Monitor+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
@@ -10465,11 +10423,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT60",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Humiture-Monitor+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
@@ -10512,11 +10469,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT61",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Lawn-Sprinkler+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -10630,11 +10586,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT62",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Light+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -10748,11 +10703,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT63",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Motion-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
@@ -10795,11 +10749,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT64",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Portable-Music-Player+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
@@ -10842,11 +10795,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT65",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Smoke-Detector+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
@@ -10889,11 +10841,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT67",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Siren+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -11007,11 +10958,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT68",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Sound-Frequency-Detector+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -11125,11 +11075,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT71",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Temperature-Monitor+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
@@ -11172,11 +11121,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT72",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Thermostat+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -11290,11 +11238,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT73",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Water-Drain+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -11408,11 +11355,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT74",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Water-Level-Monitor+PT-IOT-NM-1W+PT-UNV-PWR-ADAPTER",
@@ -11455,11 +11401,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT75",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Webcam+PT-IOT-NM-1W+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER+PT-IOT-NM-1CGE",
@@ -11580,11 +11525,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT76",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Trip-Sensor+PT-IOT-NM-1CFE+PT-UNV-PWR-ADAPTER",
@@ -11603,11 +11547,10 @@
           "name": "FastEthernet0"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT81",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Blower+PT-IOT-NM-1CFE+PT-IOT-CUSTOM-IO+PT-UNV-PWR-ADAPTER",
@@ -11697,11 +11640,10 @@
           "namingEvidence": "PT custom-IO slot order"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "IoT85",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "3650-24PS+C3650-BUILTIN+C3650-SFP-BUILTIN",
@@ -11882,11 +11824,10 @@
           "name": "GigabitEthernet1/1/4"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "Multilayer Switch0",
       "hasConfig": true,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Switch-PT-Empty",
@@ -11895,11 +11836,10 @@
       "modules": [],
       "file": "devices/Switch-PT-Empty.xml",
       "ports": [],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "Switch2",
       "hasConfig": true,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "IE-9320+C9320-SFP-BUILTIN",
@@ -12079,11 +12019,10 @@
           "name": "GigabitEthernet1/0/28"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "Multilayer Switch5",
       "hasConfig": true,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Repeater-PT+PT-REPEATER-NM-1CE",
@@ -12107,11 +12046,10 @@
           "name": "Ethernet1"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "Repeater0",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "CoAxialSplitter-PT",
@@ -12142,11 +12080,10 @@
           "namingEvidence": "PT-authored tvcoaxiatpcserver.pkt cable endpoint"
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "Coaxial Splitter0",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Meraki-MX65W",
@@ -12234,11 +12171,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "Security Appliance0",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "3702i",
@@ -12260,11 +12196,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "Light Weight Access Point1",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "AccessPoint-PT-AC+PT-REPEATER-NM-1CGE",
@@ -12288,11 +12223,10 @@
           "name": ""
         }
       ],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "Access Point2",
       "hasConfig": false,
       "hasPhysical": true,
-      "warnings": []
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
     },
     {
       "key": "Cloud-PT-Empty",
@@ -12301,9 +12235,544 @@
       "modules": [],
       "file": "devices/Cloud-PT-Empty.xml",
       "ports": [],
-      "source": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sourceName": "Cloud0",
       "hasConfig": false,
+      "hasPhysical": true,
+      "warnings": [],
+      "sourceVersion": "9.0.0.0810"
+    },
+    {
+      "key": "Router-PT-Empty+PT-ROUTER-NM-1CFE+PT-ROUTER-NM-1FGE",
+      "model": "Router-PT-Empty",
+      "kind": "Router",
+      "modules": [
+        "PT-ROUTER-NM-1CFE",
+        "PT-ROUTER-NM-1FGE"
+      ],
+      "file": "devices/Router-PT-Empty+PT-ROUTER-NM-1CFE+PT-ROUTER-NM-1FGE.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/0"
+        },
+        {
+          "index": 1,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet1/0"
+        },
+        {
+          "index": 2,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet2/0"
+        },
+        {
+          "index": 3,
+          "type": "eFiberGigabitEthernet",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "sourceVersion": "9.0.0.0810",
+      "hasConfig": true,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Switch-PT-Empty+PT-SWITCH-NM-1CFE",
+      "model": "Switch-PT-Empty",
+      "kind": "Switch",
+      "modules": [
+        "PT-SWITCH-NM-1CFE"
+      ],
+      "file": "devices/Switch-PT-Empty+PT-SWITCH-NM-1CFE.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet0/1"
+        },
+        {
+          "index": 1,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet1/1"
+        },
+        {
+          "index": 2,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet2/1"
+        },
+        {
+          "index": 3,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet3/1"
+        },
+        {
+          "index": 4,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet4/1"
+        },
+        {
+          "index": 5,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet5/1"
+        },
+        {
+          "index": 6,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet6/1"
+        },
+        {
+          "index": 7,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet7/1"
+        },
+        {
+          "index": 8,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet8/1"
+        },
+        {
+          "index": 9,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet9/1"
+        }
+      ],
+      "sourceVersion": "9.0.0.0810",
+      "hasConfig": true,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "2911+HWIC-1GE-SFP+GLC-LH-SMD",
+      "model": "2911",
+      "kind": "Router",
+      "modules": [
+        "HWIC-1GE-SFP",
+        "GLC-LH-SMD"
+      ],
+      "file": "devices/2911+HWIC-1GE-SFP+GLC-LH-SMD.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eFiberGigabitEthernet",
+          "family": "",
+          "name": ""
+        },
+        {
+          "index": 1,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet0/0"
+        },
+        {
+          "index": 2,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet0/1"
+        },
+        {
+          "index": 3,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet0/2"
+        }
+      ],
+      "sourceVersion": "9.0.0.0810",
+      "hasConfig": true,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Switch-PT-Empty+PT-SWITCH-NM-1CGE+PT-SWITCH-NM-1CFE",
+      "model": "Switch-PT-Empty",
+      "kind": "Switch",
+      "modules": [
+        "PT-SWITCH-NM-1CGE",
+        "PT-SWITCH-NM-1CFE"
+      ],
+      "file": "devices/Switch-PT-Empty+PT-SWITCH-NM-1CGE+PT-SWITCH-NM-1CFE.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet0/1"
+        },
+        {
+          "index": 1,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/1"
+        },
+        {
+          "index": 2,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet2/1"
+        },
+        {
+          "index": 3,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet3/1"
+        },
+        {
+          "index": 4,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet4/1"
+        },
+        {
+          "index": 5,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet5/1"
+        },
+        {
+          "index": 6,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet6/1"
+        },
+        {
+          "index": 7,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet7/1"
+        },
+        {
+          "index": 8,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet8/1"
+        },
+        {
+          "index": 9,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet9/1"
+        }
+      ],
+      "sourceVersion": "9.0.0.0810",
+      "hasConfig": true,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "3650-24PS+C3650-BUILTIN+C3650-SFP-BUILTIN+AC-POWER-SUPPLY",
+      "model": "3650-24PS",
+      "kind": "MultiLayerSwitch",
+      "modules": [
+        "C3650-BUILTIN",
+        "C3650-SFP-BUILTIN",
+        "AC-POWER-SUPPLY"
+      ],
+      "file": "devices/3650-24PS+C3650-BUILTIN+C3650-SFP-BUILTIN+AC-POWER-SUPPLY.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/1"
+        },
+        {
+          "index": 1,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/2"
+        },
+        {
+          "index": 2,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/3"
+        },
+        {
+          "index": 3,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/4"
+        },
+        {
+          "index": 4,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/5"
+        },
+        {
+          "index": 5,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/6"
+        },
+        {
+          "index": 6,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/7"
+        },
+        {
+          "index": 7,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/8"
+        },
+        {
+          "index": 8,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/9"
+        },
+        {
+          "index": 9,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/10"
+        },
+        {
+          "index": 10,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/11"
+        },
+        {
+          "index": 11,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/12"
+        },
+        {
+          "index": 12,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/13"
+        },
+        {
+          "index": 13,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/14"
+        },
+        {
+          "index": 14,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/15"
+        },
+        {
+          "index": 15,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/16"
+        },
+        {
+          "index": 16,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/17"
+        },
+        {
+          "index": 17,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/18"
+        },
+        {
+          "index": 18,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/19"
+        },
+        {
+          "index": 19,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/20"
+        },
+        {
+          "index": 20,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/21"
+        },
+        {
+          "index": 21,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/22"
+        },
+        {
+          "index": 22,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/23"
+        },
+        {
+          "index": 23,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/0/24"
+        },
+        {
+          "index": 24,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/1/1"
+        },
+        {
+          "index": 25,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/1/2"
+        },
+        {
+          "index": 26,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/1/3"
+        },
+        {
+          "index": 27,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet1/1/4"
+        }
+      ],
+      "sourceVersion": "9.0.0.0810",
+      "hasConfig": true,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Router-PT-Empty+PT-ROUTER-NM-1CGE+PT-ROUTER-NM-1CFE",
+      "model": "Router-PT-Empty",
+      "kind": "Router",
+      "modules": [
+        "PT-ROUTER-NM-1CGE",
+        "PT-ROUTER-NM-1CFE"
+      ],
+      "file": "devices/Router-PT-Empty+PT-ROUTER-NM-1CGE+PT-ROUTER-NM-1CFE.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet0/0"
+        },
+        {
+          "index": 1,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet1/0"
+        },
+        {
+          "index": 2,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet2/0"
+        }
+      ],
+      "sourceVersion": "9.0.0.0810",
+      "hasConfig": true,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "Router-PT-Empty+PT-ROUTER-NM-1CGE+PT-ROUTER-NM-1CFE+PT-ROUTER-NM-1FGE-SM",
+      "model": "Router-PT-Empty",
+      "kind": "Router",
+      "modules": [
+        "PT-ROUTER-NM-1CGE",
+        "PT-ROUTER-NM-1CFE",
+        "PT-ROUTER-NM-1FGE-SM"
+      ],
+      "file": "devices/Router-PT-Empty+PT-ROUTER-NM-1CGE+PT-ROUTER-NM-1CFE+PT-ROUTER-NM-1FGE-SM.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet0/0"
+        },
+        {
+          "index": 1,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet1/0"
+        },
+        {
+          "index": 2,
+          "type": "eCopperFastEthernet",
+          "family": "fastethernet",
+          "name": "FastEthernet2/0"
+        },
+        {
+          "index": 3,
+          "type": "eFiberGigabitEthernet",
+          "family": "",
+          "name": ""
+        }
+      ],
+      "sourceVersion": "9.0.0.0810",
+      "hasConfig": true,
+      "hasPhysical": true,
+      "warnings": []
+    },
+    {
+      "key": "2911+HWIC-2T",
+      "model": "2911",
+      "kind": "Router",
+      "modules": [
+        "HWIC-2T"
+      ],
+      "file": "devices/2911+HWIC-2T.xml",
+      "ports": [
+        {
+          "index": 0,
+          "type": "eSmartSerial",
+          "family": "serial",
+          "name": "Serial0/0/0"
+        },
+        {
+          "index": 1,
+          "type": "eSmartSerial",
+          "family": "serial",
+          "name": "Serial0/0/1"
+        },
+        {
+          "index": 2,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet0/0"
+        },
+        {
+          "index": 3,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet0/1"
+        },
+        {
+          "index": 4,
+          "type": "eCopperGigabitEthernet",
+          "family": "gigabitethernet",
+          "name": "GigabitEthernet0/2"
+        }
+      ],
+      "sourceVersion": "7.3.1.0362",
+      "hasConfig": true,
       "hasPhysical": true,
       "warnings": []
     }
@@ -12368,6 +12837,18 @@
       "type": "eFiber",
       "cable": "eMultiMode",
       "file": "links/eFiber-eMultiMode.xml"
+    },
+    {
+      "key": "eFiber",
+      "type": "eFiber",
+      "cable": "",
+      "file": "links/eFiber.xml"
+    },
+    {
+      "key": "eCopper-eRollOver",
+      "type": "eCopper",
+      "cable": "eRollOver",
+      "file": "links/eCopper-eRollOver.xml"
     }
   ],
   "sources": [
@@ -14316,20 +14797,6 @@
       "version": "9.0.0.0810",
       "devices": 6,
       "links": 1
-    },
-    {
-      "path": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sha256": "b7b1af1136e446322ffc3f7d11fc765c6ea53acec5064bbba57026e718131332",
-      "version": "9.0.0.0810",
-      "devices": 71,
-      "links": 0
-    },
-    {
-      "path": "C:\\Users\\L\\Desktop\\devices.pkt",
-      "sha256": "4265df2587bc2ebe2e23c4e96e81cff02df59599e952f1ccbfeaf0bdcb41e70a",
-      "version": "9.0.0.0810",
-      "devices": 145,
-      "links": 0
     }
   ],
   "warnings": [

@@ -30,9 +30,12 @@ import '../services/request_understanding/model_proposal_service.dart';
 import '../services/adapters/packet_tracer_adapter.dart';
 import '../services/advisor_service.dart' show AdviceAnswer;
 import '../services/ai_provider.dart';
+import '../services/app_diagnostics.dart';
 import '../services/assistant_voice.dart';
 import '../services/autopilot_service.dart';
 import '../services/attachment_ocr.dart';
+import '../services/chat_export_service.dart';
+import '../services/bidi_text.dart';
 import '../services/build_guide.dart';
 import '../services/build_preflight.dart';
 import '../services/build_request_reader.dart';
@@ -62,6 +65,7 @@ import '../services/context_report.dart';
 import '../services/conversation_titles.dart';
 import '../services/design_library.dart';
 import '../services/pkt/on_device_pkt_builder.dart';
+import '../services/pkt/pkt_capture_analysis.dart';
 import '../services/pkt_build_job_service.dart';
 import '../services/pkt/pkt_export_service.dart';
 import '../services/pkt_analysis_chat.dart';
@@ -410,6 +414,7 @@ class _ChatScreenState extends State<ChatScreen> {
   List<ChatMessage> _messages = [];
   List<ChatImage> _pending = [];
   bool _busy = false;
+  bool _exportingChats = false;
   bool _buildInFlight = false;
   int? _editingMessageIndex;
   ChatMessage? _editingMessage;
@@ -1180,7 +1185,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       _scroll.animateTo(
         target,
-        duration: const Duration(milliseconds: 220),
+        duration: AppTheme.motionMedium,
         curve: Curves.easeOut,
       );
     });
@@ -3876,8 +3881,8 @@ class _ChatScreenState extends State<ChatScreen> {
       // "done".
       Map<String, dynamic>? audit;
       try {
-        final a = OnDevicePktBuilder.auditReport(
-          built.file.readAsBytesSync(),
+        final a = await OnDevicePktBuilder.auditReportInBackground(
+          await built.file.readAsBytes(),
           path: path,
           project: buildIdentity.projectId,
         );
@@ -4030,6 +4035,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// Decrypt and audit a .pkt completely offline: no Packet Tracer, no
   /// window, no clicks. Findings come back as Approve/Reject cards.
+  ///
+  /// Two readers, chosen by what this platform actually has. A desktop with
+  /// the engine answering uses it first, because its report is the one the
+  /// repair cards were written against. A phone - and a desktop with no
+  /// engine - reads the file here with the same codec that wrote it. The
+  /// old flow asked the engine unconditionally, so a phone refused a file it
+  /// could decrypt itself, with an error about live Packet Tracer control.
   Future<void> _scanPkt(String path, String name) async {
     final ask = ChatMessage(
       role: 'user',
@@ -4044,28 +4056,53 @@ class _ChatScreenState extends State<ChatScreen> {
     _jumpToEnd();
     try {
       final svc = _engine();
-      // Say plainly what the file is before trying to read it: a .pcap
-      // gets an explanation, not a decode error.
-      final ident = await svc.pktIdentify(path);
-      if (ident['isPkt'] != true) {
+      final preferOnDevice =
+          _settings?.preferOnDevicePkt ?? SettingsService.isMobile;
+      // Never wait on a sidecar this platform cannot run: a phone build does
+      // its work locally, and an analysis should not cost a timeout first.
+      final engineHealthy = SettingsService.isMobile && preferOnDevice
+          ? false
+          : await svc.healthy;
+      Map<String, dynamic>? ident;
+      Map<String, dynamic>? report;
+      if (!preferOnDevice && engineHealthy) {
+        try {
+          // Say plainly what the file is before trying to read it: a .pcap
+          // gets an explanation, not a decode error.
+          ident = await svc.pktIdentify(path);
+          if (ident['isPkt'] == true) {
+            report = await svc.pktAudit(path, project: _project.text.trim());
+          }
+        } catch (_) {
+          // The engine stopped mid-request. Its error is not the file's
+          // fault, so fall through to this device's own reader.
+          report = null;
+        }
+      }
+      final what = ident ?? await PktCaptureAnalysis.identify(path, name: name);
+      if (what['isPkt'] != true) {
         if (!mounted) return;
         setState(() {
           _busy = false;
           _status = '';
         });
-        _appendSystem('${ident['message'] ?? 'That file is not a .pkt save.'}');
+        _appendSystem('${what['message'] ?? 'That file is not a .pkt save.'}');
         return;
       }
+      final audited =
+          report ??
+          await PktCaptureAnalysis.audit(path, project: _project.text.trim());
       // Keep a bounded snapshot of what the offline scan actually read so
       // follow-up questions can use the same evidence after a restart.
       _capturePath = path;
-      if (_chat != null) _chat = _withTools(_chat!);
-      final report = await svc.pktAudit(path, project: _project.text.trim());
-      final analysis = PktAnalysisChat.snapshot(report, path: path, name: name);
+      // Tools talk to the engine. Handing them to the model on a phone, or
+      // against a dead sidecar, would only produce failed calls.
+      if (_chat != null && engineHealthy) _chat = _withTools(_chat!);
+      final analysis = PktAnalysisChat.snapshot(audited, path: path, name: name);
       final analysisJson = jsonEncode(analysis);
       final turn = ChatMessage(
         role: 'model',
-        text: _auditText(report, name, path),
+        text: _auditText(audited, name, path),
         createdAt: DateTime.now().toIso8601String(),
         // The scan is a report; this card turns it into the lab. The whole
         // guide/build/edit machinery only works on a standing plan, and the
@@ -4113,10 +4150,15 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _status =
-            'Could not read that capture: '
-            '${e.toString().replaceFirst('Exception: ', '')}';
+        _status = '';
       });
+      _appendSystem(
+        'Could not read $name: '
+        '${e.toString().replaceFirst('Exception: ', '')}.\n\n'
+        'The file may be truncated or saved in a format this reader does not '
+        'know. Open it in Packet Tracer once and use File > Save As to write '
+        'a fresh .pkt, then pick that.',
+      );
     }
   }
 
@@ -4224,9 +4266,17 @@ class _ChatScreenState extends State<ChatScreen> {
                   (artifact) => !pathsBefore.contains(artifact.path),
                 ) ||
                 (_capturePath.isNotEmpty && _capturePath != captureBefore);
+            final jobs = PktBuildJobService.instance;
+            // The reason, not just the outcome: the user already saw the card
+            // above, and "not completed" alone never says what to change.
+            final failure = jobs.error.trim();
             results.add(
               built
                   ? 'Packet Tracer file: built; see the build result above.'
+                  : failure.isNotEmpty
+                  ? 'Packet Tracer file: not built - $failure'
+                  : jobs.status == PktBuildJobStatus.cancelled
+                  ? 'Packet Tracer file: the build was cancelled.'
                   : 'Packet Tracer file: not completed; see the build status above.',
             );
             final currentPlan = _lastIntent;
@@ -5942,27 +5992,17 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     final editInPlace = fileIntent == FileEditIntent.editExisting;
     final userTurn = _makeUserTurn(text, attachments);
+    // A question ABOUT the lab must not overwrite the turn that built it.
+    // `requestOutcomeJson` is the standing plan's identity, revision and
+    // requirements - exactly what a later "build it" merges against. Writing
+    // an answer-only reading over it made an advice turn look like a new plan
+    // turn and dropped those requirements, so the build command stopped
+    // resolving to the network the conversation had just agreed on. An advice
+    // turn therefore records nothing structured: the plan, its outcome and its
+    // requirements stay exactly as the committed turn wrote them, and the
+    // question itself is kept in the transcript like any other turn.
     if (_activeRequestToken == token && _activeRequestOutcome != null) {
       _state.requestOutcomeTurnCreatedAt = userTurn.createdAt;
-    } else if (!ScopeGate.isOffTopic(text) &&
-        (helpOnly || exploring || _wantsPreview.hasMatch(text))) {
-      final reading = RequestInterpretationAdapter.adapt(
-        originalText: text,
-        projectName: _lastIntent?.projectName ?? _conversation,
-        turnId: '$_conversation-${DateTime.now().microsecondsSinceEpoch}',
-        conversationId: _conversation,
-        projectId: _conversation,
-        basePlanRevision: _lastIntent?.revision ?? '',
-      ).copyWith(requirements: _currentRequirements);
-      _state
-        ..requestOutcomeJson = jsonEncode(
-          RequestOutcome(
-            interpretation: reading,
-            candidatePlan: _lastIntent,
-            disposition: RequestDisposition.answerOnly,
-          ).toJson(),
-        )
-        ..requestOutcomeTurnCreatedAt = userTurn.createdAt;
     }
     // LAYER 2: fold the new turn into the structured state before anything is
     // sent, so "what about its gateway?" is answerable from data rather than
@@ -6778,14 +6818,22 @@ class _ChatScreenState extends State<ChatScreen> {
         !NetworkingHelpReader.asksForExplanation(text) &&
         !ScopeGate.isOffTopic(text)) {
       _bindLegacyPendingQuestionContexts();
-      if (_hasStalePendingQuestionContext()) {
-        await _rejectStalePendingAnswer();
-        return;
-      }
       final answered = await _resolvePendingClarification(
         normalized.isEmpty ? text : normalized,
       );
+      // Only a message that RESOLVES a pending question can be an answer, so
+      // only that message can be refused for being stale. The check used to
+      // run first, against any message at all: while a question asked about an
+      // older plan revision was open, a correction that answered nothing -
+      // "not 99 servers 3 servers AAA, dhcp, and http" - was still swallowed
+      // with "I did not apply that answer", and the user's fix was lost
+      // instead of being planned. Unanswered text falls through to the normal
+      // routing below, as it does when no question is open.
       if (answered.isNotEmpty) {
+        if (_hasStalePendingQuestionContext()) {
+          await _rejectStalePendingAnswer();
+          return;
+        }
         await _applyClarificationAnswers(answered);
         return;
       }
@@ -7290,10 +7338,17 @@ class _ChatScreenState extends State<ChatScreen> {
       // conversation turns into a form.
       clarifyingQuestions: const [],
     );
-    // The advice branch already closes with its own "nothing changed" line,
-    // and the scope decline speaks for itself; every other branch gets the
-    // guarantee, so no exploring answer ever leaves it implied.
-    final body = reply.intent == 'advice' || reply.intent == 'offtopic'
+    // EVERY exploring answer carries the guarantee unless it already says
+    // it. Advice used to be exempt on the assumption that its closing line
+    // said "nothing changed" - but an advice answer with no plan to offer
+    // has no closing line at all, so a what-if about scale could leave the
+    // user unsure whether the lab had moved. Only a decline (which speaks
+    // for itself) and an answer already saying it may skip the line.
+    final alreadySaysIt = RegExp(
+      r'nothing (?:in your lab |in the plan )?changed',
+      caseSensitive: false,
+    ).hasMatch(reply.text);
+    final body = reply.intent == 'offtopic' || alreadySaysIt
         ? reply.text
         : '${reply.text}$_exploringTail';
     if (!mounted) return;
@@ -7317,12 +7372,9 @@ class _ChatScreenState extends State<ChatScreen> {
       actions: const [],
     );
     _state.observe(answer);
-    final store = _memory;
-    if (store != null && store.ready) {
-      try {
-        await store.setSessionState(_conversation, _state.encode());
-      } catch (_) {}
-    }
+    // Reveal FIRST, persist after: a stored write can take a moment, and a
+    // blank turn sitting under the question while it finishes is the app
+    // looking stuck. The answer is already computed; let it start typing.
     _revealAnswer(
       turn,
       body,
@@ -7337,6 +7389,12 @@ class _ChatScreenState extends State<ChatScreen> {
         await _refreshConversations();
       },
     );
+    final store = _memory;
+    if (store != null && store.ready) {
+      try {
+        await store.setSessionState(_conversation, _state.encode());
+      } catch (_) {}
+    }
   }
 
   void _reportConversationPersistenceIssue({
@@ -9062,6 +9120,18 @@ class _ChatScreenState extends State<ChatScreen> {
             onPressed: _openSearch,
           ),
           IconButton(
+            tooltip: 'Export all chats for training',
+            visualDensity: VisualDensity.compact,
+            icon: _exportingChats
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.download_outlined, size: 18),
+            onPressed: _exportingChats ? null : _exportAllChatsForTraining,
+          ),
+          IconButton(
             tooltip: 'New chat',
             visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.add_comment_outlined, size: 18),
@@ -9070,6 +9140,94 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
+  }
+
+  /// Export every conversation, the plans and builds behind them, generated
+  /// files, open questions and a redacted app log as one local JSON document.
+  ///
+  /// This is deliberately a user action with a review dialog, not a background
+  /// upload: the file is handed to the platform save dialog and nothing leaves
+  /// the machine unless the user sends it. Generated .pkt files can contain
+  /// lab credentials, so the dialog says to review the file before sharing it.
+  Future<void> _exportAllChatsForTraining() async {
+    if (_exportingChats) return;
+    final memory = _memory;
+    if (memory == null || !memory.ready) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Memory is still opening. Try the export again in a moment.',
+          ),
+        ),
+      );
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Export all chats for training?'),
+        content: const SingleChildScrollView(
+          child: Text(
+            'Creates one JSON file on this device. It includes every '
+            'conversation, the plans and builds it produced, generated .pkt '
+            'files, chat attachments, questions the offline material could '
+            'not answer, and a redacted app log. Nothing is uploaded by the '
+            'app.\n\n'
+            'Review the file before sending it: chats can contain network '
+            'details, and generated .pkt files can contain lab credentials. '
+            'API keys and secure-storage values are never included.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            icon: const Icon(Icons.download_outlined, size: 18),
+            label: const Text('Export'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _exportingChats = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final result = await ChatExportService.export(
+        memory: memory,
+        buildJobs: PktBuildJobService.instance,
+        diagnostics: () => AppDiagnostics.instance.exportText(),
+      );
+      if (!mounted) return;
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save NetBuilder chat export',
+        fileName: result.fileName,
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        bytes: result.bytes,
+      );
+      if (path == null || path.trim().isEmpty) return;
+      if (!Platform.isAndroid && !Platform.isIOS) {
+        await File(path).writeAsBytes(result.bytes, flush: true);
+      }
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 8),
+          content: Text(
+            'Exported ${result.messages} messages, ${result.conversations} '
+            'conversations and ${result.files} files to $path. Nothing was '
+            'uploaded.',
+          ),
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Chat export failed: $e')));
+    } finally {
+      if (mounted) setState(() => _exportingChats = false);
+    }
   }
 
   /// Open a fresh conversation. The old one keeps its own transcript in
@@ -9130,7 +9288,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (target != null) {
         Scrollable.ensureVisible(
           target,
-          duration: const Duration(milliseconds: 240),
+          duration: AppTheme.motionMedium,
           curve: Curves.easeOut,
           alignment: 0.05,
         );
@@ -9751,22 +9909,27 @@ class _ChatScreenState extends State<ChatScreen> {
                           if (message.text.trim().isNotEmpty)
                             // The bubble chooses the ink, so text and fill can
                             // never disagree (the invisible-text bug class).
-                            DefaultTextStyle(
-                              style:
-                                  (theme.textTheme.bodyMedium ??
-                                          const TextStyle())
-                                      .copyWith(color: ink, height: 1.5),
-                              // Headings, bullets, fenced code and tables
-                              // render as such; selection is kept so commands
-                              // can be copied.
-                              child: SelectionArea(
-                                child: ChatMarkdownView(
-                                  source: message.text,
-                                  // A `.pkt` path in the answer is a
-                                  // control: tap opens Packet Tracer when
-                                  // this machine has it, the built-in
-                                  // viewer when it does not.
-                                  onFilePathTap: _onPktPathTap,
+                            Directionality(
+                              textDirection: BidiText.isRtl(message.text)
+                                  ? TextDirection.rtl
+                                  : TextDirection.ltr,
+                              child: DefaultTextStyle(
+                                style:
+                                    (theme.textTheme.bodyMedium ??
+                                            const TextStyle())
+                                        .copyWith(color: ink, height: 1.5),
+                                // Headings, bullets, fenced code and tables
+                                // render as such; selection is kept so commands
+                                // can be copied.
+                                child: SelectionArea(
+                                  child: ChatMarkdownView(
+                                    source: message.text,
+                                    // A `.pkt` path in the answer is a
+                                    // control: tap opens Packet Tracer when
+                                    // this machine has it, the built-in
+                                    // viewer when it does not.
+                                    onFilePathTap: _onPktPathTap,
+                                  ),
                                 ),
                               ),
                             ),
@@ -11290,7 +11453,23 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ],
           ),
-          if (chooseDesignFirst)
+          if (expiredBuildCard)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, left: 26),
+              child: Text(
+                actionRevision == _lastIntent?.revision
+                    ? 'This card was written for plan rev $actionRevision, '
+                          'but the drawing has changed since. Ask me to build '
+                          'the current plan for a fresh card.'
+                    : 'This card was written for plan rev '
+                          '${actionRevision.isEmpty ? 'unknown' : actionRevision}'
+                          '; the plan is now rev '
+                          '${_lastIntent?.revision ?? 'unknown'}. Ask me to '
+                          'build the current plan for a fresh card.',
+                style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+              ),
+            )
+          else if (chooseDesignFirst)
             Padding(
               padding: const EdgeInsets.only(top: 4, left: 26),
               child: Text(
@@ -11812,7 +11991,10 @@ class _ChatScreenState extends State<ChatScreen> {
             '${HumanLanguage.count(library.devices.length, 'device template')}: '
             '${(library.kinds.toList()..sort()).join(', ')}';
       });
-      final audit = OnDevicePktBuilder.audit(File(path).readAsBytesSync());
+      final audit = await OnDevicePktBuilder.auditInBackground(
+        await File(path).readAsBytes(),
+      );
+      if (!mounted) return;
       _appendSystem(
         '**Seed imported.** I can now build '
         '${audit.kinds.toList()..sort()}\n\n'
@@ -12036,10 +12218,58 @@ class _ChatScreenState extends State<ChatScreen> {
     return b.toString();
   }
 
+  /// The network this conversation is standing on, in one quiet line above
+  /// the box: "Following: 2 routers · 4 switches · 10 PCs".
+  String _standingLabLine() {
+    final plan = _lastIntent;
+    if (plan == null || plan.nodes.isEmpty) return '';
+    final counts = <String, int>{};
+    for (final node in plan.nodes) {
+      counts.update(node.type, (value) => value + 1, ifAbsent: () => 1);
+    }
+    const order = <String>[
+      'router',
+      'wireless-router',
+      'switch',
+      'wireless',
+      'firewall',
+      'server',
+      'pc',
+      'laptop',
+      'tablet',
+      'phone',
+      'printer',
+    ];
+    const labels = <String, String>{
+      'router': 'router',
+      'wireless-router': 'wireless router',
+      'switch': 'switch',
+      'wireless': 'AP',
+      'firewall': 'firewall',
+      'server': 'server',
+      'pc': 'PC',
+      'laptop': 'laptop',
+      'tablet': 'tablet',
+      'phone': 'phone',
+      'printer': 'printer',
+    };
+    final parts = <String>[
+      for (final type in order)
+        if ((counts[type] ?? 0) > 0)
+          HumanLanguage.count(counts[type]!, labels[type]!),
+      for (final entry in counts.entries)
+        if (!labels.containsKey(entry.key))
+          HumanLanguage.count(entry.value, entry.key),
+    ];
+    if (parts.isEmpty) return '';
+    return 'Following: ${parts.join(' · ')}';
+  }
+
   Widget _composer() {
     final scheme = Theme.of(context).colorScheme;
     return ChatComposer(
       busy: _busy,
+      standing: _standingLabLine(),
       canCancelWhileBusy:
           _activeRequestSnapshotPendingToken == null ||
           _generation.isCurrent(_activeRequestSnapshotPendingToken!),

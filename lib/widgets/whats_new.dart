@@ -15,6 +15,16 @@ kChangelogEntries = [
           'the plan and the file it builds',
       'The .pkt builder no longer drops a cableable device out of the '
           'Physical Workspace, which made Packet Tracer refuse some saves',
+      'A lab whose routers chain more than one hop away builds again: '
+          '4+ router chains used to stop while writing routes',
+      'Digits inside a password no longer count as devices: "password Net@99" '
+          'used to plan ninety-nine servers',
+      'A correction keeps the rest of the lab: "not 99 servers 3 servers" '
+          'changes the server count and leaves your PCs, switches and routers '
+          'alone instead of re-planning a five-device network',
+      'An answer to an old question can no longer swallow your message: a '
+          'correction you type is planned even while an outdated question is '
+          'still on screen',
       'Explicit server roles stay on the server the brief names '
           '("DHCP on SRV1, DNS on SRV2")',
       'Unsupported service requests (DHCP failover, Active Directory) are '
@@ -219,7 +229,14 @@ class FirstRunTour extends StatelessWidget {
 
 /// A compact "what's new" card shown (once per version) at the top of the
 /// Action Hub so existing users see what changed without a full tour.
+///
+/// The hub's list is lazy: the card is its first row, so a release with a
+/// long list pushed the first feature group off the panel and the hub
+/// opened on release notes instead of on the product. Three bullets is the
+/// most the card may take; the rest is a line pointing at Settings.
 class ChangelogCard extends StatelessWidget {
+  static const int _bullets = 3;
+
   final SettingsService settings;
 
   const ChangelogCard({super.key, required this.settings});
@@ -269,7 +286,7 @@ class ChangelogCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            for (final change in latest.changes)
+            for (final change in latest.changes.take(_bullets))
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Row(
@@ -280,6 +297,16 @@ class ChangelogCard extends StatelessWidget {
                       child: Text(change, style: theme.textTheme.bodySmall),
                     ),
                   ],
+                ),
+              ),
+            if (latest.changes.length > _bullets)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'and ${latest.changes.length - _bullets} more in Settings',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
           ],

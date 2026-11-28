@@ -283,7 +283,10 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
     if (settings == null || !settings.loaded || settings.tourDone) return;
     _tourStarted = true;
     // Let the chat paint first: the tour is an introduction, not a splash.
-    await Future<void>.delayed(const Duration(milliseconds: 600));
+    // This waits for the frame to actually finish rather than guessing at a
+    // delay: 600 ms opened the tour over a half-painted screen on a slow
+    // machine and opened it 600 ms late on a fast one.
+    await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
     final ctx = _shellContext;
     if (ctx == null || !ctx.mounted) return;
@@ -600,7 +603,7 @@ class _NetBuilderAppState extends State<NetBuilderApp> {
   /// half-finished list still paints instead of flashing empty.
   Widget _shellBody() {
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 160),
+      duration: AppTheme.motionFast,
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeIn,
       transitionBuilder: (child, animation) => FadeTransition(

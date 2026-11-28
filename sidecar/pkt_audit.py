@@ -37,15 +37,35 @@ def _enabled(block: bytes, tag: str) -> bool:
     return bool(m and m.group(1) == b"1")
 
 
+def _type_of(block: bytes) -> Tuple[str, str]:
+    """(model, kind) from a device block, whatever order its attributes are in.
+
+    Packet Tracer writes both <TYPE customModel="" model="2960-24TT"> and
+    <TYPE model="2960-24TT" customModel=""> depending on the version that
+    saved the file. Keying on one order made every model from the other order
+    come back empty, which quietly skipped whole panels.
+    """
+    m = re.search(rb"<TYPE ([^>]*)>([^<]*)<", block, re.S)
+    if not m:
+        return "", ""
+    attrs, kind = m.group(1), m.group(2).decode("utf-8", "replace")
+    model = ""
+    mm = re.search(rb'(?<![A-Za-z])model="([^"]*)"', attrs)
+    if mm:
+        model = mm.group(1).decode("utf-8", "replace")
+    if not model:
+        cm = re.search(rb'customModel="([^"]*)"', attrs)
+        if cm:
+            model = cm.group(1).decode("utf-8", "replace")
+    return model, kind
+
+
 def devices(xml: bytes) -> List[dict]:
     """Device inventory: name, kind, model, config lines, interface IPs."""
     out = []
     for block in re.findall(rb"<DEVICE>.*?</DEVICE>", xml, re.S):
         name = _text(block, "NAME")
-        m = re.search(rb'<TYPE customModel="[^"]*" model="([^"]*)">([^<]*)<',
-                      block)
-        model = m.group(1).decode("utf-8", "replace") if m else ""
-        kind = m.group(2).decode("utf-8", "replace") if m else ""
+        model, kind = _type_of(block)
         ips = sorted(set(re.findall(rb"IP_ADDRESS>(\d+\.\d+\.\d+\.\d+)<",
                                     block))
                      | set(re.findall(rb"<IP>(\d+\.\d+\.\d+\.\d+)</IP>",
@@ -395,10 +415,7 @@ def server_services(xml: bytes) -> Dict[str, List[dict]]:
         name = _text(block, "NAME")
         if not name:
             continue
-        m = re.search(rb'<TYPE customModel="[^"]*" model="([^"]*)">([^<]*)<',
-                      block)
-        kind = m.group(2).decode("utf-8", "replace") if m else ""
-        model = m.group(1).decode("utf-8", "replace") if m else ""
+        model, kind = _type_of(block)
         if not _is_server(kind, model):
             continue
         rows = []
@@ -464,10 +481,7 @@ def aaa_state(xml: bytes) -> Dict[str, dict]:
         m = re.search(rb"<ACS_SERVER[^>]*>(.*?)</ACS_SERVER>", block, re.S)
         if not m or not name:
             continue
-        tm = re.search(rb'<TYPE customModel="[^"]*" model="([^"]*)">([^<]*)<',
-                       block)
-        kind = tm.group(2).decode("utf-8", "replace") if tm else ""
-        model = tm.group(1).decode("utf-8", "replace") if tm else ""
+        model, kind = _type_of(block)
         if not _is_server(kind, model):
             continue
         body = m.group(1)

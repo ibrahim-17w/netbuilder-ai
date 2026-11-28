@@ -463,6 +463,42 @@ class RequestCoordinator {
             brief: legacyBrief,
           );
         }
+        // THE TYPED PATCH COULD NOT BE VALIDATED. A grown inventory has no
+        // cables until something wires it, so "make it 30 pcs" used to be
+        // held as an invalid candidate even though the established reader had
+        // already produced a cabled, valid plan. When the reader's plan keeps
+        // every device this turn did not name, it IS the lab the conversation
+        // is about, and holding the turn only makes the user repeat himself.
+        // Only an UNVALIDATED candidate may fall back: a turn held for an
+        // unresolved device ("change only SRV9 to DNS") or a stale revision
+        // is not a validation problem, and applying part of it would answer
+        // a request the app could not read.
+        final validationOnly =
+            applied.issues.isNotEmpty &&
+            applied.issues.every(
+              (issue) => issue.code == 'candidate_validation_failed',
+            );
+        if (validationOnly &&
+            legacyCandidate != null &&
+            legacyCandidate.revision != base.revision &&
+            _preservesInventory(base, legacyCandidate, text) &&
+            _noNewBlockingFindings(base, legacyCandidate, target)) {
+          interpretation = interpretation.copyWith(
+            requirements: merge.requirements,
+            mutationPolicy: MutationPolicy.commitIfValid,
+          );
+          return RequestCoordinatorOutcome(
+            target: target,
+            base: base,
+            interpretation: interpretation,
+            merge: merge,
+            candidate: legacyCandidate,
+            changeSet: null,
+            disposition: RequestDisposition.commit,
+            route: CoordinatedRequestRoute.legacyPlan,
+            brief: legacyBrief,
+          );
+        }
         final capacityIssue = _routerTotalCapacityIssue(
           base: base,
           operations: interpretation.operations,
@@ -498,6 +534,62 @@ class RequestCoordinator {
             operations: interpretation.operations,
             text: text,
           )) {
+        final typedKeeps = _preservesInventory(base, applied.candidate!, text);
+        final legacyKeeps = _preservesInventory(base, legacyCandidate, text);
+        if (legacyKeeps && !typedKeeps) {
+          // The typed patch drops devices this turn never asked to remove and
+          // the reader kept them. An edit may change what it names; it may
+          // not rebuild the rest of the network, so the reader's plan wins.
+          interpretation = interpretation.copyWith(
+            requirements: merge.requirements,
+            mutationPolicy: MutationPolicy.commitIfValid,
+          );
+          return RequestCoordinatorOutcome(
+            target: target,
+            base: base,
+            interpretation: interpretation,
+            merge: merge,
+            candidate: legacyCandidate,
+            changeSet: null,
+            disposition: RequestDisposition.commit,
+            route: CoordinatedRequestRoute.legacyPlan,
+            brief: legacyBrief,
+          );
+        }
+        if (!typedKeeps || legacyKeeps) {
+          final issue = RequestIssue(
+            id: 'request-$turnId-candidate-disagreement',
+            kind: RequestIssueKind.conflict,
+            code: 'candidate_interpretation_disagreement',
+            message:
+                'The typed edits and the existing network reader produce different designs. The request is held so no part is applied until the wording is resolved.',
+            requirementIds: {
+              for (final operation in interpretation.operations)
+                ...operation.requirementIds,
+            }.toList(),
+            sourceSpans: [
+              for (final operation in interpretation.operations)
+                ...operation.sourceSpans,
+            ],
+          );
+          interpretation = interpretation.copyWith(
+            requirements: merge.requirements,
+            issues: [issue],
+          );
+          return RequestCoordinatorOutcome(
+            target: target,
+            base: base,
+            interpretation: interpretation,
+            merge: merge,
+            candidate: null,
+            changeSet: null,
+            disposition: RequestDisposition.ask,
+            route: CoordinatedRequestRoute.blocked,
+            brief: legacyBrief,
+          );
+        }
+        // Both preserved the inventory and still disagree: hold the turn.
+        // Neither losing devices quietly nor choosing arbitrarily is right.
         final issue = RequestIssue(
           id: 'request-$turnId-candidate-disagreement',
           kind: RequestIssueKind.conflict,
@@ -1031,6 +1123,54 @@ class RequestCoordinator {
         left.toJson(includeSecrets: false),
         right.toJson(includeSecrets: false),
       );
+
+  /// True when [candidate] still holds every device [base] had, apart from
+  /// the kinds and names this turn asked to change.
+  ///
+  /// This is the memory rule for edits: a turn may remove or resize what it
+  /// names, and may not quietly rebuild the rest of the network. Without it an
+  /// edit's fragment was read as a whole new brief and a 24-device lab became
+  /// the two devices the sentence mentioned.
+  static bool _preservesInventory(
+    NetworkIntent base,
+    NetworkIntent candidate,
+    String text,
+  ) {
+    final targets = NetworkIntent.editTargets(text, standing: base.nodes);
+    for (final node in base.nodes) {
+      if (targets.names.contains(node.name)) continue;
+      if (targets.kinds.contains(node.type)) continue;
+      if (!candidate.nodes.any((kept) => kept.name == node.name)) return false;
+    }
+    return true;
+  }
+
+  /// [candidate] introduces no blocking validator finding that [base] did not
+  /// already have - the same bar the typed applier holds its own results to.
+  static bool _noNewBlockingFindings(
+    NetworkIntent base,
+    NetworkIntent candidate,
+    String target,
+  ) {
+    final before = <String, int>{};
+    for (final finding in ValidatorService.validate(base, target: target)) {
+      if (!finding.blocks) continue;
+      before.update(finding.message, (count) => count + 1, ifAbsent: () => 1);
+    }
+    for (final finding in ValidatorService.validate(
+      candidate,
+      target: target,
+    )) {
+      if (!finding.blocks) continue;
+      final left = before[finding.message] ?? 0;
+      if (left > 0) {
+        before[finding.message] = left - 1;
+        continue;
+      }
+      return false;
+    }
+    return true;
+  }
 
   static bool _typedEditExplainsLegacyDifference({
     required NetworkIntent base,

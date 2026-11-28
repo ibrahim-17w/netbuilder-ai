@@ -82,15 +82,33 @@ class _RequestOutcomeCardState extends State<RequestOutcomeCard> {
           coverage?.forRequirement(fact.id)?.planning ==
           PlanningStatus.satisfied,
     );
-    final issues = <String, String>{
-      for (final issue in request.issues) issue.id: issue.message,
-      for (final issue in widget.outcome.clarifications)
-        issue.id: issue.message,
-      for (final fragment in request.unresolvedFragments)
-        fragment.id: fragment.text,
-      for (final question in request.pendingQuestions)
-        question.id: question.prompt,
-    };
+    // One row per open item. A diagnostic is repeated ABOVE in the answer
+    // itself, so the card labels the action and keeps the full sentence in a
+    // tooltip; a clarification or a pending question is the thing the user
+    // must read and answer, so it is shown whole.
+    final issues = <({String id, String text, String label})>[];
+    final seenIssues = <String>{};
+    void addIssue(String id, String text, String label) {
+      // The coordinator can carry one finding as both an issue and a
+      // clarification. The card is a short list of what to answer, not a
+      // place to say the same sentence twice.
+      final key = text.trim().toLowerCase();
+      if (key.isEmpty || !seenIssues.add(key)) return;
+      issues.add((id: id, text: text, label: label));
+    }
+
+    for (final issue in request.issues) {
+      addIssue(issue.id, issue.message, _issueLabel(issue.code, issue.kind));
+    }
+    for (final issue in widget.outcome.clarifications) {
+      addIssue(issue.id, issue.message, issue.message);
+    }
+    for (final fragment in request.unresolvedFragments) {
+      addIssue(fragment.id, fragment.text, fragment.text);
+    }
+    for (final question in request.pendingQuestions) {
+      addIssue(question.id, question.prompt, question.prompt);
+    }
     final changes = _changes(widget.outcome);
     final counts = <String, int>{};
     for (final node in plan?.nodes ?? <NetNode>[]) {
@@ -162,188 +180,226 @@ class _RequestOutcomeCardState extends State<RequestOutcomeCard> {
           ),
     );
 
-    return Padding(
-      padding: const EdgeInsets.only(top: AppTheme.s6),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: AppTheme.readingMeasure),
-        child: Container(
-          key: const ValueKey('request-outcome-card'),
-          padding: const EdgeInsets.all(AppTheme.s12),
-          decoration: BoxDecoration(
-            color: AppPalette.neutralFill(scheme),
-            borderRadius: BorderRadius.circular(AppTheme.rMd),
-            border: Border.all(color: AppPalette.accentBorder(scheme)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                arabic ? 'ما فهمته' : 'Understood',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: scheme.primary,
+    return Directionality(
+      // The card's own copy is Arabic when the request was Arabic; the whole
+      // card mirrors, including the chips and the action rows.
+      textDirection: arabic ? TextDirection.rtl : TextDirection.ltr,
+      child: Padding(
+        padding: const EdgeInsets.only(top: AppTheme.s6),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: AppTheme.readingMeasure),
+          child: Container(
+            key: const ValueKey('request-outcome-card'),
+            padding: const EdgeInsets.all(AppTheme.s12),
+            decoration: BoxDecoration(
+              color: AppPalette.neutralFill(scheme),
+              borderRadius: BorderRadius.circular(AppTheme.rMd),
+              border: Border.all(color: AppPalette.accentBorder(scheme)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  arabic ? 'ما فهمته' : 'Understood',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: scheme.primary,
+                  ),
                 ),
-              ),
-              const SizedBox(height: AppTheme.s6),
-              Text(
-                !isCurrent
-                    ? (arabic
-                          ? 'هذه نتيجة إصدار سابق؛ التصحيحات غير متاحة.'
-                          : 'Earlier snapshot; corrections are unavailable.')
-                    : active.isEmpty
-                    ? (arabic
-                          ? 'لا توجد متطلبات شبكة جديدة في هذا الطلب.'
-                          : 'No new network requirements in this request.')
-                    : arabic
-                    ? '${satisfied.length} من ${active.length} متطلبات مستخرجة مطابقة للخطة'
-                          '${issues.isEmpty ? '' : ' · ${issues.length} بند مفتوح'}'
-                    // "extracted" is the honest word: the ledger can only judge
-                    // the clauses the reader captured. Green coverage of every
-                    // extracted clause is not a claim that nothing was missed -
-                    // the open count below is what says how much was not read.
-                    : '${satisfied.length}/${active.length} extracted '
-                          'requirements satisfied in plan'
-                          '${issues.isEmpty ? '' : ' · ${issues.length} open clause${issues.length == 1 ? '' : 's'} not counted'}',
-                key: const ValueKey('request-planning-status'),
-                style: theme.textTheme.labelSmall,
-              ),
-              if (plan != null &&
-                  (counts.isNotEmpty || serviceChips.isNotEmpty)) ...[
                 const SizedBox(height: AppTheme.s6),
-                if (expanded)
-                  Wrap(
-                    spacing: AppTheme.s6,
-                    runSpacing: AppTheme.s4,
-                    children: [
-                      for (final entry in counts.entries)
+                Text(
+                  !isCurrent
+                      ? (arabic
+                            ? 'هذه نتيجة إصدار سابق؛ التصحيحات غير متاحة.'
+                            : 'Earlier snapshot; corrections are unavailable.')
+                      : active.isEmpty
+                      ? (arabic
+                            ? 'لا توجد متطلبات شبكة جديدة في هذا الطلب.'
+                            : 'No new network requirements in this request.')
+                      : arabic
+                      ? '${satisfied.length} من ${active.length} متطلبات مستخرجة مطابقة للخطة'
+                            '${issues.isEmpty ? '' : ' · ${issues.length} بند مفتوح'}'
+                      // "extracted" is the honest word: the ledger can only judge
+                      // the clauses the reader captured. Green coverage of every
+                      // extracted clause is not a claim that nothing was missed -
+                      // the open count below is what says how much was not read.
+                      : '${satisfied.length}/${active.length} extracted '
+                            'requirements satisfied in plan'
+                            '${issues.isEmpty ? '' : ' · ${issues.length} open clause${issues.length == 1 ? '' : 's'} not counted'}',
+                  key: const ValueKey('request-planning-status'),
+                  style: theme.textTheme.labelSmall,
+                ),
+                if (plan != null &&
+                    (counts.isNotEmpty || serviceChips.isNotEmpty)) ...[
+                  const SizedBox(height: AppTheme.s6),
+                  if (expanded)
+                    Wrap(
+                      spacing: AppTheme.s6,
+                      runSpacing: AppTheme.s4,
+                      children: [
+                        for (final entry in counts.entries)
+                          chip(
+                            '${entry.value} ${_unit(entry.key, entry.value)}',
+                            correction: correction(
+                              'count:${entry.key}',
+                              _unit(entry.key, entry.value),
+                              '${entry.value}',
+                            ),
+                          ),
+                        for (final vlan in plan.vlans) chip('VLAN $vlan'),
                         chip(
-                          '${entry.value} ${_unit(entry.key, entry.value)}',
+                          plan.routing.toUpperCase(),
                           correction: correction(
-                            'count:${entry.key}',
-                            _unit(entry.key, entry.value),
-                            '${entry.value}',
+                            'routing',
+                            'routing protocol',
+                            plan.routing,
                           ),
                         ),
-                      for (final vlan in plan.vlans) chip('VLAN $vlan'),
-                      chip(
-                        plan.routing.toUpperCase(),
-                        correction: correction(
-                          'routing',
-                          'routing protocol',
-                          plan.routing,
-                        ),
+                        ...serviceChips.map(chip),
+                      ],
+                    ),
+                  if (detailRows > _detailRowsBeforeCollapse)
+                    TextButton(
+                      key: const ValueKey('request-detail-toggle'),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
                       ),
-                      ...serviceChips.map(chip),
-                    ],
-                  ),
-                if (detailRows > _detailRowsBeforeCollapse)
-                  TextButton(
-                    key: const ValueKey('request-detail-toggle'),
-                    style: TextButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      onPressed: () =>
+                          setState(() => _expandedOverride = !expanded),
+                      child: Text(
+                        expanded
+                            ? (arabic ? 'إخفاء التفاصيل' : 'Hide details')
+                            : (arabic
+                                  ? 'إظهار كل التفاصيل (${active.length} متطلبات)'
+                                  : 'Show details (${active.length} requirements)'),
+                      ),
                     ),
-                    onPressed: () =>
-                        setState(() => _expandedOverride = !expanded),
-                    child: Text(
-                      expanded
-                          ? (arabic ? 'إخفاء التفاصيل' : 'Hide details')
-                          : (arabic
-                                ? 'إظهار كل التفاصيل (${active.length} متطلبات)'
-                                : 'Show details (${active.length} requirements)'),
+                ],
+                if (expanded)
+                  for (final fact in active) ...[
+                    const SizedBox(height: AppTheme.s4),
+                    Text(
+                      _factLine(fact, coverage?.forRequirement(fact.id)),
+                      key: ValueKey('request-fact-${fact.id}'),
+                      style: theme.textTheme.labelSmall,
                     ),
-                  ),
-              ],
-              if (expanded)
-                for (final fact in active) ...[
-                  const SizedBox(height: AppTheme.s4),
+                  ],
+                if (changes.isNotEmpty) ...[
+                  const SizedBox(height: AppTheme.s8),
                   Text(
-                    _factLine(fact, coverage?.forRequirement(fact.id)),
-                    key: ValueKey('request-fact-${fact.id}'),
+                    arabic ? 'التغييرات الفعلية:' : 'Changed:',
+                    style: theme.textTheme.labelMedium,
+                  ),
+                  for (final change in changes)
+                    Text(change, style: theme.textTheme.labelSmall),
+                ] else if (request.mutationPolicy == MutationPolicy.none) ...[
+                  const SizedBox(height: AppTheme.s6),
+                  Text(
+                    arabic ? 'لم تتغير الشبكة.' : 'No network changes applied.',
                     style: theme.textTheme.labelSmall,
                   ),
                 ],
-              if (changes.isNotEmpty) ...[
-                const SizedBox(height: AppTheme.s8),
-                Text(
-                  arabic ? 'التغييرات الفعلية:' : 'Changed:',
-                  style: theme.textTheme.labelMedium,
-                ),
-                for (final change in changes)
-                  Text(change, style: theme.textTheme.labelSmall),
-              ] else if (request.mutationPolicy == MutationPolicy.none) ...[
-                const SizedBox(height: AppTheme.s6),
-                Text(
-                  arabic ? 'لم تتغير الشبكة.' : 'No network changes applied.',
-                  style: theme.textTheme.labelSmall,
-                ),
-              ],
-              if (widget.correctionNote.isNotEmpty) ...[
-                const SizedBox(height: AppTheme.s6),
-                Text(widget.correctionNote, style: theme.textTheme.labelSmall),
-              ],
-              if (issues.isNotEmpty) ...[
-                const SizedBox(height: AppTheme.s8),
-                Text(
-                  arabic ? 'بحاجة إلى توضيح:' : 'Need to resolve:',
-                  style: theme.textTheme.labelMedium,
-                ),
-                for (final issue in issues.entries)
-                  TextButton(
-                    key: ValueKey('request-issue-${issue.key}'),
-                    onPressed: isCurrent && onReply != null
-                        ? () => onReply(issue.key, issue.value)
-                        : null,
-                    child: Text(issue.value),
+                if (widget.correctionNote.isNotEmpty) ...[
+                  const SizedBox(height: AppTheme.s6),
+                  Text(
+                    widget.correctionNote,
+                    style: theme.textTheme.labelSmall,
                   ),
-              ] else if (plan?.questions.isNotEmpty == true) ...[
-                const SizedBox(height: AppTheme.s6),
-                Text(
-                  arabic ? 'أسئلة الخطة:' : 'Worth confirming:',
-                  style: theme.textTheme.labelSmall,
-                ),
-                for (final question in plan!.questions.take(3))
-                  TextButton(
-                    onPressed: isCurrent && onReply != null
-                        ? () => onReply('plan-question:$question', question)
-                        : null,
-                    child: Text(question),
+                ],
+                if (issues.isNotEmpty) ...[
+                  const SizedBox(height: AppTheme.s8),
+                  Text(
+                    arabic ? 'بحاجة إلى توضيح:' : 'Need to resolve:',
+                    style: theme.textTheme.labelMedium,
                   ),
-              ],
-              if (fileEntries?.isNotEmpty == true) ...[
-                const SizedBox(height: AppTheme.s8),
-                Text(
-                  arabic
-                      ? 'الملف المحفوظ: ${fileVerified?.length ?? 0}/${fileEntries!.length} متطلبات تم التحقق منها'
-                      : 'Saved file: ${fileVerified?.length ?? 0}/${fileEntries!.length} requirements verified',
-                  key: const ValueKey('request-artifact-status'),
-                  style: theme.textTheme.labelSmall,
-                ),
-                for (final entry in fileEntries)
-                  if (entry.delivery != DeliveryStatus.verified)
-                    Text(
-                      '${_deliveryLabel(entry.delivery)}: ${entry.explanation}',
-                      style: theme.textTheme.labelSmall,
+                  for (final issue in issues)
+                    Tooltip(
+                      message: issue.text,
+                      child: TextButton(
+                        key: ValueKey('request-issue-${issue.id}'),
+                        onPressed: isCurrent && onReply != null
+                            ? () => onReply(issue.id, issue.text)
+                            : null,
+                        child: Text(issue.label),
+                      ),
                     ),
-              ],
-              const SizedBox(height: AppTheme.s4),
-              Text(
-                liveVerified?.isNotEmpty == true
-                    ? 'Live checks: ${liveVerified!.length} requirements verified'
-                    : arabic
-                    ? 'اختبارات الشبكة الفعلية: لم يتم التحقق منها'
-                    : 'Live checks: not verified',
-                key: const ValueKey('request-live-status'),
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
+                ] else if (plan?.questions.isNotEmpty == true) ...[
+                  const SizedBox(height: AppTheme.s6),
+                  Text(
+                    arabic ? 'أسئلة الخطة:' : 'Worth confirming:',
+                    style: theme.textTheme.labelSmall,
+                  ),
+                  for (final question in plan!.questions.take(3))
+                    TextButton(
+                      onPressed: isCurrent && onReply != null
+                          ? () => onReply('plan-question:$question', question)
+                          : null,
+                      child: Text(question),
+                    ),
+                ],
+                if (fileEntries?.isNotEmpty == true) ...[
+                  const SizedBox(height: AppTheme.s8),
+                  Text(
+                    arabic
+                        ? 'الملف المحفوظ: ${fileVerified?.length ?? 0}/${fileEntries!.length} متطلبات تم التحقق منها'
+                        : 'Saved file: ${fileVerified?.length ?? 0}/${fileEntries!.length} requirements verified',
+                    key: const ValueKey('request-artifact-status'),
+                    style: theme.textTheme.labelSmall,
+                  ),
+                  for (final entry in fileEntries)
+                    if (entry.delivery != DeliveryStatus.verified)
+                      Text(
+                        '${_deliveryLabel(entry.delivery)}: ${entry.explanation}',
+                        style: theme.textTheme.labelSmall,
+                      ),
+                ],
+                const SizedBox(height: AppTheme.s4),
+                Text(
+                  liveVerified?.isNotEmpty == true
+                      ? 'Live checks: ${liveVerified!.length} requirements verified'
+                      : arabic
+                      ? 'اختبارات الشبكة الفعلية: لم يتم التحقق منها'
+                      : 'Live checks: not verified',
+                  key: const ValueKey('request-live-status'),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
+  /// The button on a diagnostic issue names what the user can DO about it.
+  /// The full sentence stays available as the tooltip and as the reply seed.
+  static String _issueLabel(String code, RequestIssueKind kind) =>
+      switch (code) {
+        'no_plan_for_requested_output' => 'Tell me what to build',
+        'device_not_found' => 'Name an existing device',
+        'device_name_ambiguous' => 'Pick one device',
+        'routing_replacement_source_missing' => 'Confirm the protocol change',
+        'router_total_requires_capacity_decision' =>
+          'Choose how to fit the routers',
+        'candidate_interpretation_disagreement' => 'Clarify the wording',
+        'requirement_history_conflict' => 'Resolve the conflicting requirement',
+        'requirement_conflict' => 'Resolve the conflict',
+        'invalid_requested_subnet' => 'Fix the subnet',
+        'unsupported_service_configuration' => 'Choose supported settings',
+        'missing_plan_identity' => 'Confirm the project',
+        'stale_base_revision' => 'Refresh the plan',
+        'stale_operation_identity' => 'Refresh the edit',
+        _ => switch (kind) {
+          RequestIssueKind.ambiguity => 'Pick one match',
+          RequestIssueKind.conflict => 'Resolve the conflict',
+          RequestIssueKind.invalid => 'Fix the value',
+          RequestIssueKind.unsupported => 'Choose a supported option',
+          RequestIssueKind.missingInput => 'Answer this',
+        },
+      };
 
   static String _unit(String type, int count) => switch (type) {
     'pc' => count == 1 ? 'PC' : 'PCs',

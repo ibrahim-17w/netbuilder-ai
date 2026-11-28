@@ -372,8 +372,12 @@ Future<String> _readTemplateIdentity(
 Future<(PktTemplateDevice?, List<String>)> selectVariant(
   PktTemplateLibrary library,
   Map<String, dynamic> node,
-  List<String> wantedPorts,
-) async {
+  List<String> wantedPorts, {
+  /// Rebuilds of an imported save may fall back to the base chassis when the
+  /// exact module combination has no template. A plan the user typed keeps
+  /// the strict behaviour, so a nonexistent module is still refused.
+  bool allowModuleFallback = false,
+}) async {
   final nodeType = '${node['type'] ?? ''}'.trim().toLowerCase();
   final name = '${node['name'] ?? ''}';
   final wanted = [for (final p in wantedPorts) p];
@@ -459,6 +463,40 @@ Future<(PktTemplateDevice?, List<String>)> selectVariant(
           : _kindMatches(entry.kind, nodeType))
         entry,
   ];
+  // A missing MODULE costs ports, not the device: the base model can still
+  // be placed and cabled. An imported lab carries the source machine's real
+  // modules (an SFP uplink, say), and refusing the whole build because that
+  // exact combination has no template turns "make something like this" into
+  // a dead end. Build the plain base model instead and name what was left
+  // out, so the report never claims the hardware is identical.
+  if (allowModuleFallback &&
+      candidates.isEmpty &&
+      exact &&
+      requiredModules.isNotEmpty) {
+    final sameModel = [
+      for (final entry in library.devices)
+        if (ptIdentity(entry.model) == ptIdentity(requested!.model)) entry,
+    ];
+    var base = [
+      for (final entry in sameModel)
+        if (!entry.modules.any(
+          (available) => requiredModules.any(
+            (module) => ptIdentity(module) == ptIdentity(available),
+          ),
+        ))
+          entry,
+    ];
+    // Some models list their own built-in parts as modules (a 3650 lists
+    // C3650-BUILTIN and its power supply), so an "unrelated modules" entry
+    // can be impossible. Any template of the same model is still a real
+    // chassis; take the plainest one and name what it lacks.
+    if (base.isEmpty) base = sameModel;
+    if (base.isNotEmpty) {
+      // Fewest modules wins: the plain chassis is the honest stand-in.
+      base.sort((a, b) => a.modules.length.compareTo(b.modules.length));
+      candidates = [base.first];
+    }
+  }
   if (candidates.isEmpty && exact) {
     throw PktBuildFailure(
       '$name: the library cannot build exact model $hint'
@@ -578,6 +616,20 @@ Future<(PktTemplateDevice?, List<String>)> selectVariant(
     if (compare(entry, best) > 0) best = entry;
   }
   final notes = List<String>.from(rejected);
+  final missingModules = [
+    for (final module in requiredModules)
+      if (!best.modules.any(
+        (available) => ptIdentity(available) == ptIdentity(module),
+      ))
+        module,
+  ];
+  if (missingModules.isNotEmpty) {
+    notes.add(
+      '$name: ${best.model} has no template for '
+      '${missingModules.join(', ')}, so it was built as the base model '
+      'without ${missingModules.length == 1 ? 'that module' : 'those modules'}',
+    );
+  }
   final missing = <String>[];
   for (final port in wanted) {
     final (port: resolved, note: _) = resolvePort(best, port);
@@ -2698,6 +2750,8 @@ Future<PktEngineBuild> buildPkt({
   String version = '',
 }) async {
   final sections = _planSections(plan);
+  // Only an imported plan is rebuilt tolerantly; see packet_tracer_adapter.
+  final importedPlan = plan['imported'] == true;
   final nodes = [
     for (final node in sections.nodes)
       if ('${node['name'] ?? ''}'.isNotEmpty) node,
@@ -2799,26 +2853,94 @@ Future<PktEngineBuild> buildPkt({
             if (link[side] == name && link['cable'] != null)
               '${link['${side}If']}': link['cable'],
       },
-    }, wanted[name] ?? const <String>[]);
+    }, wanted[name] ?? const <String>[], allowModuleFallback: importedPlan);
     warnings.addAll(notes);
     if (selected == null) continue;
     // Name the CHOSEN model's cableable ports only now it has won - see
     // [PktTemplateDevice.withNamedPorts]. Judging the whole library by named
     // ports changes which model is picked.
     final variant = selected.withNamedPorts();
+    // A requested module the chosen template does not carry. Its ports are
+    // the source machine's, so the cables that used them cannot be exact;
+    // they are moved to the same KIND of port on the base chassis and named
+    // in the warning list, never moved in silence.
+    final lostModules = [
+      for (final module in (node['modules'] as List? ?? const <dynamic>[]))
+        if (!variant.modules.any(
+          (available) => ptIdentity(available) == ptIdentity('$module'),
+        ))
+          '$module',
+    ];
     for (final link in sections.links.where(
       (l) => l['exactPorts'] == true || node['variantKey'] != null,
     )) {
       for (final side in ['a', 'b']) {
         if (link[side] != name) continue;
         final spec = '${link['${side}If'] ?? ''}';
-        if (exactPort(variant, spec) == null) {
-          throw PktBuildFailure(
-            '$name: $spec is not an exact port on ${variant.key}. '
-            'Available ports: ${variant.ports.where((p) => p.name.isNotEmpty).map((p) => p.name).join(', ')}. '
-            'The connection was not moved to another port.',
-          );
+        if (exactPort(variant, spec) != null) continue;
+        if (lostModules.isNotEmpty) {
+          final (port: alt, note: _) = resolvePort(variant, spec);
+          if (alt != null) {
+            link['${side}If'] = alt.name;
+            final specs = wanted[name];
+            if (specs != null) {
+              for (var i = 0; i < specs.length; i++) {
+                if (specs[i] == spec) specs[i] = alt.name;
+              }
+            }
+            // The saved cable may have been fiber for that SFP port. The
+            // base chassis port is copper, so the cable has to follow the
+            // hardware: keep a cable the new port can actually take, and say
+            // so rather than shipping a fiber run into a copper socket.
+            final medium = _ethernetFamilies.contains(alt.family)
+                ? 'copper'
+                : alt.family;
+            final cableDef = PacketTracerCatalog.instance.cable(
+              '${link['cable'] ?? 'copper'}',
+            );
+            var cableNow = '${link['cable'] ?? 'copper'}';
+            if (cableDef == null || !cableDef.families.contains(medium)) {
+              for (final candidate in PacketTracerCatalog.instance.cables) {
+                if (!candidate.families.contains(medium)) continue;
+                if (medium == 'copper' &&
+                    candidate.id != 'copper' &&
+                    candidate.id != 'copper-cross') {
+                  continue;
+                }
+                cableNow = candidate.id;
+                break;
+              }
+              if (cableNow != '${link['cable'] ?? 'copper'}') {
+                link['cable'] = cableNow;
+              }
+            }
+            warnings.add(
+              '$name: $spec is a port of ${lostModules.join(', ')}, which '
+              'the library has no template for; the cable was moved to '
+              '${alt.name} on the base model'
+              '${cableNow == '${link['cable'] ?? 'copper'}' ? '' : ' and changed to $cableNow'}',
+            );
+            continue;
+          }
         }
+        if (importedPlan) {
+          // The lab came from a save whose hardware the library cannot
+          // reproduce exactly. Drop the exact-port claim so _buildLink may
+          // cable this end to a free port of the same medium (or report the
+          // link unusable); either way the fallback is named, so a rebuilt
+          // lab never claims to be the original.
+          if (link['exactPorts'] == true) link['exactPorts'] = false;
+          warnings.add(
+            '$name: $spec is not a port on ${variant.key}; the cable '
+            'falls back to a compatible port because this lab was imported',
+          );
+          continue;
+        }
+        throw PktBuildFailure(
+          '$name: $spec is not an exact port on ${variant.key}. '
+          'Available ports: ${variant.ports.where((p) => p.name.isNotEmpty).map((p) => p.name).join(', ')}. '
+          'The connection was not moved to another port.',
+        );
       }
     }
     String block;
@@ -3081,6 +3203,34 @@ Future<PktEngineBuild> buildPkt({
         (m) => const ['GLC-LH-SMD', 'GLC-LX-SM-RGD'].contains(m.toUpperCase()),
       );
       link = {...link, 'cable': single ? 'fiber-single' : 'fiber-multi'};
+    }
+    if (importedPlan) {
+      final def = PacketTracerCatalog.instance.cable(
+        '${link['cable'] ?? 'copper'}',
+      );
+      if (def != null && def.medium == 'eFiber') {
+        // The saved fiber ran into an SFP the library cannot reproduce; the
+        // rebuilt port is copper. Keep the connection, change the medium, and
+        // say so - a fiber record into a copper socket is a file PT rejects.
+        var copperEnd = false;
+        for (final side in ['a', 'b']) {
+          final dev = '${link[side] ?? ''}';
+          final spec = '${link['${side}If'] ?? ''}';
+          final variant = variantsUsed[dev];
+          if (variant == null) continue;
+          final port = exactPort(variant, spec);
+          if (port == null || _ethernetFamilies.contains(port.family)) {
+            copperEnd = true;
+          }
+        }
+        if (copperEnd) {
+          link = {...link, 'cable': 'copper'};
+          warnings.add(
+            'link ${link['a'] ?? ''}-${link['b'] ?? ''}: the saved fiber '
+            'cable does not fit the rebuilt ports; cabled with copper instead',
+          );
+        }
+      }
     }
     final requestedCable = '${link['cable'] ?? 'copper'}';
     final (template, note) = _pickLinkTemplate(library, requestedCable);

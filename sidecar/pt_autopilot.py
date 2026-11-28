@@ -14455,12 +14455,21 @@ def pkt_audit_network(path: str, project: str = "") -> dict:
             rb'<NAME translate="true">([^<]*)</NAME>', block)
         name = name_match.group(1).decode("utf-8", "replace") \
             if name_match else ""
-        type_match = re.search(
-            rb'<TYPE customModel="[^"]*" model="([^"]*)">([^<]*)<', block)
-        model = type_match.group(1).decode("utf-8", "replace") \
-            if type_match else ""
-        kind = type_match.group(2).decode("utf-8", "replace") \
-            if type_match else ""
+        type_match = re.search(rb"<TYPE ([^>]*)>([^<]*)<", block)
+        model = ""
+        kind = ""
+        if type_match:
+            attrs = type_match.group(1)
+            kind = type_match.group(2).decode("utf-8", "replace")
+            # The attributes come in either order depending on the version
+            # that saved the file.
+            attr = re.search(rb'(?<![A-Za-z])model="([^"]*)"', attrs)
+            if attr:
+                model = attr.group(1).decode("utf-8", "replace")
+            if not model:
+                attr = re.search(rb'customModel="([^"]*)"', attrs)
+                if attr:
+                    model = attr.group(1).decode("utf-8", "replace")
         config_lines = _pkt_config_lines(block)
         config_lines_by_device[name] = config_lines
         facts = _pkt_interface_facts(block)

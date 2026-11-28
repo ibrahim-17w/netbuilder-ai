@@ -232,6 +232,23 @@ class RequestInterpretationAdapter {
       )) {
         continue;
       }
+      // "remove 2 PCs" subtracts from the standing lab; it does not say the
+      // lab should hold two. The typed inventory operation only knows "set the
+      // count to N", so reading it as a total deleted the other PCs. The
+      // deterministic edit reader in NetworkIntent.followUp owns this number.
+      final clausePrefix = _clausePrefix(lower, quantity.start);
+      final removalAt = clausePrefix.lastIndexOf(
+        RegExp(
+          r'\b(?:remove|removing|delete|deleting|drop|dropping|'
+          r'take\s+out|get\s+rid\s+of|strip\s+out)',
+        ),
+      );
+      if (removalAt >= 0) {
+        final addAt = clausePrefix.lastIndexOf(
+          RegExp(r'\b(?:add|adding|plus|also|include|extra|more)\b'),
+        );
+        if (removalAt > addAt) continue;
+      }
       final evidence = span(quantity.start, quantity.end);
       if (evidence == null) continue;
       final excerpt = lower.substring(quantity.start, quantity.end);

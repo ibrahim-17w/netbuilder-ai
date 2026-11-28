@@ -210,7 +210,11 @@ class CiscoAdapter {
         final other = l.a == current ? l.b : (l.b == current ? l.a : null);
         if (other == null || other == device.name) continue;
         if (reachable.containsKey(other)) continue;
-        reachable[other] = nextHop[current]!;
+        // The hop for a router further down the chain is the hop that
+        // reaches [current] - [current] itself may be two routers away, so
+        // it has no entry in [nextHop]. Reading nextHop here crashed the
+        // build for any plan whose routers chain deeper than one hop.
+        reachable[other] = reachable[current]!;
         queue.add(other);
       }
     }

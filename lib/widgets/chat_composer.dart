@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/chat_message.dart';
+import '../services/bidi_text.dart';
 import '../services/settings_service.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
@@ -23,6 +24,11 @@ class ChatComposer extends StatelessWidget {
   final List<ChatImage> pending;
   final Widget? skillMenu;
   final Widget? planPrompt;
+
+  /// The network the conversation is standing on, in one quiet line above
+  /// the box. Empty when nothing is planned yet. It keeps "build it" from
+  /// feeling like a guess about which lab.
+  final String standing;
   final VoidCallback onSend;
   final VoidCallback onCancelGeneration;
   final VoidCallback onOpenTools;
@@ -54,6 +60,7 @@ class ChatComposer extends StatelessWidget {
     required this.onPaste,
     this.skillMenu,
     this.planPrompt,
+    this.standing = '',
     this.canCancelWhileBusy = true,
   });
 
@@ -192,6 +199,37 @@ class ChatComposer extends StatelessWidget {
                   ],
                 ),
               ),
+            // WHAT THE CONVERSATION IS STANDING ON. One muted line, not a
+            // card: the lab is context for the sentence being typed, and a
+            // chat that has a plan should say so where the next message is
+            // written. Hidden on a landscape phone and while the keyboard is
+            // open, where the transcript needs the rows more.
+            if (standing.isNotEmpty && !shortScreen && !keyboardOpen)
+              Padding(
+                key: const ValueKey('composer-standing-lab'),
+                padding: const EdgeInsets.fromLTRB(6, 0, 6, 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.hub_outlined,
+                      size: 13,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        standing,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             // One unified composer capsule - field, attach and send inside a
             // single rounded surface, the way a modern chat input reads. A
             // focus ring (a tinted border plus a soft glow) says "I am
@@ -202,7 +240,7 @@ class ChatComposer extends StatelessWidget {
                 final focused = focusNode.hasFocus;
                 return AnimatedContainer(
                   key: const ValueKey('composer-capsule'),
-                  duration: const Duration(milliseconds: 160),
+                  duration: AppTheme.motionFast,
                   curve: Curves.easeOut,
                   padding: const EdgeInsets.fromLTRB(4, 4, 6, 4),
                   decoration: BoxDecoration(
@@ -287,74 +325,90 @@ class ChatComposer extends StatelessWidget {
                         // below), because on Android it used to replace the
                         // Return key with Send - so a multi-line brief could
                         // not be written on a phone at all.
-                        child: CallbackShortcuts(
-                          bindings: <ShortcutActivator, VoidCallback>{
-                            const SingleActivator(LogicalKeyboardKey.enter):
-                                onSend,
-                            const SingleActivator(
-                              LogicalKeyboardKey.numpadEnter,
-                            ): onSend,
-                          },
-                          child: TextField(
-                            controller: input,
-                            focusNode: focusNode,
-                            // NEVER DISABLED WHILE THE ASSISTANT ANSWERS. The box
-                            // used to lock the moment a turn started, so a thought
-                            // that arrived mid-answer had to be remembered by the
-                            // user instead of written down. A disabled field also
-                            // swallows the caret and the Android keyboard, which
-                            // reads as "the app is broken" rather than "busy".
-                            autofocus: true,
-                            minLines: 1,
-                            // A phone gets fewer visible lines: six rows plus
-                            // the chips and the keyboard left the transcript
-                            // with almost nothing. A landscape phone gets two:
-                            // a long restored draft otherwise grew the box
-                            // until the opening screen overflowed. The text
-                            // still scrolls inside the field.
-                            maxLines: shortScreen
-                                ? 2
-                                : narrow
-                                ? 4
-                                : 6,
-                            // On a touch platform the IME action key inserts a
-                            // newline: Android used to replace Return with Send,
-                            // so a multi-line brief could not be written. A
-                            // desktop keyboard keeps Send, because there Enter
-                            // is the shortcut above and the action only backs
-                            // the synthetic submit path.
-                            textInputAction: mobile
-                                ? TextInputAction.newline
-                                : TextInputAction.send,
-                            // Keep the caret clear of the keyboard when the
-                            // field scrolls into view.
-                            scrollPadding: EdgeInsets.fromLTRB(
-                              20,
-                              20,
-                              20,
-                              mobile ? 96 : 20,
+                        child: ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: input,
+                          // The app's chrome stays LTR; the field follows the
+                          // sentence being typed, so an Arabic brief gets a
+                          // right-aligned caret and an English one stays LTR.
+                          builder: (context, value, child) => Directionality(
+                            textDirection: BidiText.isRtl(value.text)
+                                ? TextDirection.rtl
+                                : TextDirection.ltr,
+                            child: child!,
+                          ),
+                          child: CallbackShortcuts(
+                            bindings: <ShortcutActivator, VoidCallback>{
+                              const SingleActivator(LogicalKeyboardKey.enter):
+                                  onSend,
+                              const SingleActivator(
+                                LogicalKeyboardKey.numpadEnter,
+                              ): onSend,
+                            },
+                            child: TextField(
+                              controller: input,
+                              focusNode: focusNode,
+                              // NEVER DISABLED WHILE THE ASSISTANT ANSWERS. The box
+                              // used to lock the moment a turn started, so a thought
+                              // that arrived mid-answer had to be remembered by the
+                              // user instead of written down. A disabled field also
+                              // swallows the caret and the Android keyboard, which
+                              // reads as "the app is broken" rather than "busy".
+                              autofocus: true,
+                              minLines: 1,
+                              // A phone gets fewer visible lines: six rows plus
+                              // the chips and the keyboard left the transcript
+                              // with almost nothing. A landscape phone gets two:
+                              // a long restored draft otherwise grew the box
+                              // until the opening screen overflowed. The text
+                              // still scrolls inside the field.
+                              maxLines: shortScreen
+                                  ? 2
+                                  : narrow
+                                  ? 4
+                                  : 6,
+                              // On a touch platform the IME action key inserts a
+                              // newline: Android used to replace Return with Send,
+                              // so a multi-line brief could not be written. A
+                              // desktop keyboard keeps Send, because there Enter
+                              // is the shortcut above and the action only backs
+                              // the synthetic submit path.
+                              textInputAction: mobile
+                                  ? TextInputAction.newline
+                                  : TextInputAction.send,
+                              // Keep the caret clear of the keyboard when the
+                              // field scrolls into view.
+                              scrollPadding: EdgeInsets.fromLTRB(
+                                20,
+                                20,
+                                20,
+                                mobile ? 96 : 20,
+                              ),
+                              decoration: InputDecoration(
+                                // labelText gives the field a real accessible
+                                // name; the hint teaches the shortcuts.
+                                labelText: 'Message',
+                                // An invitation, not a manual: the old hint
+                                // described the box's mechanics. This one says
+                                // what the app is for and what it will do with
+                                // the sentence.
+                                hintText: narrow || mobile
+                                    ? 'Describe the lab you want, or ask me anything'
+                                    : 'Describe the lab you want, or ask me anything '
+                                          '(Enter sends - Shift+Enter = new line)',
+                                // The capsule IS the field's surface: the fill and
+                                // outline are removed so the input melts into it.
+                                filled: false,
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                              ),
+                              // An explicit submit action still sends: some IMEs
+                              // ignore the configured newline action, and the
+                              // test harness delivers one. A real Android Return
+                              // key sends newline (above), so this never turns
+                              // "skip line" back into "send".
+                              onSubmitted: (_) => onSend(),
                             ),
-                            decoration: InputDecoration(
-                              // labelText gives the field a real accessible
-                              // name; the hint teaches the shortcuts.
-                              labelText: 'Message',
-                              hintText: narrow || mobile
-                                  ? 'Ask a question, or describe what to do'
-                                  : 'Ask a question, or describe what to do '
-                                        '(Enter sends - Shift+Enter = new line)',
-                              // The capsule IS the field's surface: the fill and
-                              // outline are removed so the input melts into it.
-                              filled: false,
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                            ),
-                            // An explicit submit action still sends: some IMEs
-                            // ignore the configured newline action, and the
-                            // test harness delivers one. A real Android Return
-                            // key sends newline (above), so this never turns
-                            // "skip line" back into "send".
-                            onSubmitted: (_) => onSend(),
                           ),
                         ),
                       ),
@@ -375,7 +429,7 @@ class ChatComposer extends StatelessWidget {
                         builder: (context, value, _) {
                           final hasText = value.text.trim().isNotEmpty;
                           return AnimatedContainer(
-                            duration: const Duration(milliseconds: 160),
+                            duration: AppTheme.motionFast,
                             curve: Curves.easeOut,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/bidi_text.dart';
 import '../theme/app_theme.dart';
 import 'app_dialogs.dart';
 
@@ -384,10 +385,26 @@ class ChatMarkdownView extends StatelessWidget {
         for (var i = 0; i < blocks.length; i++)
           Padding(
             padding: EdgeInsets.only(top: i == 0 ? 0 : 6),
-            child: _block(context, blocks[i], base),
+            child: Directionality(
+              textDirection: _directionOf(blocks[i]),
+              child: _block(context, blocks[i], base),
+            ),
           ),
       ],
     );
+  }
+
+  /// Each block gets the direction of its own first strong character. A
+  /// mixed answer (Arabic framing, English technical body) then reads as two
+  /// paragraphs with the directions they actually use, instead of forcing the
+  /// whole answer one way. Code is always LTR.
+  static TextDirection _directionOf(MdBlock block) {
+    if (block.kind == MdKind.code) return TextDirection.ltr;
+    final text = block.kind == MdKind.table
+        ? '${block.header.join(' ')} '
+              '${block.rows.expand((row) => row).join(' ')}'
+        : block.text;
+    return BidiText.isRtl(text) ? TextDirection.rtl : TextDirection.ltr;
   }
 
   Widget _block(BuildContext context, MdBlock block, TextStyle base) {
@@ -440,7 +457,13 @@ class ChatMarkdownView extends StatelessWidget {
         );
 
       case MdKind.code:
-        return _CodeBlock(block: block, base: base);
+        // A command is not Arabic prose: it stays LTR even inside an RTL
+        // message, so the prompt, the interface and the command order are the
+        // same as they are on the device.
+        return Directionality(
+          textDirection: TextDirection.ltr,
+          child: _CodeBlock(block: block, base: base),
+        );
 
       case MdKind.table:
         return SingleChildScrollView(
@@ -588,6 +611,8 @@ class _CodeBlock extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               child: SelectableText(
                 block.text,
+                textDirection: TextDirection.ltr,
+                textAlign: TextAlign.left,
                 style: base.copyWith(
                   fontFamily: 'monospace',
                   fontSize: (base.fontSize ?? 14) - 1,
